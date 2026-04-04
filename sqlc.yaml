@@ -1,0 +1,13 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "internal/recommendation/scheduler/infrastructure/persistence/schema/*.sql"
+      - "internal/recommendation/scheduler/infrastructure/migration/*.up.sql"
+    queries:
+      - "internal/recommendation/scheduler/infrastructure/persistence/query/*.sql"
+    gen:
+      go:
+        package: "sqlcgen"
+        out: "internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
+        sql_package: "pgx/v5"
