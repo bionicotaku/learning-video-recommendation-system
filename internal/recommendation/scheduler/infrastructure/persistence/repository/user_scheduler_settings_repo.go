@@ -13,13 +13,20 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type userSchedulerSettingsRepository struct{}
-
-func NewUserSchedulerSettingsRepository() apprepo.UserSchedulerSettingsRepository {
-	return userSchedulerSettingsRepository{}
+type userSchedulerSettingsRepository struct {
+	querier sqlcgen.Querier
 }
 
-func (userSchedulerSettingsRepository) GetOrDefault(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID) (*model.UserSchedulerSettings, error) {
+func NewUserSchedulerSettingsRepository(querier sqlcgen.Querier) apprepo.UserSchedulerSettingsRepository {
+	return userSchedulerSettingsRepository{querier: querier}
+}
+
+func (r userSchedulerSettingsRepository) GetOrDefault(ctx context.Context, userID uuid.UUID) (*model.UserSchedulerSettings, error) {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return nil, err
+	}
+
 	row, err := q.GetUserSchedulerSettings(ctx, mapper.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

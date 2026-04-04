@@ -9,13 +9,20 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
 )
 
-type schedulerRunRepository struct{}
-
-func NewSchedulerRunRepository() apprepo.SchedulerRunRepository {
-	return schedulerRunRepository{}
+type schedulerRunRepository struct {
+	querier sqlcgen.Querier
 }
 
-func (schedulerRunRepository) SaveRun(ctx context.Context, q sqlcgen.Querier, batch model.RecommendationBatch) error {
+func NewSchedulerRunRepository(querier sqlcgen.Querier) apprepo.SchedulerRunRepository {
+	return schedulerRunRepository{querier: querier}
+}
+
+func (r schedulerRunRepository) SaveRun(ctx context.Context, batch model.RecommendationBatch) error {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return err
+	}
+
 	params, err := mapper.SchedulerRunParamsFromBatch(batch)
 	if err != nil {
 		return err
@@ -24,7 +31,12 @@ func (schedulerRunRepository) SaveRun(ctx context.Context, q sqlcgen.Querier, ba
 	return q.InsertSchedulerRun(ctx, params)
 }
 
-func (schedulerRunRepository) SaveRunItems(ctx context.Context, q sqlcgen.Querier, batch model.RecommendationBatch) error {
+func (r schedulerRunRepository) SaveRunItems(ctx context.Context, batch model.RecommendationBatch) error {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return err
+	}
+
 	params, err := mapper.SchedulerRunItemParamsFromBatch(batch)
 	if err != nil {
 		return err

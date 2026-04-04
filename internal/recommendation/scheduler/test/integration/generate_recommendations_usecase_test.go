@@ -43,9 +43,9 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 	}()
 
 	q := sqlcgen.New(tx)
-	stateRepo := repopkg.NewUserUnitStateRepository()
-	settingsRepo := repopkg.NewUserSchedulerSettingsRepository()
-	runRepo := repopkg.NewSchedulerRunRepository()
+	stateRepo := repopkg.NewUserUnitStateRepository(q)
+	settingsRepo := repopkg.NewUserSchedulerSettingsRepository(q)
+	runRepo := repopkg.NewSchedulerRunRepository(q)
 
 	userID, err := loadExistingUserID(ctx, tx)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 	now := time.Date(2026, 4, 8, 11, 0, 0, 0, time.UTC)
 	badQuality := 2
 
-	if err := stateRepo.BatchUpsert(ctx, q, []*model.UserUnitState{
+	if err := stateRepo.BatchUpsert(ctx, []*model.UserUnitState{
 		{
 			UserID:            userID,
 			CoarseUnitID:      unitIDs[0],
@@ -126,7 +126,6 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 	}
 
 	uc := usecase.NewGenerateLearningUnitRecommendationsUseCase(
-		q,
 		stateRepo,
 		settingsRepo,
 		runRepo,

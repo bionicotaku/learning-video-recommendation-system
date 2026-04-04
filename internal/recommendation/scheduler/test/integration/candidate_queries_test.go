@@ -39,7 +39,7 @@ func TestUserUnitStateRepositoryCandidateQueries(t *testing.T) {
 	}()
 
 	q := sqlcgen.New(tx)
-	repo := repopkg.NewUserUnitStateRepository()
+	repo := repopkg.NewUserUnitStateRepository(q)
 
 	userID, err := loadExistingUserID(ctx, tx)
 	if err != nil {
@@ -98,11 +98,11 @@ func TestUserUnitStateRepositoryCandidateQueries(t *testing.T) {
 		},
 	}
 
-	if err := repo.BatchUpsert(ctx, q, insertStates); err != nil {
+	if err := repo.BatchUpsert(ctx, insertStates); err != nil {
 		t.Fatalf("BatchUpsert() error = %v", err)
 	}
 
-	reviewCandidates, err := repo.FindDueReviewCandidates(ctx, q, userID, now)
+	reviewCandidates, err := repo.FindDueReviewCandidates(ctx, userID, now)
 	if err != nil {
 		t.Fatalf("FindDueReviewCandidates() error = %v", err)
 	}
@@ -116,7 +116,7 @@ func TestUserUnitStateRepositoryCandidateQueries(t *testing.T) {
 		t.Fatalf("review candidate kind = %q, want supported kind", reviewCandidates[0].Unit.Kind)
 	}
 
-	newCandidates, err := repo.FindNewCandidates(ctx, q, userID)
+	newCandidates, err := repo.FindNewCandidates(ctx, userID)
 	if err != nil {
 		t.Fatalf("FindNewCandidates() error = %v", err)
 	}

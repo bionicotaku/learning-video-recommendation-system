@@ -44,30 +44,6 @@ test:
 .PHONY: check
 check: accept test
 
-.PHONY: scheduler-fmt
-scheduler-fmt: fmt
-
-.PHONY: scheduler-fmt-check
-scheduler-fmt-check: fmt-check
-
-.PHONY: scheduler-vet
-scheduler-vet: vet
-
-.PHONY: scheduler-staticcheck
-scheduler-staticcheck: staticcheck
-
-.PHONY: scheduler-lint
-scheduler-lint: lint
-
-.PHONY: scheduler-accept
-scheduler-accept: accept
-
-.PHONY: scheduler-test
-scheduler-test: test
-
-.PHONY: scheduler-check
-scheduler-check: check
-
 .PHONY: scheduler-migrate-up
 scheduler-migrate-up:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
@@ -88,6 +64,3 @@ scheduler-migrate-force:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
 	@test -n "$(VERSION)" || (echo "VERSION is required" && exit 1)
 	@$(SCHEDULER_MIGRATE) -path $(SCHEDULER_MIGRATIONS_DIR) -database "$(DATABASE_URL)" force "$(VERSION)"
-
-.PHONY: scheduler-sqlc-generate
-scheduler-sqlc-generate: sqlc-generate

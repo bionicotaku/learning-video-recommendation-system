@@ -10,19 +10,17 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/policy"
 	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
-	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
-	txtx "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/tx"
 )
 
 type RecordLearningEventsAndUpdateStateUseCase struct {
-	txManager    txtx.TxManager
+	txManager    apprepo.TxManager
 	stateRepo    apprepo.UserUnitStateRepository
 	eventRepo    apprepo.UnitLearningEventRepository
 	stateUpdater domainservice.StateUpdater
 }
 
 func NewRecordLearningEventsAndUpdateStateUseCase(
-	txManager txtx.TxManager,
+	txManager apprepo.TxManager,
 	stateRepo apprepo.UserUnitStateRepository,
 	eventRepo apprepo.UnitLearningEventRepository,
 	stateUpdater domainservice.StateUpdater,
@@ -39,14 +37,14 @@ func (uc RecordLearningEventsAndUpdateStateUseCase) Execute(ctx context.Context,
 	updatedUnits := make([]int64, 0, len(cmd.Events))
 	seenUnits := make(map[int64]struct{}, len(cmd.Events))
 
-	err := uc.txManager.WithinTx(ctx, func(ctx context.Context, q sqlcgen.Querier) error {
+	err := uc.txManager.WithinTx(ctx, func(ctx context.Context) error {
 		for _, input := range cmd.Events {
-			history, err := uc.eventRepo.FindForReplay(ctx, q, cmd.UserID, &input.CoarseUnitID, nil)
+			history, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, &input.CoarseUnitID, nil)
 			if err != nil {
 				return err
 			}
 
-			currentState, err := uc.stateRepo.GetByUserAndUnit(ctx, q, cmd.UserID, input.CoarseUnitID)
+			currentState, err := uc.stateRepo.GetByUserAndUnit(ctx, cmd.UserID, input.CoarseUnitID)
 			if err != nil {
 				return err
 			}
@@ -76,10 +74,10 @@ func (uc RecordLearningEventsAndUpdateStateUseCase) Execute(ctx context.Context,
 				return err
 			}
 
-			if err := uc.eventRepo.Append(ctx, q, []model.LearningEvent{event}); err != nil {
+			if err := uc.eventRepo.Append(ctx, []model.LearningEvent{event}); err != nil {
 				return err
 			}
-			if err := uc.stateRepo.Upsert(ctx, q, nextState); err != nil {
+			if err := uc.stateRepo.Upsert(ctx, nextState); err != nil {
 				return err
 			}
 

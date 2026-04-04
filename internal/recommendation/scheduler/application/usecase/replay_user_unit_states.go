@@ -9,19 +9,17 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/policy"
 	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
-	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
-	txtx "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/tx"
 )
 
 type ReplayUserUnitStatesUseCase struct {
-	txManager    txtx.TxManager
+	txManager    apprepo.TxManager
 	stateRepo    apprepo.UserUnitStateRepository
 	eventRepo    apprepo.UnitLearningEventRepository
 	stateUpdater domainservice.StateUpdater
 }
 
 func NewReplayUserUnitStatesUseCase(
-	txManager txtx.TxManager,
+	txManager apprepo.TxManager,
 	stateRepo apprepo.UserUnitStateRepository,
 	eventRepo apprepo.UnitLearningEventRepository,
 	stateUpdater domainservice.StateUpdater,
@@ -37,12 +35,12 @@ func NewReplayUserUnitStatesUseCase(
 func (uc ReplayUserUnitStatesUseCase) Execute(ctx context.Context, cmd command.ReplayStateCommand) (dto.ReplayStateResult, error) {
 	result := dto.ReplayStateResult{}
 
-	err := uc.txManager.WithinTx(ctx, func(ctx context.Context, q sqlcgen.Querier) error {
-		if err := uc.stateRepo.DeleteForReplay(ctx, q, cmd.UserID, cmd.CoarseUnitID); err != nil {
+	err := uc.txManager.WithinTx(ctx, func(ctx context.Context) error {
+		if err := uc.stateRepo.DeleteForReplay(ctx, cmd.UserID, cmd.CoarseUnitID); err != nil {
 			return err
 		}
 
-		events, err := uc.eventRepo.FindForReplay(ctx, q, cmd.UserID, cmd.CoarseUnitID, cmd.FromTime)
+		events, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, cmd.CoarseUnitID, cmd.FromTime)
 		if err != nil {
 			return err
 		}
@@ -71,7 +69,7 @@ func (uc ReplayUserUnitStatesUseCase) Execute(ctx context.Context, cmd command.R
 			upserts = append(upserts, state)
 		}
 
-		if err := uc.stateRepo.BatchUpsert(ctx, q, upserts); err != nil {
+		if err := uc.stateRepo.BatchUpsert(ctx, upserts); err != nil {
 			return err
 		}
 

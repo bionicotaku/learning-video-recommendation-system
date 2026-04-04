@@ -49,8 +49,9 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 	defer cleanupLearningRows(ctx, t, pool, userID, unitIDs)
 
 	txManager := txtx.NewPGXTxManager(pool)
-	stateRepo := repopkg.NewUserUnitStateRepository()
-	eventRepo := repopkg.NewUnitLearningEventRepository()
+	baseQuerier := sqlcgen.New(pool)
+	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
+	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
 	stateUpdater := domainservice.NewStateUpdater()
 
 	uc := usecase.NewRecordLearningEventsAndUpdateStateUseCase(txManager, stateRepo, eventRepo, stateUpdater)
@@ -85,8 +86,7 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 		t.Fatalf("UpdatedUnits = %v, want [%d]", result.UpdatedUnits, unitIDs[0])
 	}
 
-	q := sqlcgen.New(pool)
-	events, err := eventRepo.FindForReplay(ctx, q, userID, &unitIDs[0], nil)
+	events, err := eventRepo.FindForReplay(ctx, userID, &unitIDs[0], nil)
 	if err != nil {
 		t.Fatalf("FindForReplay() error = %v", err)
 	}
@@ -94,7 +94,7 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}
 
-	state, err := stateRepo.GetByUserAndUnit(ctx, q, userID, unitIDs[0])
+	state, err := stateRepo.GetByUserAndUnit(ctx, userID, unitIDs[0])
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit() error = %v", err)
 	}
@@ -131,8 +131,9 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 	}
 	defer cleanupLearningRows(ctx, t, pool, userID, unitIDs)
 
-	baseStateRepo := repopkg.NewUserUnitStateRepository()
-	eventRepo := repopkg.NewUnitLearningEventRepository()
+	baseQuerier := sqlcgen.New(pool)
+	baseStateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
+	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
 	uc := usecase.NewRecordLearningEventsAndUpdateStateUseCase(
 		txtx.NewPGXTxManager(pool),
 		failingUserUnitStateRepository{delegate: baseStateRepo},
@@ -162,8 +163,7 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 		t.Fatal("Execute() error = nil, want rollback error")
 	}
 
-	q := sqlcgen.New(pool)
-	events, err := eventRepo.FindForReplay(ctx, q, userID, &unitIDs[0], nil)
+	events, err := eventRepo.FindForReplay(ctx, userID, &unitIDs[0], nil)
 	if err != nil {
 		t.Fatalf("FindForReplay() error = %v", err)
 	}
@@ -171,7 +171,7 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 		t.Fatalf("len(events) = %d, want 0 after rollback", len(events))
 	}
 
-	state, err := baseStateRepo.GetByUserAndUnit(ctx, q, userID, unitIDs[0])
+	state, err := baseStateRepo.GetByUserAndUnit(ctx, userID, unitIDs[0])
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit() error = %v", err)
 	}
@@ -184,28 +184,28 @@ type failingUserUnitStateRepository struct {
 	delegate apprepo.UserUnitStateRepository
 }
 
-func (f failingUserUnitStateRepository) GetByUserAndUnit(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID int64) (*model.UserUnitState, error) {
-	return f.delegate.GetByUserAndUnit(ctx, q, userID, coarseUnitID)
+func (f failingUserUnitStateRepository) GetByUserAndUnit(ctx context.Context, userID uuid.UUID, coarseUnitID int64) (*model.UserUnitState, error) {
+	return f.delegate.GetByUserAndUnit(ctx, userID, coarseUnitID)
 }
 
-func (f failingUserUnitStateRepository) Upsert(ctx context.Context, q sqlcgen.Querier, state *model.UserUnitState) error {
+func (f failingUserUnitStateRepository) Upsert(ctx context.Context, state *model.UserUnitState) error {
 	return errors.New("forced upsert failure")
 }
 
-func (f failingUserUnitStateRepository) BatchUpsert(ctx context.Context, q sqlcgen.Querier, states []*model.UserUnitState) error {
-	return f.delegate.BatchUpsert(ctx, q, states)
+func (f failingUserUnitStateRepository) BatchUpsert(ctx context.Context, states []*model.UserUnitState) error {
+	return f.delegate.BatchUpsert(ctx, states)
 }
 
-func (f failingUserUnitStateRepository) DeleteForReplay(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID *int64) error {
-	return f.delegate.DeleteForReplay(ctx, q, userID, coarseUnitID)
+func (f failingUserUnitStateRepository) DeleteForReplay(ctx context.Context, userID uuid.UUID, coarseUnitID *int64) error {
+	return f.delegate.DeleteForReplay(ctx, userID, coarseUnitID)
 }
 
-func (f failingUserUnitStateRepository) FindDueReviewCandidates(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {
-	return f.delegate.FindDueReviewCandidates(ctx, q, userID, now)
+func (f failingUserUnitStateRepository) FindDueReviewCandidates(ctx context.Context, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {
+	return f.delegate.FindDueReviewCandidates(ctx, userID, now)
 }
 
-func (f failingUserUnitStateRepository) FindNewCandidates(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID) ([]appquery.NewCandidate, error) {
-	return f.delegate.FindNewCandidates(ctx, q, userID)
+func (f failingUserUnitStateRepository) FindNewCandidates(ctx context.Context, userID uuid.UUID) ([]appquery.NewCandidate, error) {
+	return f.delegate.FindNewCandidates(ctx, userID)
 }
 
 func loadExistingUserIDFromPool(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {

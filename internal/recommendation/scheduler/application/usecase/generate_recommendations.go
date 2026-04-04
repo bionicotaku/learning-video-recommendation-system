@@ -9,11 +9,9 @@ import (
 	appquery "learning-video-recommendation-system/internal/recommendation/scheduler/application/query"
 	apprepo "learning-video-recommendation-system/internal/recommendation/scheduler/application/repository"
 	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
-	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
 )
 
 type GenerateLearningUnitRecommendationsUseCase struct {
-	querier           sqlcgen.Querier
 	stateRepo         apprepo.UserUnitStateRepository
 	settingsRepo      apprepo.UserSchedulerSettingsRepository
 	runRepo           apprepo.SchedulerRunRepository
@@ -26,7 +24,6 @@ type GenerateLearningUnitRecommendationsUseCase struct {
 }
 
 func NewGenerateLearningUnitRecommendationsUseCase(
-	querier sqlcgen.Querier,
 	stateRepo apprepo.UserUnitStateRepository,
 	settingsRepo apprepo.UserSchedulerSettingsRepository,
 	runRepo apprepo.SchedulerRunRepository,
@@ -38,7 +35,6 @@ func NewGenerateLearningUnitRecommendationsUseCase(
 	assembler domainservice.RecommendationAssembler,
 ) GenerateLearningUnitRecommendationsUseCase {
 	return GenerateLearningUnitRecommendationsUseCase{
-		querier:           querier,
 		stateRepo:         stateRepo,
 		settingsRepo:      settingsRepo,
 		runRepo:           runRepo,
@@ -52,7 +48,7 @@ func NewGenerateLearningUnitRecommendationsUseCase(
 }
 
 func (uc GenerateLearningUnitRecommendationsUseCase) Execute(ctx context.Context, cmd command.GenerateRecommendationsCommand) (dto.GenerateRecommendationsResult, error) {
-	settings, err := uc.settingsRepo.GetOrDefault(ctx, uc.querier, cmd.UserID)
+	settings, err := uc.settingsRepo.GetOrDefault(ctx, cmd.UserID)
 	if err != nil {
 		return dto.GenerateRecommendationsResult{}, err
 	}
@@ -67,11 +63,11 @@ func (uc GenerateLearningUnitRecommendationsUseCase) Execute(ctx context.Context
 		requestedLimit = settings.SessionDefaultLimit
 	}
 
-	reviewCandidates, err := uc.stateRepo.FindDueReviewCandidates(ctx, uc.querier, cmd.UserID, now)
+	reviewCandidates, err := uc.stateRepo.FindDueReviewCandidates(ctx, cmd.UserID, now)
 	if err != nil {
 		return dto.GenerateRecommendationsResult{}, err
 	}
-	newCandidates, err := uc.stateRepo.FindNewCandidates(ctx, uc.querier, cmd.UserID)
+	newCandidates, err := uc.stateRepo.FindNewCandidates(ctx, cmd.UserID)
 	if err != nil {
 		return dto.GenerateRecommendationsResult{}, err
 	}
@@ -94,10 +90,10 @@ func (uc GenerateLearningUnitRecommendationsUseCase) Execute(ctx context.Context
 	batch.DueReviewCount = reviewBacklog
 
 	if persistSnapshot(cmd.RequestContext) && uc.runRepo != nil {
-		if err := uc.runRepo.SaveRun(ctx, uc.querier, batch); err != nil {
+		if err := uc.runRepo.SaveRun(ctx, batch); err != nil {
 			return dto.GenerateRecommendationsResult{}, err
 		}
-		if err := uc.runRepo.SaveRunItems(ctx, uc.querier, batch); err != nil {
+		if err := uc.runRepo.SaveRunItems(ctx, batch); err != nil {
 			return dto.GenerateRecommendationsResult{}, err
 		}
 	}

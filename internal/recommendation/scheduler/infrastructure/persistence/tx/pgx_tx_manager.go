@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	apprepo "learning-video-recommendation-system/internal/recommendation/scheduler/application/repository"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/queryctx"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
 
 	"github.com/jackc/pgx/v5"
@@ -21,7 +23,7 @@ func NewPGXTxManager(pool *pgxpool.Pool) TxManager {
 }
 
 // WithinTx runs the callback inside a single database transaction.
-func (m *pgxTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context, q sqlcgen.Querier) error) (err error) {
+func (m *pgxTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context) error) (err error) {
 	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -38,8 +40,8 @@ func (m *pgxTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context
 		}
 	}()
 
-	queries := sqlcgen.New(tx)
-	if err = fn(ctx, queries); err != nil {
+	ctxWithTx := queryctx.WithQuerier(ctx, sqlcgen.New(tx))
+	if err = fn(ctxWithTx); err != nil {
 		return err
 	}
 
@@ -49,3 +51,5 @@ func (m *pgxTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context
 
 	return nil
 }
+
+type TxManager = apprepo.TxManager

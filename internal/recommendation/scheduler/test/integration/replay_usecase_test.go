@@ -43,8 +43,9 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	defer cleanupLearningRows(ctx, t, pool, userID, []int64{unitID})
 
 	txManager := txtx.NewPGXTxManager(pool)
-	stateRepo := repopkg.NewUserUnitStateRepository()
-	eventRepo := repopkg.NewUnitLearningEventRepository()
+	baseQuerier := sqlcgen.New(pool)
+	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
+	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
 	stateUpdater := domainservice.NewStateUpdater()
 
 	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(txManager, stateRepo, eventRepo, stateUpdater)
@@ -83,8 +84,7 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 		t.Fatalf("record Execute() error = %v", err)
 	}
 
-	querier := sqlcgen.New(pool)
-	onlineState, err := stateRepo.GetByUserAndUnit(ctx, querier, userID, unitID)
+	onlineState, err := stateRepo.GetByUserAndUnit(ctx, userID, unitID)
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit() error = %v", err)
 	}
@@ -100,7 +100,7 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	corrupted.MasteryScore = 0
 	corrupted.NextReviewAt = nil
 	corrupted.UpdatedAt = time.Now()
-	if err := stateRepo.Upsert(ctx, querier, &corrupted); err != nil {
+	if err := stateRepo.Upsert(ctx, &corrupted); err != nil {
 		t.Fatalf("Upsert(corrupted) error = %v", err)
 	}
 
@@ -118,7 +118,7 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 		t.Fatalf("ErrorCount = %d, want 0", result.ErrorCount)
 	}
 
-	rebuiltState, err := stateRepo.GetByUserAndUnit(ctx, querier, userID, unitID)
+	rebuiltState, err := stateRepo.GetByUserAndUnit(ctx, userID, unitID)
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit(rebuilt) error = %v", err)
 	}

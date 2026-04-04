@@ -16,13 +16,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type userUnitStateRepository struct{}
-
-func NewUserUnitStateRepository() apprepo.UserUnitStateRepository {
-	return userUnitStateRepository{}
+type userUnitStateRepository struct {
+	querier sqlcgen.Querier
 }
 
-func (userUnitStateRepository) GetByUserAndUnit(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID int64) (*model.UserUnitState, error) {
+func NewUserUnitStateRepository(querier sqlcgen.Querier) apprepo.UserUnitStateRepository {
+	return userUnitStateRepository{querier: querier}
+}
+
+func (r userUnitStateRepository) GetByUserAndUnit(ctx context.Context, userID uuid.UUID, coarseUnitID int64) (*model.UserUnitState, error) {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return nil, err
+	}
+
 	row, err := q.GetUserUnitStateByUserAndUnit(ctx, sqlcgen.GetUserUnitStateByUserAndUnitParams{
 		UserID:       mapper.UUIDToPG(userID),
 		CoarseUnitID: coarseUnitID,
@@ -42,7 +49,12 @@ func (userUnitStateRepository) GetByUserAndUnit(ctx context.Context, q sqlcgen.Q
 	return &state, nil
 }
 
-func (userUnitStateRepository) Upsert(ctx context.Context, q sqlcgen.Querier, state *model.UserUnitState) error {
+func (r userUnitStateRepository) Upsert(ctx context.Context, state *model.UserUnitState) error {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return err
+	}
+
 	params, err := mapper.UserUnitStateToUpsertParams(state)
 	if err != nil {
 		return err
@@ -51,9 +63,9 @@ func (userUnitStateRepository) Upsert(ctx context.Context, q sqlcgen.Querier, st
 	return q.UpsertUserUnitState(ctx, params)
 }
 
-func (repo userUnitStateRepository) BatchUpsert(ctx context.Context, q sqlcgen.Querier, states []*model.UserUnitState) error {
+func (repo userUnitStateRepository) BatchUpsert(ctx context.Context, states []*model.UserUnitState) error {
 	for _, state := range states {
-		if err := repo.Upsert(ctx, q, state); err != nil {
+		if err := repo.Upsert(ctx, state); err != nil {
 			return err
 		}
 	}
@@ -61,7 +73,12 @@ func (repo userUnitStateRepository) BatchUpsert(ctx context.Context, q sqlcgen.Q
 	return nil
 }
 
-func (userUnitStateRepository) DeleteForReplay(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID *int64) error {
+func (r userUnitStateRepository) DeleteForReplay(ctx context.Context, userID uuid.UUID, coarseUnitID *int64) error {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return err
+	}
+
 	var coarseUnitParam pgtype.Int8
 	if coarseUnitID != nil {
 		coarseUnitParam = pgtype.Int8{Int64: *coarseUnitID, Valid: true}
@@ -73,7 +90,12 @@ func (userUnitStateRepository) DeleteForReplay(ctx context.Context, q sqlcgen.Qu
 	})
 }
 
-func (userUnitStateRepository) FindDueReviewCandidates(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {
+func (r userUnitStateRepository) FindDueReviewCandidates(ctx context.Context, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return nil, err
+	}
+
 	rows, err := q.FindDueReviewCandidates(ctx, sqlcgen.FindDueReviewCandidatesParams{
 		UserID: mapper.UUIDToPG(userID),
 		Now:    mapper.TimeToPG(now),
@@ -85,7 +107,12 @@ func (userUnitStateRepository) FindDueReviewCandidates(ctx context.Context, q sq
 	return mapper.ReviewCandidatesFromRows(rows)
 }
 
-func (userUnitStateRepository) FindNewCandidates(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID) ([]appquery.NewCandidate, error) {
+func (r userUnitStateRepository) FindNewCandidates(ctx context.Context, userID uuid.UUID) ([]appquery.NewCandidate, error) {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return nil, err
+	}
+
 	rows, err := q.FindNewCandidates(ctx, mapper.UUIDToPG(userID))
 	if err != nil {
 		return nil, err

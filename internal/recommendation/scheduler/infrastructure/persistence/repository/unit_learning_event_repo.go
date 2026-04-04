@@ -13,13 +13,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type unitLearningEventRepository struct{}
-
-func NewUnitLearningEventRepository() apprepo.UnitLearningEventRepository {
-	return unitLearningEventRepository{}
+type unitLearningEventRepository struct {
+	querier sqlcgen.Querier
 }
 
-func (unitLearningEventRepository) Append(ctx context.Context, q sqlcgen.Querier, events []model.LearningEvent) error {
+func NewUnitLearningEventRepository(querier sqlcgen.Querier) apprepo.UnitLearningEventRepository {
+	return unitLearningEventRepository{querier: querier}
+}
+
+func (r unitLearningEventRepository) Append(ctx context.Context, events []model.LearningEvent) error {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return err
+	}
+
 	for _, event := range events {
 		params, err := mapper.LearningEventToInsertParams(event)
 		if err != nil {
@@ -33,7 +40,12 @@ func (unitLearningEventRepository) Append(ctx context.Context, q sqlcgen.Querier
 	return nil
 }
 
-func (unitLearningEventRepository) FindForReplay(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID *int64, from *time.Time) ([]model.LearningEvent, error) {
+func (r unitLearningEventRepository) FindForReplay(ctx context.Context, userID uuid.UUID, coarseUnitID *int64, from *time.Time) ([]model.LearningEvent, error) {
+	q, err := resolveQuerier(ctx, r.querier)
+	if err != nil {
+		return nil, err
+	}
+
 	var coarseUnitParam pgtype.Int8
 	if coarseUnitID != nil {
 		coarseUnitParam = pgtype.Int8{Int64: *coarseUnitID, Valid: true}
