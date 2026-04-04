@@ -36,37 +36,49 @@ func (uc ReplayUserUnitStatesUseCase) Execute(ctx context.Context, cmd command.R
 	result := dto.ReplayStateResult{}
 
 	err := uc.txManager.WithinTx(ctx, func(ctx context.Context) error {
-		if err := uc.stateRepo.DeleteForReplay(ctx, cmd.UserID, cmd.CoarseUnitID); err != nil {
-			return err
-		}
+		var upserts []*model.UserUnitState
 
-		events, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, cmd.CoarseUnitID, cmd.FromTime)
-		if err != nil {
-			return err
-		}
+		if cmd.FromTime == nil {
+			events, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, cmd.CoarseUnitID, nil)
+			if err != nil {
+				return err
+			}
+			if err := uc.stateRepo.DeleteForReplay(ctx, cmd.UserID, cmd.CoarseUnitID); err != nil {
+				return err
+			}
 
-		states := make(map[int64]*model.UserUnitState)
-		historyByUnit := make(map[int64][]model.LearningEvent)
-		for _, event := range events {
-			history := historyByUnit[event.CoarseUnitID]
-			current := states[event.CoarseUnitID]
-			next, _, err := uc.stateUpdater.Apply(current, event, domainservice.UpdateContext{
-				SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
-				RecentQualities:   recentQualitiesFromEvents(history),
-				RecentCorrectness: recentCorrectnessFromEvents(history),
-				Now:               event.CreatedAt,
-			})
+			upserts, err = uc.rebuildStates(events)
+			if err != nil {
+				return err
+			}
+		} else {
+			scopedEvents, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, cmd.CoarseUnitID, cmd.FromTime)
 			if err != nil {
 				return err
 			}
 
-			states[event.CoarseUnitID] = next
-			historyByUnit[event.CoarseUnitID] = append(historyByUnit[event.CoarseUnitID], event)
+			unitIDs := uniqueCoarseUnitIDs(scopedEvents)
+			for _, unitID := range unitIDs {
+				if err := uc.stateRepo.DeleteForReplay(ctx, cmd.UserID, &unitID); err != nil {
+					return err
+				}
+
+				events, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, &unitID, nil)
+				if err != nil {
+					return err
+				}
+
+				states, err := uc.rebuildStates(events)
+				if err != nil {
+					return err
+				}
+				upserts = append(upserts, states...)
+			}
 		}
 
-		upserts := make([]*model.UserUnitState, 0, len(states))
-		for _, state := range states {
-			upserts = append(upserts, state)
+		if len(upserts) == 0 {
+			result.RebuiltCount = 0
+			return nil
 		}
 
 		if err := uc.stateRepo.BatchUpsert(ctx, upserts); err != nil {
@@ -81,4 +93,50 @@ func (uc ReplayUserUnitStatesUseCase) Execute(ctx context.Context, cmd command.R
 	}
 
 	return result, nil
+}
+
+func (uc ReplayUserUnitStatesUseCase) rebuildStates(events []model.LearningEvent) ([]*model.UserUnitState, error) {
+	states := make(map[int64]*model.UserUnitState)
+	historyByUnit := make(map[int64][]model.LearningEvent)
+	for _, event := range events {
+		history := historyByUnit[event.CoarseUnitID]
+		current := states[event.CoarseUnitID]
+		next, _, err := uc.stateUpdater.Apply(current, event, domainservice.UpdateContext{
+			SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
+			RecentQualities:   recentQualitiesFromEvents(history),
+			RecentCorrectness: recentCorrectnessFromEvents(history),
+			Now:               event.CreatedAt,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		states[event.CoarseUnitID] = next
+		historyByUnit[event.CoarseUnitID] = append(historyByUnit[event.CoarseUnitID], event)
+	}
+
+	upserts := make([]*model.UserUnitState, 0, len(states))
+	for _, state := range states {
+		upserts = append(upserts, state)
+	}
+
+	return upserts, nil
+}
+
+func uniqueCoarseUnitIDs(events []model.LearningEvent) []int64 {
+	if len(events) == 0 {
+		return nil
+	}
+
+	seen := make(map[int64]struct{}, len(events))
+	unitIDs := make([]int64, 0, len(events))
+	for _, event := range events {
+		if _, ok := seen[event.CoarseUnitID]; ok {
+			continue
+		}
+		seen[event.CoarseUnitID] = struct{}{}
+		unitIDs = append(unitIDs, event.CoarseUnitID)
+	}
+
+	return unitIDs
 }

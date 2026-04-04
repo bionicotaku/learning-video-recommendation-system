@@ -2,12 +2,6 @@
 select count(*)::bigint
 from learning.scheduler_runs;
 
--- name: GetUserSchedulerSettings :one
-select *
-from learning.user_scheduler_settings
-where user_id = sqlc.arg(user_id)
-limit 1;
-
 -- name: InsertSchedulerRun :exec
 insert into learning.scheduler_runs (
   run_id,
