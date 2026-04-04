@@ -11,10 +11,10 @@ import (
 )
 
 type UpdateContext struct {
-	SchedulerPolicy  policy.SchedulerPolicy
-	RecentQualities  []int
+	SchedulerPolicy   policy.SchedulerPolicy
+	RecentQualities   []int
 	RecentCorrectness []bool
-	Now              time.Time
+	Now               time.Time
 }
 
 type StateTransitionResult struct {

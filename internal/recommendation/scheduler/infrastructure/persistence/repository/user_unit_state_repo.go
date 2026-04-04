@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type userUnitStateRepository struct{}
@@ -58,6 +59,18 @@ func (repo userUnitStateRepository) BatchUpsert(ctx context.Context, q sqlcgen.Q
 	}
 
 	return nil
+}
+
+func (userUnitStateRepository) DeleteForReplay(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, coarseUnitID *int64) error {
+	var coarseUnitParam pgtype.Int8
+	if coarseUnitID != nil {
+		coarseUnitParam = pgtype.Int8{Int64: *coarseUnitID, Valid: true}
+	}
+
+	return q.DeleteUserUnitStatesForReplay(ctx, sqlcgen.DeleteUserUnitStatesForReplayParams{
+		UserID:       mapper.UUIDToPG(userID),
+		CoarseUnitID: coarseUnitParam,
+	})
 }
 
 func (userUnitStateRepository) FindDueReviewCandidates(ctx context.Context, q sqlcgen.Querier, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {

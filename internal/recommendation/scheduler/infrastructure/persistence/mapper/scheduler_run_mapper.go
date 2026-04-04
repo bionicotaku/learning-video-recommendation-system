@@ -33,7 +33,7 @@ func SchedulerRunParamsFromBatch(batch model.RecommendationBatch) (sqlcgen.Inser
 		UserID:              UUIDToPG(batch.UserID),
 		RequestedLimit:      int32(batch.SessionLimit),
 		GeneratedAt:         TimeToPG(batch.GeneratedAt),
-		DueReviewCount:      int32(selectedReviewCount),
+		DueReviewCount:      int32(batch.DueReviewCount),
 		SelectedReviewCount: int32(selectedReviewCount),
 		SelectedNewCount:    int32(selectedNewCount),
 		Context:             contextPayload,

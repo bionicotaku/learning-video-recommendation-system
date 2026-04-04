@@ -3,6 +3,7 @@ package mapper
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,7 +90,7 @@ func requiredFloat(value pgtype.Numeric, field string) (float64, error) {
 
 func floatToPG(value float64) (pgtype.Numeric, error) {
 	var numeric pgtype.Numeric
-	if err := numeric.Scan(value); err != nil {
+	if err := numeric.Scan(strconv.FormatFloat(value, 'f', -1, 64)); err != nil {
 		return pgtype.Numeric{}, err
 	}
 

@@ -32,6 +32,7 @@ type RecommendationBatch struct {
 	UserID            uuid.UUID
 	GeneratedAt       time.Time
 	SessionLimit      int
+	DueReviewCount    int
 	ReviewQuota       int
 	NewQuota          int
 	BacklogProtection bool

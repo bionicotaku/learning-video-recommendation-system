@@ -9,6 +9,11 @@ where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id)
 limit 1;
 
+-- name: DeleteUserUnitStatesForReplay :exec
+delete from learning.user_unit_states
+where user_id = sqlc.arg(user_id)
+  and (sqlc.narg(coarse_unit_id)::bigint is null or coarse_unit_id = sqlc.narg(coarse_unit_id)::bigint);
+
 -- name: UpsertUserUnitState :exec
 insert into learning.user_unit_states (
   user_id,

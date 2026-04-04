@@ -111,10 +111,10 @@ func TestStateUpdaterTwoPassingStrongEventsMoveLearningToReviewing(t *testing.T)
 		Quality:    &quality,
 		OccurredAt: now,
 	}, UpdateContext{
-		SchedulerPolicy:  policy.DefaultSchedulerPolicy(),
-		RecentQualities:  []int{4},
+		SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
+		RecentQualities:   []int{4},
 		RecentCorrectness: []bool{true},
-		Now:              now,
+		Now:               now,
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
@@ -132,26 +132,26 @@ func TestStateUpdaterStrongSuccessAppliesSM2AndScores(t *testing.T) {
 	correct := true
 
 	next, result, err := updater.Apply(&model.UserUnitState{
-		UserID:          uuid.New(),
-		CoarseUnitID:    1,
-		Status:          enum.UnitStatusReviewing,
+		UserID:           uuid.New(),
+		CoarseUnitID:     1,
+		Status:           enum.UnitStatusReviewing,
 		StrongEventCount: 3,
-		CorrectCount:    3,
-		EaseFactor:      2.5,
-		Repetition:      3,
-		IntervalDays:    6,
-		ProgressPercent: 10,
-		MasteryScore:    0.1,
+		CorrectCount:     3,
+		EaseFactor:       2.5,
+		Repetition:       3,
+		IntervalDays:     6,
+		ProgressPercent:  10,
+		MasteryScore:     0.1,
 	}, model.LearningEvent{
 		EventType:  enum.EventTypeReview,
 		IsCorrect:  &correct,
 		Quality:    &quality,
 		OccurredAt: now,
 	}, UpdateContext{
-		SchedulerPolicy:  policy.DefaultSchedulerPolicy(),
-		RecentQualities:  []int{4, 4},
+		SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
+		RecentQualities:   []int{4, 4},
 		RecentCorrectness: []bool{true, true, true, true},
-		Now:              now,
+		Now:               now,
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
@@ -184,12 +184,12 @@ func TestStateUpdaterFailureResetsIntervalWithoutChangingEF(t *testing.T) {
 	wrong := false
 
 	next, _, err := updater.Apply(&model.UserUnitState{
-		UserID:          uuid.New(),
-		CoarseUnitID:    1,
-		Status:          enum.UnitStatusReviewing,
-		EaseFactor:      2.1,
-		Repetition:      3,
-		IntervalDays:    6,
+		UserID:             uuid.New(),
+		CoarseUnitID:       1,
+		Status:             enum.UnitStatusReviewing,
+		EaseFactor:         2.1,
+		Repetition:         3,
+		IntervalDays:       6,
 		ConsecutiveCorrect: 2,
 	}, model.LearningEvent{
 		EventType:  enum.EventTypeReview,
@@ -197,10 +197,10 @@ func TestStateUpdaterFailureResetsIntervalWithoutChangingEF(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 	}, UpdateContext{
-		SchedulerPolicy:  policy.DefaultSchedulerPolicy(),
-		RecentQualities:  []int{4, 4},
+		SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
+		RecentQualities:   []int{4, 4},
 		RecentCorrectness: []bool{true, true, false},
-		Now:              now,
+		Now:               now,
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
@@ -241,10 +241,10 @@ func TestStateUpdaterStableLongIntervalMovesToMastered(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 	}, UpdateContext{
-		SchedulerPolicy:  schedulerPolicy,
-		RecentQualities:  []int{4, 5},
+		SchedulerPolicy:   schedulerPolicy,
+		RecentQualities:   []int{4, 5},
 		RecentCorrectness: []bool{true, true, true, true},
-		Now:              now,
+		Now:               now,
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)
@@ -265,12 +265,12 @@ func TestStateUpdaterMasteredFailureDropsBackToReviewing(t *testing.T) {
 	wrong := false
 
 	next, result, err := updater.Apply(&model.UserUnitState{
-		UserID:          uuid.New(),
-		CoarseUnitID:    1,
-		Status:          enum.UnitStatusMastered,
-		EaseFactor:      2.2,
-		Repetition:      5,
-		IntervalDays:    21,
+		UserID:           uuid.New(),
+		CoarseUnitID:     1,
+		Status:           enum.UnitStatusMastered,
+		EaseFactor:       2.2,
+		Repetition:       5,
+		IntervalDays:     21,
 		ConsecutiveWrong: 0,
 	}, model.LearningEvent{
 		EventType:  enum.EventTypeReview,
@@ -278,10 +278,10 @@ func TestStateUpdaterMasteredFailureDropsBackToReviewing(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 	}, UpdateContext{
-		SchedulerPolicy:  policy.DefaultSchedulerPolicy(),
-		RecentQualities:  []int{5, 5},
+		SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
+		RecentQualities:   []int{5, 5},
 		RecentCorrectness: []bool{true, true, false},
-		Now:              now,
+		Now:               now,
 	})
 	if err != nil {
 		t.Fatalf("Apply() error = %v", err)

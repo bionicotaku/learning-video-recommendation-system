@@ -23,6 +23,22 @@ func (q *Queries) CountUserUnitStates(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const deleteUserUnitStatesForReplay = `-- name: DeleteUserUnitStatesForReplay :exec
+delete from learning.user_unit_states
+where user_id = $1
+  and ($2::bigint is null or coarse_unit_id = $2::bigint)
+`
+
+type DeleteUserUnitStatesForReplayParams struct {
+	UserID       pgtype.UUID
+	CoarseUnitID pgtype.Int8
+}
+
+func (q *Queries) DeleteUserUnitStatesForReplay(ctx context.Context, arg DeleteUserUnitStatesForReplayParams) error {
+	_, err := q.db.Exec(ctx, deleteUserUnitStatesForReplay, arg.UserID, arg.CoarseUnitID)
+	return err
+}
+
 const findDueReviewCandidates = `-- name: FindDueReviewCandidates :many
 select
   s.user_id,

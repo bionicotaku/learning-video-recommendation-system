@@ -39,8 +39,8 @@ func TestMasteryScoreCalculator(t *testing.T) {
 	schedulerPolicy := policy.DefaultSchedulerPolicy()
 
 	state := &model.UserUnitState{
-		IntervalDays:     6,
-		ProgressPercent:  math.Log(7) / math.Log(22) * 100,
+		IntervalDays:    6,
+		ProgressPercent: math.Log(7) / math.Log(22) * 100,
 	}
 
 	got := calculator.Compute(state, 0.8, schedulerPolicy)
@@ -55,8 +55,8 @@ func TestMasteryScoreCalculatorClampsToUnitInterval(t *testing.T) {
 	schedulerPolicy := policy.DefaultSchedulerPolicy()
 
 	state := &model.UserUnitState{
-		IntervalDays:     30,
-		ProgressPercent:  110,
+		IntervalDays:    30,
+		ProgressPercent: 110,
 	}
 
 	got := calculator.Compute(state, 2, schedulerPolicy)

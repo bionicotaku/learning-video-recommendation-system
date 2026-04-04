@@ -1,4 +1,4 @@
-package model
+package command
 
 import (
 	"time"
@@ -8,10 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// LearningEvent is a normalized learning activity record.
-type LearningEvent struct {
-	EventID        int64
-	UserID         uuid.UUID
+// LearningEventInput is the application-layer input used to record a learning event.
+type LearningEventInput struct {
 	CoarseUnitID   int64
 	VideoID        *uuid.UUID
 	EventType      enum.EventType
@@ -22,5 +20,11 @@ type LearningEvent struct {
 	ResponseTimeMs *int
 	Metadata       map[string]any
 	OccurredAt     time.Time
-	CreatedAt      time.Time
+}
+
+// RecordLearningEventsCommand records normalized learning events for one user.
+type RecordLearningEventsCommand struct {
+	UserID         uuid.UUID
+	Events         []LearningEventInput
+	IdempotencyKey string
 }

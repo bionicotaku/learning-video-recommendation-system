@@ -102,38 +102,6 @@ func UserUnitStateFromRow(row sqlcgen.LearningUserUnitState) (model.UserUnitStat
 	}, nil
 }
 
-func learningUnitRefFromFields(coarseUnitID int64, kindValue, label string, pos, englishDef, chineseDef anyText) (model.LearningUnitRef, error) {
-	kind, err := parseUnitKind(kindValue)
-	if err != nil {
-		return model.LearningUnitRef{}, err
-	}
-
-	return model.LearningUnitRef{
-		CoarseUnitID: coarseUnitID,
-		Kind:         kind,
-		Label:        label,
-		Pos:          pos.StringValue(),
-		EnglishDef:   englishDef.StringValue(),
-		ChineseDef:   chineseDef.StringValue(),
-	}, nil
-}
-
-type anyText interface {
-	StringValue() string
-}
-
-type pgText string
-
-func (t pgText) StringValue() string { return string(t) }
-
-type pgtypeTextWrapper struct{ value string }
-
-func (t pgtypeTextWrapper) StringValue() string { return t.value }
-
-func wrapText(value string) anyText { return pgText(value) }
-
-func wrapPGText(value string) anyText { return pgtypeTextWrapper{value: value} }
-
 // ReviewCandidateFromRow maps a sqlc review-candidate row to a domain query object.
 func ReviewCandidateFromRow(row sqlcgen.FindDueReviewCandidatesRow) (query.ReviewCandidate, error) {
 	state, err := UserUnitStateFromRow(sqlcgen.LearningUserUnitState{

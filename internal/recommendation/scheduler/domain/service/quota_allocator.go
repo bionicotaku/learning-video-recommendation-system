@@ -1,0 +1,81 @@
+package service
+
+import (
+	"math"
+
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
+)
+
+type QuotaAllocation struct {
+	ReviewQuota       int
+	NewQuota          int
+	BacklogProtection bool
+}
+
+type QuotaAllocator interface {
+	Allocate(reviewBacklog, requestedLimit int, settings model.UserSchedulerSettings) QuotaAllocation
+}
+
+type quotaAllocator struct{}
+
+func NewQuotaAllocator() QuotaAllocator {
+	return quotaAllocator{}
+}
+
+func (quotaAllocator) Allocate(reviewBacklog, requestedLimit int, settings model.UserSchedulerSettings) QuotaAllocation {
+	if requestedLimit < 0 {
+		requestedLimit = 0
+	}
+	if reviewBacklog < 0 {
+		reviewBacklog = 0
+	}
+
+	switch {
+	case reviewBacklog == 0:
+		return QuotaAllocation{
+			ReviewQuota: 0,
+			NewQuota:    minInt(requestedLimit, settings.DailyNewUnitQuota),
+		}
+	case reviewBacklog >= 1 && reviewBacklog <= 5:
+		reviewQuota := ceilFraction(requestedLimit, 0.5)
+		return QuotaAllocation{
+			ReviewQuota: reviewQuota,
+			NewQuota:    minInt(requestedLimit-reviewQuota, settings.DailyNewUnitQuota),
+		}
+	case reviewBacklog >= 6 && reviewBacklog <= 20:
+		reviewQuota := ceilFraction(requestedLimit, 0.7)
+		return QuotaAllocation{
+			ReviewQuota: reviewQuota,
+			NewQuota:    minInt(requestedLimit-reviewQuota, settings.DailyNewUnitQuota),
+		}
+	case reviewBacklog >= 21 && reviewBacklog <= settings.DailyReviewSoftLimit:
+		reviewQuota := ceilFraction(requestedLimit, 0.85)
+		return QuotaAllocation{
+			ReviewQuota: reviewQuota,
+			NewQuota:    minInt(3, requestedLimit-reviewQuota),
+		}
+	case reviewBacklog > settings.DailyReviewHardLimit:
+		return QuotaAllocation{
+			ReviewQuota:       minInt(requestedLimit, settings.DailyReviewHardLimit),
+			NewQuota:          0,
+			BacklogProtection: true,
+		}
+	default:
+		return QuotaAllocation{
+			ReviewQuota: requestedLimit,
+			NewQuota:    0,
+		}
+	}
+}
+
+func ceilFraction(limit int, ratio float64) int {
+	return int(math.Ceil(float64(limit) * ratio))
+}
+
+func minInt(left, right int) int {
+	if left < right {
+		return left
+	}
+
+	return right
+}

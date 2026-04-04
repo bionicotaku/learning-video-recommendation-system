@@ -11,6 +11,7 @@ type Querier interface {
 	CountSchedulerRuns(ctx context.Context) (int64, error)
 	CountUnitLearningEvents(ctx context.Context) (int64, error)
 	CountUserUnitStates(ctx context.Context) (int64, error)
+	DeleteUserUnitStatesForReplay(ctx context.Context, arg DeleteUserUnitStatesForReplayParams) error
 	FindDueReviewCandidates(ctx context.Context, arg FindDueReviewCandidatesParams) ([]FindDueReviewCandidatesRow, error)
 	FindNewCandidates(ctx context.Context, userID pgtype.UUID) ([]FindNewCandidatesRow, error)
 	FindUnitLearningEventsForReplay(ctx context.Context, arg FindUnitLearningEventsForReplayParams) ([]LearningUnitLearningEvent, error)

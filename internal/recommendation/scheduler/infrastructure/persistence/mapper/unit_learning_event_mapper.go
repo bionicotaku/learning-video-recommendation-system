@@ -36,19 +36,19 @@ func LearningEventFromRow(row sqlcgen.LearningUnitLearningEvent) (model.Learning
 	}
 
 	return model.LearningEvent{
-		EventID:         row.EventID,
-		UserID:          userID,
-		CoarseUnitID:    row.CoarseUnitID,
-		VideoID:         optionalUUID(row.VideoID),
-		EventType:       parseEventType(row.EventType),
-		SourceType:      row.SourceType,
-		SourceRefID:     textFromPG(row.SourceRefID),
-		IsCorrect:       optionalBool(row.IsCorrect),
-		Quality:         optionalInt(row.Quality),
-		ResponseTimeMs:  responseTimeMs,
-		Metadata:        metadata,
-		OccurredAt:      occurredAt,
-		CreatedAt:       createdAt,
+		EventID:        row.EventID,
+		UserID:         userID,
+		CoarseUnitID:   row.CoarseUnitID,
+		VideoID:        optionalUUID(row.VideoID),
+		EventType:      parseEventType(row.EventType),
+		SourceType:     row.SourceType,
+		SourceRefID:    textFromPG(row.SourceRefID),
+		IsCorrect:      optionalBool(row.IsCorrect),
+		Quality:        optionalInt(row.Quality),
+		ResponseTimeMs: responseTimeMs,
+		Metadata:       metadata,
+		OccurredAt:     occurredAt,
+		CreatedAt:      createdAt,
 	}, nil
 }
 
