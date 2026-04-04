@@ -31,16 +31,16 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	}
 	defer pool.Close()
 
-	userID, err := loadExistingUserIDFromPool(ctx, pool)
+	userID, err := createTestUserIDFromPool(ctx, pool)
 	if err != nil {
-		t.Fatalf("loadExistingUserIDFromPool() error = %v", err)
+		t.Fatalf("createTestUserIDFromPool() error = %v", err)
 	}
+	defer cleanupTestUser(ctx, t, pool, userID)
 	unitIDs, err := loadAvailableCoarseUnitIDsFromPool(ctx, pool, userID, 1)
 	if err != nil {
 		t.Fatalf("loadAvailableCoarseUnitIDsFromPool() error = %v", err)
 	}
 	unitID := unitIDs[0]
-	defer cleanupLearningRows(ctx, t, pool, userID, []int64{unitID})
 
 	txManager := txtx.NewPGXTxManager(pool)
 	baseQuerier := sqlcgen.New(pool)

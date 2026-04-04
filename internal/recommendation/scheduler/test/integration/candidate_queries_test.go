@@ -41,9 +41,9 @@ func TestUserUnitStateRepositoryCandidateQueries(t *testing.T) {
 	q := sqlcgen.New(tx)
 	repo := repopkg.NewUserUnitStateRepository(q)
 
-	userID, err := loadExistingUserID(ctx, tx)
+	userID, err := createTestUserID(ctx, tx)
 	if err != nil {
-		t.Fatalf("loadExistingUserID() error = %v", err)
+		t.Fatalf("createTestUserID() error = %v", err)
 	}
 
 	unitIDs, err := loadAvailableCoarseUnitIDs(ctx, tx, userID, 3)
@@ -131,10 +131,13 @@ func TestUserUnitStateRepositoryCandidateQueries(t *testing.T) {
 	}
 }
 
-func loadExistingUserID(ctx context.Context, tx pgx.Tx) (uuid.UUID, error) {
-	var userID uuid.UUID
-	err := tx.QueryRow(ctx, `select id from auth.users limit 1`).Scan(&userID)
-	return userID, err
+func createTestUserID(ctx context.Context, tx pgx.Tx) (uuid.UUID, error) {
+	userID := uuid.New()
+	if _, err := tx.Exec(ctx, `insert into auth.users (id) values ($1)`, userID); err != nil {
+		return uuid.Nil, err
+	}
+
+	return userID, nil
 }
 
 func loadAvailableCoarseUnitIDs(ctx context.Context, tx pgx.Tx, userID uuid.UUID, count int) ([]int64, error) {
@@ -144,7 +147,11 @@ func loadAvailableCoarseUnitIDs(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 		left join learning.user_unit_states s
 		  on s.coarse_unit_id = c.id
 		 and s.user_id = $1
+		left join learning.unit_learning_events e
+		  on e.coarse_unit_id = c.id
+		 and e.user_id = $1
 		where s.coarse_unit_id is null
+		  and e.coarse_unit_id is null
 		order by c.id
 		limit $2
 	`, userID, count)

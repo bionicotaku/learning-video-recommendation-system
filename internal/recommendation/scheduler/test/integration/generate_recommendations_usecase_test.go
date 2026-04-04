@@ -47,9 +47,9 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 	settingsRepo := repopkg.NewUserSchedulerSettingsRepository(q)
 	runRepo := repopkg.NewSchedulerRunRepository(q)
 
-	userID, err := loadExistingUserID(ctx, tx)
+	userID, err := createTestUserID(ctx, tx)
 	if err != nil {
-		t.Fatalf("loadExistingUserID() error = %v", err)
+		t.Fatalf("createTestUserID() error = %v", err)
 	}
 	unitIDs, err := loadAvailableCoarseUnitIDs(ctx, tx, userID, 4)
 	if err != nil {

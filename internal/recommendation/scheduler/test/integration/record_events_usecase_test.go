@@ -38,15 +38,15 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 	}
 	defer pool.Close()
 
-	userID, err := loadExistingUserIDFromPool(ctx, pool)
+	userID, err := createTestUserIDFromPool(ctx, pool)
 	if err != nil {
-		t.Fatalf("loadExistingUserIDFromPool() error = %v", err)
+		t.Fatalf("createTestUserIDFromPool() error = %v", err)
 	}
+	defer cleanupTestUser(ctx, t, pool, userID)
 	unitIDs, err := loadAvailableCoarseUnitIDsFromPool(ctx, pool, userID, 2)
 	if err != nil {
 		t.Fatalf("loadAvailableCoarseUnitIDsFromPool() error = %v", err)
 	}
-	defer cleanupLearningRows(ctx, t, pool, userID, unitIDs)
 
 	txManager := txtx.NewPGXTxManager(pool)
 	baseQuerier := sqlcgen.New(pool)
@@ -121,15 +121,15 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 	}
 	defer pool.Close()
 
-	userID, err := loadExistingUserIDFromPool(ctx, pool)
+	userID, err := createTestUserIDFromPool(ctx, pool)
 	if err != nil {
-		t.Fatalf("loadExistingUserIDFromPool() error = %v", err)
+		t.Fatalf("createTestUserIDFromPool() error = %v", err)
 	}
+	defer cleanupTestUser(ctx, t, pool, userID)
 	unitIDs, err := loadAvailableCoarseUnitIDsFromPool(ctx, pool, userID, 1)
 	if err != nil {
 		t.Fatalf("loadAvailableCoarseUnitIDsFromPool() error = %v", err)
 	}
-	defer cleanupLearningRows(ctx, t, pool, userID, unitIDs)
 
 	baseQuerier := sqlcgen.New(pool)
 	baseStateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
@@ -208,10 +208,20 @@ func (f failingUserUnitStateRepository) FindNewCandidates(ctx context.Context, u
 	return f.delegate.FindNewCandidates(ctx, userID)
 }
 
-func loadExistingUserIDFromPool(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
-	var userID uuid.UUID
-	err := pool.QueryRow(ctx, `select id from auth.users limit 1`).Scan(&userID)
-	return userID, err
+func createTestUserIDFromPool(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
+	userID := uuid.New()
+	if _, err := pool.Exec(ctx, `insert into auth.users (id) values ($1)`, userID); err != nil {
+		return uuid.Nil, err
+	}
+
+	return userID, nil
+}
+
+func cleanupTestUser(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID) {
+	t.Helper()
+	if _, err := pool.Exec(ctx, `delete from auth.users where id = $1`, userID); err != nil {
+		t.Fatalf("cleanup auth.users error = %v", err)
+	}
 }
 
 func loadAvailableCoarseUnitIDsFromPool(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, count int) ([]int64, error) {
@@ -221,7 +231,11 @@ func loadAvailableCoarseUnitIDsFromPool(ctx context.Context, pool *pgxpool.Pool,
 		left join learning.user_unit_states s
 		  on s.coarse_unit_id = c.id
 		 and s.user_id = $1
+		left join learning.unit_learning_events e
+		  on e.coarse_unit_id = c.id
+		 and e.user_id = $1
 		where s.coarse_unit_id is null
+		  and e.coarse_unit_id is null
 		order by c.id
 		limit $2
 	`, userID, count)
@@ -246,21 +260,4 @@ func loadAvailableCoarseUnitIDsFromPool(ctx context.Context, pool *pgxpool.Pool,
 	}
 
 	return ids, nil
-}
-
-func cleanupLearningRows(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, unitIDs []int64) {
-	t.Helper()
-	if len(unitIDs) == 0 {
-		return
-	}
-
-	if _, err := pool.Exec(ctx, `delete from learning.unit_learning_events where user_id = $1 and coarse_unit_id = any($2)`, userID, unitIDs); err != nil {
-		t.Fatalf("cleanup unit_learning_events error = %v", err)
-	}
-	if _, err := pool.Exec(ctx, `delete from learning.user_unit_states where user_id = $1 and coarse_unit_id = any($2)`, userID, unitIDs); err != nil {
-		t.Fatalf("cleanup user_unit_states error = %v", err)
-	}
-	if _, err := pool.Exec(ctx, `delete from learning.scheduler_run_items where user_id = $1 and coarse_unit_id = any($2)`, userID, unitIDs); err != nil {
-		t.Fatalf("cleanup scheduler_run_items error = %v", err)
-	}
 }

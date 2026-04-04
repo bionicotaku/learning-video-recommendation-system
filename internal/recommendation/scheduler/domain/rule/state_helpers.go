@@ -10,7 +10,9 @@ func cloneOrInitState(current *model.UserUnitState, event model.LearningEvent) *
 		return &model.UserUnitState{
 			UserID:       event.UserID,
 			CoarseUnitID: event.CoarseUnitID,
+			IsTarget:     true,
 			Status:       enum.UnitStatusNew,
+			EaseFactor:   2.5,
 		}
 	}
 
