@@ -42,7 +42,9 @@
 - repository 只做持久化，不做状态机、配额、排序决策
 - SQL 只做数据查询和写入，不做业务策略判断
 - 事件写入和状态更新必须在同一事务中完成
-- replay 必须复用在线更新同一套 `StateUpdater`
+- `learning.unit_learning_events` 是事实真相层
+- `learning.user_unit_states` 是当前投影层
+- replay 必须复用在线写入同一套 reducer，只做全量重建
 
 ## 2. 技术方案
 
@@ -70,8 +72,10 @@ internal/recommendation/scheduler/
     dto/
     query/
     repository/
+    service/
     usecase/
   domain/
+    aggregate/
     enum/
     model/
     policy/
@@ -110,8 +114,10 @@ internal/recommendation/scheduler/
   调度常量和默认策略，例如 `21 天 mastered 阈值`、`[1,3,6]` 初始间隔、`EF 下限 1.3`
 - `rule/`
   弱事件与强事件的基础字段更新
+- `aggregate/`
+  `UserUnitReducer`，统一负责把单条事件归约到当前状态投影
 - `service/`
-  SM-2、状态迁移、progress/mastery、backlog/quota、scorer、assembler、统一 `StateUpdater`
+  SM-2、状态迁移、progress/mastery、backlog/quota、scorer、assembler
 
 ### 3.2 `application/`
 
@@ -125,6 +131,8 @@ internal/recommendation/scheduler/
   应用层候选结构，例如 `ReviewCandidate`、`NewCandidate`
 - `repository/`
   application 依赖的 port interface，包括 `TxManager`
+- `service/`
+  application 内部编排服务，例如 `UserStateRebuilder`
 - `usecase/`
   三个核心入口：
   - `GenerateLearningUnitRecommendationsUseCase`
@@ -403,13 +411,10 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["RecordLearningEventsAndUpdateStateUseCase.Execute"] --> B["TxManager.WithinTx"]
-    B --> C["UnitLearningEventRepository.FindForReplay"]
-    B --> D["UserUnitStateRepository.GetByUserAndUnit"]
-    C --> E["recentQualities / recentCorrectness"]
-    D --> F["StateUpdater.Apply"]
-    E --> F
-    F --> G["UnitLearningEventRepository.Append"]
-    G --> H["UserUnitStateRepository.Upsert"]
+    B --> C["UserUnitStateRepository.GetByUserAndUnit"]
+    C --> D["UnitLearningEventRepository.Append"]
+    D --> E["UserUnitReducer.Reduce"]
+    E --> F["UserUnitStateRepository.Upsert"]
 ```
 
 代码入口：
@@ -418,8 +423,9 @@ flowchart TD
 
 关键点：
 
-- 对每条事件先查历史，再算新状态
 - 同一个事务里先写事件，再写状态
+- 归约器只依赖“当前状态 + 当前事件 + 调度策略”
+- `recent_quality_window / recent_correctness_window` 直接存进状态快照，不再每次查整段历史
 - 一旦状态写入失败，整个事务回滚
 
 ### 8.3 replay 链路
@@ -427,11 +433,10 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["ReplayUserUnitStatesUseCase.Execute"] --> B["TxManager.WithinTx"]
-    B --> C["UserUnitStateRepository.DeleteForReplay"]
-    B --> D["UnitLearningEventRepository.FindForReplay"]
-    D --> E["按 unit 聚合历史"]
-    E --> F["StateUpdater.Apply"]
-    F --> G["UserUnitStateRepository.BatchUpsert"]
+    B --> C["UnitLearningEventRepository.ListByUserOrdered"]
+    C --> D["UserUnitStateRepository.DeleteByUser"]
+    D --> E["UserStateRebuilder.Rebuild"]
+    E --> F["UserUnitStateRepository.BatchUpsert"]
 ```
 
 代码入口：
@@ -440,27 +445,28 @@ flowchart TD
 
 关键点：
 
+- MVP replay 只支持“按用户全量重建”
 - replay 不允许另写一套状态规则
-- 在线更新和 replay 都必须调用同一个 `StateUpdater`
-- 当指定 `FromTime` 时，只重建该时间窗口内真正受影响的 unit
-- 这些受影响的 unit 会从各自完整事件历史重建，而不是“删全量快照后只播放半段历史”
+- 在线更新和 replay 都必须调用同一个 `UserUnitReducer`
+- 事件表是事实真相层，状态表是当前投影层
 
-## 9. `StateUpdater` 的内部结构
+## 9. `UserUnitReducer` 的内部结构
 
-`StateUpdater` 是整个模块最关键的领域入口。
+`UserUnitReducer` 是整个模块最关键的领域入口。
 
 它的处理顺序如下：
 
 1. 先识别事件类型
 2. 弱事件走 `WeakEventHandler`
 3. 强事件走 `StrongEventHandler`
-4. 如果强事件带 `quality`，再走 `SM2Updater`
-5. 然后走 `StatusTransitioner`
-6. 最后重算 `ProgressPercent` 和 `MasteryScore`
+4. 强事件把最近质量/正确性窗口滚动写回状态
+5. 如果强事件带 `quality`，再走 `SM2Updater`
+6. 然后走 `StatusTransitioner`
+7. 最后重算 `ProgressPercent` 和 `MasteryScore`
 
 实际实现位置：
 
-- `domain/service/state_updater.go`
+- `domain/aggregate/user_unit_reducer.go`
 
 它组合的组件有：
 
@@ -471,7 +477,12 @@ flowchart TD
 - `domain/service/progress_calculator.go`
 - `domain/service/mastery_calculator.go`
 
-理解这个组合关系之后，排查“为什么状态变了”会快很多。
+理解这个组合关系之后，排查“为什么状态变了”会快很多。`learning.user_unit_states` 上的两个窗口字段：
+
+- `recent_quality_window`
+- `recent_correctness_window`
+
+就是为了保证在线更新和 replay 都只走同一套 reducer，而不是在 application 层反查历史再拼上下文。
 
 ## 10. application 和 infrastructure 的协作方式
 
@@ -512,7 +523,10 @@ import (
 	"context"
 
 	appcommand "learning-video-recommendation-system/internal/recommendation/scheduler/application/command"
+	appservice "learning-video-recommendation-system/internal/recommendation/scheduler/application/service"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/application/usecase"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/aggregate"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/policy"
 	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure"
 	infrarepo "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/repository"
@@ -540,13 +554,21 @@ func main() {
 	runRepo := infrarepo.NewSchedulerRunRepository(querier)
 	txManager := infratx.NewPGXTxManager(pool)
 
-	stateUpdater := domainservice.NewStateUpdater()
+	reducer := aggregate.NewUserUnitReducer()
+	rebuilder := appservice.NewUserStateRebuilder(reducer, policy.DefaultSchedulerPolicy())
 
 	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(
 		txManager,
 		stateRepo,
 		eventRepo,
-		stateUpdater,
+		reducer,
+	)
+
+	replayUC := usecase.NewReplayUserUnitStatesUseCase(
+		txManager,
+		stateRepo,
+		eventRepo,
+		rebuilder,
 	)
 
 	generateUC := usecase.NewGenerateLearningUnitRecommendationsUseCase(

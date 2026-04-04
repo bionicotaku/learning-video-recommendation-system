@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"time"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/scheduler/application/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
@@ -10,7 +9,6 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type unitLearningEventRepository struct {
@@ -40,22 +38,13 @@ func (r unitLearningEventRepository) Append(ctx context.Context, events []model.
 	return nil
 }
 
-func (r unitLearningEventRepository) FindForReplay(ctx context.Context, userID uuid.UUID, coarseUnitID *int64, from *time.Time) ([]model.LearningEvent, error) {
+func (r unitLearningEventRepository) ListByUserOrdered(ctx context.Context, userID uuid.UUID) ([]model.LearningEvent, error) {
 	q, err := resolveQuerier(ctx, r.querier)
 	if err != nil {
 		return nil, err
 	}
 
-	var coarseUnitParam pgtype.Int8
-	if coarseUnitID != nil {
-		coarseUnitParam = pgtype.Int8{Int64: *coarseUnitID, Valid: true}
-	}
-
-	rows, err := q.FindUnitLearningEventsForReplay(ctx, sqlcgen.FindUnitLearningEventsForReplayParams{
-		UserID:         mapper.UUIDToPG(userID),
-		CoarseUnitID:   coarseUnitParam,
-		FromOccurredAt: mapper.OptionalTimeToPG(from),
-	})
+	rows, err := q.ListUnitLearningEventsByUserOrdered(ctx, mapper.UUIDToPG(userID))
 	if err != nil {
 		return nil, err
 	}

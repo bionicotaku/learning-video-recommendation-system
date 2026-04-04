@@ -65,34 +65,36 @@ type LearningUserSchedulerSetting struct {
 }
 
 type LearningUserUnitState struct {
-	UserID             pgtype.UUID
-	CoarseUnitID       int64
-	IsTarget           bool
-	TargetSource       pgtype.Text
-	TargetSourceRefID  pgtype.Text
-	TargetPriority     pgtype.Numeric
-	Status             string
-	ProgressPercent    pgtype.Numeric
-	MasteryScore       pgtype.Numeric
-	FirstSeenAt        pgtype.Timestamptz
-	LastSeenAt         pgtype.Timestamptz
-	LastReviewedAt     pgtype.Timestamptz
-	LastRecommendedAt  pgtype.Timestamptz
-	SeenCount          int32
-	StrongEventCount   int32
-	ReviewCount        int32
-	CorrectCount       int32
-	WrongCount         int32
-	ConsecutiveCorrect int32
-	ConsecutiveWrong   int32
-	LastQuality        pgtype.Int2
-	Repetition         int32
-	IntervalDays       pgtype.Numeric
-	EaseFactor         pgtype.Numeric
-	NextReviewAt       pgtype.Timestamptz
-	SuspendedReason    pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
+	UserID                  pgtype.UUID
+	CoarseUnitID            int64
+	IsTarget                bool
+	TargetSource            pgtype.Text
+	TargetSourceRefID       pgtype.Text
+	TargetPriority          pgtype.Numeric
+	Status                  string
+	ProgressPercent         pgtype.Numeric
+	MasteryScore            pgtype.Numeric
+	FirstSeenAt             pgtype.Timestamptz
+	LastSeenAt              pgtype.Timestamptz
+	LastReviewedAt          pgtype.Timestamptz
+	LastRecommendedAt       pgtype.Timestamptz
+	SeenCount               int32
+	StrongEventCount        int32
+	ReviewCount             int32
+	CorrectCount            int32
+	WrongCount              int32
+	ConsecutiveCorrect      int32
+	ConsecutiveWrong        int32
+	LastQuality             pgtype.Int2
+	Repetition              int32
+	IntervalDays            pgtype.Numeric
+	EaseFactor              pgtype.Numeric
+	NextReviewAt            pgtype.Timestamptz
+	SuspendedReason         pgtype.Text
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	RecentQualityWindow     []int16
+	RecentCorrectnessWindow []bool
 }
 
 type SemanticCoarseUnit struct {

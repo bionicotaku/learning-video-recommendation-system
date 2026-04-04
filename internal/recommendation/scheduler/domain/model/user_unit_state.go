@@ -38,6 +38,9 @@ type UserUnitState struct {
 
 	LastQuality *int
 
+	RecentQualityWindow     []int
+	RecentCorrectnessWindow []bool
+
 	Repetition   int
 	IntervalDays float64
 	EaseFactor   float64

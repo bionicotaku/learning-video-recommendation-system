@@ -31,10 +31,8 @@ insert into learning.unit_learning_events (
   sqlc.arg(created_at)
 );
 
--- name: FindUnitLearningEventsForReplay :many
+-- name: ListUnitLearningEventsByUserOrdered :many
 select *
 from learning.unit_learning_events
 where user_id = sqlc.arg(user_id)
-  and (sqlc.narg(coarse_unit_id)::bigint is null or coarse_unit_id = sqlc.narg(coarse_unit_id)::bigint)
-  and (sqlc.narg(from_occurred_at)::timestamptz is null or occurred_at >= sqlc.narg(from_occurred_at)::timestamptz)
 order by occurred_at asc, event_id asc;

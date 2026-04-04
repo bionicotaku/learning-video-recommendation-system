@@ -9,10 +9,9 @@ where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id)
 limit 1;
 
--- name: DeleteUserUnitStatesForReplay :exec
+-- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
-where user_id = sqlc.arg(user_id)
-  and (sqlc.narg(coarse_unit_id)::bigint is null or coarse_unit_id = sqlc.narg(coarse_unit_id)::bigint);
+where user_id = sqlc.arg(user_id);
 
 -- name: UpsertUserUnitState :exec
 insert into learning.user_unit_states (
@@ -37,6 +36,8 @@ insert into learning.user_unit_states (
   consecutive_correct,
   consecutive_wrong,
   last_quality,
+  recent_quality_window,
+  recent_correctness_window,
   repetition,
   interval_days,
   ease_factor,
@@ -66,6 +67,8 @@ insert into learning.user_unit_states (
   sqlc.arg(consecutive_correct),
   sqlc.arg(consecutive_wrong),
   sqlc.arg(last_quality),
+  sqlc.arg(recent_quality_window),
+  sqlc.arg(recent_correctness_window),
   sqlc.arg(repetition),
   sqlc.arg(interval_days),
   sqlc.arg(ease_factor),
@@ -95,6 +98,8 @@ set
   consecutive_correct = excluded.consecutive_correct,
   consecutive_wrong = excluded.consecutive_wrong,
   last_quality = excluded.last_quality,
+  recent_quality_window = excluded.recent_quality_window,
+  recent_correctness_window = excluded.recent_correctness_window,
   repetition = excluded.repetition,
   interval_days = excluded.interval_days,
   ease_factor = excluded.ease_factor,
@@ -126,6 +131,8 @@ select
   s.consecutive_correct,
   s.consecutive_wrong,
   s.last_quality,
+  s.recent_quality_window,
+  s.recent_correctness_window,
   s.repetition,
   s.interval_days,
   s.ease_factor,
@@ -169,6 +176,8 @@ select
   s.consecutive_correct,
   s.consecutive_wrong,
   s.last_quality,
+  s.recent_quality_window,
+  s.recent_correctness_window,
   s.repetition,
   s.interval_days,
   s.ease_factor,

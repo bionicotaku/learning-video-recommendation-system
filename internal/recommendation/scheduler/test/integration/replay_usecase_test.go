@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"learning-video-recommendation-system/internal/recommendation/scheduler/application/command"
-	"learning-video-recommendation-system/internal/recommendation/scheduler/application/usecase"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
-	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
 	infra "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure"
 	repopkg "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
-	txtx "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/tx"
 )
 
 func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
@@ -42,14 +40,10 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	}
 	unitID := unitIDs[0]
 
-	txManager := txtx.NewPGXTxManager(pool)
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
-	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
-	stateUpdater := domainservice.NewStateUpdater()
-
-	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(txManager, stateRepo, eventRepo, stateUpdater)
-	replayUC := usecase.NewReplayUserUnitStatesUseCase(txManager, stateRepo, eventRepo, stateUpdater)
+	recordUC := newRecordEventsUseCase(pool, baseQuerier)
+	replayUC := newReplayUseCase(pool, baseQuerier)
 
 	correct := true
 	q1 := 4
@@ -99,15 +93,14 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	corrupted.ProgressPercent = 0
 	corrupted.MasteryScore = 0
 	corrupted.NextReviewAt = nil
+	corrupted.RecentQualityWindow = []int{}
+	corrupted.RecentCorrectnessWindow = []bool{}
 	corrupted.UpdatedAt = time.Now()
 	if err := stateRepo.Upsert(ctx, &corrupted); err != nil {
 		t.Fatalf("Upsert(corrupted) error = %v", err)
 	}
 
-	result, err := replayUC.Execute(ctx, command.ReplayStateCommand{
-		UserID:       userID,
-		CoarseUnitID: &unitID,
-	})
+	result, err := replayUC.Execute(ctx, command.ReplayStateCommand{UserID: userID})
 	if err != nil {
 		t.Fatalf("replay Execute() error = %v", err)
 	}
@@ -126,30 +119,10 @@ func TestReplayUserUnitStatesUseCaseRebuildsOnlineState(t *testing.T) {
 		t.Fatal("rebuiltState = nil, want value")
 	}
 
-	if rebuiltState.Status != onlineState.Status {
-		t.Fatalf("rebuilt Status = %q, want %q", rebuiltState.Status, onlineState.Status)
-	}
-	if rebuiltState.Repetition != onlineState.Repetition {
-		t.Fatalf("rebuilt Repetition = %d, want %d", rebuiltState.Repetition, onlineState.Repetition)
-	}
-	if math.Abs(rebuiltState.IntervalDays-onlineState.IntervalDays) > 1e-9 {
-		t.Fatalf("rebuilt IntervalDays = %v, want %v", rebuiltState.IntervalDays, onlineState.IntervalDays)
-	}
-	if math.Abs(rebuiltState.EaseFactor-onlineState.EaseFactor) > 1e-9 {
-		t.Fatalf("rebuilt EaseFactor = %v, want %v", rebuiltState.EaseFactor, onlineState.EaseFactor)
-	}
-	if math.Abs(rebuiltState.ProgressPercent-onlineState.ProgressPercent) > 1e-9 {
-		t.Fatalf("rebuilt ProgressPercent = %v, want %v", rebuiltState.ProgressPercent, onlineState.ProgressPercent)
-	}
-	if math.Abs(rebuiltState.MasteryScore-onlineState.MasteryScore) > 1e-9 {
-		t.Fatalf("rebuilt MasteryScore = %v, want %v", rebuiltState.MasteryScore, onlineState.MasteryScore)
-	}
-	if !sameOptionalTime(rebuiltState.NextReviewAt, onlineState.NextReviewAt) {
-		t.Fatalf("rebuilt NextReviewAt = %v, want %v", rebuiltState.NextReviewAt, onlineState.NextReviewAt)
-	}
+	assertReplayedStateMatches(t, rebuiltState, onlineState)
 }
 
-func TestReplayUserUnitStatesUseCaseFromTimeOnlyRebuildsAffectedUnits(t *testing.T) {
+func TestReplayUserUnitStatesUseCaseRebuildsAllUserUnits(t *testing.T) {
 	cfg := infra.LoadConfig()
 	if cfg.DatabaseURL == "" {
 		t.Skip("DATABASE_URL is not set")
@@ -173,138 +146,138 @@ func TestReplayUserUnitStatesUseCaseFromTimeOnlyRebuildsAffectedUnits(t *testing
 	if err != nil {
 		t.Fatalf("loadAvailableCoarseUnitIDsFromPool() error = %v", err)
 	}
-	unitA := unitIDs[0]
-	unitB := unitIDs[1]
 
-	txManager := txtx.NewPGXTxManager(pool)
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
-	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
-	stateUpdater := domainservice.NewStateUpdater()
-
-	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(txManager, stateRepo, eventRepo, stateUpdater)
-	replayUC := usecase.NewReplayUserUnitStatesUseCase(txManager, stateRepo, eventRepo, stateUpdater)
+	recordUC := newRecordEventsUseCase(pool, baseQuerier)
+	replayUC := newReplayUseCase(pool, baseQuerier)
 
 	correct := true
-	q4 := 4
-	q5 := 5
-	baseTime := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
-	cutoff := baseTime.Add(24 * time.Hour)
+	quality := 4
+	start := time.Date(2026, 4, 10, 10, 0, 0, 0, time.UTC)
 
 	_, err = recordUC.Execute(ctx, command.RecordLearningEventsCommand{
 		UserID: userID,
 		Events: []command.LearningEventInput{
 			{
-				CoarseUnitID: unitA,
+				CoarseUnitID: unitIDs[0],
 				EventType:    enum.EventTypeNewLearn,
 				SourceType:   "integration_test",
-				SourceRefID:  "from-time-a-1",
+				SourceRefID:  "full-replay-a",
 				IsCorrect:    &correct,
-				Quality:      &q4,
-				OccurredAt:   baseTime,
+				Quality:      &quality,
+				OccurredAt:   start,
 			},
 			{
-				CoarseUnitID: unitA,
-				EventType:    enum.EventTypeReview,
-				SourceType:   "integration_test",
-				SourceRefID:  "from-time-a-2",
-				IsCorrect:    &correct,
-				Quality:      &q5,
-				OccurredAt:   cutoff,
-			},
-			{
-				CoarseUnitID: unitB,
+				CoarseUnitID: unitIDs[1],
 				EventType:    enum.EventTypeNewLearn,
 				SourceType:   "integration_test",
-				SourceRefID:  "from-time-b-1",
+				SourceRefID:  "full-replay-b",
 				IsCorrect:    &correct,
-				Quality:      &q4,
-				OccurredAt:   baseTime,
+				Quality:      &quality,
+				OccurredAt:   start.Add(time.Hour),
 			},
 		},
-		IdempotencyKey: "replay-from-time-seed",
+		IdempotencyKey: "full-replay-seed",
 	})
 	if err != nil {
 		t.Fatalf("record Execute() error = %v", err)
 	}
 
-	onlineA, err := stateRepo.GetByUserAndUnit(ctx, userID, unitA)
+	beforeA, err := stateRepo.GetByUserAndUnit(ctx, userID, unitIDs[0])
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit(unitA) error = %v", err)
 	}
-	if onlineA == nil {
-		t.Fatal("onlineA = nil, want value")
-	}
-
-	onlineB, err := stateRepo.GetByUserAndUnit(ctx, userID, unitB)
+	beforeB, err := stateRepo.GetByUserAndUnit(ctx, userID, unitIDs[1])
 	if err != nil {
 		t.Fatalf("GetByUserAndUnit(unitB) error = %v", err)
 	}
-	if onlineB == nil {
-		t.Fatal("onlineB = nil, want value")
+	if beforeA == nil || beforeB == nil {
+		t.Fatal("seed states missing")
 	}
 
-	corruptedA := *onlineA
+	corruptedA := *beforeA
 	corruptedA.Status = enum.UnitStatusSuspended
-	corruptedA.IntervalDays = 0
-	corruptedA.Repetition = 0
-	corruptedA.ProgressPercent = 0
-	corruptedA.MasteryScore = 0
-	corruptedA.NextReviewAt = nil
-	corruptedA.UpdatedAt = time.Now()
+	corruptedA.RecentQualityWindow = []int{}
+	corruptedA.RecentCorrectnessWindow = []bool{}
 	if err := stateRepo.Upsert(ctx, &corruptedA); err != nil {
 		t.Fatalf("Upsert(corruptedA) error = %v", err)
 	}
 
-	corruptedB := *onlineB
+	corruptedB := *beforeB
 	corruptedB.Status = enum.UnitStatusSuspended
-	corruptedB.IntervalDays = 0
-	corruptedB.Repetition = 0
 	corruptedB.ProgressPercent = 0
 	corruptedB.MasteryScore = 0
 	corruptedB.NextReviewAt = nil
-	corruptedB.UpdatedAt = time.Now()
+	corruptedB.RecentQualityWindow = []int{}
+	corruptedB.RecentCorrectnessWindow = []bool{}
 	if err := stateRepo.Upsert(ctx, &corruptedB); err != nil {
 		t.Fatalf("Upsert(corruptedB) error = %v", err)
 	}
 
-	result, err := replayUC.Execute(ctx, command.ReplayStateCommand{
-		UserID:   userID,
-		FromTime: &cutoff,
-	})
+	result, err := replayUC.Execute(ctx, command.ReplayStateCommand{UserID: userID})
 	if err != nil {
 		t.Fatalf("replay Execute() error = %v", err)
 	}
-	if result.RebuiltCount != 1 {
-		t.Fatalf("RebuiltCount = %d, want 1", result.RebuiltCount)
+	if result.RebuiltCount != 2 {
+		t.Fatalf("RebuiltCount = %d, want 2", result.RebuiltCount)
 	}
 
-	rebuiltA, err := stateRepo.GetByUserAndUnit(ctx, userID, unitA)
+	afterA, err := stateRepo.GetByUserAndUnit(ctx, userID, unitIDs[0])
 	if err != nil {
-		t.Fatalf("GetByUserAndUnit(rebuiltA) error = %v", err)
+		t.Fatalf("GetByUserAndUnit(afterA) error = %v", err)
 	}
-	if rebuiltA == nil {
-		t.Fatal("rebuiltA = nil, want value")
+	afterB, err := stateRepo.GetByUserAndUnit(ctx, userID, unitIDs[1])
+	if err != nil {
+		t.Fatalf("GetByUserAndUnit(afterB) error = %v", err)
 	}
-	if rebuiltA.Status != onlineA.Status {
-		t.Fatalf("rebuiltA Status = %q, want %q", rebuiltA.Status, onlineA.Status)
-	}
-	if math.Abs(rebuiltA.IntervalDays-onlineA.IntervalDays) > 1e-9 {
-		t.Fatalf("rebuiltA IntervalDays = %v, want %v", rebuiltA.IntervalDays, onlineA.IntervalDays)
-	}
-	if !sameOptionalTime(rebuiltA.NextReviewAt, onlineA.NextReviewAt) {
-		t.Fatalf("rebuiltA NextReviewAt = %v, want %v", rebuiltA.NextReviewAt, onlineA.NextReviewAt)
+	if afterA == nil || afterB == nil {
+		t.Fatal("replayed states missing")
 	}
 
-	stillCorruptedB, err := stateRepo.GetByUserAndUnit(ctx, userID, unitB)
-	if err != nil {
-		t.Fatalf("GetByUserAndUnit(unitB after replay) error = %v", err)
+	assertReplayedStateMatches(t, afterA, beforeA)
+	assertReplayedStateMatches(t, afterB, beforeB)
+}
+
+func assertReplayedStateMatches(t *testing.T, got, want *model.UserUnitState) {
+	t.Helper()
+
+	if got.Status != want.Status {
+		t.Fatalf("rebuilt Status = %q, want %q", got.Status, want.Status)
 	}
-	if stillCorruptedB == nil {
-		t.Fatal("stillCorruptedB = nil, want value")
+	if got.Repetition != want.Repetition {
+		t.Fatalf("rebuilt Repetition = %d, want %d", got.Repetition, want.Repetition)
 	}
-	if stillCorruptedB.Status != enum.UnitStatusSuspended {
-		t.Fatalf("unitB Status = %q, want %q", stillCorruptedB.Status, enum.UnitStatusSuspended)
+	if math.Abs(got.IntervalDays-want.IntervalDays) > 1e-9 {
+		t.Fatalf("rebuilt IntervalDays = %v, want %v", got.IntervalDays, want.IntervalDays)
+	}
+	if math.Abs(got.EaseFactor-want.EaseFactor) > 1e-9 {
+		t.Fatalf("rebuilt EaseFactor = %v, want %v", got.EaseFactor, want.EaseFactor)
+	}
+	if math.Abs(got.ProgressPercent-want.ProgressPercent) > 1e-9 {
+		t.Fatalf("rebuilt ProgressPercent = %v, want %v", got.ProgressPercent, want.ProgressPercent)
+	}
+	if math.Abs(got.MasteryScore-want.MasteryScore) > 1e-9 {
+		t.Fatalf("rebuilt MasteryScore = %v, want %v", got.MasteryScore, want.MasteryScore)
+	}
+	if !sameOptionalTime(got.NextReviewAt, want.NextReviewAt) {
+		t.Fatalf("rebuilt NextReviewAt = %v, want %v", got.NextReviewAt, want.NextReviewAt)
+	}
+	if len(got.RecentQualityWindow) != len(want.RecentQualityWindow) {
+		t.Fatalf("rebuilt RecentQualityWindow = %v, want %v", got.RecentQualityWindow, want.RecentQualityWindow)
+	}
+	for i := range got.RecentQualityWindow {
+		if got.RecentQualityWindow[i] != want.RecentQualityWindow[i] {
+			t.Fatalf("rebuilt RecentQualityWindow = %v, want %v", got.RecentQualityWindow, want.RecentQualityWindow)
+		}
+	}
+	if len(got.RecentCorrectnessWindow) != len(want.RecentCorrectnessWindow) {
+		t.Fatalf("rebuilt RecentCorrectnessWindow = %v, want %v", got.RecentCorrectnessWindow, want.RecentCorrectnessWindow)
+	}
+	for i := range got.RecentCorrectnessWindow {
+		if got.RecentCorrectnessWindow[i] != want.RecentCorrectnessWindow[i] {
+			t.Fatalf("rebuilt RecentCorrectnessWindow = %v, want %v", got.RecentCorrectnessWindow, want.RecentCorrectnessWindow)
+		}
 	}
 }
 

@@ -23,55 +23,6 @@ func (q *Queries) CountUnitLearningEvents(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
-const findUnitLearningEventsForReplay = `-- name: FindUnitLearningEventsForReplay :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, source_type, source_ref_id, is_correct, quality, response_time_ms, metadata, occurred_at, created_at
-from learning.unit_learning_events
-where user_id = $1
-  and ($2::bigint is null or coarse_unit_id = $2::bigint)
-  and ($3::timestamptz is null or occurred_at >= $3::timestamptz)
-order by occurred_at asc, event_id asc
-`
-
-type FindUnitLearningEventsForReplayParams struct {
-	UserID         pgtype.UUID
-	CoarseUnitID   pgtype.Int8
-	FromOccurredAt pgtype.Timestamptz
-}
-
-func (q *Queries) FindUnitLearningEventsForReplay(ctx context.Context, arg FindUnitLearningEventsForReplayParams) ([]LearningUnitLearningEvent, error) {
-	rows, err := q.db.Query(ctx, findUnitLearningEventsForReplay, arg.UserID, arg.CoarseUnitID, arg.FromOccurredAt)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []LearningUnitLearningEvent
-	for rows.Next() {
-		var i LearningUnitLearningEvent
-		if err := rows.Scan(
-			&i.EventID,
-			&i.UserID,
-			&i.CoarseUnitID,
-			&i.VideoID,
-			&i.EventType,
-			&i.SourceType,
-			&i.SourceRefID,
-			&i.IsCorrect,
-			&i.Quality,
-			&i.ResponseTimeMs,
-			&i.Metadata,
-			&i.OccurredAt,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const insertUnitLearningEvent = `-- name: InsertUnitLearningEvent :exec
 insert into learning.unit_learning_events (
   user_id,
@@ -133,4 +84,45 @@ func (q *Queries) InsertUnitLearningEvent(ctx context.Context, arg InsertUnitLea
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const listUnitLearningEventsByUserOrdered = `-- name: ListUnitLearningEventsByUserOrdered :many
+select event_id, user_id, coarse_unit_id, video_id, event_type, source_type, source_ref_id, is_correct, quality, response_time_ms, metadata, occurred_at, created_at
+from learning.unit_learning_events
+where user_id = $1
+order by occurred_at asc, event_id asc
+`
+
+func (q *Queries) ListUnitLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error) {
+	rows, err := q.db.Query(ctx, listUnitLearningEventsByUserOrdered, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LearningUnitLearningEvent
+	for rows.Next() {
+		var i LearningUnitLearningEvent
+		if err := rows.Scan(
+			&i.EventID,
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.VideoID,
+			&i.EventType,
+			&i.SourceType,
+			&i.SourceRefID,
+			&i.IsCorrect,
+			&i.Quality,
+			&i.ResponseTimeMs,
+			&i.Metadata,
+			&i.OccurredAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

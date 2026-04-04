@@ -23,19 +23,13 @@ func (q *Queries) CountUserUnitStates(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
-const deleteUserUnitStatesForReplay = `-- name: DeleteUserUnitStatesForReplay :exec
+const deleteUserUnitStatesByUser = `-- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
 where user_id = $1
-  and ($2::bigint is null or coarse_unit_id = $2::bigint)
 `
 
-type DeleteUserUnitStatesForReplayParams struct {
-	UserID       pgtype.UUID
-	CoarseUnitID pgtype.Int8
-}
-
-func (q *Queries) DeleteUserUnitStatesForReplay(ctx context.Context, arg DeleteUserUnitStatesForReplayParams) error {
-	_, err := q.db.Exec(ctx, deleteUserUnitStatesForReplay, arg.UserID, arg.CoarseUnitID)
+func (q *Queries) DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserUnitStatesByUser, userID)
 	return err
 }
 
@@ -62,6 +56,8 @@ select
   s.consecutive_correct,
   s.consecutive_wrong,
   s.last_quality,
+  s.recent_quality_window,
+  s.recent_correctness_window,
   s.repetition,
   s.interval_days,
   s.ease_factor,
@@ -89,39 +85,41 @@ type FindDueReviewCandidatesParams struct {
 }
 
 type FindDueReviewCandidatesRow struct {
-	UserID             pgtype.UUID
-	CoarseUnitID       int64
-	IsTarget           bool
-	TargetSource       pgtype.Text
-	TargetSourceRefID  pgtype.Text
-	TargetPriority     pgtype.Numeric
-	Status             string
-	ProgressPercent    pgtype.Numeric
-	MasteryScore       pgtype.Numeric
-	FirstSeenAt        pgtype.Timestamptz
-	LastSeenAt         pgtype.Timestamptz
-	LastReviewedAt     pgtype.Timestamptz
-	LastRecommendedAt  pgtype.Timestamptz
-	SeenCount          int32
-	StrongEventCount   int32
-	ReviewCount        int32
-	CorrectCount       int32
-	WrongCount         int32
-	ConsecutiveCorrect int32
-	ConsecutiveWrong   int32
-	LastQuality        pgtype.Int2
-	Repetition         int32
-	IntervalDays       pgtype.Numeric
-	EaseFactor         pgtype.Numeric
-	NextReviewAt       pgtype.Timestamptz
-	SuspendedReason    pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
-	UnitKind           string
-	UnitLabel          string
-	UnitPos            pgtype.Text
-	UnitEnglishDef     pgtype.Text
-	UnitChineseDef     pgtype.Text
+	UserID                  pgtype.UUID
+	CoarseUnitID            int64
+	IsTarget                bool
+	TargetSource            pgtype.Text
+	TargetSourceRefID       pgtype.Text
+	TargetPriority          pgtype.Numeric
+	Status                  string
+	ProgressPercent         pgtype.Numeric
+	MasteryScore            pgtype.Numeric
+	FirstSeenAt             pgtype.Timestamptz
+	LastSeenAt              pgtype.Timestamptz
+	LastReviewedAt          pgtype.Timestamptz
+	LastRecommendedAt       pgtype.Timestamptz
+	SeenCount               int32
+	StrongEventCount        int32
+	ReviewCount             int32
+	CorrectCount            int32
+	WrongCount              int32
+	ConsecutiveCorrect      int32
+	ConsecutiveWrong        int32
+	LastQuality             pgtype.Int2
+	RecentQualityWindow     []int16
+	RecentCorrectnessWindow []bool
+	Repetition              int32
+	IntervalDays            pgtype.Numeric
+	EaseFactor              pgtype.Numeric
+	NextReviewAt            pgtype.Timestamptz
+	SuspendedReason         pgtype.Text
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	UnitKind                string
+	UnitLabel               string
+	UnitPos                 pgtype.Text
+	UnitEnglishDef          pgtype.Text
+	UnitChineseDef          pgtype.Text
 }
 
 func (q *Queries) FindDueReviewCandidates(ctx context.Context, arg FindDueReviewCandidatesParams) ([]FindDueReviewCandidatesRow, error) {
@@ -155,6 +153,8 @@ func (q *Queries) FindDueReviewCandidates(ctx context.Context, arg FindDueReview
 			&i.ConsecutiveCorrect,
 			&i.ConsecutiveWrong,
 			&i.LastQuality,
+			&i.RecentQualityWindow,
+			&i.RecentCorrectnessWindow,
 			&i.Repetition,
 			&i.IntervalDays,
 			&i.EaseFactor,
@@ -201,6 +201,8 @@ select
   s.consecutive_correct,
   s.consecutive_wrong,
   s.last_quality,
+  s.recent_quality_window,
+  s.recent_correctness_window,
   s.repetition,
   s.interval_days,
   s.ease_factor,
@@ -222,39 +224,41 @@ order by s.target_priority desc, s.coarse_unit_id asc
 `
 
 type FindNewCandidatesRow struct {
-	UserID             pgtype.UUID
-	CoarseUnitID       int64
-	IsTarget           bool
-	TargetSource       pgtype.Text
-	TargetSourceRefID  pgtype.Text
-	TargetPriority     pgtype.Numeric
-	Status             string
-	ProgressPercent    pgtype.Numeric
-	MasteryScore       pgtype.Numeric
-	FirstSeenAt        pgtype.Timestamptz
-	LastSeenAt         pgtype.Timestamptz
-	LastReviewedAt     pgtype.Timestamptz
-	LastRecommendedAt  pgtype.Timestamptz
-	SeenCount          int32
-	StrongEventCount   int32
-	ReviewCount        int32
-	CorrectCount       int32
-	WrongCount         int32
-	ConsecutiveCorrect int32
-	ConsecutiveWrong   int32
-	LastQuality        pgtype.Int2
-	Repetition         int32
-	IntervalDays       pgtype.Numeric
-	EaseFactor         pgtype.Numeric
-	NextReviewAt       pgtype.Timestamptz
-	SuspendedReason    pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
-	UnitKind           string
-	UnitLabel          string
-	UnitPos            pgtype.Text
-	UnitEnglishDef     pgtype.Text
-	UnitChineseDef     pgtype.Text
+	UserID                  pgtype.UUID
+	CoarseUnitID            int64
+	IsTarget                bool
+	TargetSource            pgtype.Text
+	TargetSourceRefID       pgtype.Text
+	TargetPriority          pgtype.Numeric
+	Status                  string
+	ProgressPercent         pgtype.Numeric
+	MasteryScore            pgtype.Numeric
+	FirstSeenAt             pgtype.Timestamptz
+	LastSeenAt              pgtype.Timestamptz
+	LastReviewedAt          pgtype.Timestamptz
+	LastRecommendedAt       pgtype.Timestamptz
+	SeenCount               int32
+	StrongEventCount        int32
+	ReviewCount             int32
+	CorrectCount            int32
+	WrongCount              int32
+	ConsecutiveCorrect      int32
+	ConsecutiveWrong        int32
+	LastQuality             pgtype.Int2
+	RecentQualityWindow     []int16
+	RecentCorrectnessWindow []bool
+	Repetition              int32
+	IntervalDays            pgtype.Numeric
+	EaseFactor              pgtype.Numeric
+	NextReviewAt            pgtype.Timestamptz
+	SuspendedReason         pgtype.Text
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
+	UnitKind                string
+	UnitLabel               string
+	UnitPos                 pgtype.Text
+	UnitEnglishDef          pgtype.Text
+	UnitChineseDef          pgtype.Text
 }
 
 func (q *Queries) FindNewCandidates(ctx context.Context, userID pgtype.UUID) ([]FindNewCandidatesRow, error) {
@@ -288,6 +292,8 @@ func (q *Queries) FindNewCandidates(ctx context.Context, userID pgtype.UUID) ([]
 			&i.ConsecutiveCorrect,
 			&i.ConsecutiveWrong,
 			&i.LastQuality,
+			&i.RecentQualityWindow,
+			&i.RecentCorrectnessWindow,
 			&i.Repetition,
 			&i.IntervalDays,
 			&i.EaseFactor,
@@ -312,7 +318,7 @@ func (q *Queries) FindNewCandidates(ctx context.Context, userID pgtype.UUID) ([]
 }
 
 const getUserUnitStateByUserAndUnit = `-- name: GetUserUnitStateByUserAndUnit :one
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, last_recommended_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, last_recommended_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at, recent_quality_window, recent_correctness_window
 from learning.user_unit_states
 where user_id = $1
   and coarse_unit_id = $2
@@ -356,6 +362,8 @@ func (q *Queries) GetUserUnitStateByUserAndUnit(ctx context.Context, arg GetUser
 		&i.SuspendedReason,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentQualityWindow,
+		&i.RecentCorrectnessWindow,
 	)
 	return i, err
 }
@@ -383,6 +391,8 @@ insert into learning.user_unit_states (
   consecutive_correct,
   consecutive_wrong,
   last_quality,
+  recent_quality_window,
+  recent_correctness_window,
   repetition,
   interval_days,
   ease_factor,
@@ -418,7 +428,9 @@ insert into learning.user_unit_states (
   $25,
   $26,
   $27,
-  $28
+  $28,
+  $29,
+  $30
 )
 on conflict (user_id, coarse_unit_id) do update
 set
@@ -441,6 +453,8 @@ set
   consecutive_correct = excluded.consecutive_correct,
   consecutive_wrong = excluded.consecutive_wrong,
   last_quality = excluded.last_quality,
+  recent_quality_window = excluded.recent_quality_window,
+  recent_correctness_window = excluded.recent_correctness_window,
   repetition = excluded.repetition,
   interval_days = excluded.interval_days,
   ease_factor = excluded.ease_factor,
@@ -451,34 +465,36 @@ set
 `
 
 type UpsertUserUnitStateParams struct {
-	UserID             pgtype.UUID
-	CoarseUnitID       int64
-	IsTarget           bool
-	TargetSource       pgtype.Text
-	TargetSourceRefID  pgtype.Text
-	TargetPriority     pgtype.Numeric
-	Status             string
-	ProgressPercent    pgtype.Numeric
-	MasteryScore       pgtype.Numeric
-	FirstSeenAt        pgtype.Timestamptz
-	LastSeenAt         pgtype.Timestamptz
-	LastReviewedAt     pgtype.Timestamptz
-	LastRecommendedAt  pgtype.Timestamptz
-	SeenCount          int32
-	StrongEventCount   int32
-	ReviewCount        int32
-	CorrectCount       int32
-	WrongCount         int32
-	ConsecutiveCorrect int32
-	ConsecutiveWrong   int32
-	LastQuality        pgtype.Int2
-	Repetition         int32
-	IntervalDays       pgtype.Numeric
-	EaseFactor         pgtype.Numeric
-	NextReviewAt       pgtype.Timestamptz
-	SuspendedReason    pgtype.Text
-	CreatedAt          pgtype.Timestamptz
-	UpdatedAt          pgtype.Timestamptz
+	UserID                  pgtype.UUID
+	CoarseUnitID            int64
+	IsTarget                bool
+	TargetSource            pgtype.Text
+	TargetSourceRefID       pgtype.Text
+	TargetPriority          pgtype.Numeric
+	Status                  string
+	ProgressPercent         pgtype.Numeric
+	MasteryScore            pgtype.Numeric
+	FirstSeenAt             pgtype.Timestamptz
+	LastSeenAt              pgtype.Timestamptz
+	LastReviewedAt          pgtype.Timestamptz
+	LastRecommendedAt       pgtype.Timestamptz
+	SeenCount               int32
+	StrongEventCount        int32
+	ReviewCount             int32
+	CorrectCount            int32
+	WrongCount              int32
+	ConsecutiveCorrect      int32
+	ConsecutiveWrong        int32
+	LastQuality             pgtype.Int2
+	RecentQualityWindow     []int16
+	RecentCorrectnessWindow []bool
+	Repetition              int32
+	IntervalDays            pgtype.Numeric
+	EaseFactor              pgtype.Numeric
+	NextReviewAt            pgtype.Timestamptz
+	SuspendedReason         pgtype.Text
+	CreatedAt               pgtype.Timestamptz
+	UpdatedAt               pgtype.Timestamptz
 }
 
 func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitStateParams) error {
@@ -504,6 +520,8 @@ func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitSta
 		arg.ConsecutiveCorrect,
 		arg.ConsecutiveWrong,
 		arg.LastQuality,
+		arg.RecentQualityWindow,
+		arg.RecentCorrectnessWindow,
 		arg.Repetition,
 		arg.IntervalDays,
 		arg.EaseFactor,

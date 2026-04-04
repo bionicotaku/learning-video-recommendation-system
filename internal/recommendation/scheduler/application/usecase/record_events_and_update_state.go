@@ -7,48 +7,45 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/application/command"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/application/dto"
 	apprepo "learning-video-recommendation-system/internal/recommendation/scheduler/application/repository"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/aggregate"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/policy"
-	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 )
 
 type RecordLearningEventsAndUpdateStateUseCase struct {
-	txManager    apprepo.TxManager
-	stateRepo    apprepo.UserUnitStateRepository
-	eventRepo    apprepo.UnitLearningEventRepository
-	stateUpdater domainservice.StateUpdater
+	txManager apprepo.TxManager
+	stateRepo apprepo.UserUnitStateRepository
+	eventRepo apprepo.UnitLearningEventRepository
+	reducer   aggregate.UserUnitReducer
 }
 
 func NewRecordLearningEventsAndUpdateStateUseCase(
 	txManager apprepo.TxManager,
 	stateRepo apprepo.UserUnitStateRepository,
 	eventRepo apprepo.UnitLearningEventRepository,
-	stateUpdater domainservice.StateUpdater,
+	reducer aggregate.UserUnitReducer,
 ) RecordLearningEventsAndUpdateStateUseCase {
 	return RecordLearningEventsAndUpdateStateUseCase{
-		txManager:    txManager,
-		stateRepo:    stateRepo,
-		eventRepo:    eventRepo,
-		stateUpdater: stateUpdater,
+		txManager: txManager,
+		stateRepo: stateRepo,
+		eventRepo: eventRepo,
+		reducer:   reducer,
 	}
 }
 
 func (uc RecordLearningEventsAndUpdateStateUseCase) Execute(ctx context.Context, cmd command.RecordLearningEventsCommand) (dto.RecordLearningEventsResult, error) {
 	updatedUnits := make([]int64, 0, len(cmd.Events))
 	seenUnits := make(map[int64]struct{}, len(cmd.Events))
+	schedulerPolicy := policy.DefaultSchedulerPolicy()
 
 	err := uc.txManager.WithinTx(ctx, func(ctx context.Context) error {
 		for _, input := range cmd.Events {
-			history, err := uc.eventRepo.FindForReplay(ctx, cmd.UserID, &input.CoarseUnitID, nil)
-			if err != nil {
-				return err
-			}
-
 			currentState, err := uc.stateRepo.GetByUserAndUnit(ctx, cmd.UserID, input.CoarseUnitID)
 			if err != nil {
 				return err
 			}
 
+			now := time.Now()
 			event := model.LearningEvent{
 				UserID:         cmd.UserID,
 				CoarseUnitID:   input.CoarseUnitID,
@@ -60,31 +57,27 @@ func (uc RecordLearningEventsAndUpdateStateUseCase) Execute(ctx context.Context,
 				Quality:        input.Quality,
 				ResponseTimeMs: input.ResponseTimeMs,
 				Metadata:       input.Metadata,
-				OccurredAt:     nonZeroTime(input.OccurredAt, time.Now()),
-				CreatedAt:      time.Now(),
-			}
-
-			nextState, _, err := uc.stateUpdater.Apply(currentState, event, domainservice.UpdateContext{
-				SchedulerPolicy:   policy.DefaultSchedulerPolicy(),
-				RecentQualities:   recentQualitiesFromEvents(history),
-				RecentCorrectness: recentCorrectnessFromEvents(history),
-				Now:               event.CreatedAt,
-			})
-			if err != nil {
-				return err
+				OccurredAt:     nonZeroTime(input.OccurredAt, now),
+				CreatedAt:      now,
 			}
 
 			if err := uc.eventRepo.Append(ctx, []model.LearningEvent{event}); err != nil {
+				return err
+			}
+
+			nextState, err := uc.reducer.Reduce(currentState, event, schedulerPolicy)
+			if err != nil {
 				return err
 			}
 			if err := uc.stateRepo.Upsert(ctx, nextState); err != nil {
 				return err
 			}
 
-			if _, ok := seenUnits[input.CoarseUnitID]; !ok {
-				seenUnits[input.CoarseUnitID] = struct{}{}
-				updatedUnits = append(updatedUnits, input.CoarseUnitID)
+			if _, ok := seenUnits[input.CoarseUnitID]; ok {
+				continue
 			}
+			seenUnits[input.CoarseUnitID] = struct{}{}
+			updatedUnits = append(updatedUnits, input.CoarseUnitID)
 		}
 
 		return nil
@@ -97,28 +90,6 @@ func (uc RecordLearningEventsAndUpdateStateUseCase) Execute(ctx context.Context,
 		AcceptedCount: len(cmd.Events),
 		UpdatedUnits:  updatedUnits,
 	}, nil
-}
-
-func recentQualitiesFromEvents(events []model.LearningEvent) []int {
-	qualities := make([]int, 0, len(events))
-	for _, event := range events {
-		if event.Quality != nil {
-			qualities = append(qualities, *event.Quality)
-		}
-	}
-
-	return qualities
-}
-
-func recentCorrectnessFromEvents(events []model.LearningEvent) []bool {
-	values := make([]bool, 0, len(events))
-	for _, event := range events {
-		if event.IsCorrect != nil {
-			values = append(values, *event.IsCorrect)
-		}
-	}
-
-	return values
 }
 
 func nonZeroTime(value, fallback time.Time) time.Time {

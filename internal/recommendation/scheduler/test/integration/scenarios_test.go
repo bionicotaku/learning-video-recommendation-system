@@ -16,7 +16,6 @@ import (
 	infra "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure"
 	repopkg "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
-	txtx "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/tx"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -49,7 +48,6 @@ func TestIntegrationScenarioANewUserInitialLearning(t *testing.T) {
 
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
-	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
 	now := time.Date(2026, 4, 10, 9, 0, 0, 0, time.UTC)
 
 	if err := stateRepo.BatchUpsert(ctx, []*model.UserUnitState{
@@ -111,12 +109,7 @@ func TestIntegrationScenarioANewUserInitialLearning(t *testing.T) {
 		}
 	}
 
-	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(
-		txtx.NewPGXTxManager(pool),
-		stateRepo,
-		eventRepo,
-		domainservice.NewStateUpdater(),
-	)
+	recordUC := newRecordEventsUseCase(pool, baseQuerier)
 	correct := true
 	quality := 4
 	_, err = recordUC.Execute(ctx, command.RecordLearningEventsCommand{
@@ -183,12 +176,7 @@ func TestIntegrationScenarioBNormalReviewProgressionToMastered(t *testing.T) {
 	unitID := unitIDs[0]
 
 	baseQuerier := sqlcgen.New(pool)
-	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(
-		txtx.NewPGXTxManager(pool),
-		repopkg.NewUserUnitStateRepository(baseQuerier),
-		repopkg.NewUnitLearningEventRepository(baseQuerier),
-		domainservice.NewStateUpdater(),
-	)
+	recordUC := newRecordEventsUseCase(pool, baseQuerier)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
 
 	correct := true
@@ -279,12 +267,7 @@ func TestIntegrationScenarioCFailureRegressionResetsIntervalWithoutChangingEF(t 
 	unitID := unitIDs[0]
 
 	baseQuerier := sqlcgen.New(pool)
-	recordUC := usecase.NewRecordLearningEventsAndUpdateStateUseCase(
-		txtx.NewPGXTxManager(pool),
-		repopkg.NewUserUnitStateRepository(baseQuerier),
-		repopkg.NewUnitLearningEventRepository(baseQuerier),
-		domainservice.NewStateUpdater(),
-	)
+	recordUC := newRecordEventsUseCase(pool, baseQuerier)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
 
 	correct := true

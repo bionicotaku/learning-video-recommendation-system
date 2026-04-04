@@ -155,6 +155,48 @@ func textFromPG(value pgtype.Text) string {
 	return value.String
 }
 
+func intsFromPG(values []int16) []int {
+	if len(values) == 0 {
+		return []int{}
+	}
+
+	out := make([]int, 0, len(values))
+	for _, value := range values {
+		out = append(out, int(value))
+	}
+
+	return out
+}
+
+func intsToPG(values []int) []int16 {
+	if len(values) == 0 {
+		return []int16{}
+	}
+
+	out := make([]int16, 0, len(values))
+	for _, value := range values {
+		out = append(out, int16(value))
+	}
+
+	return out
+}
+
+func boolsFromPG(values []bool) []bool {
+	if len(values) == 0 {
+		return []bool{}
+	}
+
+	return append([]bool(nil), values...)
+}
+
+func boolsToPG(values []bool) []bool {
+	if len(values) == 0 {
+		return []bool{}
+	}
+
+	return append([]bool(nil), values...)
+}
+
 func metadataFromBytes(value []byte) (map[string]any, error) {
 	if len(value) == 0 {
 		return map[string]any{}, nil

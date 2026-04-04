@@ -10,9 +10,9 @@ import (
 	appquery "learning-video-recommendation-system/internal/recommendation/scheduler/application/query"
 	apprepo "learning-video-recommendation-system/internal/recommendation/scheduler/application/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/application/usecase"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/aggregate"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
-	domainservice "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 	infra "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure"
 	repopkg "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
@@ -48,13 +48,10 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 		t.Fatalf("loadAvailableCoarseUnitIDsFromPool() error = %v", err)
 	}
 
-	txManager := txtx.NewPGXTxManager(pool)
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
 	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
-	stateUpdater := domainservice.NewStateUpdater()
-
-	uc := usecase.NewRecordLearningEventsAndUpdateStateUseCase(txManager, stateRepo, eventRepo, stateUpdater)
+	uc := newRecordEventsUseCase(pool, baseQuerier)
 
 	correct := true
 	quality := 4
@@ -86,10 +83,11 @@ func TestRecordLearningEventsAndUpdateStateUseCase(t *testing.T) {
 		t.Fatalf("UpdatedUnits = %v, want [%d]", result.UpdatedUnits, unitIDs[0])
 	}
 
-	events, err := eventRepo.FindForReplay(ctx, userID, &unitIDs[0], nil)
+	events, err := eventRepo.ListByUserOrdered(ctx, userID)
 	if err != nil {
-		t.Fatalf("FindForReplay() error = %v", err)
+		t.Fatalf("ListByUserOrdered() error = %v", err)
 	}
+	events = filterEventsByUnit(events, userID, unitIDs[0])
 	if len(events) != 1 {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}
@@ -138,7 +136,7 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 		txtx.NewPGXTxManager(pool),
 		failingUserUnitStateRepository{delegate: baseStateRepo},
 		eventRepo,
-		domainservice.NewStateUpdater(),
+		aggregate.NewUserUnitReducer(),
 	)
 
 	correct := true
@@ -163,10 +161,11 @@ func TestRecordLearningEventsAndUpdateStateUseCaseRollsBackOnStateFailure(t *tes
 		t.Fatal("Execute() error = nil, want rollback error")
 	}
 
-	events, err := eventRepo.FindForReplay(ctx, userID, &unitIDs[0], nil)
+	events, err := eventRepo.ListByUserOrdered(ctx, userID)
 	if err != nil {
-		t.Fatalf("FindForReplay() error = %v", err)
+		t.Fatalf("ListByUserOrdered() error = %v", err)
 	}
+	events = filterEventsByUnit(events, userID, unitIDs[0])
 	if len(events) != 0 {
 		t.Fatalf("len(events) = %d, want 0 after rollback", len(events))
 	}
@@ -196,8 +195,8 @@ func (f failingUserUnitStateRepository) BatchUpsert(ctx context.Context, states 
 	return f.delegate.BatchUpsert(ctx, states)
 }
 
-func (f failingUserUnitStateRepository) DeleteForReplay(ctx context.Context, userID uuid.UUID, coarseUnitID *int64) error {
-	return f.delegate.DeleteForReplay(ctx, userID, coarseUnitID)
+func (f failingUserUnitStateRepository) DeleteByUser(ctx context.Context, userID uuid.UUID) error {
+	return f.delegate.DeleteByUser(ctx, userID)
 }
 
 func (f failingUserUnitStateRepository) FindDueReviewCandidates(ctx context.Context, userID uuid.UUID, now time.Time) ([]appquery.ReviewCandidate, error) {
