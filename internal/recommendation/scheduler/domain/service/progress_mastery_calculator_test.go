@@ -34,6 +34,16 @@ func TestProgressCalculatorKeyIntervals(t *testing.T) {
 	}
 }
 
+func TestProgressCalculatorClampsBeyondMasteredThreshold(t *testing.T) {
+	calculator := NewProgressCalculator()
+	schedulerPolicy := policy.DefaultSchedulerPolicy()
+
+	got := calculator.Compute(50, schedulerPolicy)
+	if got != 100 {
+		t.Fatalf("Compute(50) = %v, want 100", got)
+	}
+}
+
 func TestMasteryScoreCalculator(t *testing.T) {
 	calculator := NewMasteryScoreCalculator()
 	schedulerPolicy := policy.DefaultSchedulerPolicy()

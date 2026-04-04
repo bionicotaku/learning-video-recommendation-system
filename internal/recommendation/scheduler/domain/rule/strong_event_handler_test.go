@@ -167,3 +167,12 @@ func TestStrongEventHandlerUpdatesCoreCounters(t *testing.T) {
 		})
 	}
 }
+
+func TestStrongEventHandlerRejectsWeakEvents(t *testing.T) {
+	handler := NewStrongEventHandler()
+
+	_, err := handler.Apply(nil, model.LearningEvent{EventType: enum.EventTypeExposure})
+	if err == nil {
+		t.Fatal("Apply() error = nil, want unsupported event error")
+	}
+}

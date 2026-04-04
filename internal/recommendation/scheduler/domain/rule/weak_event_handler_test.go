@@ -73,3 +73,12 @@ func TestWeakEventHandlerExposureAndLookupDoNotAdvanceScheduling(t *testing.T) {
 		})
 	}
 }
+
+func TestWeakEventHandlerRejectsStrongEvents(t *testing.T) {
+	handler := NewWeakEventHandler()
+
+	_, err := handler.Apply(nil, model.LearningEvent{EventType: enum.EventTypeReview})
+	if err == nil {
+		t.Fatal("Apply() error = nil, want unsupported event error")
+	}
+}
