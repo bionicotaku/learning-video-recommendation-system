@@ -64,6 +64,10 @@ recommendation-test-unit:
 recommendation-test-integration:
 	@$(GO) test ./internal/recommendation/scheduler/test/integration/... ./internal/recommendation/scheduler/test/scenario/...
 
+.PHONY: internal-test-e2e
+internal-test-e2e:
+	@$(GO) test ./internal/test/e2e/...
+
 .PHONY: check
 check: accept test
 

@@ -320,6 +320,16 @@ internal/recommendation/scheduler/
 
 `test/integration/fixture/helpers.go` 负责共享数据库、测试用户、coarse unit、状态插入和 use case 构造辅助。
 
+跨模块端到端测试不放在这里，而统一放在：
+
+- [internal/test/e2e](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e)
+
+那里负责验证：
+
+- Learning engine -> Recommendation scheduler 的真实链路
+- Recommendation 不回写 `learning.*`
+- Recommendation 的 serving state 只影响 Recommendation 自己
+
 ## 6. 关键调用关系
 
 当前推荐主链路可以简化成：

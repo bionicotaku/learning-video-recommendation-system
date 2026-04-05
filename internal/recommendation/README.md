@@ -61,7 +61,9 @@ internal/recommendation/
 3. `scheduler/application/usecase`
 4. `scheduler/domain/service`
 5. `scheduler/infrastructure/persistence/query`
-6. `scheduler/test/integration`
+6. `scheduler/test/unit`
+7. `scheduler/test/integration`
+8. `scheduler/test/scenario`
 
 ## 5. 当前边界
 

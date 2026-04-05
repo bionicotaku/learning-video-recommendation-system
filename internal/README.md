@@ -78,6 +78,17 @@ Recommendation
 - Learning engine 产出学习域业务状态
 - Recommendation 消费学习域业务状态
 
+跨模块端到端测试统一放在：
+
+- [internal/test/e2e](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e)
+
+这里专门验证：
+
+- `learningengine -> recommendation/scheduler` 的真实链路
+- 两个模块对数据库 owner 边界的遵守情况
+- Recommendation 不回写 `learning.*`
+- replay 后 Recommendation 输入仍稳定
+
 ## 3. 当前目录结构
 
 ```text
@@ -97,6 +108,8 @@ internal/
       domain/
       infrastructure/
       test/
+  test/
+    e2e/
 ```
 
 Learning engine 直接以模块分层组织。
@@ -118,6 +131,7 @@ Recommendation 则是：
 6. 看 `infrastructure/persistence/query/*.sql`
 7. 看 `test/unit/*`
 8. 最后看 `test/integration/*` 和 `test/scenario/*`
+9. 最后再看 [internal/test/e2e](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e)
 
 这样阅读的好处是：
 
@@ -172,8 +186,8 @@ Recommendation 则是：
 代码和文档的对应关系如下：
 
 - 总览：[docs/README.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/README.md)
-- 系统总览：[MVP 推荐系统整体设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/MVP%20推荐系统整体设计文档.md)
-- Learning engine：[学习引擎设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计文档.md)
+- 系统总览：[推荐系统MVP整体设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐系统MVP整体设计.md)
+- Learning engine 设计：[学习引擎设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计.md)
+- Learning engine 工程：[学习引擎工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎工程实现.md)
 - Recommendation 设计：[学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
-- Recommendation 工程：[学习调度系统工程实现稿.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现稿.md)
-- Recommendation 实施说明：[学习调度系统模块实施说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统模块实施说明.md)
+- Recommendation 工程：[学习调度系统工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现.md)

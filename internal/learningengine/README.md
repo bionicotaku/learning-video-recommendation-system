@@ -327,6 +327,15 @@ MVP 只支持 full replay。
 
 `test/integration/fixture/helpers.go` 提供跨集成测试共享的数据库、用户、coarse unit 与 use case 构造辅助。
 
+跨模块端到端测试不放在这里，而统一放在：
+
+- [internal/test/e2e](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e)
+
+那里负责验证：
+
+- Learning engine 产出的状态是否能被 Recommendation 正确消费
+- full replay 后 Recommendation 输入是否仍稳定
+
 ## 5. 关键调用关系
 
 ### 学习事件写入链路
