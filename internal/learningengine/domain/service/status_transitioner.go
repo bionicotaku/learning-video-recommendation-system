@@ -9,7 +9,7 @@ import (
 )
 
 type StatusTransitioner interface {
-	Recompute(state *model.UserUnitState, recentQualities []int, schedulerPolicy policy.SchedulerPolicy) error
+	Recompute(state *model.UserUnitState, recentQualities []int, schedulerPolicy policy.LearningPolicy) error
 }
 
 type statusTransitioner struct{}
@@ -18,7 +18,7 @@ func NewStatusTransitioner() StatusTransitioner {
 	return statusTransitioner{}
 }
 
-func (statusTransitioner) Recompute(state *model.UserUnitState, recentQualities []int, schedulerPolicy policy.SchedulerPolicy) error {
+func (statusTransitioner) Recompute(state *model.UserUnitState, recentQualities []int, schedulerPolicy policy.LearningPolicy) error {
 	if state == nil {
 		return fmt.Errorf("state is required")
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 type SM2Updater interface {
-	Apply(state *model.UserUnitState, quality int, occurredAt time.Time, schedulerPolicy policy.SchedulerPolicy) error
+	Apply(state *model.UserUnitState, quality int, occurredAt time.Time, schedulerPolicy policy.LearningPolicy) error
 }
 
 type sm2Updater struct{}
@@ -19,7 +19,7 @@ func NewSM2Updater() SM2Updater {
 	return sm2Updater{}
 }
 
-func (sm2Updater) Apply(state *model.UserUnitState, quality int, occurredAt time.Time, schedulerPolicy policy.SchedulerPolicy) error {
+func (sm2Updater) Apply(state *model.UserUnitState, quality int, occurredAt time.Time, schedulerPolicy policy.LearningPolicy) error {
 	if state == nil {
 		return fmt.Errorf("state is required")
 	}

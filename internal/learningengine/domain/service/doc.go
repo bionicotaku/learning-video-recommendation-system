@@ -1,2 +1,2 @@
-// Package service defines scheduler domain services.
+// Package service defines learning-engine domain services.
 package service

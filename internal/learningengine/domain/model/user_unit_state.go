@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// UserUnitState is the current scheduling snapshot for a user-unit relation.
+// UserUnitState is the current learning-state snapshot for a user-unit relation.
 type UserUnitState struct {
 	UserID       uuid.UUID
 	CoarseUnitID int64

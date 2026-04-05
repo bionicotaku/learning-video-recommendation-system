@@ -10,7 +10,7 @@ import (
 
 func TestStatusTransitionerCoversFullLifecycle(t *testing.T) {
 	transitioner := NewStatusTransitioner()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{
 		Status:           enum.UnitStatusNew,
@@ -52,7 +52,7 @@ func TestStatusTransitionerCoversFullLifecycle(t *testing.T) {
 
 func TestStatusTransitionerDoesNotPromoteLearningWithoutTwoPassingQualities(t *testing.T) {
 	transitioner := NewStatusTransitioner()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 	state := &model.UserUnitState{
 		Status:           enum.UnitStatusLearning,
 		StrongEventCount: 2,
@@ -69,7 +69,7 @@ func TestStatusTransitionerDoesNotPromoteLearningWithoutTwoPassingQualities(t *t
 
 func TestStatusTransitionerDoesNotMasterWithoutStableRecentPerformance(t *testing.T) {
 	transitioner := NewStatusTransitioner()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 	state := &model.UserUnitState{
 		Status:           enum.UnitStatusReviewing,
 		IntervalDays:     schedulerPolicy.MasteredIntervalDays,

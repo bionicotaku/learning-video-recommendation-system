@@ -2,7 +2,7 @@ GO ?= go
 GO_PACKAGES := ./...
 GO_FILES := $(shell find . -type f -name '*.go' -not -path './vendor/*' | sort)
 LEARNINGENGINE_MIGRATIONS_DIR := internal/learningengine/infrastructure/migration
-RECOMMENDATION_MIGRATIONS_DIR := internal/recommendation/infrastructure/migration
+RECOMMENDATION_MIGRATIONS_DIR := internal/recommendation/scheduler/infrastructure/migration
 MIGRATE := $(GO) run -tags 'postgres,file' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 .PHONY: fmt

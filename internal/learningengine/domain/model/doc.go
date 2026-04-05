@@ -1,2 +1,2 @@
-// Package model defines scheduler domain models.
+// Package model defines learning-engine domain models.
 package model

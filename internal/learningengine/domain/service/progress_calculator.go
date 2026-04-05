@@ -7,7 +7,7 @@ import (
 )
 
 type ProgressCalculator interface {
-	Compute(intervalDays float64, schedulerPolicy policy.SchedulerPolicy) float64
+	Compute(intervalDays float64, schedulerPolicy policy.LearningPolicy) float64
 }
 
 type progressCalculator struct{}
@@ -16,7 +16,7 @@ func NewProgressCalculator() ProgressCalculator {
 	return progressCalculator{}
 }
 
-func (progressCalculator) Compute(intervalDays float64, schedulerPolicy policy.SchedulerPolicy) float64 {
+func (progressCalculator) Compute(intervalDays float64, schedulerPolicy policy.LearningPolicy) float64 {
 	if intervalDays <= 0 {
 		return 0
 	}

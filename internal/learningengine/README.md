@@ -81,12 +81,12 @@ internal/learningengine/
     model/
       doc.go
       learning_event.go
-      learning_unit_ref.go
+      coarse_unit_ref.go
       user_unit_state.go
     policy/
       doc.go
-      scheduler_policy.go
-      scheduler_policy_test.go
+      learning_policy.go
+      learning_policy_test.go
     rule/
       doc.go
       state_helpers.go
@@ -201,14 +201,14 @@ MVP 只支持 full replay。
 定义领域模型：
 
 - `LearningEvent`
-- `LearningUnitRef`
+- `CoarseUnitRef`
 - `UserUnitState`
 
 这些类型是整个模块内部沟通的标准数据结构。
 
 #### `policy/`
 
-- [scheduler_policy.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/domain/policy/scheduler_policy.go)
+- [learning_policy.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/domain/policy/learning_policy.go)
 
 这里存 Learning engine 的固定策略参数，例如：
 
@@ -380,7 +380,7 @@ Recommendation 只能读取 Learning engine 的结果，不能把推荐域字段
 优先看：
 
 - `domain/service/sm2_updater.go`
-- `domain/policy/scheduler_policy.go`
+- `domain/policy/learning_policy.go`
 - 对应单测
 
 ### 调整状态表字段

@@ -8,7 +8,7 @@ import (
 )
 
 type MasteryScoreCalculator interface {
-	Compute(state *model.UserUnitState, recentAccuracy float64, schedulerPolicy policy.SchedulerPolicy) float64
+	Compute(state *model.UserUnitState, recentAccuracy float64, schedulerPolicy policy.LearningPolicy) float64
 }
 
 type masteryScoreCalculator struct{}
@@ -17,7 +17,7 @@ func NewMasteryScoreCalculator() MasteryScoreCalculator {
 	return masteryScoreCalculator{}
 }
 
-func (masteryScoreCalculator) Compute(state *model.UserUnitState, recentAccuracy float64, schedulerPolicy policy.SchedulerPolicy) float64 {
+func (masteryScoreCalculator) Compute(state *model.UserUnitState, recentAccuracy float64, schedulerPolicy policy.LearningPolicy) float64 {
 	if state == nil {
 		return 0
 	}

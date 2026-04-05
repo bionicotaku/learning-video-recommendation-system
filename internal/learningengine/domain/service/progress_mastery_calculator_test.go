@@ -11,7 +11,7 @@ import (
 
 func TestProgressCalculatorKeyIntervals(t *testing.T) {
 	calculator := NewProgressCalculator()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	tests := []struct {
 		intervalDays float64
@@ -36,7 +36,7 @@ func TestProgressCalculatorKeyIntervals(t *testing.T) {
 
 func TestProgressCalculatorClampsBeyondMasteredThreshold(t *testing.T) {
 	calculator := NewProgressCalculator()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	got := calculator.Compute(50, schedulerPolicy)
 	if got != 100 {
@@ -46,7 +46,7 @@ func TestProgressCalculatorClampsBeyondMasteredThreshold(t *testing.T) {
 
 func TestMasteryScoreCalculator(t *testing.T) {
 	calculator := NewMasteryScoreCalculator()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{
 		IntervalDays:    6,
@@ -62,7 +62,7 @@ func TestMasteryScoreCalculator(t *testing.T) {
 
 func TestMasteryScoreCalculatorClampsToUnitInterval(t *testing.T) {
 	calculator := NewMasteryScoreCalculator()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{
 		IntervalDays:    30,

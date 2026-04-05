@@ -6,19 +6,24 @@
 
 如果是第一次接手项目，建议按下面顺序阅读：
 
-1. [MVP 推荐系统整体设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/MVP%20推荐系统整体设计文档.md)
-2. [学习引擎设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计文档.md)
-3. [学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
-4. [学习调度系统工程实现稿.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现稿.md)
-5. [学习调度系统模块实施说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统模块实施说明.md)
-6. [数据表说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/数据表说明.md)
-7. [视频召回层.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/视频召回层.md)
+1. [推荐系统MVP整体设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐系统MVP整体设计文档.md)
+2. [模块统一文件结构规范.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/模块统一文件结构规范.md)
+3. [学习引擎设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计文档.md)
+4. [学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
+5. [学习调度系统工程实现稿.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现稿.md)
+6. [学习调度系统模块实施说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统模块实施说明.md)
+7. [数据表说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/数据表说明.md)
+8. [视频召回层.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/视频召回层.md)
 
 ## 文档说明
 
-### [MVP 推荐系统整体设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/MVP%20推荐系统整体设计文档.md)
+### [推荐系统MVP整体设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐系统MVP整体设计文档.md)
 
 总览文档。说明整个 MVP 的模块边界、调用关系和系统范围。
+
+### [模块统一文件结构规范.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/模块统一文件结构规范.md)
+
+统一说明 `internal/` 下顶层模块和子模块应遵守的文件结构标准，以及哪些目录按需启用、哪些职责必须有固定落点。
 
 ### [学习引擎设计文档.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计文档.md)
 

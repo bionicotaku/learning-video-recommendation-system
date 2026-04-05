@@ -36,7 +36,7 @@ func NewRecordLearningEventsUseCase(
 func (uc RecordLearningEventsUseCase) Execute(ctx context.Context, cmd command.RecordLearningEventsCommand) (dto.RecordLearningEventsResult, error) {
 	updatedUnits := make([]int64, 0, len(cmd.Events))
 	seenUnits := make(map[int64]struct{}, len(cmd.Events))
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	err := uc.txManager.WithinTx(ctx, func(ctx context.Context) error {
 		for _, input := range cmd.Events {

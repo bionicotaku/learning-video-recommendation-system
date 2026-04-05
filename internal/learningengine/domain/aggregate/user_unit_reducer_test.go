@@ -38,7 +38,7 @@ func TestUserUnitReducerWeakEventsDoNotAdvanceScheduling(t *testing.T) {
 				EventType:    eventType,
 				OccurredAt:   now,
 				CreatedAt:    now,
-			}, policy.DefaultSchedulerPolicy())
+			}, policy.DefaultLearningPolicy())
 			if err != nil {
 				t.Fatalf("Reduce() error = %v", err)
 			}
@@ -76,7 +76,7 @@ func TestUserUnitReducerFirstStrongEventMovesNewToLearning(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 		CreatedAt:  now,
-	}, policy.DefaultSchedulerPolicy())
+	}, policy.DefaultLearningPolicy())
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}
@@ -115,7 +115,7 @@ func TestUserUnitReducerTwoPassingStrongEventsMoveLearningToReviewing(t *testing
 		Quality:    &quality,
 		OccurredAt: now,
 		CreatedAt:  now,
-	}, policy.DefaultSchedulerPolicy())
+	}, policy.DefaultLearningPolicy())
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}
@@ -150,7 +150,7 @@ func TestUserUnitReducerStrongSuccessAppliesSM2AndScores(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 		CreatedAt:  now,
-	}, policy.DefaultSchedulerPolicy())
+	}, policy.DefaultLearningPolicy())
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}
@@ -194,7 +194,7 @@ func TestUserUnitReducerFailureResetsIntervalWithoutChangingEF(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 		CreatedAt:  now,
-	}, policy.DefaultSchedulerPolicy())
+	}, policy.DefaultLearningPolicy())
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}
@@ -215,7 +215,7 @@ func TestUserUnitReducerStableLongIntervalMovesToMastered(t *testing.T) {
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 5
 	correct := true
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	next, err := reducer.Reduce(&model.UserUnitState{
 		UserID:                  uuid.New(),
@@ -268,7 +268,7 @@ func TestUserUnitReducerMasteredFailureDropsBackToReviewing(t *testing.T) {
 		Quality:    &quality,
 		OccurredAt: now,
 		CreatedAt:  now,
-	}, policy.DefaultSchedulerPolicy())
+	}, policy.DefaultLearningPolicy())
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}

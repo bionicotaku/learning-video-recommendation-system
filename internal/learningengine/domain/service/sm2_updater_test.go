@@ -11,7 +11,7 @@ import (
 
 func TestSM2UpdaterSuccessBranches(t *testing.T) {
 	updater := NewSM2Updater()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 
 	tests := []struct {
@@ -85,7 +85,7 @@ func TestSM2UpdaterSuccessBranches(t *testing.T) {
 
 func TestSM2UpdaterFailureBranchResetsIntervalWithoutChangingEaseFactor(t *testing.T) {
 	updater := NewSM2Updater()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 	state := model.UserUnitState{
 		Repetition:   3,
@@ -117,7 +117,7 @@ func TestSM2UpdaterFailureBranchResetsIntervalWithoutChangingEaseFactor(t *testi
 
 func TestSM2UpdaterAppliesMinEaseFactorFloor(t *testing.T) {
 	updater := NewSM2Updater()
-	schedulerPolicy := policy.DefaultSchedulerPolicy()
+	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 	state := model.UserUnitState{
 		Repetition:   0,

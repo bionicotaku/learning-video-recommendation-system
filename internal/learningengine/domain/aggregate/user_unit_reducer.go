@@ -17,7 +17,7 @@ const (
 )
 
 type UserUnitReducer interface {
-	Reduce(current *model.UserUnitState, event model.LearningEvent, schedulerPolicy policy.SchedulerPolicy) (*model.UserUnitState, error)
+	Reduce(current *model.UserUnitState, event model.LearningEvent, schedulerPolicy policy.LearningPolicy) (*model.UserUnitState, error)
 }
 
 type userUnitReducer struct {
@@ -40,9 +40,9 @@ func NewUserUnitReducer() UserUnitReducer {
 	}
 }
 
-func (r userUnitReducer) Reduce(current *model.UserUnitState, event model.LearningEvent, schedulerPolicy policy.SchedulerPolicy) (*model.UserUnitState, error) {
+func (r userUnitReducer) Reduce(current *model.UserUnitState, event model.LearningEvent, schedulerPolicy policy.LearningPolicy) (*model.UserUnitState, error) {
 	if schedulerPolicy.MasteredIntervalDays == 0 {
-		schedulerPolicy = policy.DefaultSchedulerPolicy()
+		schedulerPolicy = policy.DefaultLearningPolicy()
 	}
 
 	var (

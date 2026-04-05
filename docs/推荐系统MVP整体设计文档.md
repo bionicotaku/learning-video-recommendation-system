@@ -1,5 +1,3 @@
-# learning-video-recommendation-system
-
 # 基于视频内容的学习推荐系统 MVP 整体设计文档
 
 ## 1. 文档目的

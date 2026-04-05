@@ -7,7 +7,12 @@
 1. `learningengine`
 2. `recommendation`
 
-这两个模块是当前 MVP 的主业务边界。它们不是父子关系，也不是一个模块内部的子包拆分，而是两个职责不同、owner 不同的内部模块。
+这两个模块是当前 MVP 的主业务边界。它们是平级业务模块。
+
+其中：
+
+- `learningengine` 直接按模块分层实现
+- `recommendation` 作为模块根，当前已实现能力整体下沉在 `scheduler/` 子模块
 
 ## 1. 整体职责分工
 
@@ -43,6 +48,10 @@
 - 写 `learning.unit_learning_events`
 - 写 `learning.user_unit_states`
 - replay 学习状态
+
+当前已实现代码位于：
+
+- [internal/recommendation/scheduler](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler)
 
 ## 2. 模块依赖关系
 
@@ -82,25 +91,20 @@ internal/
     test/
   recommendation/
     README.md
-    application/
-    domain/
-    infrastructure/
-    test/
+    scheduler/
+      README.md
+      application/
+      domain/
+      infrastructure/
+      test/
 ```
 
-两个模块内部都采用同一种分层方式：
+Learning engine 直接以模块分层组织。
 
-- `application`
-- `domain`
-- `infrastructure`
-- `test`
+Recommendation 则是：
 
-这不是为了形式统一，而是为了明确：
-
-- 规则在哪里
-- 编排在哪里
-- SQL / 数据库连接在哪里
-- 集成测试在哪里
+- 模块根负责边界和子模块组织
+- `scheduler/` 负责当前已落地实现
 
 ## 4. 推荐的阅读顺序
 
@@ -108,10 +112,11 @@ internal/
 
 1. 先读 [internal/learningengine/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/README.md)
 2. 再读 [internal/recommendation/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/README.md)
-3. 看 `application/usecase`
-4. 看 `domain/*`
-5. 看 `infrastructure/persistence/query/*.sql`
-6. 最后看 `test/integration/*`
+3. 再读 [internal/recommendation/scheduler/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/README.md)
+4. 看对应模块或子模块下的 `application/usecase`
+5. 看 `domain/*`
+6. 看 `infrastructure/persistence/query/*.sql`
+7. 最后看 `test/integration/*`
 
 这样阅读的好处是：
 

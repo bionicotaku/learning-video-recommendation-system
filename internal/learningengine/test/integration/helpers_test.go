@@ -36,7 +36,7 @@ func newReplayUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.Repla
 		txtx.NewPGXTxManager(pool),
 		repopkg.NewUserUnitStateRepository(querier),
 		repopkg.NewUnitLearningEventRepository(querier),
-		appservice.NewUserStateRebuilder(aggregate.NewUserUnitReducer(), policy.DefaultSchedulerPolicy()),
+		appservice.NewUserStateRebuilder(aggregate.NewUserUnitReducer(), policy.DefaultLearningPolicy()),
 	)
 }
 

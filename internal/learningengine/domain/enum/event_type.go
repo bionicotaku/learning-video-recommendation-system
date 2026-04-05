@@ -1,6 +1,6 @@
 package enum
 
-// EventType represents normalized learning events consumed by the scheduler.
+// EventType represents normalized learning events consumed by the learning engine.
 type EventType string
 
 const (

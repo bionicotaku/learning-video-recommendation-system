@@ -1,2 +1,2 @@
-// Package policy defines scheduler domain policies.
+// Package policy defines learning-engine domain policies.
 package policy

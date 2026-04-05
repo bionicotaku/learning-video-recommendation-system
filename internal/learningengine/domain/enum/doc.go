@@ -1,2 +1,2 @@
-// Package enum defines scheduler domain enumerations.
+// Package enum defines learning-engine domain enumerations.
 package enum

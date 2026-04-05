@@ -12,15 +12,15 @@ type UserStateRebuilder interface {
 
 type userStateRebuilder struct {
 	reducer aggregate.UserUnitReducer
-	policy  policy.SchedulerPolicy
+	policy  policy.LearningPolicy
 }
 
 func NewUserStateRebuilder(
 	reducer aggregate.UserUnitReducer,
-	schedulerPolicy policy.SchedulerPolicy,
+	schedulerPolicy policy.LearningPolicy,
 ) UserStateRebuilder {
 	if schedulerPolicy.MasteredIntervalDays == 0 {
-		schedulerPolicy = policy.DefaultSchedulerPolicy()
+		schedulerPolicy = policy.DefaultLearningPolicy()
 	}
 
 	return userStateRebuilder{

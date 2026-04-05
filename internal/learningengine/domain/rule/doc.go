@@ -1,2 +1,2 @@
-// Package rule defines scheduler domain rule handlers.
+// Package rule defines learning-engine domain rule handlers.
 package rule
