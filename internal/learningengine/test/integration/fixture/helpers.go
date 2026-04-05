@@ -1,4 +1,4 @@
-package integration
+package fixture
 
 import (
 	"context"
@@ -22,7 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newRecordEventsUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.RecordLearningEventsUseCase {
+func NewRecordEventsUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.RecordLearningEventsUseCase {
 	return usecase.NewRecordLearningEventsUseCase(
 		txtx.NewPGXTxManager(pool),
 		repopkg.NewUserUnitStateRepository(querier),
@@ -31,7 +31,7 @@ func newRecordEventsUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase
 	)
 }
 
-func newReplayUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.ReplayUserStatesUseCase {
+func NewReplayUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.ReplayUserStatesUseCase {
 	return usecase.NewReplayUserStatesUseCase(
 		txtx.NewPGXTxManager(pool),
 		repopkg.NewUserUnitStateRepository(querier),
@@ -40,7 +40,7 @@ func newReplayUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.Repla
 	)
 }
 
-func newTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
+func NewTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	t.Helper()
 
 	cfg := infra.LoadConfig()
@@ -60,7 +60,7 @@ func newTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	return ctx, pool
 }
 
-func createTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
+func CreateTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
 	userID := uuid.New()
 	if _, err := pool.Exec(ctx, `insert into auth.users (id) values ($1)`, userID); err != nil {
 		return uuid.Nil, err
@@ -69,7 +69,7 @@ func createTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) 
 	return userID, nil
 }
 
-func createTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) ([]int64, error) {
+func CreateTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) ([]int64, error) {
 	nowSeed := time.Now().UnixNano()
 	ids := make([]int64, 0, count)
 
@@ -88,7 +88,7 @@ func createTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) (
 	return ids, nil
 }
 
-func cleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitIDs []int64) {
+func CleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitIDs []int64) {
 	t.Helper()
 
 	if len(coarseUnitIDs) > 0 {
@@ -103,7 +103,7 @@ func cleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, user
 	}
 }
 
-func filterEventsByUnit(events []model.LearningEvent, userID uuid.UUID, coarseUnitID int64) []model.LearningEvent {
+func FilterEventsByUnit(events []model.LearningEvent, userID uuid.UUID, coarseUnitID int64) []model.LearningEvent {
 	items := make([]model.LearningEvent, 0, len(events))
 	for _, event := range events {
 		if event.UserID == userID && event.CoarseUnitID == coarseUnitID {
@@ -114,7 +114,7 @@ func filterEventsByUnit(events []model.LearningEvent, userID uuid.UUID, coarseUn
 	return items
 }
 
-func newLearnInput(coarseUnitID int64, correct *bool, quality *int, occurredAt time.Time, sourceRef string) command.LearningEventInput {
+func NewLearnInput(coarseUnitID int64, correct *bool, quality *int, occurredAt time.Time, sourceRef string) command.LearningEventInput {
 	return command.LearningEventInput{
 		CoarseUnitID: coarseUnitID,
 		EventType:    enum.EventTypeNewLearn,
@@ -126,7 +126,7 @@ func newLearnInput(coarseUnitID int64, correct *bool, quality *int, occurredAt t
 	}
 }
 
-func reviewInput(coarseUnitID int64, correct *bool, quality *int, occurredAt time.Time, sourceRef string) command.LearningEventInput {
+func ReviewInput(coarseUnitID int64, correct *bool, quality *int, occurredAt time.Time, sourceRef string) command.LearningEventInput {
 	return command.LearningEventInput{
 		CoarseUnitID: coarseUnitID,
 		EventType:    enum.EventTypeReview,

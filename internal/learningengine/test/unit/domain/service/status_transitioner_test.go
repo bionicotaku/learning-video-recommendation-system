@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"testing"
@@ -6,10 +6,11 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/domain/policy"
+	servicepkg "learning-video-recommendation-system/internal/learningengine/domain/service"
 )
 
 func TestStatusTransitionerCoversFullLifecycle(t *testing.T) {
-	transitioner := NewStatusTransitioner()
+	transitioner := servicepkg.NewStatusTransitioner()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{
@@ -51,7 +52,7 @@ func TestStatusTransitionerCoversFullLifecycle(t *testing.T) {
 }
 
 func TestStatusTransitionerDoesNotPromoteLearningWithoutTwoPassingQualities(t *testing.T) {
-	transitioner := NewStatusTransitioner()
+	transitioner := servicepkg.NewStatusTransitioner()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 	state := &model.UserUnitState{
 		Status:           enum.UnitStatusLearning,
@@ -68,7 +69,7 @@ func TestStatusTransitionerDoesNotPromoteLearningWithoutTwoPassingQualities(t *t
 }
 
 func TestStatusTransitionerDoesNotMasterWithoutStableRecentPerformance(t *testing.T) {
-	transitioner := NewStatusTransitioner()
+	transitioner := servicepkg.NewStatusTransitioner()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 	state := &model.UserUnitState{
 		Status:           enum.UnitStatusReviewing,

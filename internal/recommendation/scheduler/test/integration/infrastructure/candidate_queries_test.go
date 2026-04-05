@@ -1,4 +1,4 @@
-package integration
+package infrastructure_test
 
 import (
 	"testing"
@@ -7,23 +7,24 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
 	repopkg "learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/fixture"
 
 	"github.com/google/uuid"
 )
 
 func TestLearningStateSnapshotReadRepositoryCandidateQueries(t *testing.T) {
-	ctx, pool := newTestPool(t)
+	ctx, pool := fixture.NewTestPool(t)
 
-	userID, err := createTestUser(ctx, pool)
+	userID, err := fixture.CreateTestUser(ctx, pool)
 	if err != nil {
-		t.Fatalf("createTestUser() error = %v", err)
+		t.Fatalf("CreateTestUser() error = %v", err)
 	}
-	unitIDs, err := createTestCoarseUnits(ctx, pool, 3)
+	unitIDs, err := fixture.CreateTestCoarseUnits(ctx, pool, 3)
 	if err != nil {
-		t.Fatalf("createTestCoarseUnits() error = %v", err)
+		t.Fatalf("CreateTestCoarseUnits() error = %v", err)
 	}
 	t.Cleanup(func() {
-		cleanupTestData(ctx, t, pool, userID, unitIDs)
+		fixture.CleanupTestData(ctx, t, pool, userID, unitIDs)
 	})
 
 	now := time.Date(2026, 4, 6, 12, 0, 0, 0, time.UTC)
@@ -31,19 +32,19 @@ func TestLearningStateSnapshotReadRepositoryCandidateQueries(t *testing.T) {
 	nilText := any(nil)
 	nilInt := any(nil)
 
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[0], true, "lesson", "l-1", 0.9, "reviewing", 40.0, 0.4,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nilInt, []int16{}, []bool{}, 2, 3.0, 2.5, now.Add(-1*time.Hour), nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(review) error = %v", err)
 	}
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[1], true, "lesson", "l-2", 0.8, "new", 0.0, 0.0,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nilInt, []int16{}, []bool{}, 0, 0.0, 2.5, nilTime, nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(new) error = %v", err)
 	}
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[2], true, "lesson", "l-3", 0.7, "learning", 10.0, 0.1,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nilInt, []int16{}, []bool{}, 1, 1.0, 2.5, now.Add(2*time.Hour), nilText, now, now,
 	); err != nil {
@@ -51,7 +52,7 @@ func TestLearningStateSnapshotReadRepositoryCandidateQueries(t *testing.T) {
 	}
 
 	recommendedAt := now.Add(-8 * time.Hour)
-	if err := insertServingState(ctx, pool, userID, unitIDs[0], recommendedAt); err != nil {
+	if err := fixture.InsertServingState(ctx, pool, userID, unitIDs[0], recommendedAt); err != nil {
 		t.Fatalf("insertServingState() error = %v", err)
 	}
 

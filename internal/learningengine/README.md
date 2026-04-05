@@ -72,7 +72,6 @@ internal/learningengine/
     doc.go
     aggregate/
       user_unit_reducer.go
-      user_unit_reducer_test.go
     enum/
       doc.go
       event_type.go
@@ -86,29 +85,21 @@ internal/learningengine/
     policy/
       doc.go
       learning_policy.go
-      learning_policy_test.go
     rule/
       doc.go
       state_helpers.go
       weak_event_handler.go
       strong_event_handler.go
-      weak_event_handler_test.go
-      strong_event_handler_test.go
     service/
       doc.go
       sm2_updater.go
       status_transitioner.go
       progress_calculator.go
       mastery_calculator.go
-      sm2_updater_test.go
-      status_transitioner_test.go
-      progress_mastery_calculator_test.go
   infrastructure/
     doc.go
     config.go
     db.go
-    config_test.go
-    db_integration_test.go
     migration/
     persistence/
       mapper/
@@ -120,11 +111,31 @@ internal/learningengine/
       tx/
   test/
     doc.go
+    unit/
+      doc.go
+      domain/
+        aggregate/
+          user_unit_reducer_test.go
+        policy/
+          learning_policy_test.go
+        rule/
+          weak_event_handler_test.go
+          strong_event_handler_test.go
+        service/
+          sm2_updater_test.go
+          status_transitioner_test.go
+          progress_mastery_calculator_test.go
+      infrastructure/
+        config_test.go
     integration/
       doc.go
-      helpers_test.go
-      record_learning_events_usecase_test.go
-      replay_user_states_usecase_test.go
+      fixture/
+        helpers.go
+      infrastructure/
+        db_integration_test.go
+      usecase/
+        record_learning_events_usecase_test.go
+        replay_user_states_usecase_test.go
 ```
 
 ## 4. 每一层的职责
@@ -296,17 +307,25 @@ MVP 只支持 full replay。
 
 ### `test/`
 
-当前主要是集成测试：
+测试已按职责拆成两层：
 
-- [record_learning_events_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/test/integration/record_learning_events_usecase_test.go)
-- [replay_user_states_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/test/integration/replay_user_states_usecase_test.go)
+- `test/unit`
+  放纯单元测试
+- `test/integration`
+  放真实数据库、真实事务、真实用例编排测试
 
-这些测试验证的是：
+当前 Learning engine 的测试重点是：
 
-- 真实数据库事务链
-- 事件写入
-- 状态投影
-- full replay 重建
+- `test/unit/domain/*`
+  覆盖 reducer、rule、policy、service
+- `test/unit/infrastructure/config_test.go`
+  覆盖配置校验
+- `test/integration/infrastructure/db_integration_test.go`
+  覆盖真实数据库连接探针
+- `test/integration/usecase/*`
+  覆盖记录事件与 full replay
+
+`test/integration/fixture/helpers.go` 提供跨集成测试共享的数据库、用户、coarse unit 与 use case 构造辅助。
 
 ## 5. 关键调用关系
 
@@ -352,7 +371,7 @@ Recommendation 只能读取 Learning engine 的结果，不能把推荐域字段
 5. [user_unit_state.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/domain/model/user_unit_state.go)
 6. [unit_events.sql](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/query/unit_events.sql)
 7. [unit_states.sql](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/query/unit_states.sql)
-8. [record_learning_events_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/test/integration/record_learning_events_usecase_test.go)
+8. [record_learning_events_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/learningengine/test/integration/usecase/record_learning_events_usecase_test.go)
 
 ## 8. 常见改动应该落在哪里
 

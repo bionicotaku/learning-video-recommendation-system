@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"slices"
@@ -8,10 +8,11 @@ import (
 	appquery "learning-video-recommendation-system/internal/recommendation/scheduler/application/query"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
+	servicepkg "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 )
 
 func TestReviewScorerScoreDirectionAndReasons(t *testing.T) {
-	scorer := NewReviewScorer()
+	scorer := servicepkg.NewReviewScorer()
 	now := time.Date(2026, 4, 7, 12, 0, 0, 0, time.UTC)
 	oldRecommended := now.Add(-7 * time.Hour)
 	dueLongAgo := now.Add(-48 * time.Hour)
@@ -53,7 +54,7 @@ func TestReviewScorerScoreDirectionAndReasons(t *testing.T) {
 }
 
 func TestNewScorerScoreDirectionAndReasons(t *testing.T) {
-	scorer := NewNewScorer()
+	scorer := servicepkg.NewNewScorer()
 	now := time.Date(2026, 4, 7, 12, 0, 0, 0, time.UTC)
 	oldRecommended := now.Add(-25 * time.Hour)
 	recentRecommended := now.Add(-1 * time.Hour)
@@ -96,7 +97,7 @@ func TestNewScorerScoreDirectionAndReasons(t *testing.T) {
 }
 
 func TestPriorityZeroExtractorPrioritizesLearningDueAndRecentFailure(t *testing.T) {
-	extractor := NewPriorityZeroExtractor()
+	extractor := servicepkg.NewPriorityZeroExtractor()
 	now := time.Date(2026, 4, 7, 12, 0, 0, 0, time.UTC)
 	badQuality := 2
 

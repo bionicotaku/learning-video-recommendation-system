@@ -1,10 +1,11 @@
-package aggregate
+package aggregate_test
 
 import (
 	"math"
 	"testing"
 	"time"
 
+	aggregatepkg "learning-video-recommendation-system/internal/learningengine/domain/aggregate"
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/domain/policy"
@@ -13,7 +14,7 @@ import (
 )
 
 func TestUserUnitReducerWeakEventsDoNotAdvanceScheduling(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	userID := uuid.New()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	nextReviewAt := now.Add(24 * time.Hour)
@@ -60,7 +61,7 @@ func TestUserUnitReducerWeakEventsDoNotAdvanceScheduling(t *testing.T) {
 }
 
 func TestUserUnitReducerFirstStrongEventMovesNewToLearning(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 4
 	correct := true
@@ -93,7 +94,7 @@ func TestUserUnitReducerFirstStrongEventMovesNewToLearning(t *testing.T) {
 }
 
 func TestUserUnitReducerTwoPassingStrongEventsMoveLearningToReviewing(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 4
 	correct := true
@@ -126,7 +127,7 @@ func TestUserUnitReducerTwoPassingStrongEventsMoveLearningToReviewing(t *testing
 }
 
 func TestUserUnitReducerStrongSuccessAppliesSM2AndScores(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 5
 	correct := true
@@ -173,7 +174,7 @@ func TestUserUnitReducerStrongSuccessAppliesSM2AndScores(t *testing.T) {
 }
 
 func TestUserUnitReducerFailureResetsIntervalWithoutChangingEF(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 2
 	wrong := false
@@ -211,7 +212,7 @@ func TestUserUnitReducerFailureResetsIntervalWithoutChangingEF(t *testing.T) {
 }
 
 func TestUserUnitReducerStableLongIntervalMovesToMastered(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 5
 	correct := true
@@ -247,7 +248,7 @@ func TestUserUnitReducerStableLongIntervalMovesToMastered(t *testing.T) {
 }
 
 func TestUserUnitReducerMasteredFailureDropsBackToReviewing(t *testing.T) {
-	reducer := NewUserUnitReducer()
+	reducer := aggregatepkg.NewUserUnitReducer()
 	now := time.Date(2026, 4, 6, 10, 0, 0, 0, time.UTC)
 	quality := 2
 	wrong := false

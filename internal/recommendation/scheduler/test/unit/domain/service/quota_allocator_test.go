@@ -1,13 +1,14 @@
-package service
+package service_test
 
 import (
 	"testing"
 
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
+	servicepkg "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 )
 
 func TestBacklogCalculator(t *testing.T) {
-	calculator := NewBacklogCalculator()
+	calculator := servicepkg.NewBacklogCalculator()
 
 	if got := calculator.Compute(12); got != 12 {
 		t.Fatalf("Compute(12) = %d, want 12", got)
@@ -18,7 +19,7 @@ func TestBacklogCalculator(t *testing.T) {
 }
 
 func TestQuotaAllocatorRanges(t *testing.T) {
-	allocator := NewQuotaAllocator()
+	allocator := servicepkg.NewQuotaAllocator()
 	defaults := model.RecommendationDefaults{
 		DailyNewUnitQuota:    8,
 		DailyReviewSoftLimit: 30,

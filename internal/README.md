@@ -116,7 +116,8 @@ Recommendation 则是：
 4. 看对应模块或子模块下的 `application/usecase`
 5. 看 `domain/*`
 6. 看 `infrastructure/persistence/query/*.sql`
-7. 最后看 `test/integration/*`
+7. 看 `test/unit/*`
+8. 最后看 `test/integration/*` 和 `test/scenario/*`
 
 这样阅读的好处是：
 

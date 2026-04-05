@@ -1,4 +1,4 @@
-package integration
+package usecase_test
 
 import (
 	"testing"
@@ -8,27 +8,28 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
 	repopkg "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/sqlcgen"
+	"learning-video-recommendation-system/internal/learningengine/test/integration/fixture"
 )
 
 func TestRecordLearningEventsUseCase(t *testing.T) {
-	ctx, pool := newTestPool(t)
+	ctx, pool := fixture.NewTestPool(t)
 
-	userID, err := createTestUser(ctx, pool)
+	userID, err := fixture.CreateTestUser(ctx, pool)
 	if err != nil {
-		t.Fatalf("createTestUser() error = %v", err)
+		t.Fatalf("CreateTestUser() error = %v", err)
 	}
-	unitIDs, err := createTestCoarseUnits(ctx, pool, 1)
+	unitIDs, err := fixture.CreateTestCoarseUnits(ctx, pool, 1)
 	if err != nil {
-		t.Fatalf("createTestCoarseUnits() error = %v", err)
+		t.Fatalf("CreateTestCoarseUnits() error = %v", err)
 	}
 	t.Cleanup(func() {
-		cleanupTestData(ctx, t, pool, userID, unitIDs)
+		fixture.CleanupTestData(ctx, t, pool, userID, unitIDs)
 	})
 
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
 	eventRepo := repopkg.NewUnitLearningEventRepository(baseQuerier)
-	uc := newRecordEventsUseCase(pool, baseQuerier)
+	uc := fixture.NewRecordEventsUseCase(pool, baseQuerier)
 
 	correct := true
 	quality := 4
@@ -37,7 +38,7 @@ func TestRecordLearningEventsUseCase(t *testing.T) {
 	result, err := uc.Execute(ctx, command.RecordLearningEventsCommand{
 		UserID: userID,
 		Events: []command.LearningEventInput{
-			newLearnInput(unitIDs[0], &correct, &quality, occurredAt, "record-events"),
+			fixture.NewLearnInput(unitIDs[0], &correct, &quality, occurredAt, "record-events"),
 		},
 		IdempotencyKey: "integration-success",
 	})
@@ -56,7 +57,7 @@ func TestRecordLearningEventsUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListByUserOrdered() error = %v", err)
 	}
-	events = filterEventsByUnit(events, userID, unitIDs[0])
+	events = fixture.FilterEventsByUnit(events, userID, unitIDs[0])
 	if len(events) != 1 {
 		t.Fatalf("len(events) = %d, want 1", len(events))
 	}

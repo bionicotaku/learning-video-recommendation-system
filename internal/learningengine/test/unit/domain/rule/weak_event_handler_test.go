@@ -1,4 +1,4 @@
-package rule
+package rule_test
 
 import (
 	"testing"
@@ -6,12 +6,13 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
+	rulepkg "learning-video-recommendation-system/internal/learningengine/domain/rule"
 
 	"github.com/google/uuid"
 )
 
 func TestWeakEventHandlerExposureAndLookupDoNotAdvanceScheduling(t *testing.T) {
-	handler := NewWeakEventHandler()
+	handler := rulepkg.NewWeakEventHandler()
 	userID := uuid.New()
 	occurredAt := time.Date(2026, 4, 4, 12, 0, 0, 0, time.UTC)
 	nextReviewAt := occurredAt.Add(24 * time.Hour)
@@ -75,7 +76,7 @@ func TestWeakEventHandlerExposureAndLookupDoNotAdvanceScheduling(t *testing.T) {
 }
 
 func TestWeakEventHandlerRejectsStrongEvents(t *testing.T) {
-	handler := NewWeakEventHandler()
+	handler := rulepkg.NewWeakEventHandler()
 
 	_, err := handler.Apply(nil, model.LearningEvent{EventType: enum.EventTypeReview})
 	if err == nil {

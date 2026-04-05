@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"math"
@@ -7,10 +7,11 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/domain/policy"
+	servicepkg "learning-video-recommendation-system/internal/learningengine/domain/service"
 )
 
 func TestSM2UpdaterSuccessBranches(t *testing.T) {
-	updater := NewSM2Updater()
+	updater := servicepkg.NewSM2Updater()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 
@@ -75,7 +76,7 @@ func TestSM2UpdaterSuccessBranches(t *testing.T) {
 			if state.NextReviewAt == nil {
 				t.Fatal("NextReviewAt = nil, want value")
 			}
-			wantNext := occurredAt.Add(durationFromDays(tt.wantIntervalDays))
+			wantNext := occurredAt.Add(time.Duration(tt.wantIntervalDays * float64(24*time.Hour)))
 			if !state.NextReviewAt.Equal(wantNext) {
 				t.Fatalf("NextReviewAt = %v, want %v", state.NextReviewAt, wantNext)
 			}
@@ -84,7 +85,7 @@ func TestSM2UpdaterSuccessBranches(t *testing.T) {
 }
 
 func TestSM2UpdaterFailureBranchResetsIntervalWithoutChangingEaseFactor(t *testing.T) {
-	updater := NewSM2Updater()
+	updater := servicepkg.NewSM2Updater()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 	state := model.UserUnitState{
@@ -116,7 +117,7 @@ func TestSM2UpdaterFailureBranchResetsIntervalWithoutChangingEaseFactor(t *testi
 }
 
 func TestSM2UpdaterAppliesMinEaseFactorFloor(t *testing.T) {
-	updater := NewSM2Updater()
+	updater := servicepkg.NewSM2Updater()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 	occurredAt := time.Date(2026, 4, 5, 9, 0, 0, 0, time.UTC)
 	state := model.UserUnitState{

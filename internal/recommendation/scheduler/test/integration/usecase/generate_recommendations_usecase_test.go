@@ -1,4 +1,4 @@
-package integration
+package usecase_test
 
 import (
 	"encoding/json"
@@ -7,23 +7,24 @@ import (
 
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/sqlcgen"
+	"learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/fixture"
 
 	"github.com/google/uuid"
 )
 
 func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
-	ctx, pool := newTestPool(t)
+	ctx, pool := fixture.NewTestPool(t)
 
-	userID, err := createTestUser(ctx, pool)
+	userID, err := fixture.CreateTestUser(ctx, pool)
 	if err != nil {
-		t.Fatalf("createTestUser() error = %v", err)
+		t.Fatalf("CreateTestUser() error = %v", err)
 	}
-	unitIDs, err := createTestCoarseUnits(ctx, pool, 4)
+	unitIDs, err := fixture.CreateTestCoarseUnits(ctx, pool, 4)
 	if err != nil {
-		t.Fatalf("createTestCoarseUnits() error = %v", err)
+		t.Fatalf("CreateTestCoarseUnits() error = %v", err)
 	}
 	t.Cleanup(func() {
-		cleanupTestData(ctx, t, pool, userID, unitIDs)
+		fixture.CleanupTestData(ctx, t, pool, userID, unitIDs)
 	})
 
 	now := time.Date(2026, 4, 8, 11, 0, 0, 0, time.UTC)
@@ -31,43 +32,43 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 	nilText := any(nil)
 	badQuality := int16(2)
 
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[0], true, "lesson", "l-1", 0.9, "learning", 20.0, 0.2,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nil, []int16{}, []bool{}, 1, 1.0, 2.5, now.Add(-2*time.Hour), nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(unit0) error = %v", err)
 	}
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[1], true, "lesson", "l-2", 0.8, "reviewing", 50.0, 0.4,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, &badQuality, []int16{}, []bool{}, 2, 3.0, 2.5, now.Add(-24*time.Hour), nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(unit1) error = %v", err)
 	}
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[2], true, "lesson", "l-3", 0.6, "reviewing", 60.0, 0.6,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nil, []int16{}, []bool{}, 3, 6.0, 2.5, now.Add(-6*time.Hour), nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(unit2) error = %v", err)
 	}
-	if err := insertState(ctx, pool,
+	if err := fixture.InsertState(ctx, pool,
 		userID, unitIDs[3], true, "lesson", "l-4", 0.7, "new", 0.0, 0.0,
 		nilTime, nilTime, nilTime, 0, 0, 0, 0, 0, 0, 0, nil, []int16{}, []bool{}, 0, 0.0, 2.5, nilTime, nilText, now, now,
 	); err != nil {
 		t.Fatalf("insertState(unit3) error = %v", err)
 	}
 
-	if err := insertServingState(ctx, pool, userID, unitIDs[0], now.Add(-7*time.Hour)); err != nil {
+	if err := fixture.InsertServingState(ctx, pool, userID, unitIDs[0], now.Add(-7*time.Hour)); err != nil {
 		t.Fatalf("insertServingState(unit0) error = %v", err)
 	}
-	if err := insertServingState(ctx, pool, userID, unitIDs[1], now.Add(-8*time.Hour)); err != nil {
+	if err := fixture.InsertServingState(ctx, pool, userID, unitIDs[1], now.Add(-8*time.Hour)); err != nil {
 		t.Fatalf("insertServingState(unit1) error = %v", err)
 	}
-	if err := insertServingState(ctx, pool, userID, unitIDs[2], now.Add(-10*time.Hour)); err != nil {
+	if err := fixture.InsertServingState(ctx, pool, userID, unitIDs[2], now.Add(-10*time.Hour)); err != nil {
 		t.Fatalf("insertServingState(unit2) error = %v", err)
 	}
 
 	q := sqlcgen.New(pool)
-	uc := newGenerateUseCase(pool, q)
+	uc := fixture.NewGenerateUseCase(pool, q)
 
 	var beforeStateCount int
 	if err := pool.QueryRow(ctx, `select count(*) from learning.user_unit_states where user_id = $1`, userID).Scan(&beforeStateCount); err != nil {
@@ -78,7 +79,7 @@ func TestGenerateLearningUnitRecommendationsUseCase(t *testing.T) {
 		t.Fatalf("count learning.unit_learning_events before error = %v", err)
 	}
 
-	result, err := uc.Execute(ctx, generateCmd(userID, 4, now))
+	result, err := uc.Execute(ctx, fixture.GenerateCmd(userID, 4, now))
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}

@@ -1,4 +1,4 @@
-package integration
+package fixture
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
+func NewTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	t.Helper()
 
 	cfg := infra.LoadConfig()
@@ -38,7 +38,7 @@ func newTestPool(t *testing.T) (context.Context, *pgxpool.Pool) {
 	return ctx, pool
 }
 
-func createTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
+func CreateTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) {
 	userID := uuid.New()
 	if _, err := pool.Exec(ctx, `insert into auth.users (id) values ($1)`, userID); err != nil {
 		return uuid.Nil, err
@@ -47,7 +47,7 @@ func createTestUser(ctx context.Context, pool *pgxpool.Pool) (uuid.UUID, error) 
 	return userID, nil
 }
 
-func createTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) ([]int64, error) {
+func CreateTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) ([]int64, error) {
 	nowSeed := time.Now().UnixNano()
 	ids := make([]int64, 0, count)
 	kinds := []string{"word", "phrase", "grammar"}
@@ -66,7 +66,7 @@ func createTestCoarseUnits(ctx context.Context, pool *pgxpool.Pool, count int) (
 	return ids, nil
 }
 
-func cleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitIDs []int64) {
+func CleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitIDs []int64) {
 	t.Helper()
 
 	if userID != uuid.Nil {
@@ -81,7 +81,7 @@ func cleanupTestData(ctx context.Context, t *testing.T, pool *pgxpool.Pool, user
 	}
 }
 
-func insertState(ctx context.Context, pool *pgxpool.Pool, args ...any) error {
+func InsertState(ctx context.Context, pool *pgxpool.Pool, args ...any) error {
 	_, err := pool.Exec(ctx, `
 		insert into learning.user_unit_states (
 			user_id,
@@ -120,7 +120,7 @@ func insertState(ctx context.Context, pool *pgxpool.Pool, args ...any) error {
 	return err
 }
 
-func insertServingState(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitID int64, recommendedAt time.Time) error {
+func InsertServingState(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID, coarseUnitID int64, recommendedAt time.Time) error {
 	_, err := pool.Exec(ctx, `
 		insert into recommendation.user_unit_serving_states (
 			user_id, coarse_unit_id, last_recommended_at, created_at, updated_at
@@ -129,7 +129,7 @@ func insertServingState(ctx context.Context, pool *pgxpool.Pool, userID uuid.UUI
 	return err
 }
 
-func newGenerateUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.GenerateLearningUnitRecommendationsUseCase {
+func NewGenerateUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.GenerateLearningUnitRecommendationsUseCase {
 	return usecase.NewGenerateLearningUnitRecommendationsUseCase(
 		txtx.NewPGXTxManager(pool),
 		repopkg.NewLearningStateSnapshotReadRepository(querier),
@@ -144,7 +144,7 @@ func newGenerateUseCase(pool *pgxpool.Pool, querier sqlcgen.Querier) usecase.Gen
 	)
 }
 
-func generateCmd(userID uuid.UUID, limit int, now time.Time) command.GenerateRecommendationsCommand {
+func GenerateCmd(userID uuid.UUID, limit int, now time.Time) command.GenerateRecommendationsCommand {
 	return command.GenerateRecommendationsCommand{
 		UserID:         userID,
 		RequestedLimit: limit,

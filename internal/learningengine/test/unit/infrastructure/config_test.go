@@ -1,9 +1,13 @@
-package infrastructure
+package infrastructure_test
 
-import "testing"
+import (
+	"testing"
+
+	infra "learning-video-recommendation-system/internal/learningengine/infrastructure"
+)
 
 func TestConfigValidateRequiresDatabaseURL(t *testing.T) {
-	cfg := Config{}
+	cfg := infra.Config{}
 
 	err := cfg.Validate()
 	if err == nil {
@@ -16,7 +20,7 @@ func TestConfigValidateRequiresDatabaseURL(t *testing.T) {
 }
 
 func TestConfigValidateDoesNotFallbackToSupabaseURL(t *testing.T) {
-	cfg := Config{SupabaseURL: "https://example.supabase.co"}
+	cfg := infra.Config{SupabaseURL: "https://example.supabase.co"}
 
 	err := cfg.Validate()
 	if err == nil {

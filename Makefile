@@ -48,6 +48,22 @@ accept: sqlc-generate lint
 test:
 	@$(GO) test ./...
 
+.PHONY: learningengine-test-unit
+learningengine-test-unit:
+	@$(GO) test ./internal/learningengine/test/unit/...
+
+.PHONY: learningengine-test-integration
+learningengine-test-integration:
+	@$(GO) test ./internal/learningengine/test/integration/...
+
+.PHONY: recommendation-test-unit
+recommendation-test-unit:
+	@$(GO) test ./internal/recommendation/scheduler/test/unit/...
+
+.PHONY: recommendation-test-integration
+recommendation-test-integration:
+	@$(GO) test ./internal/recommendation/scheduler/test/integration/... ./internal/recommendation/scheduler/test/scenario/...
+
 .PHONY: check
 check: accept test
 

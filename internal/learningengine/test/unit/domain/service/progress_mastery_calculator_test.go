@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"math"
@@ -7,10 +7,11 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/domain/policy"
+	servicepkg "learning-video-recommendation-system/internal/learningengine/domain/service"
 )
 
 func TestProgressCalculatorKeyIntervals(t *testing.T) {
-	calculator := NewProgressCalculator()
+	calculator := servicepkg.NewProgressCalculator()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	tests := []struct {
@@ -35,7 +36,7 @@ func TestProgressCalculatorKeyIntervals(t *testing.T) {
 }
 
 func TestProgressCalculatorClampsBeyondMasteredThreshold(t *testing.T) {
-	calculator := NewProgressCalculator()
+	calculator := servicepkg.NewProgressCalculator()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	got := calculator.Compute(50, schedulerPolicy)
@@ -45,7 +46,7 @@ func TestProgressCalculatorClampsBeyondMasteredThreshold(t *testing.T) {
 }
 
 func TestMasteryScoreCalculator(t *testing.T) {
-	calculator := NewMasteryScoreCalculator()
+	calculator := servicepkg.NewMasteryScoreCalculator()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{
@@ -61,7 +62,7 @@ func TestMasteryScoreCalculator(t *testing.T) {
 }
 
 func TestMasteryScoreCalculatorClampsToUnitInterval(t *testing.T) {
-	calculator := NewMasteryScoreCalculator()
+	calculator := servicepkg.NewMasteryScoreCalculator()
 	schedulerPolicy := policy.DefaultLearningPolicy()
 
 	state := &model.UserUnitState{

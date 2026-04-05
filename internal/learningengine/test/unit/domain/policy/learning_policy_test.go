@@ -1,15 +1,19 @@
-package policy
+package policy_test
 
-import "testing"
+import (
+	"testing"
+
+	policypkg "learning-video-recommendation-system/internal/learningengine/domain/policy"
+)
 
 func TestDefaultLearningPolicyUsesDocumentedDefaults(t *testing.T) {
-	got := DefaultLearningPolicy()
+	got := policypkg.DefaultLearningPolicy()
 
-	if got.MasteredIntervalDays != DefaultMasteredIntervalDays {
-		t.Fatalf("MasteredIntervalDays = %v, want %v", got.MasteredIntervalDays, DefaultMasteredIntervalDays)
+	if got.MasteredIntervalDays != policypkg.DefaultMasteredIntervalDays {
+		t.Fatalf("MasteredIntervalDays = %v, want %v", got.MasteredIntervalDays, policypkg.DefaultMasteredIntervalDays)
 	}
-	if got.MinEaseFactor != DefaultMinEaseFactor {
-		t.Fatalf("MinEaseFactor = %v, want %v", got.MinEaseFactor, DefaultMinEaseFactor)
+	if got.MinEaseFactor != policypkg.DefaultMinEaseFactor {
+		t.Fatalf("MinEaseFactor = %v, want %v", got.MinEaseFactor, policypkg.DefaultMinEaseFactor)
 	}
 
 	wantIntervals := []float64{1, 3, 6}
@@ -24,10 +28,10 @@ func TestDefaultLearningPolicyUsesDocumentedDefaults(t *testing.T) {
 }
 
 func TestDefaultLearningPolicyReturnsCopiedIntervals(t *testing.T) {
-	first := DefaultLearningPolicy()
+	first := policypkg.DefaultLearningPolicy()
 	first.InitialIntervals[0] = 99
 
-	second := DefaultLearningPolicy()
+	second := policypkg.DefaultLearningPolicy()
 	if second.InitialIntervals[0] != 1 {
 		t.Fatalf("InitialIntervals[0] = %v, want 1 after prior mutation", second.InitialIntervals[0])
 	}

@@ -1,4 +1,4 @@
-package rule
+package rule_test
 
 import (
 	"testing"
@@ -6,12 +6,13 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
+	rulepkg "learning-video-recommendation-system/internal/learningengine/domain/rule"
 
 	"github.com/google/uuid"
 )
 
 func TestStrongEventHandlerUpdatesCoreCounters(t *testing.T) {
-	handler := NewStrongEventHandler()
+	handler := rulepkg.NewStrongEventHandler()
 	userID := uuid.New()
 	occurredAt := time.Date(2026, 4, 4, 14, 30, 0, 0, time.UTC)
 	quality := 4
@@ -169,7 +170,7 @@ func TestStrongEventHandlerUpdatesCoreCounters(t *testing.T) {
 }
 
 func TestStrongEventHandlerRejectsWeakEvents(t *testing.T) {
-	handler := NewStrongEventHandler()
+	handler := rulepkg.NewStrongEventHandler()
 
 	_, err := handler.Apply(nil, model.LearningEvent{EventType: enum.EventTypeExposure})
 	if err == nil {

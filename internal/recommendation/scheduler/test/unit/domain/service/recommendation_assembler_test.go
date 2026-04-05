@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"slices"
@@ -8,12 +8,13 @@ import (
 	appquery "learning-video-recommendation-system/internal/recommendation/scheduler/application/query"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/enum"
 	"learning-video-recommendation-system/internal/recommendation/scheduler/domain/model"
+	servicepkg "learning-video-recommendation-system/internal/recommendation/scheduler/domain/service"
 
 	"github.com/google/uuid"
 )
 
 func TestRecommendationAssemblerBuildsPredictableBatch(t *testing.T) {
-	assembler := NewRecommendationAssembler()
+	assembler := servicepkg.NewRecommendationAssembler()
 	userID := uuid.New()
 	now := time.Date(2026, 4, 7, 14, 0, 0, 0, time.UTC)
 
@@ -66,7 +67,7 @@ func TestRecommendationAssemblerBuildsPredictableBatch(t *testing.T) {
 		},
 	}
 
-	batch := assembler.Assemble(userID, now, priorityZero, scoredReviews, scoredNews, QuotaAllocation{
+	batch := assembler.Assemble(userID, now, priorityZero, scoredReviews, scoredNews, servicepkg.QuotaAllocation{
 		ReviewQuota:       2,
 		NewQuota:          1,
 		BacklogProtection: true,
@@ -112,7 +113,7 @@ func TestRecommendationAssemblerBuildsPredictableBatch(t *testing.T) {
 }
 
 func TestRecommendationAssemblerLetsNewFillUnusedReviewCapacity(t *testing.T) {
-	assembler := NewRecommendationAssembler()
+	assembler := servicepkg.NewRecommendationAssembler()
 	userID := uuid.New()
 	now := time.Date(2026, 4, 7, 14, 0, 0, 0, time.UTC)
 
@@ -142,7 +143,7 @@ func TestRecommendationAssemblerLetsNewFillUnusedReviewCapacity(t *testing.T) {
 			Score:       0.6,
 			ReasonCodes: []string{"new_candidate"},
 		},
-	}, QuotaAllocation{
+	}, servicepkg.QuotaAllocation{
 		ReviewQuota: 2,
 		NewQuota:    1,
 	})

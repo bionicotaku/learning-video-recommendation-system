@@ -118,15 +118,10 @@ internal/recommendation/scheduler/
       new_scorer.go
       priority_zero_extractor.go
       recommendation_assembler.go
-      quota_allocator_test.go
-      scoring_test.go
-      recommendation_assembler_test.go
   infrastructure/
     doc.go
     config.go
     db.go
-    config_test.go
-    db_integration_test.go
     migration/
     persistence/
       mapper/
@@ -138,11 +133,25 @@ internal/recommendation/scheduler/
       tx/
   test/
     doc.go
+    unit/
+      doc.go
+      domain/
+        service/
+          quota_allocator_test.go
+          scoring_test.go
+          recommendation_assembler_test.go
+      infrastructure/
+        config_test.go
     integration/
       doc.go
-      helpers_test.go
-      candidate_queries_test.go
-      generate_recommendations_usecase_test.go
+      fixture/
+        helpers.go
+      infrastructure/
+        candidate_queries_test.go
+        db_integration_test.go
+      usecase/
+        generate_recommendations_usecase_test.go
+    scenario/
       scenarios_test.go
 ```
 
@@ -287,19 +296,29 @@ internal/recommendation/scheduler/
 
 ### `test/`
 
-当前 scheduler 的集成测试集中在：
+测试现在按职责分层：
 
-- [candidate_queries_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/candidate_queries_test.go)
-- [generate_recommendations_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/generate_recommendations_usecase_test.go)
-- [scenarios_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/scenarios_test.go)
+- `test/unit`
+  放纯单元测试
+- `test/integration`
+  放真实数据库和真实用例编排测试
+- `test/scenario`
+  放更长链路的业务场景测试
 
-这些测试主要覆盖：
+当前覆盖重点如下：
 
-- candidate query
-- quota / scoring 组合
-- 推荐批次落库
-- serving state 更新
-- A-E 场景测试
+- `test/unit/domain/service/*`
+  覆盖 backlog、quota、scorer、assembler
+- `test/unit/infrastructure/config_test.go`
+  覆盖配置校验
+- `test/integration/infrastructure/*`
+  覆盖数据库连接探针和 candidate query
+- `test/integration/usecase/generate_recommendations_usecase_test.go`
+  覆盖推荐生成用例和落库
+- `test/scenario/scenarios_test.go`
+  覆盖典型推荐业务场景
+
+`test/integration/fixture/helpers.go` 负责共享数据库、测试用户、coarse unit、状态插入和 use case 构造辅助。
 
 ## 6. 关键调用关系
 
@@ -367,7 +386,7 @@ scheduler 读取 Learning engine 的字段，但不拥有它们。
 7. [new_scorer.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/domain/service/new_scorer.go)
 8. [recommendation_assembler.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/domain/service/recommendation_assembler.go)
 9. [candidates.sql](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/infrastructure/persistence/query/candidates.sql)
-10. [generate_recommendations_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/generate_recommendations_usecase_test.go)
+10. [generate_recommendations_usecase_test.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/test/integration/usecase/generate_recommendations_usecase_test.go)
 
 ## 9. 常见改动应该落在哪里
 
@@ -385,7 +404,7 @@ scheduler 读取 Learning engine 的字段，但不拥有它们。
 
 - `domain/service/review_scorer.go`
 - `domain/service/new_scorer.go`
-- `domain/service/scoring_test.go`
+- `test/unit/domain/service/scoring_test.go`
 
 ### 调整推荐输出结构
 
@@ -405,7 +424,7 @@ scheduler 读取 Learning engine 的字段，但不拥有它们。
 - `infrastructure/persistence/query/candidates.sql`
 - mapper
 - `sqlc` 生成代码
-- candidate query 测试
+- `test/integration/infrastructure/candidate_queries_test.go`
 
 ## 10. 不该做什么
 

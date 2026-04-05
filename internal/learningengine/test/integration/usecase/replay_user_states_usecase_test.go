@@ -1,4 +1,4 @@
-package integration
+package usecase_test
 
 import (
 	"math"
@@ -10,28 +10,29 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	repopkg "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/sqlcgen"
+	"learning-video-recommendation-system/internal/learningengine/test/integration/fixture"
 )
 
 func TestReplayUserStatesUseCaseRebuildsOnlineState(t *testing.T) {
-	ctx, pool := newTestPool(t)
+	ctx, pool := fixture.NewTestPool(t)
 
-	userID, err := createTestUser(ctx, pool)
+	userID, err := fixture.CreateTestUser(ctx, pool)
 	if err != nil {
-		t.Fatalf("createTestUser() error = %v", err)
+		t.Fatalf("CreateTestUser() error = %v", err)
 	}
-	unitIDs, err := createTestCoarseUnits(ctx, pool, 1)
+	unitIDs, err := fixture.CreateTestCoarseUnits(ctx, pool, 1)
 	if err != nil {
-		t.Fatalf("createTestCoarseUnits() error = %v", err)
+		t.Fatalf("CreateTestCoarseUnits() error = %v", err)
 	}
 	t.Cleanup(func() {
-		cleanupTestData(ctx, t, pool, userID, unitIDs)
+		fixture.CleanupTestData(ctx, t, pool, userID, unitIDs)
 	})
 	unitID := unitIDs[0]
 
 	baseQuerier := sqlcgen.New(pool)
 	stateRepo := repopkg.NewUserUnitStateRepository(baseQuerier)
-	recordUC := newRecordEventsUseCase(pool, baseQuerier)
-	replayUC := newReplayUseCase(pool, baseQuerier)
+	recordUC := fixture.NewRecordEventsUseCase(pool, baseQuerier)
+	replayUC := fixture.NewReplayUseCase(pool, baseQuerier)
 
 	correct := true
 	q1 := 4
@@ -41,8 +42,8 @@ func TestReplayUserStatesUseCaseRebuildsOnlineState(t *testing.T) {
 	_, err = recordUC.Execute(ctx, command.RecordLearningEventsCommand{
 		UserID: userID,
 		Events: []command.LearningEventInput{
-			newLearnInput(unitID, &correct, &q1, occurredAt, "replay-1"),
-			reviewInput(unitID, &correct, &q2, occurredAt.Add(24*time.Hour), "replay-2"),
+			fixture.NewLearnInput(unitID, &correct, &q1, occurredAt, "replay-1"),
+			fixture.ReviewInput(unitID, &correct, &q2, occurredAt.Add(24*time.Hour), "replay-2"),
 		},
 		IdempotencyKey: "replay-seed",
 	})
