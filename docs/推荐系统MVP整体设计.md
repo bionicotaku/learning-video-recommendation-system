@@ -838,7 +838,7 @@ Recommendation 只能写自己的表。
 
 ### 15.2 Recommendation 设计文档
 
-- [学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
+- [推荐-学习调度模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块设计.md)
 
 包含：
 
@@ -850,7 +850,7 @@ Recommendation 只能写自己的表。
 
 ### 15.3 Recommendation 工程实现稿
 
-- [学习调度系统工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现.md)
+- [推荐-学习调度模块工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块工程实现.md)
 
 包含：
 

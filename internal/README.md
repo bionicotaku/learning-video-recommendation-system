@@ -189,5 +189,5 @@ Recommendation 则是：
 - 系统总览：[推荐系统MVP整体设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐系统MVP整体设计.md)
 - Learning engine 设计：[学习引擎设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计.md)
 - Learning engine 工程：[学习引擎工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎工程实现.md)
-- Recommendation 设计：[学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
-- Recommendation 工程：[学习调度系统工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现.md)
+- Recommendation 设计：[推荐-学习调度模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块设计.md)
+- Recommendation 工程：[推荐-学习调度模块工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块工程实现.md)

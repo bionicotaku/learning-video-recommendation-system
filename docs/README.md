@@ -10,10 +10,10 @@
 2. [模块统一文件结构规范.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/模块统一文件结构规范.md)
 3. [学习引擎设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎设计.md)
 4. [学习引擎工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎工程实现.md)
-5. [学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
-6. [学习调度系统工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现.md)
+5. [推荐-学习调度模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块设计.md)
+6. [推荐-学习调度模块工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块工程实现.md)
 7. [数据表说明.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/数据表说明.md)
-8. [视频召回层设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/视频召回层设计.md)
+8. [推荐-视频召回模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-视频召回模块设计.md)
 
 ## 文档说明
 
@@ -39,7 +39,7 @@ Learning engine 的设计文档。说明：
 
 Learning engine 的工程实现说明。重点是目录结构、分层职责、reducer、repository、SQL、migration 和测试验收。
 
-### [学习调度系统设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统设计.md)
+### [推荐-学习调度模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块设计.md)
 
 Recommendation 模块设计文档。说明：
 
@@ -47,7 +47,7 @@ Recommendation 模块设计文档。说明：
 - 如何生成推荐批次
 - Recommendation 自己维护哪些表
 
-### [学习调度系统工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习调度系统工程实现.md)
+### [推荐-学习调度模块工程实现.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-学习调度模块工程实现.md)
 
 Recommendation 的工程实现说明。重点是目录结构、分层职责、repository 接口、SQL 设计和工程约束。
 
@@ -55,7 +55,7 @@ Recommendation 的工程实现说明。重点是目录结构、分层职责、re
 
 全局数据库对象说明文档。
 
-### [视频召回层设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/视频召回层设计.md)
+### [推荐-视频召回模块设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/推荐-视频召回模块设计.md)
 
 视频召回层专项设计文档，属于 Recommendation 内部后续能力设计。
 
