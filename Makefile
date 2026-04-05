@@ -1,8 +1,9 @@
 GO ?= go
 GO_PACKAGES := ./...
 GO_FILES := $(shell find . -type f -name '*.go' -not -path './vendor/*' | sort)
-SCHEDULER_MIGRATIONS_DIR := internal/recommendation/scheduler/infrastructure/migration
-SCHEDULER_MIGRATE := $(GO) run -tags 'postgres,file' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
+LEARNINGENGINE_MIGRATIONS_DIR := internal/learningengine/infrastructure/migration
+RECOMMENDATION_MIGRATIONS_DIR := internal/recommendation/infrastructure/migration
+MIGRATE := $(GO) run -tags 'postgres,file' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 .PHONY: fmt
 fmt:
@@ -34,6 +35,12 @@ lint: fmt-check vet staticcheck
 sqlc-generate:
 	@sqlc generate
 
+.PHONY: learningengine-sqlc-generate
+learningengine-sqlc-generate: sqlc-generate
+
+.PHONY: recommendation-sqlc-generate
+recommendation-sqlc-generate: sqlc-generate
+
 .PHONY: accept
 accept: sqlc-generate lint
 
@@ -44,23 +51,68 @@ test:
 .PHONY: check
 check: accept test
 
-.PHONY: scheduler-migrate-up
-scheduler-migrate-up:
+.PHONY: learningengine-migrate-up
+learningengine-migrate-up:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
-	@$(SCHEDULER_MIGRATE) -path $(SCHEDULER_MIGRATIONS_DIR) -database "$(DATABASE_URL)" up
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(LEARNINGENGINE_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=learningengine_schema_migrations" up
 
-.PHONY: scheduler-migrate-down
-scheduler-migrate-down:
+.PHONY: learningengine-migrate-down
+learningengine-migrate-down:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
-	@$(SCHEDULER_MIGRATE) -path $(SCHEDULER_MIGRATIONS_DIR) -database "$(DATABASE_URL)" down -all
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(LEARNINGENGINE_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=learningengine_schema_migrations" down -all
 
-.PHONY: scheduler-migrate-version
-scheduler-migrate-version:
+.PHONY: learningengine-migrate-version
+learningengine-migrate-version:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
-	@$(SCHEDULER_MIGRATE) -path $(SCHEDULER_MIGRATIONS_DIR) -database "$(DATABASE_URL)" version
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(LEARNINGENGINE_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=learningengine_schema_migrations" version
 
-.PHONY: scheduler-migrate-force
-scheduler-migrate-force:
+.PHONY: learningengine-migrate-force
+learningengine-migrate-force:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
 	@test -n "$(VERSION)" || (echo "VERSION is required" && exit 1)
-	@$(SCHEDULER_MIGRATE) -path $(SCHEDULER_MIGRATIONS_DIR) -database "$(DATABASE_URL)" force "$(VERSION)"
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(LEARNINGENGINE_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=learningengine_schema_migrations" force "$(VERSION)"
+
+.PHONY: recommendation-migrate-up
+recommendation-migrate-up:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(RECOMMENDATION_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=recommendation_schema_migrations" up
+
+.PHONY: recommendation-migrate-down
+recommendation-migrate-down:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(RECOMMENDATION_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=recommendation_schema_migrations" down -all
+
+.PHONY: recommendation-migrate-version
+recommendation-migrate-version:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(RECOMMENDATION_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=recommendation_schema_migrations" version
+
+.PHONY: recommendation-migrate-force
+recommendation-migrate-force:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@test -n "$(VERSION)" || (echo "VERSION is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(RECOMMENDATION_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=recommendation_schema_migrations" force "$(VERSION)"

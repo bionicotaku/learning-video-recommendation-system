@@ -1,0 +1,2 @@
+create index if not exists idx_user_unit_serving_states_user_last_recommended
+on recommendation.user_unit_serving_states (user_id, last_recommended_at);

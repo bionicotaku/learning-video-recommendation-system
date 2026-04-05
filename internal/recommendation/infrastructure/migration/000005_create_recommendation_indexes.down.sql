@@ -1,0 +1,1 @@
+drop index if exists recommendation.idx_user_unit_serving_states_user_last_recommended;
