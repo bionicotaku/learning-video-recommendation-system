@@ -13,7 +13,7 @@ type QuotaAllocation struct {
 }
 
 type QuotaAllocator interface {
-	Allocate(reviewBacklog, requestedLimit int, settings model.UserSchedulerSettings) QuotaAllocation
+	Allocate(reviewBacklog, requestedLimit int, defaults model.RecommendationDefaults) QuotaAllocation
 }
 
 type quotaAllocator struct{}
@@ -22,7 +22,7 @@ func NewQuotaAllocator() QuotaAllocator {
 	return quotaAllocator{}
 }
 
-func (quotaAllocator) Allocate(reviewBacklog, requestedLimit int, settings model.UserSchedulerSettings) QuotaAllocation {
+func (quotaAllocator) Allocate(reviewBacklog, requestedLimit int, defaults model.RecommendationDefaults) QuotaAllocation {
 	if requestedLimit < 0 {
 		requestedLimit = 0
 	}
@@ -34,15 +34,15 @@ func (quotaAllocator) Allocate(reviewBacklog, requestedLimit int, settings model
 	case reviewBacklog == 0:
 		return QuotaAllocation{
 			ReviewQuota: 0,
-			NewQuota:    minInt(requestedLimit, settings.DailyNewUnitQuota),
+			NewQuota:    minInt(requestedLimit, defaults.DailyNewUnitQuota),
 		}
-	case reviewBacklog > settings.DailyReviewHardLimit:
+	case reviewBacklog > defaults.DailyReviewHardLimit:
 		return QuotaAllocation{
-			ReviewQuota:       minInt(requestedLimit, settings.DailyReviewHardLimit),
+			ReviewQuota:       minInt(requestedLimit, defaults.DailyReviewHardLimit),
 			NewQuota:          0,
 			BacklogProtection: true,
 		}
-	case reviewBacklog > settings.DailyReviewSoftLimit:
+	case reviewBacklog > defaults.DailyReviewSoftLimit:
 		return QuotaAllocation{
 			ReviewQuota: requestedLimit,
 			NewQuota:    0,
@@ -51,15 +51,15 @@ func (quotaAllocator) Allocate(reviewBacklog, requestedLimit int, settings model
 		reviewQuota := ceilFraction(requestedLimit, 0.5)
 		return QuotaAllocation{
 			ReviewQuota: reviewQuota,
-			NewQuota:    minInt(requestedLimit-reviewQuota, settings.DailyNewUnitQuota),
+			NewQuota:    minInt(requestedLimit-reviewQuota, defaults.DailyNewUnitQuota),
 		}
 	case reviewBacklog >= 6 && reviewBacklog <= 20:
 		reviewQuota := ceilFraction(requestedLimit, 0.7)
 		return QuotaAllocation{
 			ReviewQuota: reviewQuota,
-			NewQuota:    minInt(requestedLimit-reviewQuota, settings.DailyNewUnitQuota),
+			NewQuota:    minInt(requestedLimit-reviewQuota, defaults.DailyNewUnitQuota),
 		}
-	case reviewBacklog >= 21 && reviewBacklog <= settings.DailyReviewSoftLimit:
+	case reviewBacklog >= 21 && reviewBacklog <= defaults.DailyReviewSoftLimit:
 		reviewQuota := ceilFraction(requestedLimit, 0.85)
 		return QuotaAllocation{
 			ReviewQuota: reviewQuota,

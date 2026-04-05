@@ -19,7 +19,7 @@ func TestBacklogCalculator(t *testing.T) {
 
 func TestQuotaAllocatorRanges(t *testing.T) {
 	allocator := NewQuotaAllocator()
-	settings := model.UserSchedulerSettings{
+	defaults := model.RecommendationDefaults{
 		DailyNewUnitQuota:    8,
 		DailyReviewSoftLimit: 30,
 		DailyReviewHardLimit: 60,
@@ -46,7 +46,7 @@ func TestQuotaAllocatorRanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := allocator.Allocate(tt.reviewBacklog, tt.requestedLimit, settings)
+			got := allocator.Allocate(tt.reviewBacklog, tt.requestedLimit, defaults)
 			if got.ReviewQuota != tt.wantReviewQuota {
 				t.Fatalf("ReviewQuota = %d, want %d", got.ReviewQuota, tt.wantReviewQuota)
 			}

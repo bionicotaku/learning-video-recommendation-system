@@ -90,6 +90,21 @@ MVP 阶段的稳定抽象是：
 
 而是只调用 Recommendation 模块，获取最终学习任务结果。
 
+#### 6. MVP 不支持用户级调度配置
+
+MVP 阶段明确不支持按用户持久化 Recommendation 调度配置。
+
+当前 Recommendation 统一使用模块默认值来决定：
+
+- session limit 默认值
+- daily new quota
+- daily review soft / hard limit
+- timezone 相关日界线
+
+这样做的目的，是先把跨模块边界、状态读取、推荐生成和审计闭环做稳定，而不是在 MVP 阶段引入额外的用户级配置表和配置管理链路。
+
+后续如果需要扩展，这类配置仍应归 Recommendation 自己维护，不进入 Learning engine。
+
 ## 3. 整体系统定位
 
 从最终系统边界看，当前 MVP 应拆成两个平级模块：

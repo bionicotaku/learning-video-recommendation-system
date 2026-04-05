@@ -13,17 +13,17 @@ import (
 )
 
 type GenerateLearningUnitRecommendationsUseCase struct {
-	txManager          apprepo.TxManager
-	stateRepo          apprepo.UserUnitStateReadRepository
-	servingStateRepo   apprepo.UserUnitServingStateRepository
-	runRepo            apprepo.SchedulerRunRepository
-	backlogCalculator  domainservice.BacklogCalculator
-	quotaAllocator     domainservice.QuotaAllocator
-	reviewScorer       domainservice.ReviewScorer
-	newScorer          domainservice.NewScorer
-	priorityExtractor  domainservice.PriorityZeroExtractor
-	assembler          domainservice.RecommendationAssembler
-	defaultUserSetting model.UserSchedulerSettings
+	txManager         apprepo.TxManager
+	stateRepo         apprepo.UserUnitStateReadRepository
+	servingStateRepo  apprepo.UserUnitServingStateRepository
+	runRepo           apprepo.SchedulerRunRepository
+	backlogCalculator domainservice.BacklogCalculator
+	quotaAllocator    domainservice.QuotaAllocator
+	reviewScorer      domainservice.ReviewScorer
+	newScorer         domainservice.NewScorer
+	priorityExtractor domainservice.PriorityZeroExtractor
+	assembler         domainservice.RecommendationAssembler
+	defaults          model.RecommendationDefaults
 }
 
 func NewGenerateLearningUnitRecommendationsUseCase(
@@ -39,17 +39,17 @@ func NewGenerateLearningUnitRecommendationsUseCase(
 	assembler domainservice.RecommendationAssembler,
 ) GenerateLearningUnitRecommendationsUseCase {
 	return GenerateLearningUnitRecommendationsUseCase{
-		txManager:          txManager,
-		stateRepo:          stateRepo,
-		servingStateRepo:   servingStateRepo,
-		runRepo:            runRepo,
-		backlogCalculator:  backlogCalculator,
-		quotaAllocator:     quotaAllocator,
-		reviewScorer:       reviewScorer,
-		newScorer:          newScorer,
-		priorityExtractor:  priorityExtractor,
-		assembler:          assembler,
-		defaultUserSetting: model.DefaultUserSchedulerSettings(),
+		txManager:         txManager,
+		stateRepo:         stateRepo,
+		servingStateRepo:  servingStateRepo,
+		runRepo:           runRepo,
+		backlogCalculator: backlogCalculator,
+		quotaAllocator:    quotaAllocator,
+		reviewScorer:      reviewScorer,
+		newScorer:         newScorer,
+		priorityExtractor: priorityExtractor,
+		assembler:         assembler,
+		defaults:          model.DefaultRecommendationDefaults(),
 	}
 }
 
@@ -61,7 +61,7 @@ func (uc GenerateLearningUnitRecommendationsUseCase) Execute(ctx context.Context
 
 	requestedLimit := cmd.RequestedLimit
 	if requestedLimit <= 0 {
-		requestedLimit = uc.defaultUserSetting.SessionDefaultLimit
+		requestedLimit = uc.defaults.SessionDefaultLimit
 	}
 
 	reviewCandidates, err := uc.stateRepo.FindDueReviewCandidates(ctx, cmd.UserID, now)
@@ -74,7 +74,7 @@ func (uc GenerateLearningUnitRecommendationsUseCase) Execute(ctx context.Context
 	}
 
 	reviewBacklog := uc.backlogCalculator.Compute(len(reviewCandidates))
-	quotas := uc.quotaAllocator.Allocate(reviewBacklog, requestedLimit, uc.defaultUserSetting)
+	quotas := uc.quotaAllocator.Allocate(reviewBacklog, requestedLimit, uc.defaults)
 
 	scoredReviews := make([]appquery.ScoredReviewCandidate, 0, len(reviewCandidates))
 	for _, candidate := range reviewCandidates {
