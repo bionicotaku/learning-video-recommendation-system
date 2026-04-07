@@ -30,7 +30,7 @@
 - span 级时间轴
 - span 对 coarse unit 的映射结果
 
-因此，`catalog` 的职责不再是维护媒体流水线和 AI 流水线状态，而是承接**内容事实、结构化 transcript 读模型、Recall-ready 索引、批量导入审计、用户对视频的互动状态投影**。
+因此，`catalog` 的职责不再是维护媒体流水线和 AI 流水线状态，而是承接**内容事实、结构化 transcript 读模型、Recall-ready 索引、入库审计、用户对视频的互动状态投影**。
 
 本文档的目标是明确：
 
@@ -157,7 +157,7 @@
 第一，切片视频内容资产主记录。
 第二，transcript 的标准化读模型。
 第三，从 span 聚合而来的 Recall-ready 视频级 coarse unit 索引。
-第四，批量导入审计。
+第四，入库审计。
 第五，用户对视频的互动状态投影。
 
 `catalog` 不负责：
@@ -173,16 +173,15 @@
 
 ## 5. 最终表清单
 
-最终 `catalog` schema 建议保留 8 张表：
+最终 `catalog` schema 建议保留 7 张表：
 
 1. `catalog.videos`
 2. `catalog.video_transcripts`
 3. `catalog.video_transcript_sentences`
 4. `catalog.video_semantic_spans`
 5. `catalog.video_unit_index`
-6. `catalog.video_ingestion_jobs`
-7. `catalog.video_ingestion_job_items`
-8. `catalog.video_user_states`
+6. `catalog.video_ingestion_records`
+7. `catalog.video_user_states`
 
 ---
 
@@ -197,9 +196,6 @@ catalog.videos
     ├── 1:N  -> catalog.video_semantic_spans
     ├── 1:N  -> catalog.video_unit_index
     └── 1:N  -> catalog.video_user_states
-
-catalog.video_ingestion_jobs
-    └── 1:N  -> catalog.video_ingestion_job_items
 ```
 
 ### 6.2 读路径总览
@@ -209,7 +205,7 @@ catalog.video_ingestion_jobs
 - 视频详情页：`videos -> transcripts -> sentences -> semantic_spans`
 - Recall：`coarse_unit_id -> video_unit_index -> videos`
 - 用户视频状态：`video_user_states`
-- 导入审计：`video_ingestion_jobs -> video_ingestion_job_items`
+- 导入审计：`video_ingestion_records`
 
 ---
 
@@ -471,70 +467,52 @@ catalog.video_ingestion_jobs
 
 ---
 
-## 7.6 `catalog.video_ingestion_jobs`
+## 7.6 `catalog.video_ingestion_records`
 
 ### 表职责
 
-记录一次批量导入任务的整体状态。
+记录某个 clip 的一次入库执行结果。
+它是**单视频级入库审计表**，不是批次级 job 表。
 
 ### 字段定义
 
-| 字段               | 类型          | 可空 | 默认值        | 说明                                              |
-| ------------------ | ------------- | ---- | ------------- | ------------------------------------------------- |
-| `ingestion_job_id` | `uuid`        | 否   |               | 主键                                              |
-| `status`           | `text`        | 否   |               | `running / succeeded / partially_failed / failed` |
-| `source_name`      | `text`        | 是   |               | 批次来源名称                                      |
-| `total_items`      | `integer`     | 否   |               | 总 clip 数                                        |
-| `succeeded_items`  | `integer`     | 否   | `0`           | 成功数                                            |
-| `failed_items`     | `integer`     | 否   | `0`           | 失败数                                            |
-| `context`          | `jsonb`       | 否   | `'{}'::jsonb` | 批次上下文                                        |
-| `started_at`       | `timestamptz` | 否   |               | 开始时间                                          |
-| `finished_at`      | `timestamptz` | 是   |               | 结束时间                                          |
+| 字段                  | 类型          | 可空 | 默认值        | 说明                                     |
+| --------------------- | ------------- | ---- | ------------- | ---------------------------------------- |
+| `ingestion_record_id` | `uuid`        | 否   |               | 主键                                     |
+| `source_clip_key`     | `text`        | 否   |               | 外部 clip key                            |
+| `video_id`            | `uuid`        | 是   |               | 成功后关联的视频 ID                      |
+| `source_name`         | `text`        | 是   |               | 导入来源名称                             |
+| `status`              | `text`        | 否   |               | `running / succeeded / failed / skipped` |
+| `warning_codes`       | `text[]`      | 否   | `'{}'`        | 警告码                                   |
+| `error_code`          | `text`        | 是   |               | 错误码                                   |
+| `error_message`       | `text`        | 是   |               | 错误详情                                 |
+| `context`             | `jsonb`       | 否   | `'{}'::jsonb` | 本次入库上下文                           |
+| `started_at`          | `timestamptz` | 否   |               | 开始时间                                 |
+| `finished_at`         | `timestamptz` | 是   |               | 结束时间                                 |
+| `created_at`          | `timestamptz` | 否   | `now()`       | 创建时间                                 |
 
 ### 必要约束
 
-- `primary key (ingestion_job_id)`
-- `check (status in ('running','succeeded','partially_failed','failed'))`
-- `check (total_items >= 0)`
-- `check (succeeded_items >= 0)`
-- `check (failed_items >= 0)`
-
----
-
-## 7.7 `catalog.video_ingestion_job_items`
-
-### 表职责
-
-记录某个 clip 在某个导入任务中的具体处理结果。
-
-### 字段定义
-
-| 字段               | 类型          | 可空 | 默认值 | 说明                                     |
-| ------------------ | ------------- | ---- | ------ | ---------------------------------------- |
-| `ingestion_job_id` | `uuid`        | 否   |        | 所属 job                                 |
-| `source_clip_key`  | `text`        | 否   |        | 外部 clip key                            |
-| `video_id`         | `uuid`        | 是   |        | 成功后关联的视频 ID                      |
-| `status`           | `text`        | 否   |        | `running / succeeded / failed / skipped` |
-| `warning_codes`    | `text[]`      | 否   | `'{}'` | 警告码                                   |
-| `error_code`       | `text`        | 是   |        | 错误码                                   |
-| `error_message`    | `text`        | 是   |        | 错误详情                                 |
-| `started_at`       | `timestamptz` | 否   |        | 开始时间                                 |
-| `finished_at`      | `timestamptz` | 是   |        | 结束时间                                 |
-
-### 必要约束
-
-- `primary key (ingestion_job_id, source_clip_key)`
-- `foreign key (ingestion_job_id) references catalog.video_ingestion_jobs(ingestion_job_id) on delete cascade`
+- `primary key (ingestion_record_id)`
 - `foreign key (video_id) references catalog.videos(video_id) on delete set null`
 - `check (status in ('running','succeeded','failed','skipped'))`
 
+### 索引建议
+
+- `(source_clip_key, started_at desc)`
+- `(video_id)`
+- `(status, started_at desc)`
+
 ### 设计说明
 
-这张表负责承接导入失败、跳过、警告等运行态，不应该把这些运行态塞回 `catalog.videos` 主表。
+这张表负责承接单视频导入过程中的成功、失败、跳过、警告等运行态，不应该把这些运行态塞回 `catalog.videos` 主表。
+
+这里明确**不再建立批次级 job 表**。
+当前版本只把“某个 clip 的一次入库执行”作为审计对象；如果未来确实需要批次级追踪，再单独扩展。
 
 ---
 
-## 7.8 `catalog.video_user_states`
+## 7.7 `catalog.video_user_states`
 
 ### 表职责
 
@@ -626,12 +604,11 @@ catalog.video_ingestion_jobs
 
 入库采用：
 
-**批量 job 驱动，单 clip 单事务 replace 写入。**
+**单 clip 单事务 replace 写入，并为每次执行记录单条入库审计。**
 
 含义是：
 
-- 一次导入任务由 `video_ingestion_jobs` 记录
-- 每个 clip 的处理结果由 `video_ingestion_job_items` 记录
+- 每个 clip 的一次执行由 `video_ingestion_records` 记录
 - 每个 clip 在数据库中要么整体成功，要么整体不落地
 - transcript 展开和 `video_unit_index` 聚合都在同一事务内完成
 
@@ -709,7 +686,7 @@ catalog.video_ingestion_jobs
 
 删除该视频旧 coarse unit 聚合索引，写入新的聚合结果。
 
-### Step 10：提交事务并更新 job item
+### Step 10：提交事务并更新 ingestion record
 
 成功则写：
 
@@ -923,8 +900,7 @@ catalog.video_unit_index
 
 再辅以：
 
-- `catalog.video_ingestion_jobs`
-- `catalog.video_ingestion_job_items`
+- `catalog.video_ingestion_records`
 - `catalog.video_user_states`
 
 这套设计的核心优点是：

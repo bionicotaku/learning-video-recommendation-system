@@ -13,3 +13,8 @@
 - Learning engine 的表
 - Learning engine 的索引
 - 任何旧 `scheduler` 兼容 migration
+
+执行顺序：
+
+- 整库初始化时建议在 Catalog、Learning engine 之后执行
+- 建议统一通过仓库根的 `make migrate-up` / `make migrate-down` 编排

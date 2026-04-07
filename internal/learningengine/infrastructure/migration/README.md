@@ -13,3 +13,9 @@
 - Recommendation 的表
 - Recommendation 的索引
 - 任何旧 `scheduler` 兼容 migration
+
+执行顺序：
+
+- `learning.unit_learning_events` 依赖 `catalog.videos`
+- 整库初始化时不要单独先跑 Learning engine
+- 建议统一通过仓库根的 `make migrate-up` / `make migrate-down` 编排

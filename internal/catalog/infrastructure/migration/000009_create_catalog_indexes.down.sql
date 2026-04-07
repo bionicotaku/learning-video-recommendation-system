@@ -1,0 +1,17 @@
+drop index if exists catalog.idx_video_user_states_user_last_watched_at;
+drop index if exists catalog.idx_video_user_states_video_id;
+drop index if exists catalog.idx_video_ingestion_records_status_started_at;
+drop index if exists catalog.idx_video_ingestion_records_video_id;
+drop index if exists catalog.idx_video_ingestion_records_source_clip_key_started_at;
+drop index if exists catalog.idx_video_unit_index_video_id;
+drop index if exists catalog.idx_video_unit_index_coarse_unit_mention_coverage;
+drop index if exists catalog.idx_video_semantic_spans_video_coarse_unit;
+drop index if exists catalog.idx_video_semantic_spans_coarse_unit_video;
+drop index if exists catalog.idx_video_semantic_spans_video_start_ms;
+drop index if exists catalog.idx_video_semantic_spans_video_sentence;
+drop index if exists catalog.idx_video_transcript_sentences_video_end_ms;
+drop index if exists catalog.idx_video_transcript_sentences_video_start_ms;
+drop index if exists catalog.idx_videos_created_at_desc;
+drop index if exists catalog.idx_videos_visibility_publish_at;
+drop index if exists catalog.idx_videos_status;
+drop index if exists catalog.idx_videos_parent_video_slug_clip_seq;

@@ -3,6 +3,7 @@ GO_PACKAGES := ./...
 GO_FILES := $(shell find . -type f -name '*.go' -not -path './vendor/*' | sort)
 LEARNINGENGINE_MIGRATIONS_DIR := internal/learningengine/infrastructure/migration
 RECOMMENDATION_MIGRATIONS_DIR := internal/recommendation/scheduler/infrastructure/migration
+CATALOG_MIGRATIONS_DIR := internal/catalog/infrastructure/migration
 MIGRATE := $(GO) run -tags 'postgres,file' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.3
 
 .PHONY: fmt
@@ -71,6 +72,15 @@ internal-test-e2e:
 .PHONY: check
 check: accept test
 
+.PHONY: migrate-up
+migrate-up: catalog-migrate-up learningengine-migrate-up recommendation-migrate-up
+
+.PHONY: migrate-down
+migrate-down: recommendation-migrate-down learningengine-migrate-down catalog-migrate-down
+
+.PHONY: migrate-version
+migrate-version: catalog-migrate-version learningengine-migrate-version recommendation-migrate-version
+
 .PHONY: learningengine-migrate-up
 learningengine-migrate-up:
 	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
@@ -136,3 +146,36 @@ recommendation-migrate-force:
 	sep='?'; \
 	case "$$db_url" in *\?*) sep='&';; esac; \
 	$(MIGRATE) -path $(RECOMMENDATION_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=recommendation_schema_migrations" force "$(VERSION)"
+
+.PHONY: catalog-migrate-up
+catalog-migrate-up:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(CATALOG_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=catalog_schema_migrations" up
+
+.PHONY: catalog-migrate-down
+catalog-migrate-down:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(CATALOG_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=catalog_schema_migrations" down -all
+
+.PHONY: catalog-migrate-version
+catalog-migrate-version:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(CATALOG_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=catalog_schema_migrations" version
+
+.PHONY: catalog-migrate-force
+catalog-migrate-force:
+	@test -n "$(DATABASE_URL)" || (echo "DATABASE_URL is required" && exit 1)
+	@test -n "$(VERSION)" || (echo "VERSION is required" && exit 1)
+	@db_url="$(DATABASE_URL)"; \
+	sep='?'; \
+	case "$$db_url" in *\?*) sep='&';; esac; \
+	$(MIGRATE) -path $(CATALOG_MIGRATIONS_DIR) -database "$${db_url}$${sep}x-migrations-table=catalog_schema_migrations" force "$(VERSION)"
