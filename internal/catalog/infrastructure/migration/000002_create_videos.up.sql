@@ -8,6 +8,7 @@ create table if not exists catalog.videos (
   source_end_ms integer,
   title text not null,
   description text,
+  clip_reason text,
   language text not null default 'en',
   duration_ms integer not null,
   hls_master_playlist_path text not null,

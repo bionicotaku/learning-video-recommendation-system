@@ -231,6 +231,7 @@ catalog.videos
 | `source_end_ms`            | `integer`     | 是   |                     | 原始视频中的结束偏移          |
 | `title`                    | `text`        | 否   |                     | 标题                          |
 | `description`              | `text`        | 是   |                     | 描述                          |
+| `clip_reason`              | `text`        | 是   |                     | 切片原因说明                  |
 | `language`                 | `text`        | 否   | `'en'`              | 主语言                        |
 | `duration_ms`              | `integer`     | 否   |                     | 视频时长，毫秒                |
 | `hls_master_playlist_path` | `text`        | 否   |                     | HLS 主清单路径                |
@@ -664,6 +665,7 @@ catalog.videos
 
 - 标题
 - 描述
+- 切片原因说明
 - HLS 路径
 - 缩略图
 - 时长
