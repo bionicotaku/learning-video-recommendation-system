@@ -20,9 +20,9 @@
 当前仓库中的样本文件为：
 
 - 父视频切片描述文件：
-  - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence).json](/Users/evan/Downloads/learning-video-recommendation-system/docs/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29.json)
+  - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence).json](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/samples/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29.json)
 - clip transcript 文件：
-  - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json](/Users/evan/Downloads/learning-video-recommendation-system/docs/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29-clip1.json)
+  - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/samples/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29-clip1.json)
 
 从样本中确认到的事实如下：
 
@@ -185,7 +185,7 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 
 建议当前策略为：
 
-- 缺 transcript：记 `failed` 或 `skipped`，由 CLI 参数控制
+- 缺 transcript：直接记 `skipped`
 - 孤儿 transcript：默认不入库，汇总到脚本结束报告
 - 多候选：直接视为失败，不做猜测匹配
 
@@ -574,13 +574,15 @@ placeholder://transcript/<transcript_file_name_without_ext>
 2. 对每个父文件读取 `.clips`
 3. 对每个 clip 生成 transcript 文件名
 4. 去目录 B 查找对应 transcript 文件
-5. 若 transcript 文件不存在，则记失败或跳过
+5. 若 transcript 文件不存在，则直接记 `skipped`
 6. 若存在，则读取 transcript JSON 并进入校验和导入流程
 
 此外还应增加两条收尾规则：
 
 7. 记录所有未被任何父文件消费的 transcript 文件
 8. 输出本次扫描汇总：父文件数、clip 数、成功匹配数、缺失 transcript 数、孤儿 transcript 数
+
+这里的“缺失 transcript 数”就是被记为 `skipped` 的 clip 数。
 
 ---
 
@@ -804,3 +806,317 @@ transcript 文件负责：
 **以父视频切片描述文件作为来源与切片边界输入，以 clip transcript 文件作为结构化内容输入，通过 `parent_name + clip_id -> transcript 文件名` 的规则完成匹配，不读取视频本体，直接构建 `catalog` 所需的内容资产、transcript 读模型、unit 索引和单视频入库审计。**
 
 这套方案的前提已经被当前样本验证成立，可以直接作为下一步 Python 脚本实现依据。
+
+---
+
+## 13. 实现设计
+
+本节把脚本实现层面的约束统一收口到 `scripts/catalog_ingest/README.md`。
+后续 `scripts/catalog_ingest/` 下的 Python 文件都应以这里为准。
+
+### 13.1 适用前提
+
+当前脚本建立在以下前提上：
+
+1. 数据库中只存切片视频，不存原始长视频实体。
+2. 每个 clip 的业务唯一键都按固定规则生成：`source_clip_key = <parent_video_slug>#clip<clip_id>`。
+3. 每个 clip 对应一个本地可读的 transcript JSON。
+4. transcript JSON 中已经包含 sentence 和 span 级时间信息。
+5. span 中的 `coarse_id` 已由上游流程产出。
+6. 数据库 schema 已按 [docs/Catalog-数据库设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/Catalog-数据库设计.md) 建好。
+
+因此脚本只负责导入、校验、标准化和写库，不负责生成内容。
+
+### 13.2 脚本边界
+
+脚本负责：
+
+- 读取本地输入目录和 JSON 文件
+- 组装单 clip 输入对象
+- 校验输入元数据和 transcript 结构
+- 归一化生成 `catalog` 所需行数据
+- 聚合构建 `catalog.video_unit_index`
+- 以单 clip 单事务方式写入：
+  - `catalog.videos`
+  - `catalog.video_transcripts`
+  - `catalog.video_transcript_sentences`
+  - `catalog.video_semantic_spans`
+  - `catalog.video_unit_index`
+- 写 `catalog.video_ingestion_records`
+
+脚本不负责：
+
+- 创建 `semantic.coarse_unit`
+- 修复错误 transcript
+- recommendation 审计
+- `learning.*` 或 `recommendation.*` 写入
+- 批量 job 管理
+- 对象存储上传
+
+### 13.3 总体执行模型
+
+脚本采用单 clip 单事务 replace 写入。
+
+每个 clip 的固定执行顺序是：
+
+```text
+读取输入
+  ↓
+校验
+  ↓
+归一化
+  ↓
+构建 transcript 摘要与 unit 索引
+  ↓
+开启事务
+  ↓
+upsert videos
+  ↓
+replace video_transcripts
+  ↓
+replace video_transcript_sentences
+  ↓
+replace video_semantic_spans
+  ↓
+replace video_unit_index
+  ↓
+写 video_ingestion_records
+  ↓
+提交事务
+```
+
+失败时：
+
+- 回滚当前 clip 的业务写入
+- 将本次执行标记为 `failed`
+- 记录 `error_code` 与 `error_message`
+
+### 13.4 模块拆分
+
+当前阶段目录职责固定如下：
+
+```text
+scripts/catalog_ingest/
+  README.md
+  __init__.py
+  main.py
+  models.py
+  manifest_loader.py
+  validator.py
+  normalizer.py
+  index_builder.py
+  repository.py
+  samples/
+```
+
+各文件边界如下：
+
+- [main.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/main.py)
+  只做 CLI 参数解析、数据库连接组装、总编排和退出码管理
+- [models.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/models.py)
+  只放脚本内部数据结构
+- [manifest_loader.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/manifest_loader.py)
+  只做输入目录扫描和单 clip 输入对象组装
+- [validator.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/validator.py)
+  只做输入校验和结构化错误输出
+- [normalizer.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/normalizer.py)
+  只做标准化行数据生成
+- [index_builder.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/index_builder.py)
+  只做 transcript 摘要和 `video_unit_index` 聚合
+- [repository.py](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/repository.py)
+  只做事务和 SQL 写入
+
+不要把所有逻辑堆到 `main.py`。
+
+### 13.5 输入模型
+
+脚本应围绕“单 clip 输入对象”工作。
+
+建议最小输入字段如下：
+
+```text
+source_clip_key
+parent_video_name
+parent_video_slug
+clip_seq
+source_start_ms
+source_end_ms
+title
+description
+clip_reason
+language
+duration_ms
+hls_master_playlist_path
+thumbnail_url
+publish_at
+transcript_object_path
+transcript_checksum
+transcript_format_version
+transcript_json
+source_name
+context
+```
+
+其中：
+
+- `transcript_object_path` 是数据库中记录的对象路径
+- `transcript_json` 是本地当前真正读取到的 transcript 原文对象
+- `source_name` 和 `context` 用于写 `catalog.video_ingestion_records`
+
+### 13.6 业务唯一键与数据库主键
+
+入库脚本里必须明确区分：
+
+- `source_clip_key`
+- `video_id`
+
+`source_clip_key` 是业务侧稳定唯一键，负责回答“这个外部 clip 是谁”。
+`video_id` 是数据库内部主键，负责 `catalog.videos` 主键和其他子表外键关联。
+
+当前正式规则如下：
+
+```text
+source_clip_key = <parent_video_slug>#clip<clip_id>
+clip_seq = clip_id
+```
+
+### 13.7 数据库写入策略
+
+单 clip 固定按以下顺序写入：
+
+1. `catalog.videos`
+2. `catalog.video_transcripts`
+3. `catalog.video_transcript_sentences`
+4. `catalog.video_semantic_spans`
+5. `catalog.video_unit_index`
+6. `catalog.video_ingestion_records`
+
+`catalog.videos` 按 `source_clip_key` 做幂等 upsert。
+若已存在，则更新主表字段并复用既有 `video_id`。
+
+以下四张内容表采用 replace 策略：
+
+- `catalog.video_transcripts`
+- `catalog.video_transcript_sentences`
+- `catalog.video_semantic_spans`
+- `catalog.video_unit_index`
+
+也就是：
+
+- 先按 `video_id` 删除旧明细
+- 再写入新明细
+
+原因是 transcript 和 unit index 都由当前输入完整派生，不适合做局部 patch。
+
+审计表采用执行历史模型：
+
+- 开始时插入 `running`
+- 成功后更新为 `succeeded`
+- 失败后更新为 `failed`
+- 无变化时记为 `skipped`
+- 缺少对应 transcript 文件时也记为 `skipped`
+
+### 13.8 幂等与跳过策略
+
+幂等锚点固定使用：
+
+- `source_clip_key`
+
+无变化跳过条件为：
+
+- `source_clip_key` 已存在
+- `transcript_checksum` 未变化
+- `hls_master_playlist_path` 未变化
+- 主要元数据未变化
+
+满足时：
+
+- 不重写四张内容表
+- 写一条 `video_ingestion_records`
+- `status = skipped`
+
+另外当前还固定一条跳过规则：
+
+- 若按父文件名和 `clip_id` 推导出的 transcript 文件不存在，则不写 `catalog.videos` 和其余内容表，只写一条 `video_ingestion_records`
+- 该记录的 `status = skipped`
+- 建议 `error_code = transcript_missing`
+- `context` 中记录父文件名、`clip_id` 和期望 transcript 文件名
+
+### 13.9 错误模型
+
+脚本应优先输出结构化错误，而不是只有异常堆栈。
+
+建议至少区分：
+
+- `manifest_invalid`
+- `transcript_invalid`
+- `coarse_unit_missing`
+- `db_connect_failed`
+- `db_tx_failed`
+- `db_write_failed`
+- `index_build_failed`
+- `unknown_error`
+
+每个错误都应尽量带：
+
+- `error_code`
+- `error_message`
+- `source_clip_key`
+- 失败阶段
+
+### 13.10 CLI 设计建议
+
+当前阶段 CLI 不需要复杂。
+
+建议支持：
+
+```text
+--parents-dir <path>
+--transcripts-dir <path>
+--source-name <text>
+--limit <n>
+--dry-run
+--clip-key <source_clip_key>
+```
+
+其中：
+
+- `--parents-dir` 扫描父视频切片描述目录
+- `--transcripts-dir` 扫描 clip transcript 目录
+- `--clip-key` 用于单条重跑
+- `--dry-run` 只校验和归一化，不写库
+
+### 13.11 第一阶段开发范围
+
+第一阶段只做 MVP 必需能力：
+
+1. 读取两个输入目录
+2. 按文件名规则完成父文件与 transcript 匹配
+3. 校验 transcript 结构
+4. 归一化四张内容表所需数据
+5. 构建 `video_unit_index`
+6. 单 clip 事务写库
+7. 写 `video_ingestion_records`
+8. 支持 `dry-run`
+
+当前明确不做：
+
+- 并发导入
+- 批次级 job 管理
+- 失败自动重试
+- 对象存储上传
+- 富日志平台集成
+- 指标系统
+
+### 13.12 后续扩展方向
+
+如果第一阶段稳定，后续可继续加：
+
+- 单元测试
+- fixture transcript
+- integration test
+- 并发执行器
+- 更细粒度的 evidence 生成
+- 从本地文件切换到对象存储输入
+
+但这些都应建立在当前单 clip 入库链路先稳定的前提上。
