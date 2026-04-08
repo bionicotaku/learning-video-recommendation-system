@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,8 @@ def load_clip_inputs(
             )
         )
 
+    _validate_unique_source_clip_keys(loaded_items)
+
     if clip_key:
         loaded_items = [item for item in loaded_items if item.source_clip_key == clip_key]
 
@@ -60,6 +63,30 @@ def load_clip_inputs(
         loaded_items = loaded_items[:limit]
 
     return tuple(loaded_items)
+
+
+def _validate_unique_source_clip_keys(loaded_items: list[LoadedClipInput]) -> None:
+    """校验本次输入中的 source_clip_key 唯一。
+
+    用户已经明确要求重复校验直接用 source_clip_key。
+    因此这里不再单独维护一套 clip_id 重复规则，而是统一按业务唯一键处理。
+    一旦出现重复 source_clip_key，就直接视为坏输入并失败。
+    """
+
+    duplicated_source_clip_keys = sorted(
+        source_clip_key
+        for source_clip_key, count in Counter(item.source_clip_key for item in loaded_items).items()
+        if count > 1
+    )
+    if not duplicated_source_clip_keys:
+        return
+
+    raise CatalogIngestError(
+        code="manifest_invalid",
+        stage="manifest_loader",
+        message="输入中存在重复的 source_clip_key",
+        context={"duplicated_source_clip_keys": duplicated_source_clip_keys},
+    )
 
 
 def _scan_json_files(directory: Path, label: str) -> tuple[Path, ...]:

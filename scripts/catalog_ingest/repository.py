@@ -93,6 +93,8 @@ class CatalogRepository:
               v.language,
               v.duration_ms,
               v.hls_master_playlist_path,
+              v.thumbnail_url,
+              v.publish_at,
               t.transcript_checksum
             from catalog.videos v
             left join catalog.video_transcripts t on t.video_id = v.video_id
@@ -127,6 +129,8 @@ class CatalogRepository:
             language=row["language"],
             duration_ms=row["duration_ms"],
             hls_master_playlist_path=row["hls_master_playlist_path"],
+            thumbnail_url=row["thumbnail_url"],
+            publish_at=row["publish_at"],
             transcript_checksum=row["transcript_checksum"],
         )
 

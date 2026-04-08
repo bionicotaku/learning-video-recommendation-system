@@ -281,6 +281,8 @@ class ExistingClipState:
     language: str
     duration_ms: int
     hls_master_playlist_path: str
+    thumbnail_url: str | None
+    publish_at: datetime | None
     transcript_checksum: str | None
 
 

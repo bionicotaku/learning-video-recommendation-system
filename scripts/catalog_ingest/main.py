@@ -60,37 +60,41 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    database_url = load_database_url()
-    repository = CatalogRepository(database_url)
+    try:
+        database_url = load_database_url()
+        repository = CatalogRepository(database_url)
 
-    clip_inputs = load_clip_inputs(
-        parents_dir=Path(args.parents_dir),
-        transcripts_dir=Path(args.transcripts_dir),
-        source_name=args.source_name,
-        clip_key=args.clip_key,
-        limit=args.limit,
-    )
-
-    if not clip_inputs:
-        print("未找到任何待处理的 clip。")
-        return 0
-
-    known_coarse_unit_ids = repository.load_known_coarse_unit_ids()
-    results: list[ClipProcessResult] = []
-
-    for clip_input in clip_inputs:
-        result = _process_single_clip(
-            clip_input=clip_input,
-            repository=repository,
-            known_coarse_unit_ids=known_coarse_unit_ids,
-            dry_run=args.dry_run,
-            time_tolerance_ms=args.time_tolerance_ms,
+        clip_inputs = load_clip_inputs(
+            parents_dir=Path(args.parents_dir),
+            transcripts_dir=Path(args.transcripts_dir),
+            source_name=args.source_name,
+            clip_key=args.clip_key,
+            limit=args.limit,
         )
-        results.append(result)
-        _print_single_result(result)
 
-    _print_summary(results, dry_run=args.dry_run)
-    return 1 if any(result.status == "failed" for result in results) else 0
+        if not clip_inputs:
+            print("未找到任何待处理的 clip。")
+            return 0
+
+        known_coarse_unit_ids = repository.load_known_coarse_unit_ids()
+        results: list[ClipProcessResult] = []
+
+        for clip_input in clip_inputs:
+            result = _process_single_clip(
+                clip_input=clip_input,
+                repository=repository,
+                known_coarse_unit_ids=known_coarse_unit_ids,
+                dry_run=args.dry_run,
+                time_tolerance_ms=args.time_tolerance_ms,
+            )
+            results.append(result)
+            _print_single_result(result)
+
+        _print_summary(results, dry_run=args.dry_run)
+        return 1 if any(result.status == "failed" for result in results) else 0
+    except CatalogIngestError as error:
+        print(f"[failed] code={error.code} stage={error.stage} message={error.message}")
+        return 1
 
 
 def _process_single_clip(
@@ -224,6 +228,8 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
         and existing_state.clip_reason == clip_input.clip_reason
         and existing_state.language == clip_input.language
         and existing_state.duration_ms == clip_input.duration_ms
+        and existing_state.thumbnail_url == clip_input.thumbnail_url
+        and existing_state.publish_at == clip_input.publish_at
     )
 
 

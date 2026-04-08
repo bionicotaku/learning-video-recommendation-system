@@ -140,6 +140,13 @@ def _validate_sentence_and_token_structure(clip_input: LoadedClipInput) -> None:
             )
 
         for token in sentence.tokens:
+            if token.semantic_element is None:
+                raise _error(
+                    clip_input,
+                    "transcript_invalid",
+                    "token 必须包含 semanticElement 对象",
+                    {"sentence_index": sentence.index, "token_index": token.index},
+                )
             if token.index < 0:
                 raise _error(
                     clip_input,
@@ -189,7 +196,7 @@ def _validate_coarse_ids(clip_input: LoadedClipInput, known_coarse_set: set[int]
 
     for sentence in clip_input.transcript_sentences:
         for token in sentence.tokens:
-            if token.semantic_element is None or token.semantic_element.coarse_id is None:
+            if token.semantic_element.coarse_id is None:
                 continue
             if token.semantic_element.coarse_id not in known_coarse_set:
                 raise _error(
