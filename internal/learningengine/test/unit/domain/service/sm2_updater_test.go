@@ -1,3 +1,7 @@
+// 作用：验证 SM2Updater 在成功、失败和最小 EF 下限场景下是否按预期更新间隔与复习时间。
+// 输入/输出：输入是伪造的 UserUnitState、quality、occurredAt 和默认策略；输出是更新后 state 的断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/service/sm2_updater.go；断言只返回给测试框架。
 package service_test
 
 import (

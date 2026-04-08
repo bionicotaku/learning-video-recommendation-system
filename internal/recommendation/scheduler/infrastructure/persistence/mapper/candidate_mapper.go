@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 把 candidates.sql 的查询结果行转换成 application/query 层候选对象
+//   - 同时完成枚举解析、nullable 字段处理和 pgtype 到 Go 类型的转换
+//
+// 输入/输出：
+//   - 输入：sqlcgen.FindDueReviewCandidatesRow / FindNewCandidatesRow
+//   - 输出：query.ReviewCandidate / query.NewCandidate
+//
+// 谁调用它：
+//   - infrastructure/persistence/repository/learning_state_snapshot_read_repo.go
+//
+// 它调用谁/传给谁：
+//   - 调用 parseUnitKind、parseUnitStatus 和 pgtype helper
+//   - 把结果传给 application/usecase 和 domain/service 流程
 package mapper
 
 import (

@@ -43,6 +43,7 @@
 internal/recommendation/
   README.md
   doc.go
+  docs/
   scheduler/
     README.md
     doc.go
@@ -57,13 +58,28 @@ internal/recommendation/
 如果你是第一次接手 Recommendation，建议按下面顺序读：
 
 1. [internal/recommendation/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/README.md)
-2. [internal/recommendation/scheduler/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/README.md)
-3. `scheduler/application/usecase`
-4. `scheduler/domain/service`
-5. `scheduler/infrastructure/persistence/query`
-6. `scheduler/test/unit`
-7. `scheduler/test/integration`
-8. `scheduler/test/scenario`
+2. [推荐-模块代码实现详解.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/docs/推荐-模块代码实现详解.md)
+3. [internal/recommendation/scheduler/README.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/scheduler/README.md)
+4. `scheduler/application/usecase`
+5. `scheduler/domain/service`
+6. `scheduler/infrastructure/persistence/query`
+7. `scheduler/test/unit`
+8. `scheduler/test/integration`
+9. `scheduler/test/scenario`
+
+## 4.1 docs 目录说明
+
+`internal/recommendation/docs/` 当前用于放 Recommendation 模块的补充说明文档。
+
+建议优先阅读：
+
+- [推荐-模块代码实现详解.md](/Users/evan/Downloads/learning-video-recommendation-system/internal/recommendation/docs/推荐-模块代码实现详解.md)
+
+它的定位不是设计稿，而是：
+
+- 面向新人上手
+- 对齐当前真实代码
+- 解释文件结构、调用链、事务边界、数据流和测试入口
 
 ## 5. 当前边界
 

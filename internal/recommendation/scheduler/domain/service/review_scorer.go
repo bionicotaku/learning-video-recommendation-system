@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 定义 ReviewScorer，负责给 due review 候选计算分数和原因码
+//   - 当前公式综合考虑 overdue、target priority、weak memory 和最近推荐抑制
+//
+// 输入/输出：
+//   - 输入：ReviewCandidate 和当前时间 now
+//   - 输出：ScoredReviewCandidate，包含 Score 和 ReasonCodes
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - unit test 会直接验证打分方向和原因码
+//
+// 它调用谁/传给谁：
+//   - 调用本文件内的 reviewOverdueScore、reviewWeakMemoryScore、reviewRecencyAdjustment
+//   - 输出结果传给 PriorityZeroExtractor 和 RecommendationAssembler
 package service
 
 import (

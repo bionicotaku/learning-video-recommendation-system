@@ -1,3 +1,7 @@
+// 作用：处理强事件的基础字段更新，负责计数器、最近时间、正确/错误 streak、LastQuality 的维护。
+// 输入/输出：输入是当前 UserUnitState 和强事件 LearningEvent；输出是已更新基础统计但尚未做 SM-2/状态迁移的 state。
+// 谁调用它：domain/aggregate/user_unit_reducer.go、unit test。
+// 它调用谁/传给谁：调用 state_helpers.go 的 cloneOrInitState；处理结果传回 reducer，后续再交给 domain/service。
 package rule
 
 import (

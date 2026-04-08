@@ -1,3 +1,7 @@
+// 作用：负责 learning.unit_learning_events 行模型与 domain LearningEvent 之间的双向映射。
+// 输入/输出：输入是 sqlc row 或 domain LearningEvent；输出是 domain LearningEvent 或 sqlc Insert params。
+// 谁调用它：persistence/repository/unit_learning_event_repo.go。
+// 它调用谁/传给谁：调用 pgtype_helpers.go；转换结果传给 sqlc querier 或返回给 use case/replay。
 package mapper
 
 import (

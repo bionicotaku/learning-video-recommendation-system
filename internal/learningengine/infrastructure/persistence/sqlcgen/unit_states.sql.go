@@ -16,6 +16,10 @@ select count(*)::bigint
 from learning.user_unit_states
 `
 
+// 作用：定义状态表相关 SQL，包括计数、单条读取、按用户删除和 upsert。
+// 输入/输出：输入是 sqlc 参数 user_id、coarse_unit_id、state fields；输出是状态行或执行副作用。
+// 谁调用它：sqlc 生成器；运行时通过 user_unit_state_repo.go 间接调用。
+// 它调用谁/传给谁：直接作用于 PostgreSQL；生成的方法会传给 state repository 使用。
 func (q *Queries) CountUserUnitStates(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countUserUnitStates)
 	var column_1 int64

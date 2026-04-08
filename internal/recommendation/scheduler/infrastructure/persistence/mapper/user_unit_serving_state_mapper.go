@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 把 serving state 更新请求映射成 UpsertUserUnitServingStateParams
+//   - 统一设置首次写入和更新时使用的时间字段
+//
+// 输入/输出：
+//   - 输入：userID、coarseUnitID、runID、recommendedAt
+//   - 输出：sqlcgen.UpsertUserUnitServingStateParams
+//
+// 谁调用它：
+//   - infrastructure/persistence/repository/user_unit_serving_state_repo.go
+//
+// 它调用谁/传给谁：
+//   - 调用 UUIDToPG 和 TimeToPG
+//   - 把结果传给 sqlcgen.UpsertUserUnitServingState
 package mapper
 
 import (

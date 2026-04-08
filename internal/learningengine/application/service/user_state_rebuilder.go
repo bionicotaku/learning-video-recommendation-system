@@ -1,3 +1,7 @@
+// 作用：实现 replay 场景下的用户状态重建器，按事件顺序为每个 coarse unit 重算最终状态。
+// 输入/输出：输入是按时间排序的 []LearningEvent；输出是 []*UserUnitState 或 error。
+// 谁调用它：application/usecase/replay_user_states.go。
+// 它调用谁/传给谁：调用 domain/aggregate/user_unit_reducer.go；重建结果再传回 replay use case 并交给 state repository 批量写回。
 package service
 
 import (

@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 定义 RecommendationAssembler，负责把 priority-zero、review、new 候选组装成最终 RecommendationBatch
+//   - 统一处理排序、去重、预算消费和 rank 生成
+//
+// 输入/输出：
+//   - 输入：userID、generatedAt、priorityZero、scoredReviews、scoredNews、QuotaAllocation
+//   - 输出：RecommendationBatch
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - unit test 会直接验证输出顺序和去重行为
+//
+// 它调用谁/传给谁：
+//   - 调用本文件内的排序函数和 item 映射函数
+//   - 组装结果返回给 usecase，并传给持久化 mapper 落库
 package service
 
 import (

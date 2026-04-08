@@ -1,3 +1,7 @@
+// 作用：作为 Learning engine 的领域聚合入口，把一条 LearningEvent 归约成下一版 UserUnitState。
+// 输入/输出：输入是 current state、LearningEvent、LearningPolicy；输出是 next state 或 error。
+// 谁调用它：record use case、replay rebuilder、unit/integration tests。
+// 它调用谁/传给谁：调用 domain/rule 的 weak/strong handler，以及 domain/service 的 SM2、状态迁移、进度和掌握分计算器；结果传回 use case 或 rebuilder。
 package aggregate
 
 import (

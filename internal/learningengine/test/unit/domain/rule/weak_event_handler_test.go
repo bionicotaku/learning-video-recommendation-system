@@ -1,3 +1,7 @@
+// 作用：验证 weak event handler 只更新曝光类字段，不会推进调度状态或 SM-2 相关字段。
+// 输入/输出：输入是伪造的 UserUnitState 和弱事件 LearningEvent；输出是更新后 state 的断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/rule/weak_event_handler.go；断言只返回给测试框架。
 package rule_test
 
 import (

@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 把 RecommendationBatch 映射成 scheduler_runs 和 scheduler_run_items 的 SQL 参数
+//   - 统一处理计数字段、context JSON 和 numeric score 转换
+//
+// 输入/输出：
+//   - 输入：domain/model.RecommendationBatch
+//   - 输出：sqlcgen.UpsertSchedulerRunParams 和 []sqlcgen.UpsertSchedulerRunItemParams
+//
+// 谁调用它：
+//   - infrastructure/persistence/repository/scheduler_run_repo.go
+//
+// 它调用谁/传给谁：
+//   - 调用 floatToPG 和 json.Marshal
+//   - 把结果传给 sqlcgen.UpsertSchedulerRun / UpsertSchedulerRunItem
 package mapper
 
 import (

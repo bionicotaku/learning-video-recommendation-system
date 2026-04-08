@@ -1,3 +1,20 @@
+// 文件作用：
+//   - 提供 scheduler 集成测试和场景测试共用的夹具与组装函数
+//   - 当前也是仓库里最完整的 usecase 依赖组装示例
+//
+// 输入/输出：
+//   - 输入：测试传入的 t、数据库连接上下文以及各类测试数据
+//   - 输出：测试连接池、测试数据、组装好的 usecase 和 command
+//
+// 谁调用它：
+//   - integration/infrastructure/*.go
+//   - integration/usecase/*.go
+//   - scenario/scenarios_test.go
+//
+// 它调用谁/传给谁：
+//   - 调用 infrastructure.LoadConfig / NewDBPool
+//   - 调用 repository 构造函数、tx manager 和 domain service 构造函数
+//   - 把组装结果传给测试代码
 package fixture
 
 import (

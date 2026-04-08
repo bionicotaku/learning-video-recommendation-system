@@ -1,3 +1,16 @@
+// 文件作用：
+//   - 验证 scheduler 基础设施配置校验逻辑
+//   - 防止 DATABASE_URL 必填约束被意外放松
+//
+// 输入/输出：
+//   - 输入：测试中构造的 Config
+//   - 输出：对 Validate 错误信息的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 直接调用 infrastructure/config.go 的 Validate
 package infrastructure_test
 
 import (

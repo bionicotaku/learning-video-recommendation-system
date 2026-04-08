@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 验证 LearningStateSnapshotReadRepository 的候选查询是否正确
+//   - 覆盖 review/new 候选筛选、serving state 左连接和 coarse unit 映射
+//
+// 输入/输出：
+//   - 输入：测试夹具插入到 learning.* / semantic.* / recommendation.* 的测试数据
+//   - 输出：对 FindDueReviewCandidates 和 FindNewCandidates 返回值的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 调用 fixture 创建测试数据
+//   - 调用 repository.NewLearningStateSnapshotReadRepository
+//   - 间接调用 candidates.sql 和 mapper/candidate_mapper.go
 package infrastructure_test
 
 import (

@@ -1,3 +1,7 @@
+// 作用：提供集成测试装配和测试数据构造辅助，统一创建 pool、use case、测试用户、测试 unit 和事件输入。
+// 输入/输出：输入是 testing.T、pool、querier 和测试参数；输出是 use case、测试数据 ID、事件输入等辅助对象。
+// 谁调用它：integration/infrastructure/db_integration_test.go、integration/usecase/*.go。
+// 它调用谁/传给谁：调用 infrastructure/db.go、tx manager、repository 实现、aggregate、application/service/usecase；构造结果再传给集成测试。
 package fixture
 
 import (

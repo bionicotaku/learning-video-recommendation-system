@@ -1,3 +1,7 @@
+// 作用：用 pgx 实现 TxManager，在事务内创建 sqlc querier 并通过 context 向 repository 传播。
+// 输入/输出：输入是 pool、context 和事务回调；输出是回调执行后的 error。
+// 谁调用它：application/usecase 的构造逻辑、fixture/helpers.go。
+// 它调用谁/传给谁：调用 pgxpool.BeginTx、sqlcgen.New(tx)、queryctx.WithQuerier；带事务的 context 再传给 repository。
 package tx
 
 import (

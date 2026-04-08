@@ -1,3 +1,19 @@
+// 文件作用：
+//   - 提供 TxManager 的 pgx 实现
+//   - 负责开启事务、在 context 中注入 tx querier、回滚和提交
+//
+// 输入/输出：
+//   - 输入：调用方传入的 ctx 和事务回调 fn
+//   - 输出：事务整体执行结果 error
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go 通过接口间接调用
+//   - fixture.NewGenerateUseCase 负责构造并注入它
+//
+// 它调用谁/传给谁：
+//   - 调用 pgxpool.BeginTx / tx.Commit / tx.Rollback
+//   - 调用 sqlcgen.New(tx) 构造事务 querier
+//   - 调用 queryctx.WithQuerier 把 tx querier 传给 repository
 package tx
 
 import (

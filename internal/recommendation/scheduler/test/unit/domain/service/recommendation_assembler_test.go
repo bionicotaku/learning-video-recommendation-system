@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 验证 RecommendationAssembler 的组装顺序、去重、rank 和 quota 消费行为
+//   - 明确记录“new 可以填补未用完的 review 容量”这一当前实现约束
+//
+// 输入/输出：
+//   - 输入：测试中手工构造的 scored review/new 候选和 quota
+//   - 输出：对 RecommendationBatch 结构和顺序的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 直接调用 domain/service/recommendation_assembler.go
+//   - 间接依赖 domain/model 和 application/query 结构
 package service_test
 
 import (

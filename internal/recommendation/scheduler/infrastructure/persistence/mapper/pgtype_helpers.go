@@ -1,3 +1,20 @@
+// 文件作用：
+//   - 集中封装 pgx/pgtype 与 Go 基础类型之间的互转逻辑
+//   - 避免 repository 和业务层直接处理 UUID、Numeric、Timestamptz 的底层细节
+//
+// 输入/输出：
+//   - 输入：pgtype 值或 Go 基础值
+//   - 输出：对应的 Go 值、pgtype 值或转换错误
+//
+// 谁调用它：
+//   - candidate_mapper.go
+//   - scheduler_run_mapper.go
+//   - user_unit_serving_state_mapper.go
+//   - repository 层通过这些 mapper 间接依赖它
+//
+// 它调用谁/传给谁：
+//   - 调用 pgtype 自身的 Scan / Float64Value 等方法
+//   - 把转换结果传给 mapper 和 sqlc 参数构造流程
 package mapper
 
 import (

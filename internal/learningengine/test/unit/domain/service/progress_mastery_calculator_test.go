@@ -1,3 +1,7 @@
+// 作用：验证 ProgressCalculator 和 MasteryScoreCalculator 的数值公式、关键点和边界截断行为。
+// 输入/输出：输入是 intervalDays、UserUnitState、recentAccuracy 和默认策略；输出是数值断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/service/progress_calculator.go 和 mastery_calculator.go；断言只返回给测试框架。
 package service_test
 
 import (

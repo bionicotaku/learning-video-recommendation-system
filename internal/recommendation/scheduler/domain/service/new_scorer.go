@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 定义 NewScorer，负责给 new 候选计算分数和原因码
+//   - 把 target priority、freshness 和最近推荐抑制组合成最终 new score
+//
+// 输入/输出：
+//   - 输入：NewCandidate 和当前时间 now
+//   - 输出：ScoredNewCandidate，包含 Score 和 ReasonCodes
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - unit test 会直接验证打分方向和原因码
+//
+// 它调用谁/传给谁：
+//   - 调用本文件内的 newFreshnessScore 和 newNotRecentlyRecommended
+//   - 输出结果传给 PriorityZeroExtractor 之外的 assembler 流程
 package service
 
 import (

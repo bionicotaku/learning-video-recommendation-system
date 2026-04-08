@@ -1,3 +1,7 @@
+// 作用：验证 strong event handler 是否正确更新强事件允许修改的基础计数和 streak 字段。
+// 输入/输出：输入是伪造的 UserUnitState 和强事件 LearningEvent；输出是更新后 state 的断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/rule/strong_event_handler.go；断言只返回给测试框架。
 package rule_test
 
 import (

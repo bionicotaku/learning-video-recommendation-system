@@ -1,3 +1,7 @@
+// 作用：实现简化 SM-2 更新逻辑，负责 repetition、interval、ease factor 和 next review time 的演进。
+// 输入/输出：输入是 UserUnitState、quality、occurredAt、LearningPolicy；输出是被原地修改后的 state 或 error。
+// 谁调用它：domain/aggregate/user_unit_reducer.go、unit test。
+// 它调用谁/传给谁：调用本文件内的 updatedEaseFactor/maxEaseFactor/durationFromDays 等辅助函数；修改结果传回 reducer。
 package service
 
 import (

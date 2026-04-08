@@ -1,3 +1,7 @@
+// 作用：验证 ReplayUserStatesUseCase 能从事件真相层重建状态，并把被污染的状态恢复为在线结果。
+// 输入/输出：输入是测试用户、测试事件序列和 replay 命令；输出是测试断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 fixture/helpers.go、真实 record/replay use case、真实 repository；断言只返回给测试框架。
 package usecase_test
 
 import (

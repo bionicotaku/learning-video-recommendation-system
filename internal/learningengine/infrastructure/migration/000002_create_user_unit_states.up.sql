@@ -1,3 +1,7 @@
+-- 作用：创建用户学习状态投影表 learning.user_unit_states。
+-- 输入/输出：输入无；输出是状态表及其约束。
+-- 谁调用它：仓库级 migrate 流程。
+-- 它调用谁/传给谁：直接作用于 PostgreSQL；后续由 state repository、Recommendation 读链路消费。
 create table if not exists learning.user_unit_states (
   user_id uuid not null references auth.users(id) on delete cascade,
   coarse_unit_id bigint not null references semantic.coarse_unit(id) on delete cascade,

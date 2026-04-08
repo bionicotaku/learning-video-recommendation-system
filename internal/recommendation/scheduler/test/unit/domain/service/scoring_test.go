@@ -1,3 +1,16 @@
+// 文件作用：
+//   - 验证 ReviewScorer、NewScorer 和 PriorityZeroExtractor 的核心打分与提取规则
+//   - 为最近失败、recently recommended 抑制和 priority-zero 排序提供回归保护
+//
+// 输入/输出：
+//   - 输入：测试中手工构造的候选和时间点
+//   - 输出：对 score 相对大小和 reason codes 的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 直接调用 domain/service/review_scorer.go、new_scorer.go、priority_zero_extractor.go
 package service_test
 
 import (

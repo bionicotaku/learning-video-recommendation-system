@@ -1,3 +1,7 @@
+-- 作用：创建学习事件真相层表 learning.unit_learning_events。
+-- 输入/输出：输入无；输出是事件表及其约束。
+-- 谁调用它：仓库级 migrate 流程。
+-- 它调用谁/传给谁：直接作用于 PostgreSQL；后续由 event repository 和 replay 链路消费。
 create table if not exists learning.unit_learning_events (
   event_id bigserial primary key,
 

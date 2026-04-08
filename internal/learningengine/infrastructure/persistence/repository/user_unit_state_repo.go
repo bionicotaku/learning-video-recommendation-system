@@ -1,3 +1,7 @@
+// 作用：实现状态仓储接口，负责状态表的单条读取、upsert、批量 upsert 和按用户删除。
+// 输入/输出：输入是 userID/coarseUnitID 或 UserUnitState；输出是 UserUnitState、error 或写入结果。
+// 谁调用它：record/replay use case，通过 application/repository/UserUnitStateRepository 接口调用；fixture 负责装配。
+// 它调用谁/传给谁：调用 querier_resolver.go、user_unit_state_mapper.go 和 sqlcgen/unit_states.sql.go；结果会传回 use case。
 package repository
 
 import (

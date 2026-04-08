@@ -1,3 +1,7 @@
+// 作用：定义并校验 Learning engine 的运行配置，强制要求使用 PostgreSQL 直连。
+// 输入/输出：输入是环境变量 DATABASE_URL、SUPABASE_URL；输出是 Config 和 Validate() 的 error。
+// 谁调用它：启动装配代码、infrastructure/db.go、integration test、fixture/helpers.go。
+// 它调用谁/传给谁：调用标准库 os 读取环境变量；配置对象会传给 db.go 创建连接池。
 package infrastructure
 
 import (

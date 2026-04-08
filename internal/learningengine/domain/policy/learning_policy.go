@@ -1,6 +1,9 @@
+// 作用：定义学习策略对象及其默认值，统一 mastered 阈值、初始间隔和最小 EF 下限。
+// 输入/输出：输入无；输出是 LearningPolicy 结构和 DefaultLearningPolicy() 默认策略。
+// 谁调用它：record/replay usecase、user_state_rebuilder、user_unit_reducer、各类测试。
+// 它调用谁/传给谁：不主动调用其他文件；返回的策略会传给 reducer、SM2Updater、StatusTransitioner 等规则组件。
 package policy
 
-// LearningPolicy centralizes learning-engine constants and tunable defaults.
 type LearningPolicy struct {
 	MasteredIntervalDays float64
 	InitialIntervals     []float64

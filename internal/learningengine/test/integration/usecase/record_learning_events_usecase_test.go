@@ -1,3 +1,7 @@
+// 作用：验证 RecordLearningEventsUseCase 的完整在线写链路，包括写事件表和更新状态表。
+// 输入/输出：输入是测试用户、测试 coarse unit 和构造好的 RecordLearningEventsCommand；输出是测试断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 fixture/helpers.go、真实 use case、真实 repository；断言结果只返回给测试框架。
 package usecase_test
 
 import (

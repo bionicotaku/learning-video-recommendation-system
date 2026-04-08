@@ -1,3 +1,7 @@
+// 作用：根据当前状态、最近质量窗口和策略，重算 new/learning/reviewing/mastered/suspended 之间的迁移。
+// 输入/输出：输入是 UserUnitState、recentQualities、LearningPolicy；输出是被原地修改后的状态或 error。
+// 谁调用它：domain/aggregate/user_unit_reducer.go、unit test。
+// 它调用谁/传给谁：调用本文件内 recentPassingStreak 和 recentHasFailure；迁移结果传回 reducer。
 package service
 
 import (

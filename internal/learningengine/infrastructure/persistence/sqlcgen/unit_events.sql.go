@@ -16,6 +16,10 @@ select count(*)::bigint
 from learning.unit_learning_events
 `
 
+// 作用：定义事件表相关 SQL，包括计数、插入和按用户顺序读取事件。
+// 输入/输出：输入是 sqlc 参数 user_id、event fields；输出是查询结果或执行副作用。
+// 谁调用它：sqlc 生成器；运行时通过 unit_learning_event_repo.go 间接调用。
+// 它调用谁/传给谁：直接作用于 PostgreSQL；生成的方法会传给 event repository 使用。
 func (q *Queries) CountUnitLearningEvents(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countUnitLearningEvents)
 	var column_1 int64

@@ -1,3 +1,13 @@
+-- 文件作用：
+--   - 定义 scheduler_runs 和 scheduler_run_items 的查询与写入 SQL
+-- 输入/输出：
+--   - 输入：RecommendationBatch 映射出的 run / item 参数
+--   - 输出：写入 recommendation.scheduler_runs 与 recommendation.scheduler_run_items，或返回计数结果
+-- 谁调用它：
+--   - sqlc 读取它生成 CountSchedulerRuns / UpsertSchedulerRun / UpsertSchedulerRunItem
+--   - repository/scheduler_run_repo.go 和测试间接调用
+-- 它调用谁/传给谁：
+--   - 直接传给 PostgreSQL 执行
 -- name: CountSchedulerRuns :one
 select count(*)::bigint
 from recommendation.scheduler_runs;

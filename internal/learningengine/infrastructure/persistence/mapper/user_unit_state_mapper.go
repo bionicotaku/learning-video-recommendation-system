@@ -1,3 +1,7 @@
+// 作用：负责 learning.user_unit_states 行模型与 domain UserUnitState 之间的双向映射。
+// 输入/输出：输入是 sqlc row 或 domain UserUnitState；输出是 domain UserUnitState 或 sqlc Upsert params。
+// 谁调用它：persistence/repository/user_unit_state_repo.go。
+// 它调用谁/传给谁：调用 pgtype_helpers.go；转换结果传给 sqlc querier 或返回给 use case/reducer 链路。
 package mapper
 
 import (

@@ -1,3 +1,7 @@
+// 作用：创建和探活 pgx 连接池，为 Learning engine 的 repository 和事务实现提供数据库入口。
+// 输入/输出：输入是 context 和 Config；输出是 *pgxpool.Pool 或 ping error。
+// 谁调用它：启动装配代码、integration test、fixture/helpers.go。
+// 它调用谁/传给谁：调用 pgxpool；返回的 pool 会传给 tx manager、sqlc querier 和 repository 装配逻辑。
 package infrastructure
 
 import (

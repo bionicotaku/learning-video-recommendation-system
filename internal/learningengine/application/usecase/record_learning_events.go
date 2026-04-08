@@ -1,3 +1,7 @@
+// 作用：实现在线写链路的主用例，负责在同一事务内写事件真相层并更新状态投影层。
+// 输入/输出：输入是 RecordLearningEventsCommand；输出是 RecordLearningEventsResult 或 error。
+// 谁调用它：上层业务调用方、integration/usecase/record_learning_events_usecase_test.go、fixture/helpers.go。
+// 它调用谁/传给谁：调用 TxManager、UserUnitStateRepository、UnitLearningEventRepository、UserUnitReducer；最后把结果 DTO 返回给调用方。
 package usecase
 
 import (

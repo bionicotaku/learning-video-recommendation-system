@@ -1,3 +1,7 @@
+// 作用：根据进度、最近正确率和稳定性计算 0..1 的 MasteryScore。
+// 输入/输出：输入是 UserUnitState、recentAccuracy、LearningPolicy；输出是 float64 mastery score。
+// 谁调用它：domain/aggregate/user_unit_reducer.go、unit test。
+// 它调用谁/传给谁：不主动调用其他文件；结果会传回 reducer 并写入 UserUnitState.MasteryScore。
 package service
 
 import (

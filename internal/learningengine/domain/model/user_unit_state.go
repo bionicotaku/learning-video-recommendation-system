@@ -1,3 +1,7 @@
+// 作用：定义用户与 coarse unit 关系的当前学习状态模型，是 Recommendation 读取的稳定输入之一。
+// 输入/输出：输入来自 reducer 或 mapper；输出供 repository、calculator、use case、测试消费。
+// 谁调用它：domain/rule、domain/service、domain/aggregate、state mapper、state repository、测试。
+// 它调用谁/传给谁：不主动调用其他文件；实例会在 reducer、repository 和上层读取链路之间传递。
 package model
 
 import (

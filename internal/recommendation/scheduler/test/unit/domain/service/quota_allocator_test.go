@@ -1,3 +1,16 @@
+// 文件作用：
+//   - 验证 BacklogCalculator 和 QuotaAllocator 的边界与分段规则
+//   - 防止 quota 规则调整时出现静默回归
+//
+// 输入/输出：
+//   - 输入：测试中手工构造的 backlog、requestedLimit 和 defaults
+//   - 输出：对 Compute / Allocate 返回值的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 直接调用 domain/service/backlog_calculator.go 和 quota_allocator.go
 package service_test
 
 import (

@@ -1,3 +1,20 @@
+// 文件作用：
+//   - 实现 UserUnitServingStateRepository
+//   - 负责触碰本轮被推荐 coarse unit 的最近推荐时间和最近 run ID
+//
+// 输入/输出：
+//   - 输入：userID、runID、coarseUnitIDs、recommendedAt
+//   - 输出：serving state 更新成功或失败
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - 集成测试 usecase 场景会间接覆盖它
+//
+// 它调用谁/传给谁：
+//   - 调用 resolveQuerier
+//   - 调用 uniqueInt64s 去重
+//   - 调用 mapper.UserUnitServingStateToUpsertParams
+//   - 调用 sqlcgen.UpsertUserUnitServingState
 package repository
 
 import (

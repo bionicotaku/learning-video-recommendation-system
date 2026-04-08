@@ -1,3 +1,7 @@
+// 作用：提供状态克隆和初始化辅助函数，保证 reducer/rule 在修改状态时不会污染原对象。
+// 输入/输出：输入是当前 state 和 event；输出是已初始化或已深拷贝的 next state。
+// 谁调用它：weak_event_handler.go、strong_event_handler.go。
+// 它调用谁/传给谁：不主动调用其他文件；返回值会传回各个 handler，随后再交给 reducer。
 package rule
 
 import (

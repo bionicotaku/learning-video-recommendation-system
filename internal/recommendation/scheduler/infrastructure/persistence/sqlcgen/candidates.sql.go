@@ -109,6 +109,19 @@ type FindDueReviewCandidatesRow struct {
 	UnitChineseDef          pgtype.Text
 }
 
+// 文件作用：
+//   - 定义 scheduler 读取 review/new 候选的 SQL
+//
+// 输入/输出：
+//   - 输入：user_id，以及 review 查询使用的 now
+//   - 输出：learning.user_unit_states + semantic.coarse_unit + recommendation.user_unit_serving_states 的联表结果
+//
+// 谁调用它：
+//   - sqlc 读取它生成 FindDueReviewCandidates / FindNewCandidates
+//   - repository/learning_state_snapshot_read_repo.go 间接调用
+//
+// 它调用谁/传给谁：
+//   - 直接传给 PostgreSQL 执行
 func (q *Queries) FindDueReviewCandidates(ctx context.Context, arg FindDueReviewCandidatesParams) ([]FindDueReviewCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, findDueReviewCandidates, arg.UserID, arg.Now)
 	if err != nil {

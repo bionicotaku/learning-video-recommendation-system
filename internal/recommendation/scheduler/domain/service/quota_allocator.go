@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 定义 QuotaAllocator，负责把 backlog 和请求上限映射成 review/new quota
+//   - 当前实现承载 MVP 的配额分段规则和 backlog protection 开关
+//
+// 输入/输出：
+//   - 输入：reviewBacklog、requestedLimit、RecommendationDefaults
+//   - 输出：QuotaAllocation，包含 review/new 配额和 backlogProtection 标志
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - unit test 会逐区间验证配额结果
+//
+// 它调用谁/传给谁：
+//   - 调用本文件内的 ceilFraction 和 minInt
+//   - 输出结果传给 RecommendationAssembler
 package service
 
 import (

@@ -1,3 +1,7 @@
+// 作用：集中处理 pgtype 与 Go 基础类型、uuid、time、slice、json 之间的互转细节。
+// 输入/输出：输入是 pgtype 或 Go 原生值；输出是另一侧的可用类型或 error。
+// 谁调用它：unit_learning_event_mapper.go、user_unit_state_mapper.go。
+// 它调用谁/传给谁：调用标准库 json/strconv/time 等；转换结果传回 mapper 层再传给 repository 或 domain。
 package mapper
 
 import (

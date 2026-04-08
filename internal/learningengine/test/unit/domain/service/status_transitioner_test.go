@@ -1,3 +1,7 @@
+// 作用：验证 StatusTransitioner 的生命周期迁移和不满足条件时的禁止升级行为。
+// 输入/输出：输入是伪造的 UserUnitState、recent quality window 和默认策略；输出是状态迁移断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/service/status_transitioner.go；断言只返回给测试框架。
 package service_test
 
 import (

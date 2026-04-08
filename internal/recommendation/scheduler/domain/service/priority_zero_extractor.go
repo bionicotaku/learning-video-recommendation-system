@@ -1,3 +1,18 @@
+// 文件作用：
+//   - 定义 PriorityZeroExtractor，从 scored review 中提取需要最高优先级出队的项目
+//   - 当前规则聚焦于 learning 状态的 due review 和近期失败内容
+//
+// 输入/输出：
+//   - 输入：ScoredReviewCandidate 列表
+//   - 输出：按 priority-zero 规则筛选并排序后的 review 子集
+//
+// 谁调用它：
+//   - application/usecase/generate_recommendations.go
+//   - unit test 会直接验证筛选和排序行为
+//
+// 它调用谁/传给谁：
+//   - 调用本文件内的 priorityZeroWeight 和 uniqueStrings
+//   - 输出结果传给 RecommendationAssembler
 package service
 
 import (

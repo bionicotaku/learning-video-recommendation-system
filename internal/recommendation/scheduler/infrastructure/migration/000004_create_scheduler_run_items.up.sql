@@ -1,3 +1,12 @@
+-- 文件作用：
+--   - 创建 recommendation.scheduler_run_items 表，记录一轮 run 中每个 coarse unit 的推荐明细
+-- 输入/输出：
+--   - 输入：无，执行当前 migration up
+--   - 输出：创建 run item 表
+-- 谁调用它：
+--   - migration 执行器
+-- 它调用谁/传给谁：
+--   - 直接传给 PostgreSQL 执行
 create table if not exists recommendation.scheduler_run_items (
   run_id uuid not null references recommendation.scheduler_runs(run_id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,

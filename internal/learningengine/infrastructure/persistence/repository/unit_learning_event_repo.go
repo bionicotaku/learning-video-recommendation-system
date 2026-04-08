@@ -1,3 +1,7 @@
+// 作用：实现事件仓储接口，负责事件表的追加写入和按用户顺序读取。
+// 输入/输出：输入是 []LearningEvent 或 userID；输出是 error 或按 occurred_at/event_id 排序的 []LearningEvent。
+// 谁调用它：record/replay use case，通过 application/repository/UnitLearningEventRepository 接口调用；fixture 负责装配。
+// 它调用谁/传给谁：调用 querier_resolver.go、unit_learning_event_mapper.go 和 sqlcgen/unit_events.sql.go；读取结果会传回 use case。
 package repository
 
 import (

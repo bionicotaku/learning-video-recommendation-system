@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 提供更贴近业务语义的场景测试，验证 scheduler 输出行为是否符合产品规则
+//   - 重点覆盖 review 优先和 recently recommended new 抑制这两条显式策略
+//
+// 输入/输出：
+//   - 输入：fixture 构造的最小场景测试数据
+//   - 输出：对最终 RecommendationBatch.Items 顺序和类型的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 调用 fixture.NewGenerateUseCase / GenerateCmd
+//   - 间接调用完整 scheduler 用例链路
 package scenario_test
 
 import (

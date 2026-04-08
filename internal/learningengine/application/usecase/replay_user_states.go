@@ -1,3 +1,7 @@
+// 作用：实现 full replay 主用例，负责读取事件历史、清空旧状态并重建用户全部状态。
+// 输入/输出：输入是 ReplayUserStatesCommand；输出是 ReplayUserStatesResult 或 error。
+// 谁调用它：上层业务调用方、integration/usecase/replay_user_states_usecase_test.go、fixture/helpers.go。
+// 它调用谁/传给谁：调用 TxManager、两个 repository 和 UserStateRebuilder；最终把 replay 结果返回给调用方。
 package usecase
 
 import (

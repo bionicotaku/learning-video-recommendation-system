@@ -1,3 +1,7 @@
+// 作用：验证 UserUnitReducer 作为领域核心入口时，能否正确串起弱/强事件、SM-2、状态迁移和分数计算。
+// 输入/输出：输入是伪造的 current state、LearningEvent 和 LearningPolicy；输出是 next state 断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/aggregate/user_unit_reducer.go；断言结果只返回给测试框架。
 package aggregate_test
 
 import (

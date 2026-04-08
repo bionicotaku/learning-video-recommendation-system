@@ -1,3 +1,7 @@
+// 作用：验证基础设施配置校验逻辑，确保 Learning engine 必须走 DATABASE_URL 直连。
+// 输入/输出：输入是不同组合的 Config；输出是 Validate() 返回错误的断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 infrastructure/config.go；断言只返回给测试框架。
 package infrastructure_test
 
 import (

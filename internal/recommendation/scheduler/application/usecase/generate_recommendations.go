@@ -1,3 +1,21 @@
+// 文件作用：
+//   - 实现 scheduler 当前唯一主用例 GenerateLearningUnitRecommendationsUseCase
+//   - 负责把候选读取、规则计算、批次组装和 Recommendation 自有表写入串成一条完整链路
+//
+// 输入/输出：
+//   - 输入：GenerateRecommendationsCommand
+//   - 输出：GenerateRecommendationsResult，其中包含 RecommendationBatch
+//
+// 谁调用它：
+//   - 外层业务组装代码
+//   - 测试夹具 fixture.NewGenerateUseCase 组装后的调用方
+//   - 集成测试与场景测试直接调用 Execute
+//
+// 它调用谁/传给谁：
+//   - 调用 LearningStateSnapshotReadRepository 读取候选
+//   - 调用 BacklogCalculator / QuotaAllocator / ReviewScorer / NewScorer / PriorityZeroExtractor / RecommendationAssembler
+//   - 调用 TxManager 在事务中写 SchedulerRunRepository 和 UserUnitServingStateRepository
+//   - 最终把结果返回给上层调用方
 package usecase
 
 import (

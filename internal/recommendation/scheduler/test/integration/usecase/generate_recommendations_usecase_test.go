@@ -1,3 +1,17 @@
+// 文件作用：
+//   - 验证 scheduler 主用例在真实数据库下的完整闭环
+//   - 同时覆盖候选读取、规则计算、run 落库、run item 落库和 serving state 更新
+//
+// 输入/输出：
+//   - 输入：fixture 构造的 learning state、serving state 和 coarse unit 测试数据
+//   - 输出：对 RecommendationBatch、recommendation.* 表和 learning.* 不变性的断言
+//
+// 谁调用它：
+//   - `go test` 和 `make check`
+//
+// 它调用谁/传给谁：
+//   - 调用 fixture.NewGenerateUseCase / GenerateCmd
+//   - 间接调用 application/usecase、domain/service、repository、SQL 和 PostgreSQL
 package usecase_test
 
 import (

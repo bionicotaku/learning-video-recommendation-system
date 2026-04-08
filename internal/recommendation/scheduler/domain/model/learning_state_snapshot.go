@@ -1,3 +1,19 @@
+// 文件作用：
+//   - 定义 LearningStateSnapshot，表示 Recommendation 读取到的学习状态快照
+//   - 承接 learning.user_unit_states 中 scheduler 需要的字段集合
+//
+// 输入/输出：
+//   - 输入：候选 SQL 查询结果经 mapper 转换后的状态字段
+//   - 输出：提供给 scorer、priority extractor、assembler 和测试
+//
+// 谁调用它：
+//   - infrastructure/persistence/mapper/candidate_mapper.go 负责构造
+//   - application/query/candidate.go 持有它
+//   - domain/service/*.go 负责读取它的字段
+//
+// 它调用谁/传给谁：
+//   - 不直接调用其他实现
+//   - 作为跨模块输入模型传给 scheduler 的领域服务
 package model
 
 import (

@@ -1,3 +1,7 @@
+// 作用：验证默认 LearningPolicy 是否符合文档约束，并确保默认 interval slice 不会共享底层数据。
+// 输入/输出：输入是 DefaultLearningPolicy() 返回值；输出是测试断言结果。
+// 谁调用它：go test、make check。
+// 它调用谁/传给谁：调用 domain/policy/learning_policy.go；断言只返回给测试框架。
 package policy_test
 
 import (
