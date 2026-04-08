@@ -40,27 +40,32 @@ def load_clip_inputs(
     parent_files = _scan_json_files(parents_dir, label="parents_dir")
     transcript_files = _scan_json_files(transcripts_dir, label="transcripts_dir")
 
-    # transcript 目录以“文件名 -> Path”建索引，后续按规则 O(1) 匹配。
-    # 当前规则是由父文件 basename 和 clip_id 直接推导 transcript 文件名。
+    # transcript 目录预先构造成两份轻量索引：
+    # 1. 文件名集合：用于快速判断“文件是否存在”
+    # 2. 文件名到 Path 的映射：只有确认存在后才取具体路径
+    #
+    # 这里显式保留 set，是因为当前 skip 逻辑的第一层判断就是“对应 transcript
+    # 文件是否存在”。这样后续遍历每个 clip 时不需要反复碰文件系统。
+    transcript_name_set = {path.name for path in transcript_files}
     transcript_index = {path.name: path for path in transcript_files}
 
     loaded_items: list[LoadedClipInput] = []
     for parent_file in parent_files:
-        loaded_items.extend(
-            _load_from_parent_file(
-                parent_file=parent_file,
-                transcript_index=transcript_index,
-                source_name=source_name,
-            )
+        remaining_limit = None if limit is None else max(0, limit - len(loaded_items))
+        if remaining_limit == 0:
+            break
+
+        parent_items = _load_from_parent_file(
+            parent_file=parent_file,
+            transcript_name_set=transcript_name_set,
+            transcript_index=transcript_index,
+            source_name=source_name,
+            clip_key=clip_key,
+            remaining_limit=remaining_limit,
         )
+        loaded_items.extend(parent_items)
 
     _validate_unique_source_clip_keys(loaded_items)
-
-    if clip_key:
-        loaded_items = [item for item in loaded_items if item.source_clip_key == clip_key]
-
-    if limit is not None:
-        loaded_items = loaded_items[:limit]
 
     return tuple(loaded_items)
 
@@ -125,8 +130,11 @@ def _scan_json_files(directory: Path, label: str) -> tuple[Path, ...]:
 
 def _load_from_parent_file(
     parent_file: Path,
+    transcript_name_set: set[str],
     transcript_index: dict[str, Path],
     source_name: str | None,
+    clip_key: str | None,
+    remaining_limit: int | None,
 ) -> tuple[LoadedClipInput, ...]:
     """读取单个父文件，并展开成多个 clip 输入对象。"""
 
@@ -145,6 +153,9 @@ def _load_from_parent_file(
     loaded_items: list[LoadedClipInput] = []
 
     for raw_clip in clips_payload:
+        if remaining_limit is not None and len(loaded_items) >= remaining_limit:
+            break
+
         if not isinstance(raw_clip, dict):
             raise CatalogIngestError(
                 code="manifest_invalid",
@@ -173,11 +184,15 @@ def _load_from_parent_file(
             ) from exc
 
         expected_transcript_filename = f"{parent_video_name}-clip{descriptor.clip_id}.json"
-        transcript_file_path = transcript_index.get(expected_transcript_filename)
         title = Path(expected_transcript_filename).stem
         source_clip_key = f"{parent_video_slug}#clip{descriptor.clip_id}"
 
-        if transcript_file_path is None:
+        # clip_key 过滤尽量前置，避免为了无关 clip 去读 transcript JSON。
+        if clip_key is not None and source_clip_key != clip_key:
+            continue
+
+        # 先用预扫描得到的文件名集合判断是否存在；只有存在时才拿 Path。
+        if expected_transcript_filename not in transcript_name_set:
             # 缺 transcript 时，仍然返回一个 LoadedClipInput。
             # main 后续会根据 skip_reason_code 直接写 skipped 审计，而不是报错中断整批执行。
             loaded_items.append(
@@ -213,7 +228,11 @@ def _load_from_parent_file(
             )
             continue
 
-        transcript_payload = _read_json_file(transcript_file_path, code="transcript_invalid")
+        transcript_file_path = transcript_index[expected_transcript_filename]
+        transcript_payload, transcript_bytes = _read_json_file_with_bytes(
+            transcript_file_path,
+            code="transcript_invalid",
+        )
         transcript_sentences = _parse_transcript_sentences(
             transcript_payload=transcript_payload,
             transcript_file_path=transcript_file_path,
@@ -236,7 +255,7 @@ def _load_from_parent_file(
                 thumbnail_url=None,
                 publish_at=None,
                 transcript_object_path=f"placeholder://transcript/{transcript_file_path.stem}",
-                transcript_checksum=_sha256_of_file(transcript_file_path),
+                transcript_checksum=_sha256_of_bytes(transcript_bytes),
                 transcript_format_version=1,
                 source_name=source_name,
                 parent_file_path=parent_file,
@@ -280,6 +299,50 @@ def _read_json_file(path: Path, code: str) -> dict[str, Any]:
             context={"file_path": str(path)},
         )
     return payload
+
+
+def _read_json_file_with_bytes(path: Path, code: str) -> tuple[dict[str, Any], bytes]:
+    """读取原始字节并解析 JSON。
+
+    transcript 文件后续还要计算 sha256，因此这里一次读取原始字节，
+    同时复用给 JSON 解析和 checksum 计算，避免同一文件重复读两遍。
+    """
+
+    try:
+        raw_bytes = path.read_bytes()
+    except FileNotFoundError as exc:
+        raise CatalogIngestError(
+            code=code,
+            stage="manifest_loader",
+            message=f"文件不存在: {path}",
+            context={"file_path": str(path)},
+        ) from exc
+
+    try:
+        payload = json.loads(raw_bytes.decode("utf-8"))
+    except UnicodeDecodeError as exc:
+        raise CatalogIngestError(
+            code=code,
+            stage="manifest_loader",
+            message=f"文件编码不是合法 UTF-8: {path}",
+            context={"file_path": str(path)},
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise CatalogIngestError(
+            code=code,
+            stage="manifest_loader",
+            message=f"JSON 解析失败: {path}",
+            context={"file_path": str(path), "line": exc.lineno, "column": exc.colno},
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise CatalogIngestError(
+            code=code,
+            stage="manifest_loader",
+            message="JSON 顶层必须是对象",
+            context={"file_path": str(path)},
+        )
+    return payload, raw_bytes
 
 
 def _parse_transcript_sentences(
@@ -399,17 +462,13 @@ def _parse_transcript_sentences(
     return tuple(parsed_sentences)
 
 
-def _sha256_of_file(path: Path) -> str:
+def _sha256_of_bytes(raw_bytes: bytes) -> str:
     """对 transcript 原始字节计算 sha256。
 
     按 README 的规则，这里必须基于原始字节，而不是基于重排后的 JSON 文本。
     """
 
-    digest = hashlib.sha256()
-    with path.open("rb") as file_obj:
-        for chunk in iter(lambda: file_obj.read(8192), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return hashlib.sha256(raw_bytes).hexdigest()
 
 
 def _slugify(value: str) -> str:

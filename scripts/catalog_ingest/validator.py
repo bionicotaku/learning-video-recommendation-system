@@ -1,16 +1,32 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import dataclass
 from typing import Iterable
 
 from .models import CatalogIngestError, LoadedClipInput
+
+
+@dataclass(slots=True, frozen=True)
+class ValidationWarning:
+    """表示校验阶段发现的非阻断性告警。
+
+    这类问题不会阻止当前 clip 入库，但需要：
+    - 在命令行结果里暴露
+    - 在审计表 warning_codes 中留下痕迹
+    - 必要时把细节带到 repository 的 context 中，便于后续排查
+    """
+
+    code: str
+    message: str
+    context: dict[str, object]
 
 
 def validate_loaded_clip(
     clip_input: LoadedClipInput,
     known_coarse_unit_ids: Iterable[int],
     time_tolerance_ms: int = 0,
-) -> None:
+) -> tuple[ValidationWarning, ...]:
     """校验单 clip 输入是否满足 catalog 入库规则。
 
     这里专门做“规则判断”，不做数据库写入，也不做标准化映射。
@@ -22,7 +38,7 @@ def validate_loaded_clip(
     if clip_input.skip_reason_code is not None:
         # 缺 transcript 的情况属于已知跳过分支，不是失败分支。
         # 这种输入对象不进入完整校验流程，直接由 main 写 skipped 审计。
-        return
+        return tuple()
 
     known_coarse_set = set(known_coarse_unit_ids)
 
@@ -30,8 +46,9 @@ def validate_loaded_clip(
     _validate_parent_clip(clip_input)
     _validate_transcript_level_fields(clip_input)
     _validate_time_range(clip_input, time_tolerance_ms=time_tolerance_ms)
-    _validate_sentence_and_token_structure(clip_input)
+    warnings = _validate_sentence_and_token_structure(clip_input)
     _validate_coarse_ids(clip_input, known_coarse_set)
+    return warnings
 
 
 def _validate_video_level_fields(clip_input: LoadedClipInput) -> None:
@@ -106,9 +123,10 @@ def _validate_time_range(clip_input: LoadedClipInput, time_tolerance_ms: int) ->
         )
 
 
-def _validate_sentence_and_token_structure(clip_input: LoadedClipInput) -> None:
+def _validate_sentence_and_token_structure(clip_input: LoadedClipInput) -> tuple[ValidationWarning, ...]:
     """校验 sentence / token 的索引、文本和时间结构。"""
 
+    warnings: list[ValidationWarning] = []
     sentence_indexes = [sentence.index for sentence in clip_input.transcript_sentences]
     duplicated_sentence_indexes = [index for index, count in Counter(sentence_indexes).items() if count > 1]
     if duplicated_sentence_indexes:
@@ -176,19 +194,22 @@ def _validate_sentence_and_token_structure(clip_input: LoadedClipInput) -> None:
                     {"sentence_index": sentence.index, "token_index": token.index},
                 )
             if token.start_ms < sentence.start_ms or token.end_ms > sentence.end_ms:
-                raise _error(
-                    clip_input,
-                    "transcript_invalid",
-                    "token 时间必须落在所属 sentence 区间内",
-                    {
-                        "sentence_index": sentence.index,
-                        "token_index": token.index,
-                        "token_start_ms": token.start_ms,
-                        "token_end_ms": token.end_ms,
-                        "sentence_start_ms": sentence.start_ms,
-                        "sentence_end_ms": sentence.end_ms,
-                    },
+                warnings.append(
+                    ValidationWarning(
+                        code="token_time_outside_sentence",
+                        message="token 时间超出所属 sentence 区间，按 warning 继续入库",
+                        context={
+                            "sentence_index": sentence.index,
+                            "token_index": token.index,
+                            "token_start_ms": token.start_ms,
+                            "token_end_ms": token.end_ms,
+                            "sentence_start_ms": sentence.start_ms,
+                            "sentence_end_ms": sentence.end_ms,
+                        },
+                    )
                 )
+
+    return tuple(warnings)
 
 
 def _validate_coarse_ids(clip_input: LoadedClipInput, known_coarse_set: set[int]) -> None:

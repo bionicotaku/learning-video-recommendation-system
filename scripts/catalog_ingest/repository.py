@@ -58,16 +58,49 @@ class CatalogRepository:
 
     def __init__(self, database_url: str) -> None:
         self._database_url = database_url
+        self._connection: psycopg.Connection | None = None
+
+    def close(self) -> None:
+        """关闭 repository 持有的长连接。"""
+
+        if self._connection is None:
+            return
+        self._connection.close()
+        self._connection = None
+
+    def _get_connection(self) -> psycopg.Connection:
+        """返回可复用的长连接。
+
+        当前脚本是单进程、串行执行，不存在多线程并发共享同一连接的问题。
+        因此这里直接复用一个 autocommit 连接，避免每个 clip 都重复 connect。
+        """
+
+        if self._connection is not None and not self._connection.closed:
+            return self._connection
+
+        try:
+            self._connection = psycopg.connect(
+                self._database_url,
+                row_factory=dict_row,
+                autocommit=True,
+            )
+            return self._connection
+        except Exception as exc:
+            raise CatalogIngestError(
+                code="db_connect_failed",
+                stage="repository",
+                message="连接数据库失败",
+                context={},
+            ) from exc
 
     def load_known_coarse_unit_ids(self) -> set[int]:
         """一次性加载所有 coarse unit id，避免 validator 逐 token 查库。"""
 
         sql = "select id from semantic.coarse_unit"
         try:
-            with psycopg.connect(self._database_url) as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute(sql)
-                    return {row[0] for row in cursor.fetchall()}
+            with self._get_connection().cursor() as cursor:
+                cursor.execute(sql)
+                return {row["id"] for row in cursor.fetchall()}
         except Exception as exc:
             raise CatalogIngestError(
                 code="db_connect_failed",
@@ -76,11 +109,19 @@ class CatalogRepository:
                 context={},
             ) from exc
 
-    def get_existing_clip_state(self, source_clip_key: str) -> ExistingClipState | None:
-        """读取数据库中已存在的 clip 快照，用于决定是否可以 skipped。"""
+    def load_existing_clip_states(self, source_clip_keys: list[str]) -> dict[str, ExistingClipState]:
+        """批量加载数据库中已存在的 clip 快照。
+
+        这里保持和单条 `get_existing_clip_state` 完全一致的字段集合，只是把
+        多次单条查询改成一次批量查询，避免大批量导入时反复 round trip。
+        """
+
+        if not source_clip_keys:
+            return {}
 
         sql = """
             select
+              v.source_clip_key,
               v.video_id,
               v.parent_video_name,
               v.parent_video_slug,
@@ -98,47 +139,52 @@ class CatalogRepository:
               t.transcript_checksum
             from catalog.videos v
             left join catalog.video_transcripts t on t.video_id = v.video_id
-            where v.source_clip_key = %s
+            where v.source_clip_key = any(%s)
         """
         try:
-            with psycopg.connect(self._database_url, row_factory=dict_row) as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute(sql, (source_clip_key,))
-                    row = cursor.fetchone()
+            with self._get_connection().cursor() as cursor:
+                cursor.execute(sql, (source_clip_keys,))
+                rows = cursor.fetchall()
         except Exception as exc:
             raise CatalogIngestError(
                 code="db_connect_failed",
                 stage="repository",
-                message="读取已有 clip 状态失败",
-                context={"source_clip_key": source_clip_key},
+                message="批量读取已有 clip 状态失败",
+                context={"source_clip_key_count": len(source_clip_keys)},
             ) from exc
 
-        if row is None:
-            return None
+        return {
+            row["source_clip_key"]: ExistingClipState(
+                video_id=str(row["video_id"]),
+                parent_video_name=row["parent_video_name"],
+                parent_video_slug=row["parent_video_slug"],
+                clip_seq=row["clip_seq"],
+                source_start_ms=row["source_start_ms"],
+                source_end_ms=row["source_end_ms"],
+                title=row["title"],
+                description=row["description"],
+                clip_reason=row["clip_reason"],
+                language=row["language"],
+                duration_ms=row["duration_ms"],
+                hls_master_playlist_path=row["hls_master_playlist_path"],
+                thumbnail_url=row["thumbnail_url"],
+                publish_at=row["publish_at"],
+                transcript_checksum=row["transcript_checksum"],
+            )
+            for row in rows
+        }
 
-        return ExistingClipState(
-            video_id=str(row["video_id"]),
-            parent_video_name=row["parent_video_name"],
-            parent_video_slug=row["parent_video_slug"],
-            clip_seq=row["clip_seq"],
-            source_start_ms=row["source_start_ms"],
-            source_end_ms=row["source_end_ms"],
-            title=row["title"],
-            description=row["description"],
-            clip_reason=row["clip_reason"],
-            language=row["language"],
-            duration_ms=row["duration_ms"],
-            hls_master_playlist_path=row["hls_master_playlist_path"],
-            thumbnail_url=row["thumbnail_url"],
-            publish_at=row["publish_at"],
-            transcript_checksum=row["transcript_checksum"],
-        )
+    def get_existing_clip_state(self, source_clip_key: str) -> ExistingClipState | None:
+        """读取数据库中已存在的 clip 快照，用于决定是否可以 skipped。"""
+
+        return self.load_existing_clip_states([source_clip_key]).get(source_clip_key)
 
     def persist_clip(
         self,
         normalized_data: NormalizedClipData,
         source_name: str | None,
         context: dict[str, object],
+        warning_codes: tuple[str, ...],
     ) -> str:
         """将完整 clip 数据以单事务方式写入数据库。"""
 
@@ -146,42 +192,42 @@ class CatalogRepository:
         ingestion_record_id = str(uuid4())
 
         try:
-            with psycopg.connect(self._database_url, row_factory=dict_row) as connection:
-                with connection.transaction():
-                    with connection.cursor() as cursor:
-                        self._insert_running_record(
-                            cursor=cursor,
-                            ingestion_record_id=ingestion_record_id,
-                            payload=IngestionRecordPayload(
-                                source_clip_key=normalized_data.video.source_clip_key,
-                                video_id=None,
-                                source_name=source_name,
-                                status="running",
-                                warning_codes=tuple(),
-                                error_code=None,
-                                error_message=None,
-                                context=context,
-                            ),
-                            started_at=started_at,
-                        )
+            connection = self._get_connection()
+            with connection.transaction():
+                with connection.cursor() as cursor:
+                    self._insert_running_record(
+                        cursor=cursor,
+                        ingestion_record_id=ingestion_record_id,
+                        payload=IngestionRecordPayload(
+                            source_clip_key=normalized_data.video.source_clip_key,
+                            video_id=None,
+                            source_name=source_name,
+                            status="running",
+                            warning_codes=tuple(),
+                            error_code=None,
+                            error_message=None,
+                            context=context,
+                        ),
+                        started_at=started_at,
+                    )
 
-                        video_id = self._upsert_video(cursor, normalized_data)
-                        self._replace_transcript_related_rows(cursor, video_id, normalized_data)
+                    video_id = self._upsert_video(cursor, normalized_data)
+                    self._replace_transcript_related_rows(cursor, video_id, normalized_data)
 
-                        cursor.execute(
-                            """
-                            update catalog.video_ingestion_records
-                            set video_id = %s,
-                                status = 'succeeded',
-                                warning_codes = %s,
-                                error_code = null,
-                                error_message = null,
-                                finished_at = %s
-                            where ingestion_record_id = %s
-                            """,
-                            (video_id, [], _utcnow(), ingestion_record_id),
-                        )
-                        return video_id
+                    cursor.execute(
+                        """
+                        update catalog.video_ingestion_records
+                        set video_id = %s,
+                            status = 'succeeded',
+                            warning_codes = %s,
+                            error_code = null,
+                            error_message = null,
+                            finished_at = %s
+                        where ingestion_record_id = %s
+                        """,
+                        (video_id, list(warning_codes), _utcnow(), ingestion_record_id),
+                    )
+                    return video_id
         except CatalogIngestError:
             raise
         except Exception as exc:
@@ -195,21 +241,24 @@ class CatalogRepository:
     def write_skipped_record(self, payload: IngestionRecordPayload) -> None:
         """写入 skipped 审计记录。"""
 
-        self._write_terminal_record(payload)
+        self.write_terminal_records([payload])
 
     def write_failed_record(self, payload: IngestionRecordPayload) -> None:
         """写入 failed 审计记录。"""
 
-        self._write_terminal_record(payload)
+        self.write_terminal_records([payload])
 
-    def _write_terminal_record(self, payload: IngestionRecordPayload) -> None:
-        """写入最终态审计记录。
+    def write_terminal_records(self, payloads: list[IngestionRecordPayload]) -> None:
+        """批量写入最终态审计记录。
 
-        skipped / failed 都不需要业务写入事务，因此单独用一条 insert 即可。
+        这里只服务于 skipped / failed 这两类最终态。
+        它们不依赖业务写入事务，因此可以由 main 先积攒一批，再统一落库。
+        这样不会改变业务判断，只是减少大量逐条 insert 的数据库往返。
         """
 
-        started_at = _utcnow()
-        finished_at = _utcnow()
+        if not payloads:
+            return
+
         sql = """
             insert into catalog.video_ingestion_records (
               ingestion_record_id,
@@ -227,32 +276,41 @@ class CatalogRepository:
             values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         try:
-            with psycopg.connect(self._database_url) as connection:
+            connection = self._get_connection()
+            with connection.transaction():
                 with connection.cursor() as cursor:
-                    cursor.execute(
+                    cursor.executemany(
                         sql,
-                        (
-                            str(uuid4()),
-                            payload.source_clip_key,
-                            payload.video_id,
-                            payload.source_name,
-                            payload.status,
-                            list(payload.warning_codes),
-                            payload.error_code,
-                            payload.error_message,
-                            Jsonb(payload.context),
-                            started_at,
-                            finished_at,
-                        ),
+                        [self._build_terminal_record_params(payload) for payload in payloads],
                     )
-                connection.commit()
         except Exception as exc:
             raise CatalogIngestError(
                 code="db_write_failed",
                 stage="repository",
-                message="写入审计记录失败",
-                context={"source_clip_key": payload.source_clip_key, "status": payload.status},
+                message="批量写入审计记录失败",
+                context={"record_count": len(payloads)},
             ) from exc
+
+    def _build_terminal_record_params(self, payload: IngestionRecordPayload) -> tuple[object, ...]:
+        """把最终态审计记录转换成 executemany 需要的参数元组。"""
+
+        # 如果 main 在决定 skipped / failed 的那一刻已经生成了时间戳，
+        # 这里必须复用那一刻的值，避免批量 flush 把审计时间整体后移。
+        started_at = payload.started_at or _utcnow()
+        finished_at = payload.finished_at or started_at
+        return (
+            str(uuid4()),
+            payload.source_clip_key,
+            payload.video_id,
+            payload.source_name,
+            payload.status,
+            list(payload.warning_codes),
+            payload.error_code,
+            payload.error_message,
+            Jsonb(payload.context),
+            started_at,
+            finished_at,
+        )
 
     def _insert_running_record(
         self,

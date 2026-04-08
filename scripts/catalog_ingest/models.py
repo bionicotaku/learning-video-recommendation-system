@@ -259,6 +259,8 @@ class IngestionRecordPayload:
     error_code: str | None
     error_message: str | None
     context: dict[str, Any]
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -295,3 +297,4 @@ class ClipProcessResult:
     video_id: str | None
     warning_codes: tuple[str, ...]
     error: CatalogIngestError | None
+    terminal_record: IngestionRecordPayload | None = None

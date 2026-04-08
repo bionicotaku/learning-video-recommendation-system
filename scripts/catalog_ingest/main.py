@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 if __package__ in (None, ""):
@@ -13,17 +14,20 @@ if __package__ in (None, ""):
 
     from scripts.catalog_ingest.index_builder import build_normalized_clip_data
     from scripts.catalog_ingest.manifest_loader import load_clip_inputs
-    from scripts.catalog_ingest.models import CatalogIngestError, ClipProcessResult, IngestionRecordPayload, LoadedClipInput
+    from scripts.catalog_ingest.models import CatalogIngestError, ClipProcessResult, ExistingClipState, IngestionRecordPayload, LoadedClipInput
     from scripts.catalog_ingest.normalizer import normalize_clip_input
     from scripts.catalog_ingest.repository import CatalogRepository, load_database_url
-    from scripts.catalog_ingest.validator import validate_loaded_clip
+    from scripts.catalog_ingest.validator import ValidationWarning, validate_loaded_clip
 else:
     from .index_builder import build_normalized_clip_data
     from .manifest_loader import load_clip_inputs
-    from .models import CatalogIngestError, ClipProcessResult, IngestionRecordPayload, LoadedClipInput
+    from .models import CatalogIngestError, ClipProcessResult, ExistingClipState, IngestionRecordPayload, LoadedClipInput
     from .normalizer import normalize_clip_input
     from .repository import CatalogRepository, load_database_url
-    from .validator import validate_loaded_clip
+    from .validator import ValidationWarning, validate_loaded_clip
+
+
+BATCH_TERMINAL_AUDIT_SIZE = 200
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -60,6 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    repository: CatalogRepository | None = None
+    pending_terminal_records: list[IngestionRecordPayload] = []
+    fatal_error: CatalogIngestError | None = None
+    exit_code = 0
     try:
         database_url = load_database_url()
         repository = CatalogRepository(database_url)
@@ -77,29 +85,70 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         known_coarse_unit_ids = repository.load_known_coarse_unit_ids()
+        existing_states_by_key = repository.load_existing_clip_states(
+            [
+                clip_input.source_clip_key
+                for clip_input in clip_inputs
+                if clip_input.skip_reason_code is None
+            ]
+        )
         results: list[ClipProcessResult] = []
 
         for clip_input in clip_inputs:
             result = _process_single_clip(
                 clip_input=clip_input,
                 repository=repository,
+                existing_state=existing_states_by_key.get(clip_input.source_clip_key),
                 known_coarse_unit_ids=known_coarse_unit_ids,
                 dry_run=args.dry_run,
                 time_tolerance_ms=args.time_tolerance_ms,
             )
             results.append(result)
+            if not args.dry_run and result.terminal_record is not None:
+                pending_terminal_records.append(result.terminal_record)
+                if len(pending_terminal_records) >= BATCH_TERMINAL_AUDIT_SIZE:
+                    repository.write_terminal_records(pending_terminal_records)
+                    pending_terminal_records.clear()
             _print_single_result(result)
 
+        if not args.dry_run and pending_terminal_records:
+            repository.write_terminal_records(pending_terminal_records)
+            pending_terminal_records.clear()
+
         _print_summary(results, dry_run=args.dry_run)
-        return 1 if any(result.status == "failed" for result in results) else 0
+        exit_code = 1 if any(result.status == "failed" for result in results) else 0
     except CatalogIngestError as error:
-        print(f"[failed] code={error.code} stage={error.stage} message={error.message}")
+        fatal_error = error
+        exit_code = 1
+    finally:
+        # 批量终态审计必须在退出前做最后一次 flush。
+        # 这样即使主循环中途因异常提前结束，也尽量不丢已经判定完成的
+        # skipped / failed 记录。
+        if repository is not None and not args.dry_run and pending_terminal_records:
+            try:
+                repository.write_terminal_records(pending_terminal_records)
+                pending_terminal_records.clear()
+            except CatalogIngestError as flush_error:
+                if fatal_error is None:
+                    fatal_error = flush_error
+                else:
+                    print(
+                        f"[failed] code={flush_error.code} "
+                        f"stage={flush_error.stage} message={flush_error.message}"
+                    )
+        if repository is not None:
+            repository.close()
+
+    if fatal_error is not None:
+        print(f"[failed] code={fatal_error.code} stage={fatal_error.stage} message={fatal_error.message}")
         return 1
+    return exit_code
 
 
 def _process_single_clip(
     clip_input: LoadedClipInput,
     repository: CatalogRepository,
+    existing_state: ExistingClipState | None,
     known_coarse_unit_ids: set[int],
     dry_run: bool,
     time_tolerance_ms: int,
@@ -107,6 +156,7 @@ def _process_single_clip(
     """处理单个 clip 的完整链路。"""
 
     if clip_input.skip_reason_code is not None:
+        terminal_at = _utcnow()
         payload = IngestionRecordPayload(
             source_clip_key=clip_input.source_clip_key,
             video_id=None,
@@ -116,44 +166,48 @@ def _process_single_clip(
             error_code=clip_input.skip_reason_code,
             error_message=clip_input.skip_reason_message,
             context=clip_input.context,
+            started_at=terminal_at,
+            finished_at=terminal_at,
         )
-        if not dry_run:
-            repository.write_skipped_record(payload)
         return ClipProcessResult(
             source_clip_key=clip_input.source_clip_key,
             status="skipped",
             video_id=None,
             warning_codes=tuple(),
             error=None,
+            terminal_record=None if dry_run else payload,
         )
 
     try:
-        validate_loaded_clip(
+        validation_warnings = validate_loaded_clip(
             clip_input=clip_input,
             known_coarse_unit_ids=known_coarse_unit_ids,
             time_tolerance_ms=time_tolerance_ms,
         )
+        warning_codes = _collect_warning_codes(validation_warnings)
+        warning_context = _build_warning_context(validation_warnings)
 
-        existing_state = repository.get_existing_clip_state(clip_input.source_clip_key)
         if _should_skip_unchanged_clip(existing_state, clip_input):
+            terminal_at = _utcnow()
             payload = IngestionRecordPayload(
                 source_clip_key=clip_input.source_clip_key,
                 video_id=existing_state.video_id if existing_state else None,
                 source_name=clip_input.source_name,
                 status="skipped",
-                warning_codes=tuple(),
+                warning_codes=warning_codes,
                 error_code=None,
                 error_message=None,
-                context={**clip_input.context, "skip_reason": "unchanged"},
+                context={**clip_input.context, "skip_reason": "unchanged", **warning_context},
+                started_at=terminal_at,
+                finished_at=terminal_at,
             )
-            if not dry_run:
-                repository.write_skipped_record(payload)
             return ClipProcessResult(
                 source_clip_key=clip_input.source_clip_key,
                 status="skipped",
                 video_id=existing_state.video_id if existing_state else None,
-                warning_codes=tuple(),
+                warning_codes=warning_codes,
                 error=None,
+                terminal_record=None if dry_run else payload,
             )
 
         normalized_core = normalize_clip_input(clip_input)
@@ -164,43 +218,52 @@ def _process_single_clip(
                 source_clip_key=clip_input.source_clip_key,
                 status="dry_run_would_write",
                 video_id=existing_state.video_id if existing_state else None,
-                warning_codes=tuple(),
+                warning_codes=warning_codes,
                 error=None,
             )
 
         video_id = repository.persist_clip(
             normalized_data=normalized_clip,
             source_name=clip_input.source_name,
-            context=clip_input.context,
+            context={**clip_input.context, **warning_context},
+            warning_codes=warning_codes,
         )
         return ClipProcessResult(
             source_clip_key=clip_input.source_clip_key,
             status="succeeded",
             video_id=video_id,
-            warning_codes=tuple(),
+            warning_codes=warning_codes,
             error=None,
+            terminal_record=None,
         )
     except CatalogIngestError as error:
-        if not dry_run:
-            repository.write_failed_record(
-                IngestionRecordPayload(
-                    source_clip_key=clip_input.source_clip_key,
-                    video_id=None,
-                    source_name=clip_input.source_name,
-                    status="failed",
-                    warning_codes=tuple(),
-                    error_code=error.code,
-                    error_message=error.message,
-                    context=error.context,
-                )
-            )
+        terminal_at = _utcnow()
+        payload = IngestionRecordPayload(
+            source_clip_key=clip_input.source_clip_key,
+            video_id=None,
+            source_name=clip_input.source_name,
+            status="failed",
+            warning_codes=tuple(),
+            error_code=error.code,
+            error_message=error.message,
+            context=error.context,
+            started_at=terminal_at,
+            finished_at=terminal_at,
+        )
         return ClipProcessResult(
             source_clip_key=clip_input.source_clip_key,
             status="failed",
             video_id=None,
             warning_codes=tuple(),
             error=error,
+            terminal_record=None if dry_run else payload,
         )
+
+
+def _utcnow() -> datetime:
+    """返回带 UTC 时区的当前时间。"""
+
+    return datetime.now(timezone.utc)
 
 
 def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> bool:
@@ -233,11 +296,52 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
     )
 
 
+def _collect_warning_codes(warnings: tuple[ValidationWarning, ...]) -> tuple[str, ...]:
+    """提取去重后的 warning code，供命令行和审计表复用。"""
+
+    seen: set[str] = set()
+    ordered_codes: list[str] = []
+    for warning in warnings:
+        if warning.code in seen:
+            continue
+        seen.add(warning.code)
+        ordered_codes.append(warning.code)
+    return tuple(ordered_codes)
+
+
+def _build_warning_context(warnings: tuple[ValidationWarning, ...]) -> dict[str, object]:
+    """把 warning 细节压入审计上下文。
+
+    审计表当前只有 warning_codes，没有单独的 warning_message 字段。
+    因此这里把详细位置和时间信息塞进 context，避免 warning 只剩一个裸 code。
+    """
+
+    if not warnings:
+        return {}
+
+    return {
+        "warnings": [
+            {
+                "code": warning.code,
+                "message": warning.message,
+                **warning.context,
+            }
+            for warning in warnings
+        ]
+    }
+
+
 def _print_single_result(result: ClipProcessResult) -> None:
     """打印单条执行结果，方便在命令行里追踪进度。"""
 
     if result.error is None:
-        print(f"[{result.status}] {result.source_clip_key}")
+        if result.warning_codes:
+            print(
+                f"[{result.status}] {result.source_clip_key} "
+                f"warnings={','.join(result.warning_codes)}"
+            )
+        else:
+            print(f"[{result.status}] {result.source_clip_key}")
         return
 
     print(

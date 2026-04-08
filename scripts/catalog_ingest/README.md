@@ -571,16 +571,18 @@ placeholder://transcript/<transcript_file_name_without_ext>
 当前读取策略应为：
 
 1. 扫描目录 A 下所有父视频描述文件
-2. 对每个父文件读取 `.clips`
-3. 对每个 clip 生成 transcript 文件名
-4. 去目录 B 查找对应 transcript 文件
-5. 若 transcript 文件不存在，则直接记 `skipped`
-6. 若存在，则读取 transcript JSON 并进入校验和导入流程
+2. 扫描目录 B 下所有 transcript 文件，并预构造成“文件名集合 + 文件名到 Path 的索引”
+3. 对每个父文件读取 `.clips`
+4. 对每个 clip 生成 transcript 文件名
+5. 先用目录 B 的文件名集合判断对应 transcript 是否存在
+6. 若存在，再通过文件名索引拿到具体 Path 并读取 transcript JSON
+7. 若 transcript 文件不存在，则直接记 `skipped`
+8. 若存在，则进入校验和导入流程
 
 此外还应增加两条收尾规则：
 
-7. 记录所有未被任何父文件消费的 transcript 文件
-8. 输出本次扫描汇总：父文件数、clip 数、成功匹配数、缺失 transcript 数、孤儿 transcript 数
+9. 记录所有未被任何父文件消费的 transcript 文件
+10. 输出本次扫描汇总：父文件数、clip 数、成功匹配数、缺失 transcript 数、孤儿 transcript 数
 
 这里的“缺失 transcript 数”就是被记为 `skipped` 的 clip 数。
 
@@ -634,7 +636,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 顶层必须有 `sentences`
 - sentence `index / text / start / end` 必须存在
 - token `index / text / start / end` 必须存在
-- token 时间必须落在 sentence 区间内
+- token 时间若超出 sentence 区间，不阻断入库，但必须记 warning
 - `semanticElement` 不一定所有字段都非空，但结构应存在
 - 同一视频内 `sentence.index` 必须唯一
 - 同一句内 `token.index` 必须唯一
@@ -646,6 +648,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 空 transcript 直接视为失败，不写入空内容视频
 - sentence 可以没有 token
 - token 可以没有 `coarse_id`
+- 当前已知上游 `AssemblyAI -> 1transcript-raw -> 2cleaned-data` 可能产生 `token.end > sentence.end` 的脏时间；该类问题当前固定记 `warning_code = token_time_outside_sentence`
 
 ### 7.5 coarse_unit 校验
 
@@ -891,6 +894,14 @@ replace video_unit_index
 - 将本次执行标记为 `failed`
 - 记录 `error_code` 与 `error_message`
 
+实现上当前还固定两条性能约束，但都不改变业务语义：
+
+- transcript 目录先整体预扫描成“文件名集合 + 文件名到 Path 的索引”，避免逐 clip 反复访问文件系统
+- 脚本启动后一次性批量加载本批 `source_clip_key` 对应的已有数据库状态，并复用同一个数据库连接；不要退回到“每个 clip 单独 connect + 单独 select”
+- `skipped / failed` 审计记录允许在主循环中先收集，再按固定批次批量写入；`running / succeeded` 仍保留在单 clip 事务内原子完成
+- 对于批量写入的 `skipped / failed`，`started_at / finished_at` 必须在“结果被判定”的那一刻生成，不能等到批量 flush 时再生成
+- 主循环异常退出前，必须对内存中尚未落库的终态审计做最后一次 flush，避免把已经判定完成的 `skipped / failed` 静默丢掉
+
 ### 13.4 模块拆分
 
 当前阶段目录职责固定如下：
@@ -1063,6 +1074,18 @@ clip_seq = clip_id
 - `error_message`
 - `source_clip_key`
 - 失败阶段
+
+另外，非阻断性脏数据不记为 `failed`，而是记为 warning。
+
+当前固定 warning 至少包括：
+
+- `token_time_outside_sentence`
+
+warning 的处理方式是：
+
+- 继续执行并允许入库成功
+- 将 warning code 写入 `catalog.video_ingestion_records.warning_codes`
+- 将具体 sentence/token 位置和时间明细写入审计 `context`
 
 ### 13.10 CLI 设计建议
 
