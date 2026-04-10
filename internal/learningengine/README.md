@@ -41,6 +41,61 @@ Learning engine 不负责：
 2. 再更新状态投影
 3. 如有必要，从完整事件历史重建状态
 
+## 2.1 为什么 Learning engine 也坚持 `pgx + sqlc`
+
+Learning engine 当前同样没有采用 ORM。
+
+原因不是仓库“反对 ORM”，而是 Learning engine 的核心链路本来就不是简单对象 CRUD，而是：
+
+- append-only 事件写入
+- 同事务写事件与状态
+- replay 重放
+- 明确的 reducer 规则
+- 对 `learning.unit_learning_events` 和 `learning.user_unit_states` 的 owner 边界控制
+
+在这类模块里，最重要的是：
+
+- SQL 行为清楚
+- 事务边界清楚
+- replay 和在线写入链路可追踪
+- 查询与写入便于调试和校验
+
+因此当前 Learning engine 明确坚持：
+
+- PostgreSQL 直连
+- `pgx/v5`
+- `sqlc`
+- SQL 与 mapper 隔离
+
+这样做的好处是：
+
+1. 事件与状态写入完全透明  
+   哪些字段由事实表写入，哪些字段由状态表 upsert，一眼能看清。
+
+2. replay 更容易校验  
+   Learning engine 强依赖：
+   - 读完整事件历史
+   - 清空用户状态
+   - 重建状态
+
+   这种链路比普通 CRUD 更适合显式 SQL。
+
+3. 领域规则和持久化边界更干净  
+   reducer、SM-2、状态迁移都留在 domain；SQL 只负责持久化，不反向承担业务规则。
+
+4. 更容易做性能和正确性排查  
+   一旦在线写链路或 replay 结果异常，直接定位 SQL、事务和 repository 会比先分析 ORM 生成语句更直接。
+
+它的代价也很明确：
+
+- CRUD 样板更多
+- 需要维护 `sqlc` 生成代码和 mapper
+- 对新人理解成本更高
+
+但对于 Learning engine 来说，这些代价小于收益，因为它最值钱的不是“少写几行对象映射”，而是：
+
+> 事件链路可靠、状态投影可重建、事务行为可验证。
+
 ## 3. 当前目录结构
 
 ```text

@@ -246,6 +246,40 @@ The current concrete modules are:
 - `staticcheck`
 - Python + `psycopg[binary]` for catalog ingest tooling
 
+### Why `pgx + sqlc` Instead Of An ORM
+
+The repository intentionally does not use an ORM for the core business chain.
+
+The main reason is that the repository's most important data access paths are not simple entity CRUD paths. The current implementation already depends on:
+
+- cross-schema reads such as `learning.*`, `semantic.*`, and `recommendation.*`
+- explicit candidate-selection SQL
+- audit-table writes
+- transaction boundaries that must stay obvious
+- future recall/index queries that will likely become more SQL-heavy rather than less
+
+For this repository, that makes `pgx + sqlc` a better fit than an ORM for the core modules.
+
+`pgx + sqlc` is preferred here because it gives:
+
+- explicit SQL that is easy to inspect, review, and optimize
+- type-safe generated query code without hiding the SQL itself
+- cleaner module boundaries, because repository code reads and writes only the tables it owns
+- predictable behavior for migrations, indexing, and query tuning
+
+An ORM would be more attractive if the repository were dominated by:
+
+- single-table CRUD
+- admin/config pages
+- object-centric reads and updates with little query complexity
+
+That is not the current shape of the Learning engine, Recommendation scheduler, or future Recall path.
+
+This does not mean “never use an ORM anywhere.” It means:
+
+- keep the core learning/recommendation/catalog chain on `pgx + sqlc`
+- only consider ORM-style access for clearly non-core, low-complexity CRUD modules in the future
+
 ## Getting Started
 
 ### Prerequisites
