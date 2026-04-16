@@ -1,21 +1,4 @@
-下面是基于你当前最终方案整理的一版**完整设计文档**。
-这版只覆盖 **`catalog` schema**，并且已经吸收了我们前面确定的所有关键结论：
-
-- 数据库里**只存切片视频**
-- 原始长视频**不入库**
-- 视频已经离线处理完成，拿到的是 **HLS 路径 + transcript JSON**
-- transcript JSON **带 sentence 和 span 级时间戳**
-- span 已带 `coarse_id`
-- 原始 transcript JSON **保留在存储桶**
-- 数据库中**不存整坨 transcript JSON 作为主读模型**
-- 数据库里把 transcript 拆成标准化关系表
-- `catalog.videos` 是**切片内容资产主表**
-- `catalog.video_transcripts` 存 **transcript 原始对象路径 + transcript 摘要**
-- Recall 未来从 `catalog.video_unit_index` 读取 video-level coarse unit 索引
-
----
-
-# catalog schema 最终重构设计文档
+# catalog schema 设计文档
 
 ## 1. 文档目标
 
