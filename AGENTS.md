@@ -3,6 +3,16 @@
 本文件定义本仓库内 agent 的默认执行规则。
 调用 Subagent 完全不允许自定义模型, 必须直接继承当前会话模型
 
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
 ## 工作原则
 
 1. 先读文档，再读代码，再动手实现。

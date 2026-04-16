@@ -1,4 +1,4 @@
-.PHONY: fmt lint test check sqlc-generate recommendation-test-integration \
+.PHONY: fmt lint test check sqlc-generate recommendation-test-integration e2e-test \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
 	learningengine-migrate-up learningengine-migrate-down learningengine-migrate-version learningengine-migrate-status \
 	recommendation-migrate-up recommendation-migrate-down recommendation-migrate-version recommendation-migrate-status \
@@ -19,6 +19,9 @@ sqlc-generate:
 
 recommendation-test-integration:
 	go test -tags=integration ./internal/recommendation/test/integration/...
+
+e2e-test:
+	go test -tags=e2e ./internal/test/e2e/...
 
 check:
 	gofmt -w cmd internal
