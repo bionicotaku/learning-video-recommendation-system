@@ -8,14 +8,15 @@
 ## 1. 范围与判定口径
 
 当前 `.env` 只连接到一个 PostgreSQL 数据库：`postgres`。  
-因此这里把“需要识别的非 Supabase 默认部分”解释为：
+本文只描述当前实例里仍然存在、且与项目业务直接相关的 schema、表、约束与索引。
 
-1. 当前数据库中 **非 Supabase 默认的业务 schema**
-2. 当前业务链路真实依赖的表、函数、约束与索引
+不展开：
 
-本文不展开 Supabase 系统 schema 的内部结构，只识别其存在并从业务分析中排除。
+- PostgreSQL 系统 schema
+- Supabase 托管 schema 的内部结构
+- 已经删除的历史 schema 或历史表
 
-## 2. 当前库中的 schema 分类
+## 2. 当前 schema 分类
 
 ### 2.1 PostgreSQL 系统 schema
 
@@ -25,9 +26,7 @@
 - `pg_temp_*`
 - `pg_toast_temp_*`
 
-这些都是 PostgreSQL 系统对象，不属于业务 schema。
-
-### 2.2 Supabase 默认/托管 schema
+### 2.2 Supabase 默认 / 托管 schema
 
 - `auth`
 - `extensions`
@@ -44,31 +43,37 @@
 - `supabase_migrations`
 - `vault`
 
-### 2.3 当前识别出的业务 schema
+### 2.3 当前业务 schema
 
-以下四个 schema 不是 Supabase 默认业务域，属于项目当前实际使用的业务 schema：
+当前实例里仍然存在的业务 schema 只有两个：
 
 1. `semantic`
 2. `catalog`
-3. `learning`
-4. `recommendation`
+
+### 2.4 已清空 / 已移除
+
+截至本次更新：
+
+- `public` 中没有自定义表、视图、序列或函数
+- `learning` schema 已删除
+- `recommendation` schema 已删除
 
 ## 3. 总体结论
 
-当前 live DB 的业务结构已经收口到四个 schema：
+当前 live DB 已收口到：
 
 1. `semantic`
+   - 语义主数据
 2. `catalog`
-3. `learning`
-4. `recommendation`
+   - 内容事实、transcript 读模型、视频级 coarse unit 索引、入库审计、用户视频互动投影
 
-`public` 当前没有自定义表、视图、序列或函数。
+也就是说，当前数据库已经不再承载 Learning engine 和 Recommendation 的业务表。
 
 ## 4. 当前业务 schema 现状
 
 ### 4.1 `semantic`
 
-用途：语义单元主数据。当前是内容与学习域共享的基础字典层。
+用途：语义单元主数据。当前是内容域共享的基础字典层。
 
 当前对象：
 
@@ -115,7 +120,7 @@
 
 #### `semantic.coarse_unit`
 
-用途：Recommendation、Catalog、Learning engine 共同依赖的 coarse unit 主表。
+用途：Catalog 当前依赖的 coarse unit 主表。
 
 - 主键：`id`
 - 行数：`170730`
@@ -147,7 +152,7 @@
 
 关键行为：
 
-- `trg_coarse_unit_validate` 在写入前执行 `coarse_unit_validate_fine_ids()`，说明 `fine_unit_ids` 会做校验。
+- `trg_coarse_unit_validate` 在写入前执行 `coarse_unit_validate_fine_ids()`，说明 `fine_unit_ids` 会做校验
 
 索引：
 
@@ -173,7 +178,7 @@
 
 #### `catalog.videos`
 
-用途：视频/clip 主记录。
+用途：视频 / clip 主记录。
 
 - 主键：`video_id`
 - 唯一键：`source_clip_key`
@@ -321,7 +326,7 @@
 
 #### `catalog.video_unit_index`
 
-用途：视频级 coarse unit 索引，供 recall / recommendation 使用。
+用途：视频级 coarse unit 索引。
 
 - 复合主键：`(video_id, coarse_unit_id)`
 - 外键：
@@ -362,12 +367,12 @@
 
 注意：
 
-- live DB 里仍然是 `evidence_sentence_indexes + evidence_span_indexes` 组合。
-- 当前库里 **还没有** `evidence_span_refs`。
+- live DB 里仍然是 `evidence_sentence_indexes + evidence_span_indexes` 组合
+- 当前库里还没有 `evidence_span_refs`
 
 #### `catalog.video_ingestion_records`
 
-用途：单视频入库/处理审计。
+用途：单视频入库 / 处理审计。
 
 - 主键：`ingestion_record_id`
 - 外键：`video_id -> catalog.videos(video_id)`，`ON DELETE SET NULL`
@@ -439,194 +444,6 @@
 - `idx_video_user_states_user_last_watched_at`
 - `idx_video_user_states_video_id`
 
-### 4.3 `learning`
-
-用途：Learning engine 的事件真相层和状态投影层。
-
-当前数据量：
-
-- `learning.unit_learning_events`: `0`
-- `learning.user_unit_states`: `0`
-
-#### `learning.unit_learning_events`
-
-用途：append-only 学习事件表。
-
-- 主键：`event_id`
-- 外键：
-  - `user_id -> auth.users(id)`
-  - `coarse_unit_id -> semantic.coarse_unit(id)`
-  - `video_id -> catalog.videos(video_id)`，`ON DELETE SET NULL`
-- 行数：`0`
-
-列：
-
-- `event_id bigint not null default nextval(...)`
-- `user_id uuid not null`
-- `coarse_unit_id bigint not null`
-- `video_id uuid null`
-- `event_type text not null`
-- `source_type text not null`
-- `source_ref_id text null`
-- `is_correct bool null`
-- `quality smallint null`
-- `response_time_ms int null`
-- `metadata jsonb not null default '{}'::jsonb`
-- `occurred_at timestamptz not null`
-- `created_at timestamptz not null default now()`
-
-关键约束：
-
-- `CHECK event_type in ('exposure', 'lookup', 'new_learn', 'review', 'quiz')`
-- `CHECK quality between 0 and 5`
-
-索引：
-
-- `unit_learning_events_pkey`
-- `idx_unit_learning_events_user_unit_time`
-- `idx_unit_learning_events_user_video_time`
-
-#### `learning.user_unit_states`
-
-用途：用户 x coarse unit 当前状态投影。
-
-- 复合主键：`(user_id, coarse_unit_id)`
-- 外键：
-  - `user_id -> auth.users(id)`
-  - `coarse_unit_id -> semantic.coarse_unit(id)`
-- 行数：`0`
-
-列：
-
-- `user_id uuid not null`
-- `coarse_unit_id bigint not null`
-- `is_target bool not null default true`
-- `target_source text null`
-- `target_source_ref_id text null`
-- `target_priority numeric not null default 0.5`
-- `status text not null default 'new'`
-- `progress_percent numeric not null default 0`
-- `mastery_score numeric not null default 0`
-- `first_seen_at timestamptz null`
-- `last_seen_at timestamptz null`
-- `last_reviewed_at timestamptz null`
-- `seen_count int not null default 0`
-- `strong_event_count int not null default 0`
-- `review_count int not null default 0`
-- `correct_count int not null default 0`
-- `wrong_count int not null default 0`
-- `consecutive_correct int not null default 0`
-- `consecutive_wrong int not null default 0`
-- `last_quality smallint null`
-- `recent_quality_window smallint[] not null default '{}'`
-- `recent_correctness_window boolean[] not null default '{}'`
-- `repetition int not null default 0`
-- `interval_days numeric not null default 0`
-- `ease_factor numeric not null default 2.5`
-- `next_review_at timestamptz null`
-- `suspended_reason text null`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
-
-关键约束：
-
-- `CHECK status in ('new', 'learning', 'reviewing', 'mastered', 'suspended')`
-- `CHECK progress_percent between 0 and 100`
-- `CHECK mastery_score between 0 and 1`
-- `CHECK last_quality between 0 and 5`（允许 null）
-
-索引：
-
-- `user_unit_states_pkey`
-- `idx_user_unit_states_target_status`
-- `idx_user_unit_states_next_review`
-
-### 4.4 `recommendation`
-
-用途：当前 live DB 中 Recommendation 已落地的仍是旧 `scheduler` 结构。
-
-当前数据量：
-
-- `recommendation.scheduler_runs`: `0`
-- `recommendation.scheduler_run_items`: `0`
-- `recommendation.user_unit_serving_states`: `0`
-
-#### `recommendation.scheduler_runs`
-
-用途：单次 scheduler 运行头记录。
-
-- 主键：`run_id`
-- 外键：`user_id -> auth.users(id)`
-- 行数：`0`
-
-列：
-
-- `run_id uuid not null`
-- `user_id uuid not null`
-- `requested_limit int not null`
-- `generated_at timestamptz not null`
-- `due_review_count int not null default 0`
-- `selected_review_count int not null default 0`
-- `selected_new_count int not null default 0`
-- `context jsonb not null default '{}'::jsonb`
-
-索引：
-
-- `scheduler_runs_pkey`
-
-#### `recommendation.scheduler_run_items`
-
-用途：单次 scheduler 输出的 coarse unit 列表。
-
-- 复合主键：`(run_id, coarse_unit_id)`
-- 外键：
-  - `run_id -> recommendation.scheduler_runs(run_id)`
-  - `user_id -> auth.users(id)`
-  - `coarse_unit_id -> semantic.coarse_unit(id)`
-- 行数：`0`
-
-列：
-
-- `run_id uuid not null`
-- `user_id uuid not null`
-- `coarse_unit_id bigint not null`
-- `recommend_type text not null`
-- `rank int not null`
-- `score numeric not null`
-- `reason_codes text[] not null default '{}'`
-
-关键约束：
-
-- `CHECK recommend_type in ('review', 'new')`
-
-索引：
-
-- `scheduler_run_items_pkey`
-
-#### `recommendation.user_unit_serving_states`
-
-用途：Recommendation 对用户 x coarse unit 的 serving 冷却状态。
-
-- 复合主键：`(user_id, coarse_unit_id)`
-- 外键：
-  - `user_id -> auth.users(id)`
-  - `coarse_unit_id -> semantic.coarse_unit(id)`
-- 行数：`0`
-
-列：
-
-- `user_id uuid not null`
-- `coarse_unit_id bigint not null`
-- `last_recommended_at timestamptz null`
-- `last_recommendation_run_id uuid null`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
-
-索引：
-
-- `user_unit_serving_states_pkey`
-- `idx_user_unit_serving_states_user_last_recommended`
-
 ## 5. `public` schema 当前状态
 
 `public` 是 Supabase 默认 schema。  
@@ -638,7 +455,7 @@
 - 序列
 - 函数
 
-因此当前业务现状文档不再把 `public` 作为业务结构的一部分展开。
+因此当前业务现状文档不把 `public` 作为业务结构展开。
 
 ## 6. 当前 cross-schema 依赖
 
@@ -652,8 +469,6 @@
 4. `catalog.video_transcript_sentences`
 5. `catalog.video_semantic_spans`
 6. `catalog.video_unit_index`
-7. `learning.*`
-8. `recommendation.*`
 
 ### 6.2 主要外键关系
 
@@ -665,17 +480,6 @@
 - `catalog.video_unit_index.coarse_unit_id -> semantic.coarse_unit.id`
 - `catalog.video_user_states.user_id -> auth.users.id`
 - `catalog.video_user_states.video_id -> catalog.videos.video_id`
-- `learning.unit_learning_events.user_id -> auth.users.id`
-- `learning.unit_learning_events.coarse_unit_id -> semantic.coarse_unit.id`
-- `learning.unit_learning_events.video_id -> catalog.videos.video_id`
-- `learning.user_unit_states.user_id -> auth.users.id`
-- `learning.user_unit_states.coarse_unit_id -> semantic.coarse_unit.id`
-- `recommendation.scheduler_runs.user_id -> auth.users.id`
-- `recommendation.scheduler_run_items.run_id -> recommendation.scheduler_runs.run_id`
-- `recommendation.scheduler_run_items.user_id -> auth.users.id`
-- `recommendation.scheduler_run_items.coarse_unit_id -> semantic.coarse_unit.id`
-- `recommendation.user_unit_serving_states.user_id -> auth.users.id`
-- `recommendation.user_unit_serving_states.coarse_unit_id -> semantic.coarse_unit.id`
 
 ## 7. 当前现状与最新版设计文档的明显差异
 
@@ -691,42 +495,26 @@
 
 这说明 Catalog 仍停留在旧 evidence 表达。
 
-### 7.2 `recommendation` 仍是旧 `scheduler_*` 结构
+### 7.2 Learning / Recommendation schema 已不存在
 
-当前 live DB 只有：
+当前实例里已经没有：
 
-- `scheduler_runs`
-- `scheduler_run_items`
-- `user_unit_serving_states`
+- `learning` schema
+- `recommendation` schema
 
-还没有最新版设计里更完整的视频推荐 run/item 结构，也没有 `v_recommendable_video_units`、`v_unit_video_inventory` 这类读模型对象。
-
-### 7.3 Learning / Recommendation 业务数据尚未启动
-
-虽然 schema 已建好，但当前：
-
-- `learning.unit_learning_events = 0`
-- `learning.user_unit_states = 0`
-- `recommendation.scheduler_runs = 0`
-- `recommendation.scheduler_run_items = 0`
-- `recommendation.user_unit_serving_states = 0`
-
-说明学习与推荐主链路在当前实例里还没有真实业务数据。
+因此 live DB 当前只承载语义与内容层，不承载 Learning engine 或 Recommendation 的业务表。
 
 ## 8. 结论
 
 如果只看 live DB，当前数据库可以概括为：
 
-1. **语义主数据已大量落库**
-   - `semantic.coarse_unit`
-   - `semantic.fine_unit`
-2. **Catalog 新结构已经有真实内容数据**
-   - `videos / transcripts / sentences / spans / unit_index`
-3. **Learning / Recommendation schema 已建，但还没有业务数据**
-4. **当前 DB 现实仍早于最新版设计文档**
-   - 特别是 `evidence_span_refs`
-   - 以及 Recommendation 的最终 run/item / read-model 结构
+1. `semantic` 语义主数据已大量落库
+2. `catalog` 内容事实链已经有真实数据
+3. `public` 当前为空，不承载业务对象
+4. `learning` 和 `recommendation` schema 已被清理
+5. 当前 DB 仍早于最新版 Catalog 设计
+   - 主要差异是 `evidence_span_refs` 还没有落库
 
-因此，当前库最准确的描述不是“已经完全对齐最新版设计”，而是：
+因此，当前库最准确的描述是：
 
-> 四个业务 schema 已经落库并承载当前业务主链路，但部分最新版设计对象还没有真正落到 live DB。
+> 当前实例已经收口为 `semantic + catalog` 两层结构；学习与推荐层已从 live DB 中移除，Catalog 也仍保留旧 evidence 表达。

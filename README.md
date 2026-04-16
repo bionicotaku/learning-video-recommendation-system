@@ -448,7 +448,7 @@ Most design documents are written in Chinese. The list below explains what each 
   - overall MVP system design
   - module boundaries
   - current output versus target output
-- [`docs/统一文件结构规范.md`](/Users/evan/Downloads/learning-video-recommendation-system/docs/统一文件结构规范.md)
+- [`docs/编码和结构规范.md`](/Users/evan/Downloads/learning-video-recommendation-system/docs/编码和结构规范.md)
   - repository-wide module and submodule structure standard
 - [`docs/学习引擎-整体设计.md`](/Users/evan/Downloads/learning-video-recommendation-system/docs/学习引擎-整体设计.md)
   - learning-event model
