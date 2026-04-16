@@ -1,5 +1,10 @@
 # Catalog 数据库改造文档（MVP / Delta 版）
 
+状态：DEPRECATED
+说明：本文档仅保留为历史参考，作为 `docs/Catalog-数据库设计.md` 与《全新设计-Catalog-数据库设计.md》之间的对齐改造过程记录，不再作为当前系统实现依据。当前 Catalog 设计以《全新设计-Catalog-数据库设计.md》为准。
+
+---
+
 ## 1. 文档目标
 
 本文档只回答一个问题：
@@ -744,6 +749,8 @@ Recommendation 仍然先从：
 - `recommendation.user_video_serving_states`
 - `recommendation.video_recommendation_runs`
 - `recommendation.video_recommendation_items`
+
+其中 `recommendation.v_recommendable_video_units` 的 owner、字段 contract、过滤规则与刷新策略，以《全新设计-推荐模块设计.md》中的权威定义为准；本文仅保留其作为配套对象的说明，不重复定义字段清单。
 
 ### 13.2 为什么这些不放在 catalog
 

@@ -1,5 +1,10 @@
 # catalog schema 设计文档
 
+状态：DEPRECATED
+说明：本文档仅保留为历史参考，不再作为当前系统实现依据。当前 Catalog 设计以《全新设计-Catalog-数据库设计.md》为准。
+
+---
+
 ## 1. 文档目标
 
 本文档定义当前版本内容系统中 `catalog` schema 的最终设计。
