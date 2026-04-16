@@ -221,6 +221,7 @@
 - `idx_videos_visibility_publish_at`
 - `idx_videos_parent_video_slug_clip_seq`
 - `idx_videos_created_at_desc`
+- `idx_videos_recommendable`
 
 #### `catalog.video_transcripts`
 
@@ -240,7 +241,7 @@
 - `semantic_span_count int not null`
 - `mapped_span_count int not null`
 - `unmapped_span_count int not null`
-- `mapped_span_ratio numeric not null`
+- `mapped_span_ratio numeric(6,5) not null`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
@@ -323,6 +324,7 @@
 - `idx_video_semantic_spans_video_start_ms`
 - `idx_video_semantic_spans_coarse_unit_video`（`coarse_unit_id is not null`）
 - `idx_video_semantic_spans_video_coarse_unit`（`coarse_unit_id is not null`）
+- `idx_video_semantic_spans_unit_video_start`（`coarse_unit_id is not null`）
 
 #### `catalog.video_unit_index`
 
@@ -343,10 +345,9 @@
 - `first_start_ms int not null`
 - `last_end_ms int not null`
 - `coverage_ms int not null`
-- `coverage_ratio numeric not null`
+- `coverage_ratio numeric(6,5) not null`
 - `sentence_indexes int[] not null default '{}'`
-- `evidence_sentence_indexes int[] not null default '{}'`
-- `evidence_span_indexes int[] not null default '{}'`
+- `evidence_span_refs jsonb not null default '[]'::jsonb`
 - `sample_surface_forms text[] not null default '{}'`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
@@ -363,12 +364,14 @@
 
 - `video_unit_index_pkey`
 - `idx_video_unit_index_coarse_unit_mention_coverage`
+- `idx_video_unit_index_unit_video`
 - `idx_video_unit_index_video_id`
 
 注意：
 
-- live DB 里仍然是 `evidence_sentence_indexes + evidence_span_indexes` 组合
-- 当前库里还没有 `evidence_span_refs`
+- `evidence_span_refs` 是最终 evidence 表达
+- 每个元素至少包含 `sentence_index` 与 `span_index`
+- Catalog 不在这一层固化 `best_evidence_*`
 
 #### `catalog.video_ingestion_records`
 
@@ -427,8 +430,8 @@
 - `last_watched_at timestamptz null`
 - `watch_count int not null default 0`
 - `completed_count int not null default 0`
-- `last_watch_ratio numeric null`
-- `max_watch_ratio numeric null`
+- `last_watch_ratio numeric(6,5) null`
+- `max_watch_ratio numeric(6,5) null`
 - `updated_at timestamptz not null default now()`
 
 关键约束：
@@ -481,19 +484,19 @@
 - `catalog.video_user_states.user_id -> auth.users.id`
 - `catalog.video_user_states.video_id -> catalog.videos.video_id`
 
-## 7. 当前现状与最新版设计文档的明显差异
+## 7. 当前现状与最新版设计的对齐情况
 
-这部分不是目标设计，而是 live DB 与当前最新版设计文档之间已经能直接观察到的差异。
+### 7.1 Catalog schema 已对齐当前最终设计
 
-### 7.1 `catalog.video_unit_index` 仍是旧 evidence 结构
+截至本次探查，`catalog` 已完成当前最终设计要求的关键对齐：
 
-当前 live DB：
+- `catalog.video_unit_index` 已使用 `evidence_span_refs`
+- 旧 evidence 两列已删除
+- `catalog.video_unit_index (coarse_unit_id, video_id)` 索引已存在
+- `catalog.video_semantic_spans (coarse_unit_id, video_id, start_ms)` partial index 已存在
+- `catalog.videos` 的 recommendable partial index 已存在
 
-- 有 `evidence_sentence_indexes`
-- 有 `evidence_span_indexes`
-- 没有 `evidence_span_refs`
-
-这说明 Catalog 仍停留在旧 evidence 表达。
+因此当前实例里的 `catalog` schema 已与 migration head 一致，也与《全新设计-Catalog-数据库设计.md》的最终设计一致。
 
 ### 7.2 Learning / Recommendation schema 已不存在
 
@@ -512,9 +515,8 @@
 2. `catalog` 内容事实链已经有真实数据
 3. `public` 当前为空，不承载业务对象
 4. `learning` 和 `recommendation` schema 已被清理
-5. 当前 DB 仍早于最新版 Catalog 设计
-   - 主要差异是 `evidence_span_refs` 还没有落库
+5. 当前 `catalog` schema 已与最终设计对齐
 
 因此，当前库最准确的描述是：
 
-> 当前实例已经收口为 `semantic + catalog` 两层结构；学习与推荐层已从 live DB 中移除，Catalog 也仍保留旧 evidence 表达。
+> 当前实例已经收口为 `semantic + catalog` 两层结构；学习与推荐层已从 live DB 中移除，而 `catalog` 已经对齐当前最终设计。

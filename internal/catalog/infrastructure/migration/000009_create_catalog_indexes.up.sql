@@ -30,11 +30,23 @@ create index if not exists idx_video_semantic_spans_video_coarse_unit
 on catalog.video_semantic_spans (video_id, coarse_unit_id)
 where coarse_unit_id is not null;
 
+create index if not exists idx_video_semantic_spans_unit_video_start
+on catalog.video_semantic_spans (coarse_unit_id, video_id, start_ms)
+where coarse_unit_id is not null;
+
 create index if not exists idx_video_unit_index_coarse_unit_mention_coverage
 on catalog.video_unit_index (coarse_unit_id, mention_count desc, coverage_ratio desc);
 
+create index if not exists idx_video_unit_index_unit_video
+on catalog.video_unit_index (coarse_unit_id, video_id);
+
 create index if not exists idx_video_unit_index_video_id
 on catalog.video_unit_index (video_id);
+
+create index if not exists idx_videos_recommendable
+on catalog.videos (publish_at desc, duration_ms)
+where status = 'active'
+  and visibility_status = 'public';
 
 create index if not exists idx_video_ingestion_records_source_clip_key_started_at
 on catalog.video_ingestion_records (source_clip_key, started_at desc);

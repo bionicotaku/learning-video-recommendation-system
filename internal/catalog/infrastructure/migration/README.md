@@ -1,20 +1,22 @@
 # Catalog Migrations
 
-这个目录是 Catalog 唯一合法的 migration 根。
+这个目录只保留 Catalog 的最终 clean baseline。
 
-最终应只定义：
+它只定义：
 
 - Catalog 自己的 schema
 - Catalog 自己的表
 - Catalog 自己的索引
 
-不负责：
+它不定义：
 
 - Learning engine 的表
 - Recommendation 的表
-- 任何旧 `videos` 流水线兼容 migration
+- 任何历史兼容 patch migration
+- 任何 archive 改造过程
 
-执行顺序：
+要求：
 
-- 在整库初始化场景下，Catalog 应最先执行
-- 建议统一通过仓库根的 `make migrate-up` / `make migrate-down` 编排
+- 从空库执行这里的 migration head，得到的必须是当前最终版 Catalog schema
+- live DB 的 `catalog` schema 必须与这里的 head 一致
+- 如果需要修正现网历史库，使用一次性临时 SQL；不要把中间过程写回正式 migration 历史
