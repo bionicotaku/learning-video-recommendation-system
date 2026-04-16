@@ -521,7 +521,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 完全由 `video_semantic_spans` 聚合生成，不直接从原始 JSON 写入。
 
-聚合规则沿用 `docs/Catalog-数据库设计.md`：
+聚合规则沿用 `docs/archive/Catalog-数据库设计.md`：
 
 - `(video_id, coarse_unit_id)` 分组
 - 统计 `mention_count`
@@ -826,7 +826,7 @@ transcript 文件负责：
 3. 每个 clip 对应一个本地可读的 transcript JSON。
 4. transcript JSON 中已经包含 sentence 和 span 级时间信息。
 5. span 中的 `coarse_id` 已由上游流程产出。
-6. 数据库 schema 已按 [docs/Catalog-数据库设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/Catalog-数据库设计.md) 建好。
+6. 数据库 schema 已按 [docs/archive/Catalog-数据库设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/archive/Catalog-数据库设计.md) 建好。
 
 因此脚本只负责导入、校验、标准化和写库，不负责生成内容。
 

@@ -458,7 +458,7 @@ Most design documents are written in Chinese. The list below explains what each 
   - scheduler design
   - quota and scoring rules
   - recommendation-owned tables
-- [`docs/Catalog-数据库设计.md`](/Users/evan/Downloads/learning-video-recommendation-system/docs/Catalog-数据库设计.md)
+- [`docs/全新设计-Catalog-数据库设计.md`](/Users/evan/Downloads/learning-video-recommendation-system/docs/全新设计-Catalog-数据库设计.md)
   - final `catalog` schema design
   - transcript read model
   - recall-ready video-unit index

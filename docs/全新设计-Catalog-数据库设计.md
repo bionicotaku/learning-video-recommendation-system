@@ -7,7 +7,7 @@
 目标读者：后端、数据、测试、Learning engine 对接方、Recommendation 对接方
 文档目标：定义当前系统中 `catalog` schema 的最终职责边界、数据模型、入库流程、后处理逻辑、幂等策略、读路径契约与实施约束，使读者在**不了解任何历史设计文档**的前提下，也能完整理解并实施当前版本的 Catalog。当前系统的业务前提是：数据库不再接收待处理的原始视频上传，而是接收**已经离线处理完成的切片内容资产**；每个切片已经具备最终可播放的 HLS 产物、transcript JSON、sentence 级时间轴、span 级时间轴，以及 span 到 `semantic.coarse_unit` 的映射结果。因此，Catalog 的职责是承接**内容事实、结构化 transcript 读模型、Recall-ready 索引、入库审计、用户对视频的互动状态投影**，而不是承接媒体/AI 流水线状态机或 Recommendation 的投放状态。
 
-本文档是当前 Catalog 的唯一权威设计文档。`docs/Catalog-数据库设计.md` 与 `docs/Catalog数据库改造.md` 仅保留为历史参考，不再作为当前实现依据。
+本文档是当前 Catalog 的唯一权威设计文档。`docs/archive/Catalog-数据库设计.md` 与 `docs/archive/Catalog数据库改造.md` 仅保留为历史参考，不再作为当前实现依据。
 
 ## 1. 设计目标
 
