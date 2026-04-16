@@ -42,6 +42,10 @@ Catalog 的权威最终设计文档。定义 `catalog` schema 的最终边界、
 
 基于 `.env` 指向的 live DB 做只读探查得到的现状快照。它描述当前实例里实际存在的业务 schema、`public` 中的遗留对象、真实表结构、索引、约束和与最新版设计的明显差异。
 
+### [当前实现现状.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/当前实现现状.md)
+
+基于当前仓库代码整理的实现快照。它描述当前代码已经实现到哪一层、哪些基础设施已经落地、哪些模块仍然只是骨架，以及仓库现状与 live DB 现状之间的区别。
+
 ## 历史归档
 
 ### [archive/README.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/archive/README.md)
