@@ -288,7 +288,7 @@ Recommendation 的实现顺序固定如下，不允许跳步：
   - 原计划假设可以直接基于当前 `DATABASE_URL` 做仓储集成测试，但实际遇到 Supabase schema DDL 权限不足
   - 已改为使用本地 embedded Postgres 运行 Recommendation 仓储集成测试，仍保持真实数据库仓储测试，不影响 Recommendation 与 Learning/Catalog 的 owner 边界
 - 下一步入口：
-  - 回读 `docs/全新设计-学习引擎设计.md` 与 `docs/temp/recommendation-实现步骤.md`
+  - 回读 `docs/学习引擎设计.md` 与 `docs/temp/recommendation-实现步骤.md`
   - 然后开始 Step 2：实现 Context Assembler 与 usecase 外壳
 
 ## Step 2. 实现 Context Assembler 与 usecase 外壳
@@ -384,9 +384,9 @@ Recommendation 的实现顺序固定如下，不允许跳步：
 - 与计划偏差：
   - 为满足仓库级 `make check`，顺手修复了 Learning engine 事件仓储层对 `metadata` 的兜底，避免现有测试因 nil metadata 失败
 - 下一步入口：
-  - 回读 `docs/全新设计-学习引擎设计.md`
+  - 回读 `docs/学习引擎设计.md`
   - 回读 `docs/temp/recommendation-实现步骤.md`
-  - 回读 `docs/全新设计-推荐模块设计.md`
+  - 回读 `docs/推荐模块设计.md`
   - 然后开始 Step 3：实现 Demand Planner
 
 ## Step 3. 实现 Demand Planner
@@ -490,9 +490,9 @@ Planner 规则必须按设计文档直接实现：
   - `new_now` 的 supply-aware 规则当前采用“`supply_grade = none` 降到 `near_future`，其余仍可进入 `new_now`”这一保守实现
   - planner weight 增加了固定小数位 round，避免 golden 快照抖动
 - 下一步入口：
-  - 回读 `docs/全新设计-学习引擎设计.md`
+  - 回读 `docs/学习引擎设计.md`
   - 回读 `docs/temp/recommendation-实现步骤.md`
-  - 回读 `docs/全新设计-推荐模块设计.md`
+  - 回读 `docs/推荐模块设计.md`
   - 然后开始 Step 4：实现 Candidate Generator 四条 lane
 
 ## Step 4. 实现 Candidate Generator 四条 lane
@@ -597,7 +597,7 @@ Planner 规则必须按设计文档直接实现：
   - `quality_fallback` 当前实现将 lane cap 收敛为最多补 1 个 distinct video，与设计文档“通常最多 1 条”的保守策略一致。
   - `bundle` 的低供给放宽规则当前只允许“2 个 soft_review”进入，不额外引入更宽的 near-future-only bundle。
 - 下一步入口：
-  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 重新回读 `docs/学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/推荐模块设计.md`。
   - 然后开始 Step 5：实现 Evidence Resolver 与 Video Evidence Aggregator。
 
 ## Step 5. 实现 Evidence Resolver 与 Video Evidence Aggregator
@@ -705,7 +705,7 @@ Planner 规则必须按设计文档直接实现：
   - 容错规则收敛为“refs 失配时回退到最早 span”，而不是直接放弃该 candidate；这样可以保证 explanation/audit 链路在 Catalog 数据局部不一致时仍可继续。
   - 当前只保留第二强证据的 15% 弱增量，未继续实现第三条及以后证据的增量累计。
 - 下一步入口：
-  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 重新回读 `docs/学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/推荐模块设计.md`。
   - 然后开始 Step 6：实现 Ranker / Selector / Explanation Builder。
 
 ## Step 6. 实现 Ranker / Selector / Explanation Builder
@@ -836,7 +836,7 @@ base_score =
   - Ranker 额外显式扣减了 `recent_watched_penalty`，这是依据设计文档正文里的轻量 watched penalty 约束做的收敛；虽然公式示例未单独列项，但语义与文档一致。
   - Selector 的 `extreme_sparse` 当前实现收敛为“直接 under-fill 返回当前可用列表”，不再继续做复杂配额尝试。
 - 下一步入口：
-  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 重新回读 `docs/学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/推荐模块设计.md`。
   - 然后开始 Step 7：接通 Audit Writer / Serving State Manager / 完整主用例。
 
 ## Step 7. 接通 Audit Writer / Serving State Manager / 完整主用例

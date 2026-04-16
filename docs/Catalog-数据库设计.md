@@ -245,7 +245,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 同时要明确：Recommendation 需要的 `v_recommendable_video_units`、`v_unit_video_inventory`、`user_video_serving_states`、`video_recommendation_runs`、`video_recommendation_items` 都属于 `recommendation` schema，而不是 Catalog 的一部分。Catalog 只提供内容事实与内容索引，不拥有 Recommendation serving/audit 对象。
 
-其中 `recommendation.v_recommendable_video_units` 的 owner、字段 contract、过滤规则与刷新策略，以《全新设计-推荐模块设计.md》中的权威定义为准。
+其中 `recommendation.v_recommendable_video_units` 的 owner、字段 contract、过滤规则与刷新策略，以《推荐模块设计.md》中的权威定义为准。
 
 ## 17. 明确不保留或不建立的结构
 
@@ -260,7 +260,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 本文档定义的是 Catalog 的最终逻辑 schema 与最终读写契约，因此当前实现必须满足以下约束：
 
 - `catalog.video_unit_index` 的最终证据表达以 `evidence_span_refs` 为准；`evidence_sentence_indexes` 与 `evidence_span_indexes` 不属于当前逻辑 schema 与对外契约。
-- Recommendation 新读路径的正式启用前提，以《全新设计-总设计.md》与《全新设计-推荐模块设计.md》中的系统级契约为准。
+- Recommendation 新读路径的正式启用前提，以《视频推荐系统总设计.md》与《推荐模块设计.md》中的系统级契约为准。
 - 若现网仍存在旧版结构、双写、回填或 reader 切换需求，应在单独的迁移/实施文档中描述，不纳入本最终设计文档。
 
 ## 19. 最终结论

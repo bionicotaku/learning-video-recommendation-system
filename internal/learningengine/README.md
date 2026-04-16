@@ -80,6 +80,7 @@ internal/learningengine/
 - Replay 依赖的基础能力以“全量状态读取 + control slice 抽取 + delete by user + batch upsert”为准
 - 在线写入与 Replay 共用同一个 reducer
 - 同一 `user_id` 的所有状态写入 usecase 通过数据库 advisory xact lock 串行化，避免 `ReplayUserStates` 与在线写入并发破坏最终一致性
+- 仅由学习事件创建的新状态默认 `is_target = false`；target 只能来自显式 control 命令，不能由学习事件隐式产生
 - `recommendation` 只能读取 `learning.user_unit_states`，不能回写 Learning engine 业务表
 
 ## 主要调用链
@@ -116,6 +117,22 @@ request
   -> batch upsert rebuilt states
   -> tx commit
 ```
+
+### Empty-State Initialization
+
+```text
+first learning event for unseen unit
+  -> create new UserUnitState
+  -> default is_target = false
+  -> default target_priority = 0
+  -> apply reducer progression fields
+```
+
+这个约束保证：
+
+- “有学习事件”不等于“进入推荐目标集合”
+- Recommendation 只消费显式 target/control 选中的 unit
+- 非 target 的学习历史不会误进入 Recommendation active demand
 
 ## 测试布局
 

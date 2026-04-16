@@ -71,8 +71,8 @@ func initState(currentState *model.UserUnitState, event model.LearningEvent) *mo
 		return &model.UserUnitState{
 			UserID:         event.UserID,
 			CoarseUnitID:   event.CoarseUnitID,
-			IsTarget:       true,
-			TargetPriority: 0.5,
+			IsTarget:       false,
+			TargetPriority: 0,
 			Status:         enum.StatusNew,
 			EaseFactor:     2.5,
 			CreatedAt:      now,

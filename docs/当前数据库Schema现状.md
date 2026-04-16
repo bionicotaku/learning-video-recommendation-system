@@ -496,7 +496,7 @@
 - `catalog.video_semantic_spans (coarse_unit_id, video_id, start_ms)` partial index 已存在
 - `catalog.videos` 的 recommendable partial index 已存在
 
-因此当前实例里的 `catalog` schema 已与 migration head 一致，也与《全新设计-Catalog-数据库设计.md》的最终设计一致。
+因此当前实例里的 `catalog` schema 已与 migration head 一致，也与《Catalog-数据库设计.md》的最终设计一致。
 
 ### 7.2 Learning / Recommendation schema 已不存在
 

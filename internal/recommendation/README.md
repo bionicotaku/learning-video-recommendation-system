@@ -19,6 +19,7 @@
 - `video_recommendation_runs` / `video_recommendation_items` 审计写入
 - `user_unit_serving_states` / `user_video_serving_states` 短事务写入
 - 单测、scenario/golden 测试、Recommendation integration 测试
+- 基于真实 Learning engine + Catalog fixture + Recommendation 主链路的跨模块 E2E
 
 ## 当前边界
 
@@ -26,7 +27,11 @@
 - 只读 Catalog 稳定内容契约与 `catalog.video_user_states`
 - 只写 `recommendation.*`
 - 不回写 Learning engine 或 Catalog owner 对象
-- 不包含跨模块 e2e、HTTP API、worker、自动刷新任务
+- 不包含 HTTP API、worker、自动刷新任务
+
+补充说明：
+
+- 跨模块 E2E 不属于 Recommendation 模块自身 owner 范围，但当前仓库已经建立并持续扩展了真实 `learningengine × recommendation` 端到端回归，用来验证 Recommendation 在真实上游输入下的稳定行为
 
 ## 目录职责
 
@@ -47,6 +52,7 @@
   - `GenerateVideoRecommendationsService`
   - 只通过完整 pipeline constructor 构造
   - constructor 会校验主链路依赖必须全部就绪
+  - 不再保留 assembler-only shell 或空响应降级路径
 - `domain/planner`
   - 需求分桶、lane budget、mix quota
 - `domain/aggregator`
@@ -66,7 +72,6 @@
 
 ## 当前未实现
 
-- 跨模块 e2e
 - 自动刷新任务
 - embedding / vector recall
 - ML ranking
@@ -85,3 +90,6 @@
   - `DefaultVideoStateEnricher` 负责 candidate-derived video-scope 输入：video serving states、catalog video user states
 - `DefaultVideoRanker` 仍计算 `RecentWatchedPenalty` 作为辅助观测值，但 MVP `BaseScore` 不再直接扣这一项，避免与 `FreshnessScore` 重复惩罚。
 - `best_evidence` 只允许从 `evidence_span_refs` 命中结果中派生；如果 refs 无法命中 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并返回空 `best_evidence`，不会再兜底选“最早 span”。
+- 当前 Recommendation 的真实验证分两层：
+  - 模块内 integration：owner migration、物化视图、refresh、repository 契约
+  - 跨模块 E2E：demand mapping、selector constraints、read model visibility、write-side consistency、Replay 交互、多用户隔离

@@ -53,6 +53,22 @@ type LearningSuite struct {
 	ListUserUnitState learningusecase.ListUserUnitStatesUsecase
 }
 
+type RecommendationVideoView = recommendationdto.RecommendationVideo
+
+type RecommendationRunSummary struct {
+	SelectorMode string
+	Underfilled  bool
+	ResultCount  int32
+}
+
+type RecommendationItemSummary struct {
+	Rank           int
+	VideoID        string
+	PrimaryLane    string
+	DominantBucket string
+	DominantUnitID *int64
+}
+
 type CatalogVideoFixture struct {
 	VideoID           string
 	DurationMs        int32
@@ -213,6 +229,10 @@ func (h *Harness) LearningSuite() *LearningSuite {
 }
 
 func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRecommendationsUsecase {
+	return h.RecommendationUsecaseWithResultWriter(nil)
+}
+
+func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendationservice.RecommendationResultWriter) recommendationusecase.GenerateVideoRecommendationsUsecase {
 	learningStates := recommendationrepo.NewLearningStateReader(h.Pool)
 	inventory := recommendationrepo.NewUnitInventoryReader(h.Pool)
 	unitServing := recommendationrepo.NewUnitServingStateRepository(h.Pool)
@@ -230,11 +250,13 @@ func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRec
 	)
 	videoStateEnricher := recommendationservice.NewDefaultVideoStateEnricher(videoServing, videoUserState)
 	resolver := recommendationservice.NewDefaultEvidenceResolver(semanticSpans, transcriptSentences)
-	resultWriter := recommendationservice.NewDefaultRecommendationResultWriter(
-		recommendationtx.NewManager(h.Pool),
-		recommendationservice.NewDefaultAuditWriter(auditRepo),
-		recommendationservice.NewDefaultServingStateManager(unitServing, videoServing),
-	)
+	if resultWriter == nil {
+		resultWriter = recommendationservice.NewDefaultRecommendationResultWriter(
+			recommendationtx.NewManager(h.Pool),
+			recommendationservice.NewDefaultAuditWriter(auditRepo),
+			recommendationservice.NewDefaultServingStateManager(unitServing, videoServing),
+		)
+	}
 
 	usecase, err := recommendationusecase.NewGenerateVideoRecommendationsPipeline(
 		assembler,
@@ -449,6 +471,16 @@ func (h *Harness) LoadVideoServingCount(t *testing.T, userID, videoID string) in
 	return servedCount
 }
 
+func (h *Harness) LoadVideoServingCountOrZero(t *testing.T, userID, videoID string) int {
+	t.Helper()
+	var servedCount int
+	err := h.Pool.QueryRow(context.Background(), `select served_count from recommendation.user_video_serving_states where user_id = $1 and video_id = $2`, userID, videoID).Scan(&servedCount)
+	if err != nil {
+		return 0
+	}
+	return servedCount
+}
+
 func (h *Harness) LoadUnitServingCount(t *testing.T, userID string, unitID int64) int {
 	t.Helper()
 	var servedCount int
@@ -456,6 +488,75 @@ func (h *Harness) LoadUnitServingCount(t *testing.T, userID string, unitID int64
 		t.Fatalf("load user_unit_serving_states: %v", err)
 	}
 	return servedCount
+}
+
+func (h *Harness) LoadUnitServingCountOrZero(t *testing.T, userID string, unitID int64) int {
+	t.Helper()
+	var servedCount int
+	err := h.Pool.QueryRow(context.Background(), `select served_count from recommendation.user_unit_serving_states where user_id = $1 and coarse_unit_id = $2`, userID, unitID).Scan(&servedCount)
+	if err != nil {
+		return 0
+	}
+	return servedCount
+}
+
+func (h *Harness) LoadRecommendationRun(t *testing.T, runID string) RecommendationRunSummary {
+	t.Helper()
+	run := RecommendationRunSummary{}
+	if err := h.Pool.QueryRow(
+		context.Background(),
+		`select selector_mode, underfilled, result_count
+		 from recommendation.video_recommendation_runs
+		 where run_id = $1`,
+		runID,
+	).Scan(&run.SelectorMode, &run.Underfilled, &run.ResultCount); err != nil {
+		t.Fatalf("load recommendation run: %v", err)
+	}
+	return run
+}
+
+func (h *Harness) LoadRecommendationItems(t *testing.T, runID string) []RecommendationItemSummary {
+	t.Helper()
+	rows, err := h.Pool.Query(
+		context.Background(),
+		`select rank, video_id, primary_lane, dominant_bucket, dominant_unit_id
+		 from recommendation.video_recommendation_items
+		 where run_id = $1
+		 order by rank asc`,
+		runID,
+	)
+	if err != nil {
+		t.Fatalf("query recommendation items: %v", err)
+	}
+	defer rows.Close()
+
+	items := make([]RecommendationItemSummary, 0)
+	for rows.Next() {
+		var item RecommendationItemSummary
+		if err := rows.Scan(&item.Rank, &item.VideoID, &item.PrimaryLane, &item.DominantBucket, &item.DominantUnitID); err != nil {
+			t.Fatalf("scan recommendation item: %v", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate recommendation items: %v", err)
+	}
+	return items
+}
+
+func (h *Harness) LoadSupplyGrade(t *testing.T, unitID int64) string {
+	t.Helper()
+	var supplyGrade string
+	if err := h.Pool.QueryRow(
+		context.Background(),
+		`select supply_grade
+		 from recommendation.v_unit_video_inventory
+		 where coarse_unit_id = $1`,
+		unitID,
+	).Scan(&supplyGrade); err != nil {
+		t.Fatalf("load unit supply grade: %v", err)
+	}
+	return supplyGrade
 }
 
 func (h *Harness) LoadAuditEvidence(t *testing.T, runID string, rank int) (sentenceIndex, spanIndex, startMs, endMs *int32) {
