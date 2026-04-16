@@ -1,0 +1,837 @@
+{
+  "nodes": [
+    {
+      "id": "recommendation_readme_module",
+      "label": "Recommendation Module",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_readme_pipeline",
+      "label": "Video Recommendation Pipeline",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_readme_boundary",
+      "label": "Recommendation Boundary",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_readme_short_write_tx_policy",
+      "label": "Short Final-Write Transactions",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_readme_audit_center_policy",
+      "label": "Run/Item Audit Center Policy",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_readme_readonly_upstream_policy",
+      "label": "Read-Only Upstream Data Policy",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_catalog_video_user_states_table",
+      "label": "catalog.video_user_states",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_audit_tables",
+      "label": "video_recommendation_runs / video_recommendation_items",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_user_unit_serving_states_table",
+      "label": "user_unit_serving_states",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_user_video_serving_states_table",
+      "label": "user_video_serving_states",
+      "file_type": "document",
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "generate_video_recommendations_request",
+      "label": "GenerateVideoRecommendationsRequest",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/dto/generate_video_recommendations.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "generate_video_recommendations_response",
+      "label": "GenerateVideoRecommendationsResponse",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/dto/generate_video_recommendations.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "evidence_readers_semantic_span_reader",
+      "label": "SemanticSpanReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/evidence_readers.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "evidence_readers_transcript_sentence_reader",
+      "label": "TranscriptSentenceReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/evidence_readers.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "learning_state_reader_port",
+      "label": "LearningStateReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/learning_state_reader.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendable_video_unit_reader_port",
+      "label": "RecommendableVideoUnitReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/recommendable_video_unit_reader.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "recommendation_audit_repository_port",
+      "label": "RecommendationAuditRepository",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/recommendation_audit_repository.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "serving_state_unit_repository_port",
+      "label": "UnitServingStateRepository",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/serving_state_repositories.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "serving_state_video_repository_port",
+      "label": "VideoServingStateRepository",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/serving_state_repositories.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "unit_inventory_reader_port",
+      "label": "UnitInventoryReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/unit_inventory_reader.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_user_state_reader_port",
+      "label": "VideoUserStateReader",
+      "file_type": "code",
+      "source_file": "internal/recommendation/application/repository/video_user_state_reader.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "target_state_command_repository_impl",
+      "label": "TargetStateCommandRepository",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/target_state_command_repository.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "unit_learning_event_repository_impl",
+      "label": "UnitLearningEventRepository",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/unit_learning_event_repository.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "user_unit_state_repository_impl",
+      "label": "UserUnitStateRepository",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/user_unit_state_repository.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tx_manager_manager",
+      "label": "Persistence Transaction Manager",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sqlc_queries_core",
+      "label": "sqlc Query Facade",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/sqlcgen/db.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "learning_unit_learning_events_table",
+      "label": "learning.unit_learning_events",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/sqlcgen/unit_learning_events.sql.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "learning_user_unit_states_table",
+      "label": "learning.user_unit_states",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/sqlcgen/user_unit_states.sql.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "testutil_postgres_test_database",
+      "label": "Embedded Postgres Test Database",
+      "file_type": "code",
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "repository_integration_tests_suite",
+      "label": "Repository Integration Tests",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/repository_integration_test.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tx_manager_integration_test_suite",
+      "label": "Transaction Manager Integration Test",
+      "file_type": "code",
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager_integration_test.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_users_table",
+      "label": "auth.users",
+      "file_type": "code",
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "semantic_coarse_unit_table",
+      "label": "semantic.coarse_unit",
+      "file_type": "code",
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "catalog_videos_table",
+      "label": "catalog.videos",
+      "file_type": "code",
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "recommendation_readme_module",
+      "target": "recommendation_readme_pipeline",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_module",
+      "target": "recommendation_readme_boundary",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_module",
+      "target": "recommendation_audit_repository_port",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_module",
+      "target": "serving_state_unit_repository_port",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_module",
+      "target": "serving_state_video_repository_port",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_module",
+      "target": "learning_state_reader_port",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_boundary",
+      "target": "learning_user_unit_states_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_boundary",
+      "target": "recommendation_catalog_video_user_states_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "learning_state_reader_port",
+      "target": "learning_user_unit_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "video_user_state_reader_port",
+      "target": "recommendation_catalog_video_user_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_audit_repository_port",
+      "target": "recommendation_audit_tables",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "serving_state_unit_repository_port",
+      "target": "recommendation_user_unit_serving_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "serving_state_video_repository_port",
+      "target": "recommendation_user_video_serving_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_audit_center_policy",
+      "target": "recommendation_audit_repository_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_short_write_tx_policy",
+      "target": "recommendation_audit_repository_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_short_write_tx_policy",
+      "target": "serving_state_unit_repository_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_short_write_tx_policy",
+      "target": "serving_state_video_repository_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_readonly_upstream_policy",
+      "target": "learning_state_reader_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendation_readme_readonly_upstream_policy",
+      "target": "video_user_state_reader_port",
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "evidence_readers_semantic_span_reader",
+      "target": "evidence_readers_transcript_sentence_reader",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/application/repository/evidence_readers.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "recommendable_video_unit_reader_port",
+      "target": "unit_inventory_reader_port",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.84,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "generate_video_recommendations_request",
+      "target": "generate_video_recommendations_response",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/application/dto/generate_video_recommendations.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "target_state_command_repository_impl",
+      "target": "sqlc_queries_core",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/target_state_command_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "unit_learning_event_repository_impl",
+      "target": "sqlc_queries_core",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/unit_learning_event_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "user_unit_state_repository_impl",
+      "target": "sqlc_queries_core",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/user_unit_state_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "target_state_command_repository_impl",
+      "target": "learning_user_unit_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/target_state_command_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "user_unit_state_repository_impl",
+      "target": "learning_user_unit_states_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/user_unit_state_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "unit_learning_event_repository_impl",
+      "target": "learning_unit_learning_events_table",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/unit_learning_event_repository.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "tx_manager_manager",
+      "target": "target_state_command_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "tx_manager_manager",
+      "target": "unit_learning_event_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "tx_manager_manager",
+      "target": "user_unit_state_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repository_integration_tests_suite",
+      "target": "target_state_command_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/repository_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repository_integration_tests_suite",
+      "target": "unit_learning_event_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/repository_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repository_integration_tests_suite",
+      "target": "user_unit_state_repository_impl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/repository_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "repository_integration_tests_suite",
+      "target": "testutil_postgres_test_database",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/repository/repository_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "tx_manager_integration_test_suite",
+      "target": "tx_manager_manager",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "tx_manager_integration_test_suite",
+      "target": "testutil_postgres_test_database",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager_integration_test.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "testutil_postgres_test_database",
+      "target": "auth_users_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "testutil_postgres_test_database",
+      "target": "semantic_coarse_unit_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "testutil_postgres_test_database",
+      "target": "catalog_videos_table",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/testutil/postgres.go",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "learning_state_reader_port",
+      "target": "user_unit_state_repository_impl",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.89,
+      "source_file": "internal/recommendation/README.md",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "recommendation_read_ports_bundle",
+      "label": "Recommendation Read Ports",
+      "nodes": [
+        "learning_state_reader_port",
+        "recommendable_video_unit_reader_port",
+        "unit_inventory_reader_port",
+        "video_user_state_reader_port",
+        "evidence_readers_semantic_span_reader",
+        "evidence_readers_transcript_sentence_reader"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md"
+    },
+    {
+      "id": "recommendation_final_write_bundle",
+      "label": "Recommendation Final Write Bundle",
+      "nodes": [
+        "recommendation_audit_repository_port",
+        "serving_state_unit_repository_port",
+        "serving_state_video_repository_port"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/recommendation/README.md"
+    },
+    {
+      "id": "learningengine_transaction_bundle",
+      "label": "Learningengine Transaction Repository Bundle",
+      "nodes": [
+        "tx_manager_manager",
+        "target_state_command_repository_impl",
+        "unit_learning_event_repository_impl",
+        "user_unit_state_repository_impl"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "internal/learningengine/infrastructure/persistence/tx/manager.go"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

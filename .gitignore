@@ -26,5 +26,5 @@ coverage.out
 .air/
 .air.toml
 
-graphify-out/
+graphify-out/cache/
 .codex/
