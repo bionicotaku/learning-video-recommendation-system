@@ -76,3 +76,12 @@ func (r *RecommendationAuditRepository) InsertItem(ctx context.Context, item mod
 		BestEvidenceEndMs:         mapper.Int32PointerToPG(item.BestEvidenceEndMs),
 	})
 }
+
+func (r *RecommendationAuditRepository) InsertItems(ctx context.Context, items []model.RecommendationItem) error {
+	for _, item := range items {
+		if err := r.InsertItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}

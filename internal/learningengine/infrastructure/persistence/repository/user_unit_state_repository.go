@@ -78,35 +78,26 @@ func (r *UserUnitStateRepository) BatchUpsert(ctx context.Context, states []*mod
 	return result, nil
 }
 
-func (r *UserUnitStateRepository) ListByUser(ctx context.Context, userID string) ([]model.UserUnitState, error) {
+func (r *UserUnitStateRepository) DeleteByUser(ctx context.Context, userID string) error {
 	pgUserID, err := mapper.StringToUUID(userID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	rows, err := r.queries.ListUserUnitStates(ctx, pgUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]model.UserUnitState, 0, len(rows))
-	for _, row := range rows {
-		mapped, err := mapper.ToUserUnitState(row)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, mapped)
-	}
-	return result, nil
+	return r.queries.DeleteUserUnitStatesByUser(ctx, pgUserID)
 }
 
-func (r *UserUnitStateRepository) ListRecommendationStates(ctx context.Context, userID string) ([]model.UserUnitState, error) {
+func (r *UserUnitStateRepository) ListByUser(ctx context.Context, userID string, filter model.UserUnitStateFilter) ([]model.UserUnitState, error) {
 	pgUserID, err := mapper.StringToUUID(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := r.queries.ListRecommendationUnitStates(ctx, pgUserID)
+	rows, err := r.queries.ListUserUnitStates(ctx, learningenginesqlc.ListUserUnitStatesParams{
+		UserID:           pgUserID,
+		OnlyTarget:       filter.OnlyTarget,
+		ExcludeSuspended: filter.ExcludeSuspended,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +139,15 @@ func toUpsertUserUnitStateParams(state *model.UserUnitState) (learningenginesqlc
 		return learningenginesqlc.UpsertUserUnitStateParams{}, err
 	}
 
+	recentQualityWindow := state.RecentQualityWindow
+	if recentQualityWindow == nil {
+		recentQualityWindow = []int16{}
+	}
+	recentCorrectnessWindow := state.RecentCorrectnessWindow
+	if recentCorrectnessWindow == nil {
+		recentCorrectnessWindow = []bool{}
+	}
+
 	return learningenginesqlc.UpsertUserUnitStateParams{
 		UserID:                  userID,
 		CoarseUnitID:            state.CoarseUnitID,
@@ -169,8 +169,8 @@ func toUpsertUserUnitStateParams(state *model.UserUnitState) (learningenginesqlc
 		ConsecutiveCorrect:      state.ConsecutiveCorrect,
 		ConsecutiveWrong:        state.ConsecutiveWrong,
 		LastQuality:             mapper.Int16PointerToPG(state.LastQuality),
-		RecentQualityWindow:     state.RecentQualityWindow,
-		RecentCorrectnessWindow: state.RecentCorrectnessWindow,
+		RecentQualityWindow:     recentQualityWindow,
+		RecentCorrectnessWindow: recentCorrectnessWindow,
 		Repetition:              state.Repetition,
 		IntervalDays:            intervalDays,
 		EaseFactor:              easeFactor,

@@ -232,6 +232,88 @@ func (q *Queries) ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUni
 	return items, nil
 }
 
+const listUserUnitServingStatesByUnitIDs = `-- name: ListUserUnitServingStatesByUnitIDs :many
+select user_id, coarse_unit_id, last_served_at, last_run_id, served_count, created_at, updated_at
+from recommendation.user_unit_serving_states
+where user_id = $1
+  and coarse_unit_id = any($2::bigint[])
+order by coarse_unit_id asc
+`
+
+type ListUserUnitServingStatesByUnitIDsParams struct {
+	UserID        pgtype.UUID `json:"user_id"`
+	CoarseUnitIds []int64     `json:"coarse_unit_ids"`
+}
+
+func (q *Queries) ListUserUnitServingStatesByUnitIDs(ctx context.Context, arg ListUserUnitServingStatesByUnitIDsParams) ([]RecommendationUserUnitServingState, error) {
+	rows, err := q.db.Query(ctx, listUserUnitServingStatesByUnitIDs, arg.UserID, arg.CoarseUnitIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RecommendationUserUnitServingState{}
+	for rows.Next() {
+		var i RecommendationUserUnitServingState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.LastServedAt,
+			&i.LastRunID,
+			&i.ServedCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserVideoServingStatesByVideoIDs = `-- name: ListUserVideoServingStatesByVideoIDs :many
+select user_id, video_id, last_served_at, last_run_id, served_count, created_at, updated_at
+from recommendation.user_video_serving_states
+where user_id = $1
+  and video_id = any($2::uuid[])
+order by video_id asc
+`
+
+type ListUserVideoServingStatesByVideoIDsParams struct {
+	UserID   pgtype.UUID   `json:"user_id"`
+	VideoIds []pgtype.UUID `json:"video_ids"`
+}
+
+func (q *Queries) ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg ListUserVideoServingStatesByVideoIDsParams) ([]RecommendationUserVideoServingState, error) {
+	rows, err := q.db.Query(ctx, listUserVideoServingStatesByVideoIDs, arg.UserID, arg.VideoIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RecommendationUserVideoServingState{}
+	for rows.Next() {
+		var i RecommendationUserVideoServingState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.VideoID,
+			&i.LastServedAt,
+			&i.LastRunID,
+			&i.ServedCount,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVideoUserStatesByUserAndVideoIDs = `-- name: ListVideoUserStatesByUserAndVideoIDs :many
 select user_id, video_id, last_watched_at, watch_count, completed_count, last_watch_ratio, max_watch_ratio
 from catalog.video_user_states

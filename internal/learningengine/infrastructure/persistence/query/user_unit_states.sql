@@ -127,34 +127,14 @@ set
 where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id);
 
--- name: SuspendTargetUnit :exec
-update learning.user_unit_states
-set
-  status = 'suspended',
-  suspended_reason = sqlc.narg(suspended_reason),
-  updated_at = now()
-where user_id = sqlc.arg(user_id)
-  and coarse_unit_id = sqlc.arg(coarse_unit_id);
-
--- name: ResumeTargetUnit :exec
-update learning.user_unit_states
-set
-  status = case when status = 'suspended' then 'new' else status end,
-  suspended_reason = null,
-  updated_at = now()
-where user_id = sqlc.arg(user_id)
-  and coarse_unit_id = sqlc.arg(coarse_unit_id);
+-- name: DeleteUserUnitStatesByUser :exec
+delete from learning.user_unit_states
+where user_id = sqlc.arg(user_id);
 
 -- name: ListUserUnitStates :many
 select *
 from learning.user_unit_states
 where user_id = sqlc.arg(user_id)
+  and (not sqlc.arg(only_target)::boolean or is_target = true)
+  and (not sqlc.arg(exclude_suspended)::boolean or status <> 'suspended')
 order by coarse_unit_id asc;
-
--- name: ListRecommendationUnitStates :many
-select *
-from learning.user_unit_states
-where user_id = sqlc.arg(user_id)
-  and is_target = true
-  and status <> 'suspended'
-order by target_priority desc, coarse_unit_id asc;

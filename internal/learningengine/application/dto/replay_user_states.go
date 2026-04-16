@@ -4,4 +4,7 @@ type ReplayUserStatesRequest struct {
 	UserID string
 }
 
-type ReplayUserStatesResponse struct{}
+type ReplayUserStatesResponse struct {
+	RebuiltUnitCount    int
+	ProcessedEventCount int
+}

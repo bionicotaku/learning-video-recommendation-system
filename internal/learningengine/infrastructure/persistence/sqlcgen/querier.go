@@ -12,15 +12,13 @@ import (
 
 type Querier interface {
 	AppendLearningEvent(ctx context.Context, arg AppendLearningEventParams) (LearningUnitLearningEvent, error)
+	DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error
 	EnsureTargetUnit(ctx context.Context, arg EnsureTargetUnitParams) error
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)
-	ListRecommendationUnitStates(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
-	ListUserUnitStates(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
-	ResumeTargetUnit(ctx context.Context, arg ResumeTargetUnitParams) error
+	ListUserUnitStates(ctx context.Context, arg ListUserUnitStatesParams) ([]LearningUserUnitState, error)
 	SetTargetInactive(ctx context.Context, arg SetTargetInactiveParams) error
-	SuspendTargetUnit(ctx context.Context, arg SuspendTargetUnitParams) error
 	UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitStateParams) (LearningUserUnitState, error)
 }
 

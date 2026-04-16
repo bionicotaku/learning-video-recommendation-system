@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteUserUnitStatesByUser = `-- name: DeleteUserUnitStatesByUser :exec
+delete from learning.user_unit_states
+where user_id = $1
+`
+
+func (q *Queries) DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUserUnitStatesByUser, userID)
+	return err
+}
+
 const ensureTargetUnit = `-- name: EnsureTargetUnit :exec
 insert into learning.user_unit_states (
   user_id,
@@ -105,74 +115,23 @@ func (q *Queries) GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnit
 	return i, err
 }
 
-const listRecommendationUnitStates = `-- name: ListRecommendationUnitStates :many
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, recent_quality_window, recent_correctness_window, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
-from learning.user_unit_states
-where user_id = $1
-  and is_target = true
-  and status <> 'suspended'
-order by target_priority desc, coarse_unit_id asc
-`
-
-func (q *Queries) ListRecommendationUnitStates(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error) {
-	rows, err := q.db.Query(ctx, listRecommendationUnitStates, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []LearningUserUnitState{}
-	for rows.Next() {
-		var i LearningUserUnitState
-		if err := rows.Scan(
-			&i.UserID,
-			&i.CoarseUnitID,
-			&i.IsTarget,
-			&i.TargetSource,
-			&i.TargetSourceRefID,
-			&i.TargetPriority,
-			&i.Status,
-			&i.ProgressPercent,
-			&i.MasteryScore,
-			&i.FirstSeenAt,
-			&i.LastSeenAt,
-			&i.LastReviewedAt,
-			&i.SeenCount,
-			&i.StrongEventCount,
-			&i.ReviewCount,
-			&i.CorrectCount,
-			&i.WrongCount,
-			&i.ConsecutiveCorrect,
-			&i.ConsecutiveWrong,
-			&i.LastQuality,
-			&i.RecentQualityWindow,
-			&i.RecentCorrectnessWindow,
-			&i.Repetition,
-			&i.IntervalDays,
-			&i.EaseFactor,
-			&i.NextReviewAt,
-			&i.SuspendedReason,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listUserUnitStates = `-- name: ListUserUnitStates :many
 select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, recent_quality_window, recent_correctness_window, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
+  and (not $2::boolean or is_target = true)
+  and (not $3::boolean or status <> 'suspended')
 order by coarse_unit_id asc
 `
 
-func (q *Queries) ListUserUnitStates(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error) {
-	rows, err := q.db.Query(ctx, listUserUnitStates, userID)
+type ListUserUnitStatesParams struct {
+	UserID           pgtype.UUID `json:"user_id"`
+	OnlyTarget       bool        `json:"only_target"`
+	ExcludeSuspended bool        `json:"exclude_suspended"`
+}
+
+func (q *Queries) ListUserUnitStates(ctx context.Context, arg ListUserUnitStatesParams) ([]LearningUserUnitState, error) {
+	rows, err := q.db.Query(ctx, listUserUnitStates, arg.UserID, arg.OnlyTarget, arg.ExcludeSuspended)
 	if err != nil {
 		return nil, err
 	}
@@ -219,26 +178,6 @@ func (q *Queries) ListUserUnitStates(ctx context.Context, userID pgtype.UUID) ([
 		return nil, err
 	}
 	return items, nil
-}
-
-const resumeTargetUnit = `-- name: ResumeTargetUnit :exec
-update learning.user_unit_states
-set
-  status = case when status = 'suspended' then 'new' else status end,
-  suspended_reason = null,
-  updated_at = now()
-where user_id = $1
-  and coarse_unit_id = $2
-`
-
-type ResumeTargetUnitParams struct {
-	UserID       pgtype.UUID `json:"user_id"`
-	CoarseUnitID int64       `json:"coarse_unit_id"`
-}
-
-func (q *Queries) ResumeTargetUnit(ctx context.Context, arg ResumeTargetUnitParams) error {
-	_, err := q.db.Exec(ctx, resumeTargetUnit, arg.UserID, arg.CoarseUnitID)
-	return err
 }
 
 const setTargetInactive = `-- name: SetTargetInactive :exec
@@ -257,27 +196,6 @@ type SetTargetInactiveParams struct {
 
 func (q *Queries) SetTargetInactive(ctx context.Context, arg SetTargetInactiveParams) error {
 	_, err := q.db.Exec(ctx, setTargetInactive, arg.UserID, arg.CoarseUnitID)
-	return err
-}
-
-const suspendTargetUnit = `-- name: SuspendTargetUnit :exec
-update learning.user_unit_states
-set
-  status = 'suspended',
-  suspended_reason = $1,
-  updated_at = now()
-where user_id = $2
-  and coarse_unit_id = $3
-`
-
-type SuspendTargetUnitParams struct {
-	SuspendedReason pgtype.Text `json:"suspended_reason"`
-	UserID          pgtype.UUID `json:"user_id"`
-	CoarseUnitID    int64       `json:"coarse_unit_id"`
-}
-
-func (q *Queries) SuspendTargetUnit(ctx context.Context, arg SuspendTargetUnitParams) error {
-	_, err := q.db.Exec(ctx, suspendTargetUnit, arg.SuspendedReason, arg.UserID, arg.CoarseUnitID)
 	return err
 }
 

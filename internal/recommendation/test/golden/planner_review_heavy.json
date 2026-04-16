@@ -1,0 +1,61 @@
+{
+  "HardReview": [
+    {
+      "UnitID": 101,
+      "Bucket": "hard_review",
+      "Weight": 1.9,
+      "SupplyGrade": "weak",
+      "TargetWeight": 0.9
+    }
+  ],
+  "NewNow": [
+    {
+      "UnitID": 201,
+      "Bucket": "new_now",
+      "Weight": 1.7,
+      "SupplyGrade": "ok",
+      "TargetWeight": 0.8
+    }
+  ],
+  "SoftReview": [
+    {
+      "UnitID": 301,
+      "Bucket": "soft_review",
+      "Weight": 1.5,
+      "SupplyGrade": "strong",
+      "TargetWeight": 0.7
+    }
+  ],
+  "NearFuture": [
+    {
+      "UnitID": 401,
+      "Bucket": "near_future",
+      "Weight": 1.2,
+      "SupplyGrade": "strong",
+      "TargetWeight": 0.6
+    }
+  ],
+  "SessionMode": "review_heavy",
+  "TargetVideoCount": 8,
+  "PreferredDurationSec": [
+    45,
+    180
+  ],
+  "LaneBudget": {
+    "ExactCore": 0.35,
+    "Bundle": 0.35,
+    "SoftFuture": 0.2,
+    "QualityFallback": 0.1
+  },
+  "MixQuota": {
+    "CoreDominantMin": 3,
+    "FutureDominantMax": 3,
+    "FutureLikeMax": 3,
+    "FallbackMax": 1,
+    "SameUnitMax": 2
+  },
+  "Flags": {
+    "HardReviewLowSupply": true,
+    "ExtremeSparse": false
+  }
+}

@@ -1,4 +1,4 @@
-.PHONY: fmt lint test check sqlc-generate \
+.PHONY: fmt lint test check sqlc-generate recommendation-test-integration \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
 	learningengine-migrate-up learningengine-migrate-down learningengine-migrate-version learningengine-migrate-status \
 	recommendation-migrate-up recommendation-migrate-down recommendation-migrate-version recommendation-migrate-status \
@@ -16,6 +16,9 @@ test:
 sqlc-generate:
 	sqlc generate -f internal/learningengine/infrastructure/persistence/sqlc.yaml
 	sqlc generate -f internal/recommendation/infrastructure/persistence/sqlc.yaml
+
+recommendation-test-integration:
+	go test -tags=integration ./internal/recommendation/test/integration/...
 
 check:
 	gofmt -w cmd internal

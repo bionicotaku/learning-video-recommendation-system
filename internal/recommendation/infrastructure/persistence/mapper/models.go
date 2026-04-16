@@ -161,3 +161,44 @@ func ToTranscriptSentence(row recommendationsqlc.CatalogVideoTranscriptSentence)
 		Explanation:   TextToString(row.Explanation),
 	}
 }
+
+func ToVideoUserState(row recommendationsqlc.CatalogVideoUserState) (model.VideoUserState, error) {
+	lastWatchRatio, err := NumericToFloat64(row.LastWatchRatio)
+	if err != nil {
+		return model.VideoUserState{}, err
+	}
+	maxWatchRatio, err := NumericToFloat64(row.MaxWatchRatio)
+	if err != nil {
+		return model.VideoUserState{}, err
+	}
+
+	return model.VideoUserState{
+		UserID:         UUIDToString(row.UserID),
+		VideoID:        UUIDToString(row.VideoID),
+		LastWatchedAt:  TimePointerFromPG(row.LastWatchedAt),
+		WatchCount:     row.WatchCount,
+		CompletedCount: row.CompletedCount,
+		LastWatchRatio: lastWatchRatio,
+		MaxWatchRatio:  maxWatchRatio,
+	}, nil
+}
+
+func ToUserUnitServingState(row recommendationsqlc.RecommendationUserUnitServingState) model.UserUnitServingState {
+	return model.UserUnitServingState{
+		UserID:       UUIDToString(row.UserID),
+		CoarseUnitID: row.CoarseUnitID,
+		LastServedAt: TimePointerFromPG(row.LastServedAt),
+		LastRunID:    UUIDToString(row.LastRunID),
+		ServedCount:  row.ServedCount,
+	}
+}
+
+func ToUserVideoServingState(row recommendationsqlc.RecommendationUserVideoServingState) model.UserVideoServingState {
+	return model.UserVideoServingState{
+		UserID:       UUIDToString(row.UserID),
+		VideoID:      UUIDToString(row.VideoID),
+		LastServedAt: TimePointerFromPG(row.LastServedAt),
+		LastRunID:    UUIDToString(row.LastRunID),
+		ServedCount:  row.ServedCount,
+	}
+}

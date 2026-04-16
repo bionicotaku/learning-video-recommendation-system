@@ -64,13 +64,13 @@
 
 | 步骤 | 名称 | 状态 |
 | --- | --- | --- |
-| 1 | 契约与骨架收正 | NOT_STARTED |
-| 2 | 领域规则与 reducer | NOT_STARTED |
-| 3 | target/control 与读取 usecase | NOT_STARTED |
-| 4 | RecordLearningEvents | NOT_STARTED |
-| 5 | ReplayUserStates | NOT_STARTED |
-| 6 | 模块内数据库测试 | NOT_STARTED |
-| 7 | 文档同步与最终验收 | NOT_STARTED |
+| 1 | 契约与骨架收正 | ACCEPTED |
+| 2 | 领域规则与 reducer | ACCEPTED |
+| 3 | target/control 与读取 usecase | ACCEPTED |
+| 4 | RecordLearningEvents | ACCEPTED |
+| 5 | ReplayUserStates | ACCEPTED |
+| 6 | 模块内数据库测试 | ACCEPTED |
+| 7 | 文档同步与最终验收 | ACCEPTED |
 
 ---
 
@@ -141,13 +141,24 @@ go test ./internal/learningengine/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 删除 Recommendation-specific 的 `ListRecommendationStates` 命名
+  - 新增 `UserUnitStateFilter`，并把 `ListUserUnitStatesRequest` 与 `UserUnitStateRepository.ListByUser` 收正为统一过滤读取接口
+  - 补齐 `DeleteByUser`，为 Replay 提前准备状态清理能力
+  - 删除 query/sqlc/repository 中 `SuspendTargetUnit` / `ResumeTargetUnit` 的错误 SQL 直写路径
+  - 收缩 `TargetStateCommandRepository` 为纯 control 命令边界
+  - 为 `ReplayUserStatesResponse` 增加可观测计数字段
+  - 更新 `internal/learningengine/README.md`
+- 实际测试命令：
+  - `make sqlc-generate`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - `sqlc` 生成成功
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：无偏差
 
 ---
 
@@ -236,13 +247,21 @@ go test ./internal/learningengine/domain/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 新增学习事件类型常量
+  - 新增 event 校验、强弱事件分类、recent window 截断、简化 SM-2、progress/mastery 计算、状态迁移与挂起覆盖规则
+  - 新增统一 reducer，并暴露 late strong event 错误
+  - 先写领域测试，再补实现，完成 reducer 行为收敛
+- 实际测试命令：
+  - `go test ./internal/learningengine/domain/...`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - 领域测试通过
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：无偏差
 
 ---
 
@@ -329,13 +348,23 @@ go test ./internal/learningengine/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 新增 `application/service`，实现 `EnsureTargetUnits`、`SetTargetInactive`、`SuspendTargetUnit`、`ResumeTargetUnit`、`ListUserUnitStates`
+  - 新增轻量事务抽象 `TxManager` / `TransactionalRepositories`
+  - 调整基础事务管理器以支持 usecase 在事务内读取和 upsert 状态
+  - 新增 usecase 单测
+  - 新增最小连库验证和测试数据库 helper
+- 实际测试命令：
+  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - application/service 单测与最小连库测试通过
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：
+  - 原计划偏向临时 Postgres 容器；由于当前环境无可用 Docker daemon，最小连库验证改用模块内 embedded Postgres。语义仍为真实 Postgres 连库测试。
 
 ---
 
@@ -415,13 +444,26 @@ go test ./internal/learningengine/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 新增 `RecordLearningEventsUsecase`
+  - 实现事件映射、请求校验、按 unit 分组排序、事务内 append + reduce + batch upsert
+  - 将 late strong event 提升为 application 错误
+  - 为 `metadata` 补齐默认 `{}`，满足事实表 not-null 约束
+  - 新增 `RecordLearningEvents` 的 unit 测试和 real Postgres 连库测试
+  - 新增事务回滚测试，验证 state 写失败时 event append 不会落库
+- 实际测试命令：
+  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - `RecordLearningEvents` 单测通过
+  - real Postgres 连库测试通过
+  - 事务回滚测试通过
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：
+  - 连库测试继续使用 embedded Postgres，而非 Docker 容器；原因同步骤 3。
 
 ---
 
@@ -500,13 +542,25 @@ go test ./internal/learningengine/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 新增 `ReplayUserStatesUsecase`
+  - 实现全量状态读取、control slice 抽取、按事件重放 reducer、delete by user、merge 后 batch upsert
+  - 保留无事件 target/control 行
+  - 保留挂起控制态
+  - 新增 replay 单测和 real Postgres 连库测试
+  - 修复无事件状态 upsert 时 `recent_*_window` 为空切片而非 `NULL`
+- 实际测试命令：
+  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - replay 单测通过
+  - replay real Postgres 连库测试通过
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：
+  - 连库测试继续使用 embedded Postgres，而非 Docker 容器；原因同步骤 3。
 
 ---
 
@@ -578,13 +632,25 @@ go test ./internal/learningengine/...
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 新增模块内测试数据库 helper
+  - 新增 repository 连库测试：事件表、状态表、target command
+  - 新增事务管理器连库测试，验证 error 时回滚
+  - 扩展 application/service 的 real Postgres 用例，覆盖 target/control、record、replay
+- 实际测试命令：
+  - `go test ./internal/learningengine/infrastructure/persistence/repository ./internal/learningengine/infrastructure/persistence/tx`
+  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/...`
+- 测试结果：
+  - repository 连库测试通过
+  - tx 连库测试通过
+  - application/service real Postgres 测试通过
+  - `go test ./internal/learningengine/...` 通过
+- 与设计文档偏差：
+  - 模块内数据库测试使用 embedded Postgres，而非 Docker 容器；原因同步骤 3。
 
 ---
 
@@ -641,21 +707,29 @@ make check
 
 ### 进度记录
 
-- 状态：NOT_STARTED
-- 开始时间：待执行
-- 完成时间：待执行
-- 实际改动摘要：待执行
-- 实际测试命令：待执行
-- 测试结果：待执行
-- 与设计文档偏差：待执行
+- 状态：ACCEPTED
+- 开始时间：2026-04-16
+- 完成时间：2026-04-16
+- 实际改动摘要：
+  - 更新 `internal/learningengine/README.md`，补齐目录结构、职责边界、主调用链和测试布局
+  - 更新 `docs/当前实现现状.md`，把 Learning engine 从“只有基础层”改成已实现业务逻辑和模块内测试
+  - 回填本文档全部步骤状态、测试结果和最终验收记录
+- 实际测试命令：
+  - `go test ./internal/learningengine/...`
+  - `make check`
+- 测试结果：
+  - `go test ./internal/learningengine/...` 通过
+  - `make check` 通过
+- 与设计文档偏差：
+  - 模块内数据库测试继续使用 embedded Postgres，而非 Docker 容器；原因同步骤 3。
 
 ---
 
 ## 最终验收记录
 
-- 最终状态：待执行
-- `go test ./internal/learningengine/...`：待执行
-- `make check`：待执行
-- README 同步状态：待执行
-- 当前实现现状文档同步状态：待执行
-- 步骤总表最终状态检查：待执行
+- 最终状态：ACCEPTED
+- `go test ./internal/learningengine/...`：通过
+- `make check`：通过
+- README 同步状态：已完成
+- 当前实现现状文档同步状态：已完成
+- 步骤总表最终状态检查：7 个步骤均为 `ACCEPTED`

@@ -58,28 +58,3 @@ func (r *TargetStateCommandRepository) SetTargetInactive(ctx context.Context, us
 		CoarseUnitID: coarseUnitID,
 	})
 }
-
-func (r *TargetStateCommandRepository) SuspendTargetUnit(ctx context.Context, userID string, coarseUnitID int64, reason string) error {
-	pgUserID, err := mapper.StringToUUID(userID)
-	if err != nil {
-		return err
-	}
-
-	return r.queries.SuspendTargetUnit(ctx, learningenginesqlc.SuspendTargetUnitParams{
-		UserID:          pgUserID,
-		CoarseUnitID:    coarseUnitID,
-		SuspendedReason: mapper.StringToText(reason),
-	})
-}
-
-func (r *TargetStateCommandRepository) ResumeTargetUnit(ctx context.Context, userID string, coarseUnitID int64) error {
-	pgUserID, err := mapper.StringToUUID(userID)
-	if err != nil {
-		return err
-	}
-
-	return r.queries.ResumeTargetUnit(ctx, learningenginesqlc.ResumeTargetUnitParams{
-		UserID:       pgUserID,
-		CoarseUnitID: coarseUnitID,
-	})
-}

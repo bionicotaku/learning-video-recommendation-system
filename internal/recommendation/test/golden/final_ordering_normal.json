@@ -1,0 +1,58 @@
+[
+  {
+    "VideoID": "video-hard",
+    "Rank": 1,
+    "Score": 0.93,
+    "ReasonCodes": [
+      "hard_review_covered",
+      "soft_review_supported",
+      "bundle_coverage_high",
+      "strong_evidence_window",
+      "good_learning_fit",
+      "recently_not_served",
+      "low_supply_core_preserved"
+    ],
+    "CoveredUnits": [
+      101,
+      301
+    ],
+    "CoveredHardReviewUnits": [
+      101
+    ],
+    "CoveredNewNowUnits": null,
+    "CoveredSoftReviewUnits": [
+      301
+    ],
+    "CoveredNearFutureUnits": null,
+    "BestEvidenceSentenceIndex": 1,
+    "BestEvidenceSpanIndex": 1,
+    "BestEvidenceStartMs": 1240,
+    "BestEvidenceEndMs": 1820,
+    "Explanation": "覆盖 1 个当前应复习内容，支持 1 个近期不稳内容，主要学习证据集中在 00:01.24–00:01.82，最近未重复推荐"
+  },
+  {
+    "VideoID": "video-future",
+    "Rank": 2,
+    "Score": 0.74,
+    "ReasonCodes": [
+      "near_future_warmup",
+      "strong_evidence_window",
+      "good_learning_fit",
+      "recently_not_served"
+    ],
+    "CoveredUnits": [
+      401
+    ],
+    "CoveredHardReviewUnits": null,
+    "CoveredNewNowUnits": null,
+    "CoveredSoftReviewUnits": null,
+    "CoveredNearFutureUnits": [
+      401
+    ],
+    "BestEvidenceSentenceIndex": 3,
+    "BestEvidenceSpanIndex": 1,
+    "BestEvidenceStartMs": 3000,
+    "BestEvidenceEndMs": 3560,
+    "Explanation": "主要学习证据集中在 00:03.00–00:03.56，最近未重复推荐"
+  }
+]

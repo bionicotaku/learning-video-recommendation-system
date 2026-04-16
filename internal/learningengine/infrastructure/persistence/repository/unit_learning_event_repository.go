@@ -32,6 +32,11 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 			return err
 		}
 
+		metadata := event.Metadata
+		if len(metadata) == 0 {
+			metadata = []byte("{}")
+		}
+
 		if _, err := r.queries.AppendLearningEvent(ctx, learningenginesqlc.AppendLearningEventParams{
 			UserID:         userID,
 			CoarseUnitID:   event.CoarseUnitID,
@@ -42,7 +47,7 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 			IsCorrect:      mapper.BoolPointerToPG(event.IsCorrect),
 			Quality:        mapper.Int16PointerToPG(event.Quality),
 			ResponseTimeMs: mapper.Int32PointerToPG(event.ResponseTimeMs),
-			Metadata:       event.Metadata,
+			Metadata:       metadata,
 			OccurredAt:     mapper.TimePointerToPG(&event.OccurredAt),
 		}); err != nil {
 			return err

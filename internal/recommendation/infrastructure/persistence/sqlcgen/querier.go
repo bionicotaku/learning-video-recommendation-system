@@ -18,6 +18,8 @@ type Querier interface {
 	ListSemanticSpansByVideoAndUnit(ctx context.Context, arg ListSemanticSpansByVideoAndUnitParams) ([]CatalogVideoSemanticSpan, error)
 	ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, arg ListTranscriptSentencesByVideoAndIndexesParams) ([]CatalogVideoTranscriptSentence, error)
 	ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVUnitVideoInventory, error)
+	ListUserUnitServingStatesByUnitIDs(ctx context.Context, arg ListUserUnitServingStatesByUnitIDsParams) ([]RecommendationUserUnitServingState, error)
+	ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg ListUserVideoServingStatesByVideoIDsParams) ([]RecommendationUserVideoServingState, error)
 	ListVideoUserStatesByUserAndVideoIDs(ctx context.Context, arg ListVideoUserStatesByUserAndVideoIDsParams) ([]CatalogVideoUserState, error)
 	RefreshRecommendableVideoUnits(ctx context.Context) error
 	RefreshUnitVideoInventory(ctx context.Context) error

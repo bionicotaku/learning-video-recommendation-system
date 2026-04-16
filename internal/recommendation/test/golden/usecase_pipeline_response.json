@@ -1,0 +1,27 @@
+{
+  "RunID": "fixed-run-id",
+  "SelectorMode": "normal",
+  "Underfilled": true,
+  "Videos": [
+    {
+      "VideoID": "video-1",
+      "Rank": 1,
+      "Score": 0.91,
+      "ReasonCodes": [
+        "hard_review_covered"
+      ],
+      "CoveredUnits": null,
+      "CoveredHardReviewUnits": [
+        101
+      ],
+      "CoveredNewNowUnits": null,
+      "CoveredSoftReviewUnits": null,
+      "CoveredNearFutureUnits": null,
+      "BestEvidenceSentenceIndex": null,
+      "BestEvidenceSpanIndex": null,
+      "BestEvidenceStartMs": null,
+      "BestEvidenceEndMs": null,
+      "Explanation": "ok"
+    }
+  ]
+}

@@ -3,7 +3,9 @@ package dto
 import "learning-video-recommendation-system/internal/learningengine/domain/model"
 
 type ListUserUnitStatesRequest struct {
-	UserID string
+	UserID           string
+	OnlyTarget       bool
+	ExcludeSuspended bool
 }
 
 type ListUserUnitStatesResponse struct {

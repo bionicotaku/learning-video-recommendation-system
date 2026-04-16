@@ -156,13 +156,13 @@ Recommendation 的实现顺序固定如下，不允许跳步：
 
 | Step | Name | Status | Depends On | Acceptance | Last Updated |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 补 Recommendation 缺失契约与内部接口 | pending | 无 | `make check` + Recommendation 仓储集成测试 | 2026-04-16 |
-| 2 | 实现 Context Assembler 与 usecase 外壳 | pending | Step 1 | `make check` | 2026-04-16 |
-| 3 | 实现 Demand Planner | pending | Step 2 | `make check` | 2026-04-16 |
-| 4 | 实现 Candidate Generator 四条 lane | pending | Step 3 | `make check` | 2026-04-16 |
-| 5 | 实现 Evidence Resolver 与 Video Evidence Aggregator | pending | Step 4 | `make check` | 2026-04-16 |
-| 6 | 实现 Ranker / Selector / Explanation Builder | pending | Step 5 | `make check` | 2026-04-16 |
-| 7 | 接通 Audit Writer / Serving State Manager / 完整主用例 | pending | Step 6 | `make check` + Recommendation 仓储集成测试 + scenario/golden 验收 | 2026-04-16 |
+| 1 | 补 Recommendation 缺失契约与内部接口 | accepted | 无 | `make check` + Recommendation 仓储集成测试 | 2026-04-16 |
+| 2 | 实现 Context Assembler 与 usecase 外壳 | accepted | Step 1 | `make check` | 2026-04-16 |
+| 3 | 实现 Demand Planner | accepted | Step 2 | `make check` | 2026-04-16 |
+| 4 | 实现 Candidate Generator 四条 lane | accepted | Step 3 | `make check` | 2026-04-16 |
+| 5 | 实现 Evidence Resolver 与 Video Evidence Aggregator | accepted | Step 4 | `make check` | 2026-04-16 |
+| 6 | 实现 Ranker / Selector / Explanation Builder | accepted | Step 5 | `make check` | 2026-04-16 |
+| 7 | 接通 Audit Writer / Serving State Manager / 完整主用例 | accepted | Step 6 | `make check` + Recommendation 仓储集成测试 + scenario/golden 验收 | 2026-04-16 |
 
 `Status` 只允许以下三个值：
 
@@ -268,12 +268,28 @@ Recommendation 的实现顺序固定如下，不允许跳步：
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 补齐 `VideoUserStateReader`、serving state 批量读取、audit item 批量写接口
+  - 新增 Recommendation 主链路所需的 request/context/demand/candidate/final item 领域模型
+  - 新增 Recommendation 稳定枚举与各内部模块接口壳
+  - 扩展 query/sqlc/repository/mapper，支持 `catalog.video_user_states` 读取与 serving state 批量读取
+  - 新增 Recommendation 专属集成测试基线与 `make recommendation-test-integration`
 - 运行命令：
+  - `make sqlc-generate`
+  - `go test ./internal/recommendation/...`
+  - `make recommendation-test-integration`
+  - `make check`
 - 验收结果：
+  - 通过
+  - `make recommendation-test-integration` 在本地 embedded Postgres 上通过
+  - `make check` 通过
 - 与计划偏差：
+  - 原计划假设可以直接基于当前 `DATABASE_URL` 做仓储集成测试，但实际遇到 Supabase schema DDL 权限不足
+  - 已改为使用本地 embedded Postgres 运行 Recommendation 仓储集成测试，仍保持真实数据库仓储测试，不影响 Recommendation 与 Learning/Catalog 的 owner 边界
 - 下一步入口：
+  - 回读 `docs/全新设计-学习引擎设计.md` 与 `docs/temp/recommendation-实现步骤.md`
+  - 然后开始 Step 2：实现 Context Assembler 与 usecase 外壳
 
 ## Step 2. 实现 Context Assembler 与 usecase 外壳
 
@@ -351,12 +367,27 @@ Recommendation 的实现顺序固定如下，不允许跳步：
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 实现 `DefaultContextAssembler`
+  - 实现 `GenerateVideoRecommendationsService` 主用例外壳
+  - 打通请求默认值规范化、active learning states 装配、inventory 装配、unit serving states 装配
+  - 保持 `video_semantic_spans` / `video_transcript_sentences` / `video_user_states` 延迟读取
+  - 新增 assembler/usecase 单测
 - 运行命令：
+  - `go test ./internal/recommendation/...`
+  - `make check`
 - 验收结果：
+  - 通过
+  - Recommendation 范围单测通过
+  - `make check` 通过
 - 与计划偏差：
+  - 为满足仓库级 `make check`，顺手修复了 Learning engine 事件仓储层对 `metadata` 的兜底，避免现有测试因 nil metadata 失败
 - 下一步入口：
+  - 回读 `docs/全新设计-学习引擎设计.md`
+  - 回读 `docs/temp/recommendation-实现步骤.md`
+  - 回读 `docs/全新设计-推荐模块设计.md`
+  - 然后开始 Step 3：实现 Demand Planner
 
 ## Step 3. 实现 Demand Planner
 
@@ -441,12 +472,28 @@ Planner 规则必须按设计文档直接实现：
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 实现 `DefaultDemandPlanner`
+  - 固化四类 bucket、precedence、session mode、lane budget、mix quota、flags
+  - 将 `fragility` / `instability` 保持为 planner 内部派生判断，不新增 Learning engine 字段依赖
+  - 新增 planner 单测与 planner golden
 - 运行命令：
+  - `go test ./internal/recommendation/test/unit/domain/planner`
+  - `make check`
 - 验收结果：
+  - 通过
+  - planner 单测通过
+  - planner golden 通过
+  - `make check` 通过
 - 与计划偏差：
+  - `new_now` 的 supply-aware 规则当前采用“`supply_grade = none` 降到 `near_future`，其余仍可进入 `new_now`”这一保守实现
+  - planner weight 增加了固定小数位 round，避免 golden 快照抖动
 - 下一步入口：
+  - 回读 `docs/全新设计-学习引擎设计.md`
+  - 回读 `docs/temp/recommendation-实现步骤.md`
+  - 回读 `docs/全新设计-推荐模块设计.md`
+  - 然后开始 Step 4：实现 Candidate Generator 四条 lane
 
 ## Step 4. 实现 Candidate Generator 四条 lane
 
@@ -531,12 +578,27 @@ Planner 规则必须按设计文档直接实现：
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 新增 `DefaultCandidateGenerator`，实现 `exact_core / bundle / soft_future / quality_fallback` 四条 lane。
+  - `exact_core` 当前落地为：输入全部 `hard_review` 与按权重截断后的 top `new_now`，按 `unit_weight + coverage_strength` 精排，并按 distinct video cap 截断。
+  - `bundle` 当前落地为：先按 `video_id` 聚合，再按每个 `video_id` 内的最强 `video_id + unit_id` 命中判定；默认必须 `>= 2` 个 unit 且至少包含一个 `hard_review / new_now`。
+  - `bundle` 的低供给放宽规则当前收敛为：`hard_review_low_supply = true` 时，允许“没有 core unit，但至少覆盖 2 个 soft_review”的视频进入 bundle lane。
+  - `soft_future` 当前落地为：只消费 `soft_review + near_future`，并在 lane 内继续保持 `soft_review` 优先于 `near_future`。
+  - `quality_fallback` 当前落地为：只在前三条 lane 的 distinct videos 仍小于 `target_video_count` 时触发，并且只从剩余未进入候选集的视频里补 1 个最佳视频。
+  - 新增 Candidate Generator 的 lane 单测、场景测试和 candidate summary golden 测试。
 - 运行命令：
+  - `go test ./internal/recommendation/test/unit/application/service -run CandidateGenerator`
+  - `make check`
 - 验收结果：
+  - Candidate Generator 的 lane 级单测、场景测试和 golden 测试通过。
+  - `make check` 通过。
 - 与计划偏差：
+  - `quality_fallback` 当前实现将 lane cap 收敛为最多补 1 个 distinct video，与设计文档“通常最多 1 条”的保守策略一致。
+  - `bundle` 的低供给放宽规则当前只允许“2 个 soft_review”进入，不额外引入更宽的 near-future-only bundle。
 - 下一步入口：
+  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 然后开始 Step 5：实现 Evidence Resolver 与 Video Evidence Aggregator。
 
 ## Step 5. 实现 Evidence Resolver 与 Video Evidence Aggregator
 
@@ -620,12 +682,31 @@ Planner 规则必须按设计文档直接实现：
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 新增 `DefaultEvidenceResolver`，按 `video_id + coarse_unit_id` 定向读取 spans，并且只按 `evidence_span_refs` 和候选句索引读取 transcript sentences。
+  - best evidence 选择规则当前落地为：
+    - 先按 `evidence_span_refs` 顺序匹配 span；
+    - 若多个命中的 ref 落在同一句，则选更早 `start_ms` 的 span；
+    - 若 refs 全部失配但查询到 spans，则回退到该 `video_id + unit_id` 下最早出现的 span。
+  - sentence window 当前落地为：优先使用 candidate 自带 `sentence_indexes`；若为空则回退到 refs 的句子集合；再为空则回退到 best span 所在句。
+  - 新增 `DefaultVideoEvidenceAggregator`，按 `video_id` 聚合，并对同 `video_id + unit_id` 的多条证据只保留最强证据，第二强证据仅按弱增量计入覆盖强度。
+  - Aggregator 已输出 `lane_sources`、四类覆盖集合与覆盖率、`coverage_strength_score`、`bundle_value_score`、`educational_fit_score`、`future_value_score`、`dominant_bucket / dominant_unit_id` 和 `best_evidence_*`。
+  - 新增 resolver 单测与 aggregator 单测，覆盖 ref 回查、span/sentence 缺失容错、同 unit 去重、bucket 覆盖统计和 best evidence 选择。
 - 运行命令：
+  - `go test ./internal/recommendation/test/unit/application/service -run EvidenceResolver`
+  - `go test ./internal/recommendation/test/unit/domain/aggregator -run VideoEvidenceAggregator`
+  - `make check`
 - 验收结果：
+  - Resolver 单测通过。
+  - Aggregator 单测通过。
+  - `make check` 通过。
 - 与计划偏差：
+  - 容错规则收敛为“refs 失配时回退到最早 span”，而不是直接放弃该 candidate；这样可以保证 explanation/audit 链路在 Catalog 数据局部不一致时仍可继续。
+  - 当前只保留第二强证据的 15% 弱增量，未继续实现第三条及以后证据的增量累计。
 - 下一步入口：
+  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 然后开始 Step 6：实现 Ranker / Selector / Explanation Builder。
 
 ## Step 6. 实现 Ranker / Selector / Explanation Builder
 
@@ -734,12 +815,29 @@ base_score =
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 新增 `DefaultVideoRanker`，按 `demand_coverage / coverage_strength_score / bundle_value_score / educational_fit_score / future_value_score / freshness_score` 做第一版评分，并计算 `recent_served_penalty / recent_watched_penalty / overload_penalty`。
+  - `catalog.video_user_states` 的轻量 penalty 已纳入 Ranker，仅消费 `last_watched_at / watch_count / completed_count / max_watch_ratio`。
+  - 新增 `DefaultVideoSelector`，实现 `normal / low_supply / extreme_sparse` 三种模式；先保 core dominant，再用边际收益贪心填充，并约束 `future_dominant_max / future_like_max / fallback_max / same_dominant_unit_max`。
+  - 新增 `DefaultExplanationBuilder`，生成模板化 `reason_codes + explanation`，并输出 final ordering golden。
+  - 新增 ranker、selector、explain 单测与 final ordering golden 测试。
 - 运行命令：
+  - `go test ./internal/recommendation/test/unit/domain/ranking -run VideoRanker`
+  - `go test ./internal/recommendation/test/unit/domain/selector -run VideoSelector`
+  - `go test ./internal/recommendation/test/unit/domain/explain -run ExplanationBuilder`
+  - `make check`
 - 验收结果：
+  - Ranker 单测通过。
+  - Selector 单测通过。
+  - Explanation 单测和 final ordering golden 通过。
+  - `make check` 通过。
 - 与计划偏差：
+  - Ranker 额外显式扣减了 `recent_watched_penalty`，这是依据设计文档正文里的轻量 watched penalty 约束做的收敛；虽然公式示例未单独列项，但语义与文档一致。
+  - Selector 的 `extreme_sparse` 当前实现收敛为“直接 under-fill 返回当前可用列表”，不再继续做复杂配额尝试。
 - 下一步入口：
+  - 重新回读 `docs/全新设计-学习引擎设计.md`、`docs/temp/recommendation-实现步骤.md`、`docs/全新设计-推荐模块设计.md`。
+  - 然后开始 Step 7：接通 Audit Writer / Serving State Manager / 完整主用例。
 
 ## Step 7. 接通 Audit Writer / Serving State Manager / 完整主用例
 
@@ -822,12 +920,30 @@ base_score =
 
 ### 完成记录
 
-- 日期：
+- 日期：2026-04-16
 - 实际完成内容：
+  - 新增 `DefaultAuditWriter`、`DefaultServingStateManager` 和 `DefaultRecommendationResultWriter`。
+  - 当前写路径收敛为：usecase 先完成 assemble -> plan -> candidate -> resolve -> aggregate -> rank -> select -> explain 的只读/纯计算流程；随后通过 `DefaultRecommendationResultWriter` 在单个短事务中写入 run/items，并同步 upsert unit/video serving states。
+  - 为了复用同一笔事务，当前实现采用“tx queries 注入 context”的方式，让 `AuditWriter` 和 `ServingStateManager` 在事务内共享同一组 `sqlc Queries`。
+  - `GenerateVideoRecommendations` 已接成完整 orchestrator：支持 planner snapshot、lane budget snapshot、candidate summary 审计写入，支持在聚合后延迟加载 `video serving states` 与 `video_user_states`，并把最终结果映射到 `GenerateVideoRecommendationsResponse`。
+  - 新增完整主用例 unit scenario/golden 测试，以及 Recommendation result writer 的 integration 测试。
 - 运行命令：
+  - `go test ./internal/recommendation/test/unit/application/usecase -run Pipeline`
+  - `go test -tags=integration ./internal/recommendation/test/integration -run RecommendationResultWriter`
+  - `make check`
+  - `make recommendation-test-integration`
+  - `go test ./internal/recommendation/...`
 - 验收结果：
+  - 完整主用例 unit scenario/golden 通过。
+  - Recommendation integration 测试通过。
+  - `make check` 通过。
+  - `go test ./internal/recommendation/...` 通过。
 - 与计划偏差：
+  - 为了保持 Step 1 已固定的接口稳定，`AuditWriter` 与 `ServingStateManager` 没有改签名，而是通过 `context` 传递事务内 `Queries` 来共享短事务。
+  - `GenerateVideoRecommendationsService` 保留了 assembler-only 的 shell constructor，用于兼容前两步已经存在的空壳测试；完整主链路通过独立的 pipeline constructor 启用。
 - 下一步入口：
+  - 进入“收尾要求”阶段。
+  - 同步更新 `internal/recommendation/README.md` 反映当前真实实现状态。
 
 ## 7. 进度记录规则
 

@@ -1,0 +1,37 @@
+{
+  "lane_counts": {
+    "bundle": 2,
+    "exact_core": 2,
+    "quality_fallback": 1,
+    "soft_future": 2
+  },
+  "lane_distinct_videos": {
+    "bundle": 1,
+    "exact_core": 2,
+    "quality_fallback": 1,
+    "soft_future": 2
+  },
+  "distinct_video_count": 4,
+  "ordered_videos": [
+    "video-exact-a",
+    "video-bundle-a",
+    "video-soft-a",
+    "video-exact-b"
+  ],
+  "video_lanes": {
+    "video-bundle-a": [
+      "bundle",
+      "exact_core",
+      "soft_future"
+    ],
+    "video-exact-a": [
+      "exact_core"
+    ],
+    "video-exact-b": [
+      "quality_fallback"
+    ],
+    "video-soft-a": [
+      "soft_future"
+    ]
+  }
+}

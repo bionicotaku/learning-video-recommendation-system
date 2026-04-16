@@ -32,6 +32,20 @@ from recommendation.v_unit_video_inventory
 where coarse_unit_id = any(sqlc.arg(coarse_unit_ids)::bigint[])
 order by coarse_unit_id asc;
 
+-- name: ListUserUnitServingStatesByUnitIDs :many
+select *
+from recommendation.user_unit_serving_states
+where user_id = sqlc.arg(user_id)
+  and coarse_unit_id = any(sqlc.arg(coarse_unit_ids)::bigint[])
+order by coarse_unit_id asc;
+
+-- name: ListUserVideoServingStatesByVideoIDs :many
+select *
+from recommendation.user_video_serving_states
+where user_id = sqlc.arg(user_id)
+  and video_id = any(sqlc.arg(video_ids)::uuid[])
+order by video_id asc;
+
 -- name: ListSemanticSpansByVideoAndUnit :many
 select *
 from catalog.video_semantic_spans
