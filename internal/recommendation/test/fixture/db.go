@@ -8,6 +8,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,79 +73,33 @@ func BeginTestTx(t *testing.T, pool *pgxpool.Pool) pgx.Tx {
 }
 
 func EnsureRecommendationStep1Schema(ctx context.Context, db execer) error {
-	statements := []string{
-		`create schema if not exists catalog`,
-		`create schema if not exists recommendation`,
-		`create table if not exists catalog.video_user_states (
-			user_id uuid not null,
-			video_id uuid not null,
-			last_watched_at timestamptz,
-			watch_count integer not null default 0,
-			completed_count integer not null default 0,
-			last_watch_ratio numeric(6,5),
-			max_watch_ratio numeric(6,5)
-		)`,
-		`create table if not exists recommendation.user_unit_serving_states (
-			user_id uuid not null,
-			coarse_unit_id bigint not null,
-			last_served_at timestamptz,
-			last_run_id uuid,
-			served_count integer not null default 0,
-			created_at timestamptz not null default now(),
-			updated_at timestamptz not null default now(),
-			primary key (user_id, coarse_unit_id)
-		)`,
-		`create table if not exists recommendation.user_video_serving_states (
-			user_id uuid not null,
-			video_id uuid not null,
-			last_served_at timestamptz,
-			last_run_id uuid,
-			served_count integer not null default 0,
-			created_at timestamptz not null default now(),
-			updated_at timestamptz not null default now(),
-			primary key (user_id, video_id)
-		)`,
-		`create table if not exists recommendation.video_recommendation_runs (
-			run_id uuid primary key,
-			user_id uuid not null,
-			request_context jsonb not null default '{}'::jsonb,
-			session_mode text,
-			selector_mode text,
-			planner_snapshot jsonb not null default '{}'::jsonb,
-			lane_budget_snapshot jsonb not null default '{}'::jsonb,
-			candidate_summary jsonb not null default '{}'::jsonb,
-			underfilled boolean not null default false,
-			result_count integer not null default 0,
-			created_at timestamptz not null default now()
-		)`,
-		`create table if not exists recommendation.video_recommendation_items (
-			run_id uuid not null,
-			rank integer not null,
-			video_id uuid not null,
-			score numeric(10,4) not null default 0,
-			primary_lane text,
-			dominant_bucket text,
-			dominant_unit_id bigint,
-			reason_codes text[] not null default '{}',
-			covered_hard_review_count integer not null default 0,
-			covered_new_now_count integer not null default 0,
-			covered_soft_review_count integer not null default 0,
-			covered_near_future_count integer not null default 0,
-			best_evidence_sentence_index integer,
-			best_evidence_span_index integer,
-			best_evidence_start_ms integer,
-			best_evidence_end_ms integer,
-			created_at timestamptz not null default now(),
-			primary key (run_id, rank)
-		)`,
+	if err := execSQLFile(ctx, db, repoPath(
+		"internal",
+		"recommendation",
+		"infrastructure",
+		"persistence",
+		"schema",
+		"000000_external_refs.sql",
+	)); err != nil {
+		return err
 	}
 
-	for _, statement := range statements {
-		if _, err := db.Exec(ctx, statement); err != nil {
-			return fmt.Errorf("exec schema statement: %w", err)
+	if _, err := db.Exec(ctx, `drop materialized view if exists recommendation.v_unit_video_inventory`); err != nil {
+		return fmt.Errorf("drop inventory stub view: %w", err)
+	}
+	if _, err := db.Exec(ctx, `drop materialized view if exists recommendation.v_recommendable_video_units`); err != nil {
+		return fmt.Errorf("drop recommendable stub view: %w", err)
+	}
+
+	migrations, err := migrationFiles(repoPath("internal", "recommendation", "infrastructure", "migration"))
+	if err != nil {
+		return err
+	}
+	for _, path := range migrations {
+		if err := execSQLFile(ctx, db, path); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
@@ -184,4 +142,54 @@ func WaitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {
 		time.Sleep(50 * time.Millisecond)
 	}
 	return fmt.Errorf("database did not become ready before deadline")
+}
+
+func execSQLFile(ctx context.Context, db execer, path string) error {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read sql file %s: %w", path, err)
+	}
+	if _, err := db.Exec(ctx, string(contents)); err != nil {
+		return fmt.Errorf("exec sql file %s: %w", path, err)
+	}
+	return nil
+}
+
+func migrationFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read migration dir: %w", err)
+	}
+
+	files := make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".up.sql") {
+			continue
+		}
+		files = append(files, filepath.Join(dir, entry.Name()))
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return migrationVersion(files[i]) < migrationVersion(files[j])
+	})
+	return files, nil
+}
+
+func migrationVersion(path string) int {
+	base := filepath.Base(path)
+	version, err := strconv.Atoi(strings.SplitN(base, "_", 2)[0])
+	if err != nil {
+		return 0
+	}
+	return version
+}
+
+func repoPath(parts ...string) string {
+	_, currentFile, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("resolve fixture path")
+	}
+	base := filepath.Clean(filepath.Join(filepath.Dir(currentFile), "../../../.."))
+	all := append([]string{base}, parts...)
+	return filepath.Join(all...)
 }

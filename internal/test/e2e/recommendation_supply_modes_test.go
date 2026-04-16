@@ -211,7 +211,7 @@ func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 	}
 }
 
-func TestE2E_RecommendationExtremeSparseModeAllowsUnderfill(t *testing.T) {
+func TestE2E_RecommendationNoDemandDoesNotMarkExtremeSparse(t *testing.T) {
 	h := harness(t)
 	recommendation := h.RecommendationUsecase()
 
@@ -219,8 +219,8 @@ func TestE2E_RecommendationExtremeSparseModeAllowsUnderfill(t *testing.T) {
 	h.SeedUser(t, userID)
 
 	response := testutil.MustRecommend(t, recommendation, userID, 3)
-	if response.SelectorMode != "extreme_sparse" {
-		t.Fatalf("selector_mode = %q, want extreme_sparse", response.SelectorMode)
+	if response.SelectorMode != "normal" {
+		t.Fatalf("selector_mode = %q, want normal", response.SelectorMode)
 	}
 	if !response.Underfilled {
 		t.Fatalf("underfilled = false, want true")

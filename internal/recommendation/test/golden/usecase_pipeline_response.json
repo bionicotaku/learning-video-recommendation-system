@@ -17,10 +17,7 @@
       "CoveredNewNowUnits": null,
       "CoveredSoftReviewUnits": null,
       "CoveredNearFutureUnits": null,
-      "BestEvidenceSentenceIndex": null,
-      "BestEvidenceSpanIndex": null,
-      "BestEvidenceStartMs": null,
-      "BestEvidenceEndMs": null,
+      "BestEvidence": null,
       "Explanation": "ok"
     }
   ]

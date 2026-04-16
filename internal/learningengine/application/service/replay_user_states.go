@@ -28,7 +28,7 @@ func (u *ReplayUserStatesUsecase) Execute(ctx context.Context, request dto.Repla
 
 	response := dto.ReplayUserStatesResponse{}
 
-	err := u.txManager.WithinTx(ctx, func(ctx context.Context, repos TransactionalRepositories) error {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
 		currentStates, err := repos.UserUnitStates().ListByUser(ctx, request.UserID, model.UserUnitStateFilter{})
 		if err != nil {
 			return err

@@ -79,6 +79,7 @@ internal/learningengine/
 - `SuspendTargetUnit` / `ResumeTargetUnit` 通过状态读取 + upsert 完成，不保留错误的 SQL 直写语义
 - Replay 依赖的基础能力以“全量状态读取 + control slice 抽取 + delete by user + batch upsert”为准
 - 在线写入与 Replay 共用同一个 reducer
+- 同一 `user_id` 的所有状态写入 usecase 通过数据库 advisory xact lock 串行化，避免 `ReplayUserStates` 与在线写入并发破坏最终一致性
 - `recommendation` 只能读取 `learning.user_unit_states`，不能回写 Learning engine 业务表
 
 ## 主要调用链
@@ -92,6 +93,7 @@ request
   -> group by coarse_unit_id
   -> sort by occurred_at
   -> tx begin
+  -> acquire user-scoped advisory lock
   -> append learning.unit_learning_events
   -> load current state (for update)
   -> reduce event stream
@@ -104,6 +106,7 @@ request
 ```text
 request
   -> tx begin
+  -> acquire user-scoped advisory lock
   -> list current user_unit_states
   -> extract control slice
   -> list unit_learning_events ordered by occurred_at, event_id

@@ -8,21 +8,25 @@ type GenerateVideoRecommendationsRequest struct {
 	RequestContext       []byte
 }
 
+type BestEvidence struct {
+	SentenceIndex *int32
+	SpanIndex     *int32
+	StartMs       *int32
+	EndMs         *int32
+}
+
 type RecommendationVideo struct {
-	VideoID                   string
-	Rank                      int
-	Score                     float64
-	ReasonCodes               []string
-	CoveredUnits              []int64
-	CoveredHardReviewUnits    []int64
-	CoveredNewNowUnits        []int64
-	CoveredSoftReviewUnits    []int64
-	CoveredNearFutureUnits    []int64
-	BestEvidenceSentenceIndex *int32
-	BestEvidenceSpanIndex     *int32
-	BestEvidenceStartMs       *int32
-	BestEvidenceEndMs         *int32
-	Explanation               string
+	VideoID                string
+	Rank                   int
+	Score                  float64
+	ReasonCodes            []string
+	CoveredUnits           []int64
+	CoveredHardReviewUnits []int64
+	CoveredNewNowUnits     []int64
+	CoveredSoftReviewUnits []int64
+	CoveredNearFutureUnits []int64
+	BestEvidence           *BestEvidence
+	Explanation            string
 }
 
 type GenerateVideoRecommendationsResponse struct {

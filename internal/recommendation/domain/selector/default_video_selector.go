@@ -25,13 +25,6 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 		targetCount = 8
 	}
 
-	if mode == string(policy.SelectorModeExtremeSparse) {
-		if len(ranked) < targetCount {
-			return append([]model.VideoCandidate(nil), ranked...), nil
-		}
-		return append([]model.VideoCandidate(nil), ranked[:targetCount]...), nil
-	}
-
 	selected := make([]model.VideoCandidate, 0, minInt(targetCount, len(ranked)))
 	selectedIDs := make(map[string]struct{}, len(ranked))
 	dominantUnitCount := make(map[int64]int)
@@ -99,9 +92,6 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 }
 
 func selectorMode(demand model.DemandBundle) string {
-	if demand.Flags.ExtremeSparse {
-		return string(policy.SelectorModeExtremeSparse)
-	}
 	if demand.Flags.HardReviewLowSupply {
 		return string(policy.SelectorModeLowSupply)
 	}

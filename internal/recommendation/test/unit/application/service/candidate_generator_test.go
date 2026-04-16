@@ -17,12 +17,21 @@ import (
 )
 
 type stubRecommendableVideoUnitReader struct {
-	rows []model.RecommendableVideoUnit
+	rows    []model.RecommendableVideoUnit
+	lastCtx context.Context
+	err     error
 }
 
 var _ apprepo.RecommendableVideoUnitReader = (*stubRecommendableVideoUnitReader)(nil)
 
-func (s *stubRecommendableVideoUnitReader) ListByUnitIDs(_ context.Context, coarseUnitIDs []int64) ([]model.RecommendableVideoUnit, error) {
+func (s *stubRecommendableVideoUnitReader) ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64) ([]model.RecommendableVideoUnit, error) {
+	s.lastCtx = ctx
+	if s.err != nil {
+		return nil, s.err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	allowed := make(map[int64]struct{}, len(coarseUnitIDs))
 	for _, id := range coarseUnitIDs {
 		allowed[id] = struct{}{}
@@ -47,7 +56,7 @@ func TestDefaultCandidateGeneratorExactCoreRanksCoreHitsByStrength(t *testing.T)
 		},
 	})
 
-	candidates, err := generator.Generate(recommendationContext(), recommendationDemand())
+	candidates, err := generator.Generate(context.Background(), recommendationContext(), recommendationDemand())
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -78,7 +87,7 @@ func TestDefaultCandidateGeneratorBundleRequiresTwoUnitsAndCoreCoverageByDefault
 		},
 	})
 
-	candidates, err := generator.Generate(recommendationContext(), recommendationDemand())
+	candidates, err := generator.Generate(context.Background(), recommendationContext(), recommendationDemand())
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -96,7 +105,7 @@ func TestDefaultCandidateGeneratorBundleRequiresTwoUnitsAndCoreCoverageByDefault
 }
 
 func TestDefaultCandidateGeneratorBundleRelaxesWhenHardReviewSupplyIsLow(t *testing.T) {
-	ctx := recommendationContext()
+	recommendationCtx := recommendationContext()
 	demand := recommendationDemand()
 	demand.Flags.HardReviewLowSupply = true
 
@@ -107,7 +116,7 @@ func TestDefaultCandidateGeneratorBundleRelaxesWhenHardReviewSupplyIsLow(t *test
 		},
 	})
 
-	candidates, err := generator.Generate(ctx, demand)
+	candidates, err := generator.Generate(context.Background(), recommendationCtx, demand)
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -127,7 +136,7 @@ func TestDefaultCandidateGeneratorSoftFutureUsesOnlySoftAndNearFuture(t *testing
 		},
 	})
 
-	candidates, err := generator.Generate(recommendationContext(), recommendationDemand())
+	candidates, err := generator.Generate(context.Background(), recommendationContext(), recommendationDemand())
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -152,7 +161,7 @@ func TestDefaultCandidateGeneratorQualityFallbackOnlyFillsRemainingGap(t *testin
 		},
 	})
 
-	candidates, err := generator.Generate(recommendationContext(), recommendationDemand())
+	candidates, err := generator.Generate(context.Background(), recommendationContext(), recommendationDemand())
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -177,7 +186,7 @@ func TestDefaultCandidateGeneratorScenarioCoreStillLeadsWhenNearFutureInventoryI
 	}
 
 	generator := recommendationservice.NewDefaultCandidateGenerator(&stubRecommendableVideoUnitReader{rows: rows})
-	candidates, err := generator.Generate(recommendationContext(), recommendationDemand())
+	candidates, err := generator.Generate(context.Background(), recommendationContext(), recommendationDemand())
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -195,7 +204,7 @@ func TestDefaultCandidateGeneratorScenarioCoreStillLeadsWhenNearFutureInventoryI
 }
 
 func TestDefaultCandidateGeneratorScenarioGoldenCandidateSummary(t *testing.T) {
-	ctx := recommendationContext()
+	recommendationCtx := recommendationContext()
 	demand := recommendationDemand()
 	demand.Flags.HardReviewLowSupply = true
 
@@ -210,7 +219,7 @@ func TestDefaultCandidateGeneratorScenarioGoldenCandidateSummary(t *testing.T) {
 	}
 
 	generator := recommendationservice.NewDefaultCandidateGenerator(&stubRecommendableVideoUnitReader{rows: rows})
-	candidates, err := generator.Generate(ctx, demand)
+	candidates, err := generator.Generate(context.Background(), recommendationCtx, demand)
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -232,6 +241,34 @@ func TestDefaultCandidateGeneratorScenarioGoldenCandidateSummary(t *testing.T) {
 
 	if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
 		t.Fatalf("candidate summary golden mismatch\nactual:\n%s\nexpected:\n%s", actual, expected)
+	}
+}
+
+func TestDefaultCandidateGeneratorPropagatesContextToReader(t *testing.T) {
+	reader := &stubRecommendableVideoUnitReader{}
+	generator := recommendationservice.NewDefaultCandidateGenerator(reader)
+
+	ctx := context.WithValue(context.Background(), "trace", "candidate-generator")
+	_, err := generator.Generate(ctx, recommendationContext(), recommendationDemand())
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+
+	if got := reader.lastCtx.Value("trace"); got != "candidate-generator" {
+		t.Fatalf("reader ctx value = %#v, want propagated request context", got)
+	}
+}
+
+func TestDefaultCandidateGeneratorReturnsCanceledWhenContextCanceled(t *testing.T) {
+	reader := &stubRecommendableVideoUnitReader{}
+	generator := recommendationservice.NewDefaultCandidateGenerator(reader)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := generator.Generate(ctx, recommendationContext(), recommendationDemand())
+	if err == nil || err != context.Canceled {
+		t.Fatalf("generate error = %v, want context.Canceled", err)
 	}
 }
 

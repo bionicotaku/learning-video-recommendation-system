@@ -198,13 +198,12 @@ func (h *Harness) Close() error {
 }
 
 func (h *Harness) LearningSuite() *LearningSuite {
-	targetRepo := learningrepo.NewTargetStateCommandRepository(h.Pool)
 	stateRepo := learningrepo.NewUserUnitStateRepository(h.Pool)
 	txManager := learningtx.NewManager(h.Pool)
 
 	return &LearningSuite{
-		EnsureTargetUnits: learningservice.NewEnsureTargetUnitsUsecase(targetRepo),
-		SetTargetInactive: learningservice.NewSetTargetInactiveUsecase(targetRepo),
+		EnsureTargetUnits: learningservice.NewEnsureTargetUnitsUsecase(txManager),
+		SetTargetInactive: learningservice.NewSetTargetInactiveUsecase(txManager),
 		SuspendTargetUnit: learningservice.NewSuspendTargetUnitUsecase(txManager),
 		ResumeTargetUnit:  learningservice.NewResumeTargetUnitUsecase(txManager),
 		RecordEvents:      learningservice.NewRecordLearningEventsUsecase(txManager),
@@ -228,9 +227,8 @@ func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRec
 		learningStates,
 		inventory,
 		unitServing,
-		videoServing,
-		videoUserState,
 	)
+	videoStateEnricher := recommendationservice.NewDefaultVideoStateEnricher(videoServing, videoUserState)
 	resolver := recommendationservice.NewDefaultEvidenceResolver(semanticSpans, transcriptSentences)
 	resultWriter := recommendationservice.NewDefaultRecommendationResultWriter(
 		recommendationtx.NewManager(h.Pool),
@@ -238,7 +236,7 @@ func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRec
 		recommendationservice.NewDefaultServingStateManager(unitServing, videoServing),
 	)
 
-	return recommendationusecase.NewGenerateVideoRecommendationsPipeline(
+	usecase, err := recommendationusecase.NewGenerateVideoRecommendationsPipeline(
 		assembler,
 		recommendationplanner.NewDefaultDemandPlanner(),
 		recommendationservice.NewDefaultCandidateGenerator(recommendable),
@@ -247,10 +245,13 @@ func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRec
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),
 		recommendationexplain.NewDefaultExplanationBuilder(),
-		videoServing,
-		videoUserState,
+		videoStateEnricher,
 		resultWriter,
 	)
+	if err != nil {
+		panic(err)
+	}
+	return usecase
 }
 
 func (h *Harness) SeedUser(t *testing.T, userID string) {

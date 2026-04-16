@@ -114,7 +114,6 @@ func plannerFlags(bundle model.DemandBundle) model.PlannerFlags {
 		}
 	}
 
-	flags.ExtremeSparse = len(bundle.HardReview)+len(bundle.NewNow)+len(bundle.SoftReview)+len(bundle.NearFuture) == 0
 	return flags
 }
 

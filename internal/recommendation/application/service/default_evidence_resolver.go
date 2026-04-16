@@ -27,29 +27,22 @@ func NewDefaultEvidenceResolver(
 	}
 }
 
-func (r *DefaultEvidenceResolver) Resolve(recommendationContext model.RecommendationContext, candidates []model.VideoUnitCandidate, demand model.DemandBundle) ([]model.ResolvedEvidenceWindow, error) {
+func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationContext model.RecommendationContext, candidates []model.VideoUnitCandidate, demand model.DemandBundle) ([]model.ResolvedEvidenceWindow, error) {
 	_ = recommendationContext
 	_ = demand
 
 	resolved := make([]model.ResolvedEvidenceWindow, 0, len(candidates))
 	for _, candidate := range candidates {
-		spans, err := r.spanReader.ListByVideoAndUnit(context.Background(), candidate.VideoID, candidate.CoarseUnitID)
+		spans, err := r.spanReader.ListByVideoAndUnit(ctx, candidate.VideoID, candidate.CoarseUnitID)
 		if err != nil {
 			return nil, err
 		}
 
 		refs := parseEvidenceRefs(candidate.EvidenceSpanRefs)
 		bestRef, bestSpan := selectBestEvidence(refs, spans)
-		if bestSpan == nil && len(spans) > 0 {
-			bestSpan = earliestSpan(spans)
-			bestRef = &model.EvidenceRef{
-				SentenceIndex: bestSpan.SentenceIndex,
-				SpanIndex:     bestSpan.SpanIndex,
-			}
-		}
 
 		windowSentenceIndexes := resolveWindowSentenceIndexes(candidate.SentenceIndexes, refs, bestSpan)
-		sentences, err := r.sentenceReader.ListByVideoAndIndexes(context.Background(), candidate.VideoID, windowSentenceIndexes)
+		sentences, err := r.sentenceReader.ListByVideoAndIndexes(ctx, candidate.VideoID, windowSentenceIndexes)
 		if err != nil {
 			return nil, err
 		}
@@ -136,24 +129,6 @@ func selectBestEvidence(refs []model.EvidenceRef, spans []model.SemanticSpan) (*
 	ref := best.ref
 	span := best.span
 	return &ref, &span
-}
-
-func earliestSpan(spans []model.SemanticSpan) *model.SemanticSpan {
-	if len(spans) == 0 {
-		return nil
-	}
-
-	best := spans[0]
-	for _, candidate := range spans[1:] {
-		if candidate.StartMs < best.StartMs {
-			best = candidate
-			continue
-		}
-		if candidate.StartMs == best.StartMs && candidate.SentenceIndex < best.SentenceIndex {
-			best = candidate
-		}
-	}
-	return &best
 }
 
 func resolveWindowSentenceIndexes(candidateSentenceIndexes []int32, refs []model.EvidenceRef, bestSpan *model.SemanticSpan) []int32 {

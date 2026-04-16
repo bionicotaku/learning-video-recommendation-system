@@ -60,7 +60,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 	groupedEvents := groupAndSortEvents(events)
 	orderedEvents := flattenGroupedEvents(groupedEvents)
 
-	err := u.txManager.WithinTx(ctx, func(ctx context.Context, repos TransactionalRepositories) error {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
 		if err := repos.UnitLearningEvents().Append(ctx, orderedEvents); err != nil {
 			return err
 		}

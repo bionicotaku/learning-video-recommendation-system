@@ -2,6 +2,7 @@ package tx
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +23,14 @@ func NewManager(pool *pgxpool.Pool) *Manager {
 var _ service.TxManager = (*Manager)(nil)
 
 func (m *Manager) WithinTx(ctx context.Context, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	return m.withinTx(ctx, "", false, fn)
+}
+
+func (m *Manager) WithinUserTx(ctx context.Context, userID string, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	return m.withinTx(ctx, userID, true, fn)
+}
+
+func (m *Manager) withinTx(ctx context.Context, userID string, lockUser bool, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
 	tx, err := m.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err
@@ -29,6 +38,12 @@ func (m *Manager) WithinTx(ctx context.Context, fn func(ctx context.Context, rep
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
+
+	if lockUser {
+		if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtextextended('learningengine:user:' || $1, 0))`, userID); err != nil {
+			return fmt.Errorf("acquire user advisory lock: %w", err)
+		}
+	}
 
 	repositories := repositories{tx: tx}
 	if err := fn(ctx, repositories); err != nil {

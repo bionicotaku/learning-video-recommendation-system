@@ -14,6 +14,10 @@ type AuditWriter interface {
 	Write(ctx context.Context, run model.RecommendationRun, items []model.RecommendationItem) error
 }
 
+type VideoStateEnricher interface {
+	Enrich(ctx context.Context, contextModel model.RecommendationContext, videos []model.VideoCandidate) (model.RecommendationContext, error)
+}
+
 type RecommendationResultWriter interface {
 	Persist(ctx context.Context, run model.RecommendationRun, items []model.RecommendationItem, userID string, videos []model.FinalRecommendationItem) error
 }

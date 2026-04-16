@@ -37,6 +37,7 @@
 - `application/service`
   - 依赖 repository 的实现：
     - `DefaultContextAssembler`
+    - `DefaultVideoStateEnricher`
     - `DefaultCandidateGenerator`
     - `DefaultEvidenceResolver`
     - `DefaultAuditWriter`
@@ -44,8 +45,8 @@
     - `DefaultRecommendationResultWriter`
 - `application/usecase`
   - `GenerateVideoRecommendationsService`
-  - 兼容保留 assembler-only shell constructor
-  - 完整主链路通过 pipeline constructor 启用
+  - 只通过完整 pipeline constructor 构造
+  - constructor 会校验主链路依赖必须全部就绪
 - `domain/planner`
   - 需求分桶、lane budget、mix quota
 - `domain/aggregator`
@@ -60,6 +61,8 @@
   - query/sqlc/repository/tx
 - `test`
   - Recommendation 自己的 unit / golden / integration 测试
+  - integration 测试使用外部依赖 stub + 真实 Recommendation migration / 物化视图 / refresh 路径
+  - 默认 `make check` 已包含 Recommendation integration；E2E 仍通过 `make e2e-test` 单独运行
 
 ## 当前未实现
 
@@ -74,3 +77,11 @@
 - Recommendation 的审计中心始终是 video recommendation run/item。
 - 只读计算不包长事务；只在最终写 audit 和 serving state 时开启短事务。
 - `catalog.video_user_states` 只作为轻量 penalty 输入，不承载 Recommendation own 的投放状态。
+- Candidate Generator 和 Evidence Resolver 必须沿调用方 `ctx` 传播取消、超时和 trace 上下文。
+- `selector_mode=extreme_sparse` 由 selection 结果 underfill 后置判定，而不是 planner 预判。
+- `GenerateVideoRecommendations` 对外响应使用 `best_evidence` 对象，而不是 4 个扁平字段；audit 表仍保留扁平存储字段。
+- Recommendation 的输入装配边界是显式两阶段：
+  - `DefaultContextAssembler` 只装配 request-scope / unit-scope 输入：active learning states、unit inventory、unit serving states
+  - `DefaultVideoStateEnricher` 负责 candidate-derived video-scope 输入：video serving states、catalog video user states
+- `DefaultVideoRanker` 仍计算 `RecentWatchedPenalty` 作为辅助观测值，但 MVP `BaseScore` 不再直接扣这一项，避免与 `FreshnessScore` 重复惩罚。
+- `best_evidence` 只允许从 `evidence_span_refs` 命中结果中派生；如果 refs 无法命中 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并返回空 `best_evidence`，不会再兜底选“最早 span”。

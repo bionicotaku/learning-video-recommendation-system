@@ -1,7 +1,11 @@
 package candidate
 
-import "learning-video-recommendation-system/internal/recommendation/domain/model"
+import (
+	"context"
+
+	"learning-video-recommendation-system/internal/recommendation/domain/model"
+)
 
 type CandidateGenerator interface {
-	Generate(context model.RecommendationContext, demand model.DemandBundle) ([]model.VideoUnitCandidate, error)
+	Generate(ctx context.Context, context model.RecommendationContext, demand model.DemandBundle) ([]model.VideoUnitCandidate, error)
 }

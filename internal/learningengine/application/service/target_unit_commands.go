@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"learning-video-recommendation-system/internal/learningengine/application/dto"
-	apprepo "learning-video-recommendation-system/internal/learningengine/application/repository"
 	appusecase "learning-video-recommendation-system/internal/learningengine/application/usecase"
 	"learning-video-recommendation-system/internal/learningengine/domain/aggregate"
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
@@ -13,13 +12,13 @@ import (
 )
 
 type EnsureTargetUnitsUsecase struct {
-	targetCommands apprepo.TargetStateCommandRepository
+	txManager TxManager
 }
 
 var _ appusecase.EnsureTargetUnitsUsecase = (*EnsureTargetUnitsUsecase)(nil)
 
-func NewEnsureTargetUnitsUsecase(targetCommands apprepo.TargetStateCommandRepository) *EnsureTargetUnitsUsecase {
-	return &EnsureTargetUnitsUsecase{targetCommands: targetCommands}
+func NewEnsureTargetUnitsUsecase(txManager TxManager) *EnsureTargetUnitsUsecase {
+	return &EnsureTargetUnitsUsecase{txManager: txManager}
 }
 
 func (u *EnsureTargetUnitsUsecase) Execute(ctx context.Context, request dto.EnsureTargetUnitsRequest) (dto.EnsureTargetUnitsResponse, error) {
@@ -37,7 +36,10 @@ func (u *EnsureTargetUnitsUsecase) Execute(ctx context.Context, request dto.Ensu
 		})
 	}
 
-	if err := u.targetCommands.EnsureTargetUnits(ctx, request.UserID, targets); err != nil {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
+		return repos.TargetCommands().EnsureTargetUnits(ctx, request.UserID, targets)
+	})
+	if err != nil {
 		return dto.EnsureTargetUnitsResponse{}, err
 	}
 
@@ -45,13 +47,13 @@ func (u *EnsureTargetUnitsUsecase) Execute(ctx context.Context, request dto.Ensu
 }
 
 type SetTargetInactiveUsecase struct {
-	targetCommands apprepo.TargetStateCommandRepository
+	txManager TxManager
 }
 
 var _ appusecase.SetTargetInactiveUsecase = (*SetTargetInactiveUsecase)(nil)
 
-func NewSetTargetInactiveUsecase(targetCommands apprepo.TargetStateCommandRepository) *SetTargetInactiveUsecase {
-	return &SetTargetInactiveUsecase{targetCommands: targetCommands}
+func NewSetTargetInactiveUsecase(txManager TxManager) *SetTargetInactiveUsecase {
+	return &SetTargetInactiveUsecase{txManager: txManager}
 }
 
 func (u *SetTargetInactiveUsecase) Execute(ctx context.Context, request dto.SetTargetInactiveRequest) (dto.SetTargetInactiveResponse, error) {
@@ -62,7 +64,10 @@ func (u *SetTargetInactiveUsecase) Execute(ctx context.Context, request dto.SetT
 		return dto.SetTargetInactiveResponse{}, fmt.Errorf("coarse_unit_id is required")
 	}
 
-	if err := u.targetCommands.SetTargetInactive(ctx, request.UserID, request.CoarseUnitID); err != nil {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
+		return repos.TargetCommands().SetTargetInactive(ctx, request.UserID, request.CoarseUnitID)
+	})
+	if err != nil {
 		return dto.SetTargetInactiveResponse{}, err
 	}
 
@@ -87,7 +92,7 @@ func (u *SuspendTargetUnitUsecase) Execute(ctx context.Context, request dto.Susp
 		return dto.SuspendTargetUnitResponse{}, fmt.Errorf("coarse_unit_id is required")
 	}
 
-	err := u.txManager.WithinTx(ctx, func(ctx context.Context, repos TransactionalRepositories) error {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
 		state, err := repos.UserUnitStates().GetByUserAndUnitForUpdate(ctx, request.UserID, request.CoarseUnitID)
 		if err != nil {
 			return err
@@ -127,7 +132,7 @@ func (u *ResumeTargetUnitUsecase) Execute(ctx context.Context, request dto.Resum
 		return dto.ResumeTargetUnitResponse{}, fmt.Errorf("coarse_unit_id is required")
 	}
 
-	err := u.txManager.WithinTx(ctx, func(ctx context.Context, repos TransactionalRepositories) error {
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
 		state, err := repos.UserUnitStates().GetByUserAndUnitForUpdate(ctx, request.UserID, request.CoarseUnitID)
 		if err != nil {
 			return err

@@ -3,6 +3,8 @@ package tx_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -65,5 +67,104 @@ func TestManagerRollsBackTransactionOnError(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("event count = %d, want 1", count)
+	}
+}
+
+func TestManagerWithinUserTxSerializesSameUser(t *testing.T) {
+	db := testutil.StartPostgres(t)
+	manager := persisttx.NewManager(db.Pool)
+
+	firstStarted := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondFinished := make(chan struct{})
+	var secondElapsed int64
+
+	go func() {
+		err := manager.WithinUserTx(context.Background(), "same-user", func(ctx context.Context, repos service.TransactionalRepositories) error {
+			close(firstStarted)
+			<-releaseFirst
+			return nil
+		})
+		if err != nil {
+			t.Errorf("first WithinUserTx() error = %v", err)
+		}
+	}()
+
+	<-firstStarted
+
+	go func() {
+		start := time.Now()
+		err := manager.WithinUserTx(context.Background(), "same-user", func(ctx context.Context, repos service.TransactionalRepositories) error {
+			atomic.StoreInt64(&secondElapsed, int64(time.Since(start)))
+			return nil
+		})
+		if err != nil {
+			t.Errorf("second WithinUserTx() error = %v", err)
+		}
+		close(secondFinished)
+	}()
+
+	time.Sleep(150 * time.Millisecond)
+
+	select {
+	case <-secondFinished:
+		t.Fatal("expected same-user transaction to block until first transaction finishes")
+	default:
+	}
+
+	close(releaseFirst)
+
+	select {
+	case <-secondFinished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for second transaction to finish")
+	}
+
+	if got := time.Duration(atomic.LoadInt64(&secondElapsed)); got < 100*time.Millisecond {
+		t.Fatalf("second transaction elapsed = %v, want blocking delay", got)
+	}
+}
+
+func TestManagerWithinUserTxAllowsDifferentUsersConcurrently(t *testing.T) {
+	db := testutil.StartPostgres(t)
+	manager := persisttx.NewManager(db.Pool)
+
+	startBarrier := make(chan struct{})
+	releaseBarrier := make(chan struct{})
+	var concurrent int32
+	var maxConcurrent int32
+	var wg sync.WaitGroup
+
+	run := func(userID string) {
+		defer wg.Done()
+		err := manager.WithinUserTx(context.Background(), userID, func(ctx context.Context, repos service.TransactionalRepositories) error {
+			<-startBarrier
+			current := atomic.AddInt32(&concurrent, 1)
+			for {
+				observed := atomic.LoadInt32(&maxConcurrent)
+				if current <= observed || atomic.CompareAndSwapInt32(&maxConcurrent, observed, current) {
+					break
+				}
+			}
+			<-releaseBarrier
+			atomic.AddInt32(&concurrent, -1)
+			return nil
+		})
+		if err != nil {
+			t.Errorf("WithinUserTx(%q) error = %v", userID, err)
+		}
+	}
+
+	wg.Add(2)
+	go run("user-a")
+	go run("user-b")
+
+	close(startBarrier)
+	time.Sleep(150 * time.Millisecond)
+	close(releaseBarrier)
+	wg.Wait()
+
+	if atomic.LoadInt32(&maxConcurrent) < 2 {
+		t.Fatalf("max concurrent transactions = %d, want at least 2 for different users", maxConcurrent)
 	}
 }

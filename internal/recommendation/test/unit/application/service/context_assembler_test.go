@@ -33,8 +33,6 @@ func TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(t *t
 		learningStates,
 		inventory,
 		unitServing,
-		&stubVideoServingStateRepository{},
-		&stubVideoUserStateReader{},
 	)
 
 	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
@@ -73,8 +71,6 @@ func TestDefaultContextAssemblerAssembleReturnsErrors(t *testing.T) {
 		&stubLearningStateReader{err: expectedErr},
 		&stubUnitInventoryReader{},
 		&stubUnitServingStateRepository{},
-		&stubVideoServingStateRepository{},
-		&stubVideoUserStateReader{},
 	)
 
 	if _, err := assembler.Assemble(context.Background(), model.RecommendationRequest{UserID: "user-1"}); !errors.Is(err, expectedErr) {
@@ -115,28 +111,10 @@ func (s *stubUnitServingStateRepository) Upsert(context.Context, model.UserUnitS
 	return nil
 }
 
-type stubVideoServingStateRepository struct{}
-
-func (s *stubVideoServingStateRepository) ListByUserAndVideoIDs(context.Context, string, []string) ([]model.UserVideoServingState, error) {
-	return nil, nil
-}
-
-func (s *stubVideoServingStateRepository) Upsert(context.Context, model.UserVideoServingState) error {
-	return nil
-}
-
-type stubVideoUserStateReader struct{}
-
-func (s *stubVideoUserStateReader) ListByUserAndVideoIDs(context.Context, string, []string) ([]model.VideoUserState, error) {
-	return nil, nil
-}
-
 var (
-	_ apprepo.LearningStateReader         = (*stubLearningStateReader)(nil)
-	_ apprepo.UnitInventoryReader         = (*stubUnitInventoryReader)(nil)
-	_ apprepo.UnitServingStateRepository  = (*stubUnitServingStateRepository)(nil)
-	_ apprepo.VideoServingStateRepository = (*stubVideoServingStateRepository)(nil)
-	_ apprepo.VideoUserStateReader        = (*stubVideoUserStateReader)(nil)
+	_ apprepo.LearningStateReader        = (*stubLearningStateReader)(nil)
+	_ apprepo.UnitInventoryReader        = (*stubUnitInventoryReader)(nil)
+	_ apprepo.UnitServingStateRepository = (*stubUnitServingStateRepository)(nil)
 )
 
 func TestNormalizeDurationResetsInvalidRange(t *testing.T) {
@@ -144,8 +122,6 @@ func TestNormalizeDurationResetsInvalidRange(t *testing.T) {
 		&stubLearningStateReader{},
 		&stubUnitInventoryReader{},
 		&stubUnitServingStateRepository{},
-		&stubVideoServingStateRepository{},
-		&stubVideoUserStateReader{},
 	)
 	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
 		UserID:               "user-1",

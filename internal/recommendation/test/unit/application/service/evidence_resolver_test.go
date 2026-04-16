@@ -11,21 +11,31 @@ import (
 )
 
 type stubSemanticSpanReader struct {
-	rows map[string][]model.SemanticSpan
+	rows    map[string][]model.SemanticSpan
+	lastCtx context.Context
 }
 
 type stubTranscriptSentenceReader struct {
-	rows map[string][]model.TranscriptSentence
+	rows    map[string][]model.TranscriptSentence
+	lastCtx context.Context
 }
 
 var _ apprepo.SemanticSpanReader = (*stubSemanticSpanReader)(nil)
 var _ apprepo.TranscriptSentenceReader = (*stubTranscriptSentenceReader)(nil)
 
-func (s *stubSemanticSpanReader) ListByVideoAndUnit(_ context.Context, videoID string, coarseUnitID int64) ([]model.SemanticSpan, error) {
+func (s *stubSemanticSpanReader) ListByVideoAndUnit(ctx context.Context, videoID string, coarseUnitID int64) ([]model.SemanticSpan, error) {
+	s.lastCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return append([]model.SemanticSpan(nil), s.rows[spanKey(videoID, coarseUnitID)]...), nil
 }
 
-func (s *stubTranscriptSentenceReader) ListByVideoAndIndexes(_ context.Context, videoID string, sentenceIndexes []int32) ([]model.TranscriptSentence, error) {
+func (s *stubTranscriptSentenceReader) ListByVideoAndIndexes(ctx context.Context, videoID string, sentenceIndexes []int32) ([]model.TranscriptSentence, error) {
+	s.lastCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	allowed := make(map[int32]struct{}, len(sentenceIndexes))
 	for _, index := range sentenceIndexes {
 		allowed[index] = struct{}{}
@@ -61,7 +71,7 @@ func TestDefaultEvidenceResolverResolvesReferencedSpansAndSentences(t *testing.T
 		},
 	)
 
-	windows, err := resolver.Resolve(model.RecommendationContext{}, []model.VideoUnitCandidate{
+	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
 			VideoID:          "video-1",
 			CoarseUnitID:     101,
@@ -101,7 +111,7 @@ func TestDefaultEvidenceResolverPrefersEarlierSpanWhenRefsShareSentence(t *testi
 		&stubTranscriptSentenceReader{},
 	)
 
-	windows, err := resolver.Resolve(model.RecommendationContext{}, []model.VideoUnitCandidate{
+	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
 			VideoID:          "video-2",
 			CoarseUnitID:     101,
@@ -117,7 +127,7 @@ func TestDefaultEvidenceResolverPrefersEarlierSpanWhenRefsShareSentence(t *testi
 	}
 }
 
-func TestDefaultEvidenceResolverFallsBackWhenReferencedSpanIsMissing(t *testing.T) {
+func TestDefaultEvidenceResolverLeavesBestEvidenceEmptyWhenReferencedSpanIsMissing(t *testing.T) {
 	resolver := recommendationservice.NewDefaultEvidenceResolver(
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
@@ -135,7 +145,7 @@ func TestDefaultEvidenceResolverFallsBackWhenReferencedSpanIsMissing(t *testing.
 		},
 	)
 
-	windows, err := resolver.Resolve(model.RecommendationContext{}, []model.VideoUnitCandidate{
+	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
 			VideoID:          "video-3",
 			CoarseUnitID:     101,
@@ -147,8 +157,11 @@ func TestDefaultEvidenceResolverFallsBackWhenReferencedSpanIsMissing(t *testing.
 		t.Fatalf("resolve: %v", err)
 	}
 
-	if windows[0].BestEvidenceRef == nil || windows[0].BestEvidenceRef.SentenceIndex != 3 {
-		t.Fatalf("expected fallback best evidence, got %#v", windows[0].BestEvidenceRef)
+	if windows[0].BestEvidenceRef != nil {
+		t.Fatalf("expected missing best evidence ref, got %#v", windows[0].BestEvidenceRef)
+	}
+	if windows[0].BestEvidenceStartMs != nil || windows[0].BestEvidenceEndMs != nil {
+		t.Fatalf("expected missing best evidence bounds, got start=%#v end=%#v", windows[0].BestEvidenceStartMs, windows[0].BestEvidenceEndMs)
 	}
 }
 
@@ -164,7 +177,7 @@ func TestDefaultEvidenceResolverToleratesMissingSentences(t *testing.T) {
 		&stubTranscriptSentenceReader{},
 	)
 
-	windows, err := resolver.Resolve(model.RecommendationContext{}, []model.VideoUnitCandidate{
+	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
 			VideoID:          "video-4",
 			CoarseUnitID:     101,
@@ -186,6 +199,57 @@ func TestDefaultEvidenceResolverToleratesMissingSentences(t *testing.T) {
 
 func spanKey(videoID string, coarseUnitID int64) string {
 	return fmt.Sprintf("%s#%d", videoID, coarseUnitID)
+}
+
+func TestDefaultEvidenceResolverPropagatesContextToReaders(t *testing.T) {
+	spanReader := &stubSemanticSpanReader{
+		rows: map[string][]model.SemanticSpan{
+			spanKey("video-ctx", 101): {
+				{VideoID: "video-ctx", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400, Text: "ctx"},
+			},
+		},
+	}
+	sentenceReader := &stubTranscriptSentenceReader{
+		rows: map[string][]model.TranscriptSentence{
+			"video-ctx": {
+				{VideoID: "video-ctx", SentenceIndex: 1, StartMs: 900, EndMs: 1500, Text: "Sentence 1"},
+			},
+		},
+	}
+	resolver := recommendationservice.NewDefaultEvidenceResolver(spanReader, sentenceReader)
+
+	ctx := context.WithValue(context.Background(), "trace", "evidence-resolver")
+	_, err := resolver.Resolve(ctx, model.RecommendationContext{}, []model.VideoUnitCandidate{
+		{
+			VideoID:          "video-ctx",
+			CoarseUnitID:     101,
+			SentenceIndexes:  []int32{1},
+			EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":1}]`),
+		},
+	}, model.DemandBundle{})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+
+	if got := spanReader.lastCtx.Value("trace"); got != "evidence-resolver" {
+		t.Fatalf("span reader ctx value = %#v, want propagated context", got)
+	}
+	if got := sentenceReader.lastCtx.Value("trace"); got != "evidence-resolver" {
+		t.Fatalf("sentence reader ctx value = %#v, want propagated context", got)
+	}
+}
+
+func TestDefaultEvidenceResolverReturnsCanceledWhenContextCanceled(t *testing.T) {
+	resolver := recommendationservice.NewDefaultEvidenceResolver(&stubSemanticSpanReader{}, &stubTranscriptSentenceReader{})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := resolver.Resolve(ctx, model.RecommendationContext{}, []model.VideoUnitCandidate{
+		{VideoID: "video-cancel", CoarseUnitID: 101},
+	}, model.DemandBundle{})
+	if err == nil || err != context.Canceled {
+		t.Fatalf("resolve error = %v, want context.Canceled", err)
+	}
 }
 
 func int64Ptr(value int64) *int64 {

@@ -215,39 +215,40 @@
 
 ## 4. B. 实现偏差但暂不构成明确 bug 的项
 
-### B.1 Recommendation 返回结构把 `best_evidence` 扁平化了
+### B.1 Recommendation 返回结构把 `best_evidence` 扁平化了（已修复）
 
-- 设计要求最终条目至少包含 `best_evidence` 概念对象。
-- 当前 DTO 直接暴露 `BestEvidenceSentenceIndex`、`BestEvidenceSpanIndex`、`BestEvidenceStartMs`、`BestEvidenceEndMs` 四个字段。
-- 这属于 API 表达偏差，但当前不会直接造成错误行为。
+- 当前状态：
+  - 对外 DTO 已改为 `BestEvidence *BestEvidence`
+  - 当 4 个 evidence 值全为空时返回 `nil`，而不是空对象
+  - audit 存储层仍保持扁平字段，这部分属于持久化契约，不在本轮变更范围
 - 证据：
   - 设计：`docs/全新设计-推荐模块设计.md:128`, `317`
-  - 实现：`internal/recommendation/application/dto/generate_video_recommendations.go:11-32`
+  - 实现：`internal/recommendation/application/dto/generate_video_recommendations.go`
 
-### B.2 Context Assembler 的边界比设计更窄
+### B.2 Context Assembler 的边界比设计更窄（已收口为显式两阶段边界）
 
-- 设计描述更偏向“一次性装配 Recommendation 所需输入”。
-- 当前实现中：
-  - assembler 只装配 active states、inventory、unit serving states
-  - video serving states / video user states 在 rank 之前再按候选视频后置读取
-- 这种实现仍然符合 owner 边界，只是没有完全按文档中的边界切法实现。
+- 当前状态：
+  - `DefaultContextAssembler` 明确只装配 request-scope / unit-scope 输入：active states、inventory、unit serving states
+  - `DefaultVideoStateEnricher` 显式负责 candidate-derived video-scope 输入：video serving states、video user states
+  - Recommendation usecase 不再内联 repository 读取视频态状态
 - 证据：
   - 设计：`docs/全新设计-推荐模块设计.md:160-162`
   - 实现：
-    - `internal/recommendation/application/service/context_assembler.go:49-84`
-    - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go:109-112`
-    - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go:188-209`
+    - `internal/recommendation/application/service/context_assembler.go`
+    - `internal/recommendation/application/service/default_video_state_enricher.go`
+    - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go`
 
-### B.3 Recommendation 的排序公式额外引入了 `recent_watched_penalty`
+### B.3 Recommendation 的排序公式额外引入了 `recent_watched_penalty`（已修复）
 
-- 文档在文字部分允许“如有”时加入 `recent_watched_penalty`，但给出的 MVP 基础公式只列出 `recent_served_penalty` 和 `overload_penalty`。
-- 当前实现额外把 `RecentWatchedPenalty` 扣进了 `BaseScore`。
-- 这更像实现上更激进的一步，而不是立刻错误。
+- 当前状态：
+  - `RecentWatchedPenalty` 仍保留为辅助观测值
+  - `FreshnessScore` 仍可综合 watched 信号
+  - MVP `BaseScore` 已删除 `- 0.02 * RecentWatchedPenalty` 这一项，避免重复惩罚
 - 证据：
   - 设计：
     - `docs/全新设计-推荐模块设计.md:214-222`
     - `docs/全新设计-总设计.md:810-825`
-  - 实现：`internal/recommendation/domain/ranking/default_video_ranker.go:43-53`
+  - 实现：`internal/recommendation/domain/ranking/default_video_ranker.go`
 
 ## 5. C. 明确的 Code Review Findings
 
@@ -426,9 +427,10 @@
   - pipeline：`internal/recommendation/test/unit/application/usecase/generate_video_recommendations_pipeline_test.go:26-140`
   - selector：`internal/recommendation/test/unit/domain/selector/video_selector_test.go:11-101`
 - 当前缺口：
-  - integration tests 没有真实验证 owner migration 和物化视图。
-  - 默认 `make check` 不会包含 `-tags=integration` 的 Recommendation integration tests。
-  - 目前没有测试证明 `extreme_sparse` 的设计定义被正确实现；现有 selector 测试只验证 selector 在 flag 已给定时的行为，不验证 planner 如何得出该 flag。
+  - 上述 Recommendation 测试缺口已在后续修复中补齐：
+    - integration tests 已切到真实 migration / 物化视图
+    - 默认 `make check` 已包含 Recommendation integration
+    - pipeline / E2E 已覆盖 `extreme_sparse` 的当前设计定义
 
 ## 8. 测试覆盖缺口
 
@@ -438,8 +440,8 @@
   - Recommendation migration head 和两个物化视图的真实连库验证。
 - 为什么重要：
   - 这是 Recommendation 最关键的 owner 契约之一。
-- 当前测试为什么不足：
-  - integration fixture 手写了最小 stub schema，绕过了真实 migration。
+- 当前状态：
+  - 已修复。integration fixture 现已执行外部依赖 stub SQL + Recommendation 真实 migration head，并覆盖两个物化视图与 refresh 路径。
 
 ### Gap ID: G-REC-002
 
@@ -456,8 +458,8 @@
   - Replay 与在线写入并发冲突保护测试。
 - 为什么重要：
   - 这是 Learning engine 状态一致性的关键边界。
-- 当前测试为什么不足：
-  - 现有测试只验证顺序执行下的 replay 一致性。
+- 当前状态：
+  - 已修复。`WithinUserTx(...)` 的 advisory xact lock 串行化了同用户写入，并补了 manager/usecase 级并发验证。
 
 ### Gap ID: G-REC-003
 
@@ -465,8 +467,8 @@
   - Context 取消 / 超时是否能贯穿 Candidate Generator 与 Evidence Resolver。
 - 为什么重要：
   - 这是热路径的运行时稳定性要求。
-- 当前测试为什么不足：
-  - 当前测试没有校验上下文传播，且代码直接使用了 `context.Background()`。
+- 当前状态：
+  - 已修复。Candidate Generator / Evidence Resolver 已透传调用方 `ctx`，并补了 context 传播单测。
 
 ## 9. 总体结论
 
@@ -517,3 +519,139 @@
   - `internal/recommendation/application/service/*`
   - `internal/recommendation/domain/*`
   - `internal/recommendation/test/*`
+
+## 12. 修复状态更新（本轮已完成）
+
+### F-LE-001
+
+- 状态：`已修复`
+- 修复内容：
+  - `learningengine` 的所有同用户状态写入 usecase 统一改为走 `TxManager.WithinUserTx(...)`
+  - `WithinUserTx(...)` 在事务开始后通过 `pg_advisory_xact_lock(hashtextextended('learningengine:user:' || $1, 0))` 获取用户级事务锁
+  - `EnsureTargetUnits` / `SetTargetInactive` 也已纳入同一用户锁范围，不再只保护 `RecordLearningEvents` / `ReplayUserStates`
+- 主要代码位置：
+  - `internal/learningengine/application/service/tx.go`
+  - `internal/learningengine/infrastructure/persistence/tx/manager.go`
+  - `internal/learningengine/application/service/target_unit_commands.go`
+  - `internal/learningengine/application/service/record_learning_events.go`
+  - `internal/learningengine/application/service/replay_user_states.go`
+- 新增验证：
+  - `internal/learningengine/infrastructure/persistence/tx/manager_integration_test.go`
+  - `internal/learningengine/application/service/usecases_integration_test.go`
+
+### F-REC-001
+
+- 状态：`已修复`
+- 修复内容：
+  - 删除 assembler-only shell 路径
+  - Recommendation 只保留完整 pipeline constructor
+  - constructor 在装配阶段对 assembler/planner/candidate/resolver/aggregator/ranker/selector/explainer 做完整依赖校验，缺失时返回显式错误 `ErrIncompletePipeline`
+- 主要代码位置：
+  - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go`
+  - `internal/recommendation/test/unit/application/usecase/generate_video_recommendations_test.go`
+  - `internal/recommendation/README.md`
+
+### F-REC-002
+
+- 状态：`已修复`
+- 修复内容：
+  - planner 不再预判 `ExtremeSparse`
+  - `selector_mode=extreme_sparse` 改为在 selection 完成后，根据“存在实际 demand 且最终 underfill”统一后置判定
+  - selector 不再持有基于 `ExtremeSparse` 的专用分支
+- 主要代码位置：
+  - `internal/recommendation/domain/planner/default_demand_planner.go`
+  - `internal/recommendation/domain/selector/default_video_selector.go`
+  - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go`
+  - `internal/recommendation/test/unit/application/usecase/generate_video_recommendations_pipeline_test.go`
+
+### F-REC-003
+
+- 状态：`已修复`
+- 修复内容：
+  - `CandidateGenerator.Generate(...)` 与 `EvidenceResolver.Resolve(...)` 都改为显式接收 `ctx`
+  - `GenerateVideoRecommendations.Execute(...)` 透传调用方上下文到底层读库
+  - 已删除热路径读库中的 `context.Background()` 使用
+- 主要代码位置：
+  - `internal/recommendation/domain/candidate/candidate_generator.go`
+  - `internal/recommendation/domain/resolver/evidence_resolver.go`
+  - `internal/recommendation/application/service/default_candidate_generator.go`
+  - `internal/recommendation/application/service/default_evidence_resolver.go`
+  - `internal/recommendation/test/unit/application/service/candidate_generator_test.go`
+  - `internal/recommendation/test/unit/application/service/evidence_resolver_test.go`
+
+### F-REC-004
+
+- 状态：`已修复`
+- 修复内容：
+  - Recommendation integration fixture 不再手写 recommendation schema
+  - 先执行 `internal/recommendation/infrastructure/persistence/schema/000000_external_refs.sql`
+  - 再顺序执行 Recommendation migration head
+  - integration tests 已覆盖真实 `v_recommendable_video_units`、`v_unit_video_inventory` 和 refresh 路径
+- 主要代码位置：
+  - `internal/recommendation/test/fixture/db.go`
+  - `internal/recommendation/test/integration/repository_integration_test.go`
+
+### 本轮实际验证命令
+
+- `go test ./internal/recommendation/...`
+- `go test ./internal/learningengine/...`
+- `go test -tags=integration ./internal/recommendation/test/...`
+
+## 13. 修复状态更新（本轮剩余收口项）
+
+### B.1 / API 契约表达
+
+- 状态：`已修复`
+- 修复内容：
+  - `RecommendationVideo` 对外响应已改为 `BestEvidence *BestEvidence`
+  - usecase 映射层在 4 个 evidence 值全空时返回 `nil`
+  - golden 与 pipeline 单测已同步
+- 主要代码位置：
+  - `internal/recommendation/application/dto/generate_video_recommendations.go`
+  - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go`
+  - `internal/recommendation/test/golden/usecase_pipeline_response.json`
+  - `internal/recommendation/test/unit/application/usecase/generate_video_recommendations_pipeline_test.go`
+
+### B.2 / 两阶段输入边界
+
+- 状态：`已修复`
+- 修复内容：
+  - `DefaultContextAssembler` 不再持有 video-scope repository
+  - 新增 `DefaultVideoStateEnricher`，显式负责候选视频派生后的 `video serving states` / `video user states` 加载
+  - `GenerateVideoRecommendationsService` 不再内联视频态 enrichment 读取逻辑
+- 主要代码位置：
+  - `internal/recommendation/application/service/context_assembler.go`
+  - `internal/recommendation/application/service/default_video_state_enricher.go`
+  - `internal/recommendation/application/service/side_effects.go`
+  - `internal/recommendation/application/usecase/generate_video_recommendations_impl.go`
+  - `internal/recommendation/test/unit/application/service/video_state_enricher_test.go`
+
+### B.3 / 排序公式收口
+
+- 状态：`已修复`
+- 修复内容：
+  - `DefaultVideoRanker` 保留 `RecentWatchedPenalty` 作为辅助指标
+  - MVP `BaseScore` 已删除对 `RecentWatchedPenalty` 的直接扣分
+  - ranking 单测已改为校验“有 watched penalty 指标，但不直接参与 BaseScore”
+- 主要代码位置：
+  - `internal/recommendation/domain/ranking/default_video_ranker.go`
+  - `internal/recommendation/test/unit/domain/ranking/video_ranker_test.go`
+
+### 默认验收链路
+
+- 状态：`已修复`
+- 修复内容：
+  - `make check` 已纳入 `go test -tags=integration ./internal/recommendation/test/...`
+  - E2E 仍保持显式 `make e2e-test`
+- 主要代码位置：
+  - `Makefile`
+  - `docs/当前实现现状.md`
+  - `internal/recommendation/README.md`
+
+### 本轮新增验证命令
+
+- `go test ./internal/recommendation/test/unit/...`
+- `go test ./internal/recommendation/...`
+- `go test ./internal/learningengine/... ./internal/recommendation/...`
+- `go test -tags=integration ./internal/recommendation/test/...`
+- `make check`

@@ -81,10 +81,8 @@ func TestDefaultVideoSelectorLowSupplyAllowsFutureLikeButLimitsFallback(t *testi
 	}
 }
 
-func TestDefaultVideoSelectorExtremeSparseUnderfillsInsteadOfViolatingConstraints(t *testing.T) {
+func TestDefaultVideoSelectorUnderfillsWhenConstraintsLeaveNoAdditionalCandidates(t *testing.T) {
 	demand := normalDemand()
-	demand.Flags.ExtremeSparse = true
-
 	selector := recommendationselector.NewDefaultVideoSelector()
 	selected, err := selector.Select(model.RecommendationContext{
 		Request: model.RecommendationRequest{TargetVideoCount: 4},

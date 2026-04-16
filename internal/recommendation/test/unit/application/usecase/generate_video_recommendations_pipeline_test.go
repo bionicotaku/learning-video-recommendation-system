@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"learning-video-recommendation-system/internal/recommendation/application/dto"
-	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	"learning-video-recommendation-system/internal/recommendation/application/usecase"
 	domainaggregator "learning-video-recommendation-system/internal/recommendation/domain/aggregator"
@@ -38,8 +37,8 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 		},
 	}
 
-	service := usecase.NewGenerateVideoRecommendationsPipeline(
-		&stubContextAssembler{
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
 				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2, PreferredDurationSec: [2]int{45, 180}},
 			},
@@ -56,10 +55,15 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 		ranker,
 		&stubSelector{selected: ranker.ranked},
 		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
-		&stubVideoServingStateRepo{states: []model.UserVideoServingState{{VideoID: "video-1"}}},
-		&stubVideoUserStateReader{states: []model.VideoUserState{{VideoID: "video-1", WatchCount: 1}}},
+		&stubVideoStateEnricher{
+			videoServingStates: []model.UserVideoServingState{{VideoID: "video-1"}},
+			videoUserStates:    []model.VideoUserState{{VideoID: "video-1", WatchCount: 1}},
+		},
 		writer,
 	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
 		UserID:               "user-1",
@@ -91,8 +95,8 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 }
 
 func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
-	service := usecase.NewGenerateVideoRecommendationsPipeline(
-		&stubContextAssembler{
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
 				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2, PreferredDurationSec: [2]int{45, 180}},
 			},
@@ -104,10 +108,12 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
 		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
 		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
-		&stubVideoServingStateRepo{},
-		&stubVideoUserStateReader{},
+		&stubVideoStateEnricher{},
 		&spyResultWriter{},
 	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
 		UserID:               "user-1",
@@ -139,6 +145,101 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 	}
 }
 
+func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnderfill(t *testing.T) {
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
+			context: model.RecommendationContext{
+				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 3, PreferredDurationSec: [2]int{45, 180}},
+			},
+		},
+		&stubPlanner{
+			bundle: model.DemandBundle{
+				TargetVideoCount: 3,
+				HardReview:       []model.DemandUnit{{UnitID: 101, Bucket: "hard_review"}},
+			},
+		},
+		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
+		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
+		&stubVideoStateEnricher{},
+		&spyResultWriter{},
+	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
+
+	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
+		UserID:               "user-1",
+		TargetVideoCount:     3,
+		PreferredDurationSec: [2]int{45, 180},
+	})
+	if err != nil {
+		t.Fatalf("execute pipeline: %v", err)
+	}
+
+	if response.SelectorMode != "extreme_sparse" {
+		t.Fatalf("expected extreme_sparse selector mode, got %q", response.SelectorMode)
+	}
+	if !response.Underfilled {
+		t.Fatal("expected underfilled response")
+	}
+}
+
+func TestGenerateVideoRecommendationsPipelineMapsBestEvidenceObject(t *testing.T) {
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
+			context: model.RecommendationContext{
+				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1, PreferredDurationSec: [2]int{45, 180}},
+			},
+		},
+		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 1}},
+		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
+		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubExplainer{items: []model.FinalRecommendationItem{{
+			VideoID:                   "video-1",
+			Rank:                      1,
+			Score:                     0.91,
+			ReasonCodes:               []string{"hard_review_covered"},
+			CoveredHardReviewUnits:    []int64{101},
+			BestEvidenceSentenceIndex: int32Ptr(1),
+			BestEvidenceSpanIndex:     int32Ptr(2),
+			BestEvidenceStartMs:       int32Ptr(1240),
+			BestEvidenceEndMs:         int32Ptr(1820),
+			Explanation:               "ok",
+		}}},
+		&stubVideoStateEnricher{},
+		&spyResultWriter{},
+	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
+
+	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
+		UserID:               "user-1",
+		TargetVideoCount:     1,
+		PreferredDurationSec: [2]int{45, 180},
+	})
+	if err != nil {
+		t.Fatalf("execute pipeline: %v", err)
+	}
+
+	if len(response.Videos) != 1 {
+		t.Fatalf("expected 1 video, got %#v", response.Videos)
+	}
+	if response.Videos[0].BestEvidence == nil {
+		t.Fatalf("expected best evidence object, got %#v", response.Videos[0])
+	}
+	if response.Videos[0].BestEvidence.StartMs == nil || *response.Videos[0].BestEvidence.StartMs != 1240 {
+		t.Fatalf("unexpected best evidence bounds: %#v", response.Videos[0].BestEvidence)
+	}
+}
+
 type stubPlanner struct{ bundle model.DemandBundle }
 
 func (s *stubPlanner) Plan(model.RecommendationContext) (model.DemandBundle, error) {
@@ -149,7 +250,7 @@ var _ domainplanner.DemandPlanner = (*stubPlanner)(nil)
 
 type stubCandidateGenerator struct{ candidates []model.VideoUnitCandidate }
 
-func (s *stubCandidateGenerator) Generate(model.RecommendationContext, model.DemandBundle) ([]model.VideoUnitCandidate, error) {
+func (s *stubCandidateGenerator) Generate(context.Context, model.RecommendationContext, model.DemandBundle) ([]model.VideoUnitCandidate, error) {
 	return s.candidates, nil
 }
 
@@ -159,7 +260,7 @@ type stubResolver struct {
 	windows []model.ResolvedEvidenceWindow
 }
 
-func (s *stubResolver) Resolve(model.RecommendationContext, []model.VideoUnitCandidate, model.DemandBundle) ([]model.ResolvedEvidenceWindow, error) {
+func (s *stubResolver) Resolve(context.Context, model.RecommendationContext, []model.VideoUnitCandidate, model.DemandBundle) ([]model.ResolvedEvidenceWindow, error) {
 	return s.windows, nil
 }
 
@@ -205,24 +306,18 @@ func (s *stubExplainer) Build(model.RecommendationContext, []model.VideoCandidat
 
 var _ domainexplain.ExplanationBuilder = (*stubExplainer)(nil)
 
-type stubVideoServingStateRepo struct{ states []model.UserVideoServingState }
-
-func (s *stubVideoServingStateRepo) ListByUserAndVideoIDs(context.Context, string, []string) ([]model.UserVideoServingState, error) {
-	return s.states, nil
-}
-func (s *stubVideoServingStateRepo) Upsert(context.Context, model.UserVideoServingState) error {
-	return nil
+type stubVideoStateEnricher struct {
+	videoServingStates []model.UserVideoServingState
+	videoUserStates    []model.VideoUserState
 }
 
-var _ apprepo.VideoServingStateRepository = (*stubVideoServingStateRepo)(nil)
-
-type stubVideoUserStateReader struct{ states []model.VideoUserState }
-
-func (s *stubVideoUserStateReader) ListByUserAndVideoIDs(context.Context, string, []string) ([]model.VideoUserState, error) {
-	return s.states, nil
+func (s *stubVideoStateEnricher) Enrich(_ context.Context, contextModel model.RecommendationContext, _ []model.VideoCandidate) (model.RecommendationContext, error) {
+	contextModel.VideoServingStates = append([]model.UserVideoServingState(nil), s.videoServingStates...)
+	contextModel.VideoUserStates = append([]model.VideoUserState(nil), s.videoUserStates...)
+	return contextModel, nil
 }
 
-var _ apprepo.VideoUserStateReader = (*stubVideoUserStateReader)(nil)
+var _ appservice.VideoStateEnricher = (*stubVideoStateEnricher)(nil)
 
 type spyResultWriter struct {
 	called bool
@@ -236,5 +331,9 @@ func (s *spyResultWriter) Persist(context.Context, model.RecommendationRun, []mo
 var _ appservice.RecommendationResultWriter = (*spyResultWriter)(nil)
 
 func int64Ptr(value int64) *int64 {
+	return &value
+}
+
+func int32Ptr(value int32) *int32 {
 	return &value
 }

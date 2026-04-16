@@ -48,7 +48,6 @@ func (r *DefaultVideoRanker) Rank(recommendationContext model.RecommendationCont
 				0.05*candidate.FutureValueScore +
 				0.05*candidate.FreshnessScore -
 				0.03*candidate.RecentServedPenalty -
-				0.02*candidate.RecentWatchedPenalty -
 				0.02*candidate.OverloadPenalty,
 		)
 	}

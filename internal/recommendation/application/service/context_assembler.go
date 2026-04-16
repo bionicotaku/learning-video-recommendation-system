@@ -20,8 +20,6 @@ type DefaultContextAssembler struct {
 	learningStates apprepo.LearningStateReader
 	inventory      apprepo.UnitInventoryReader
 	unitServing    apprepo.UnitServingStateRepository
-	videoServing   apprepo.VideoServingStateRepository
-	videoUserState apprepo.VideoUserStateReader
 	now            func() time.Time
 }
 
@@ -31,15 +29,11 @@ func NewDefaultContextAssembler(
 	learningStates apprepo.LearningStateReader,
 	inventory apprepo.UnitInventoryReader,
 	unitServing apprepo.UnitServingStateRepository,
-	videoServing apprepo.VideoServingStateRepository,
-	videoUserState apprepo.VideoUserStateReader,
 ) *DefaultContextAssembler {
 	return &DefaultContextAssembler{
 		learningStates: learningStates,
 		inventory:      inventory,
 		unitServing:    unitServing,
-		videoServing:   videoServing,
-		videoUserState: videoUserState,
 		now: func() time.Time {
 			return time.Now().UTC()
 		},

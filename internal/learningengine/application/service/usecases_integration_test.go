@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,12 +24,10 @@ func TestTargetControlUsecasesWithDatabase(t *testing.T) {
 	db.SeedUser(t, "11111111-1111-1111-1111-111111111111")
 	db.SeedCoarseUnit(t, 101)
 
-	targetRepo := persistrepo.NewTargetStateCommandRepository(db.Pool)
-	stateRepo := persistrepo.NewUserUnitStateRepository(db.Pool)
 	txManager := persisttx.NewManager(db.Pool)
 
-	ensureUsecase := service.NewEnsureTargetUnitsUsecase(targetRepo)
-	listUsecase := service.NewListUserUnitStatesUsecase(stateRepo)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
 	suspendUsecase := service.NewSuspendTargetUnitUsecase(txManager)
 	resumeUsecase := service.NewResumeTargetUnitUsecase(txManager)
 
@@ -171,11 +170,10 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	db.SeedCoarseUnit(t, 101)
 	db.SeedCoarseUnit(t, 102)
 
-	targetRepo := persistrepo.NewTargetStateCommandRepository(db.Pool)
 	stateRepo := persistrepo.NewUserUnitStateRepository(db.Pool)
 	txManager := persisttx.NewManager(db.Pool)
 
-	ensureUsecase := service.NewEnsureTargetUnitsUsecase(targetRepo)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
 	suspendUsecase := service.NewSuspendTargetUnitUsecase(txManager)
 	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
 	replayUsecase := service.NewReplayUserStatesUsecase(txManager)
@@ -249,6 +247,92 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	}
 }
 
+func TestReplayAndRecordSerializeForSameUser(t *testing.T) {
+	db := testutil.StartPostgres(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	baseManager := persisttx.NewManager(db.Pool)
+	replayGate := newBlockingUserTxManager(baseManager, userID)
+	recordUsecase := service.NewRecordLearningEventsUsecase(baseManager)
+	replayUsecase := service.NewReplayUserStatesUsecase(replayGate)
+	stateRepo := persistrepo.NewUserUnitStateRepository(db.Pool)
+
+	firstQuality := int16(4)
+	firstOccurredAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &firstQuality, OccurredAt: firstOccurredAt},
+		},
+	}); err != nil {
+		t.Fatalf("seed RecordLearningEvents.Execute() error = %v", err)
+	}
+
+	var replayErr error
+	var replayWG sync.WaitGroup
+	replayWG.Add(1)
+	go func() {
+		defer replayWG.Done()
+		_, replayErr = replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID})
+	}()
+
+	<-replayGate.started
+
+	recordDone := make(chan error, 1)
+	go func() {
+		secondQuality := int16(4)
+		_, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+			UserID: userID,
+			Events: []dto.LearningEventInput{
+				{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &secondQuality, OccurredAt: firstOccurredAt.Add(24 * time.Hour)},
+			},
+		})
+		recordDone <- err
+	}()
+
+	select {
+	case err := <-recordDone:
+		t.Fatalf("record completed before replay released lock: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(replayGate.release)
+	replayWG.Wait()
+	if replayErr != nil {
+		t.Fatalf("ReplayUserStates.Execute() error = %v", replayErr)
+	}
+
+	select {
+	case err := <-recordDone:
+		if err != nil {
+			t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for blocked record to finish")
+	}
+
+	states, err := stateRepo.ListByUser(context.Background(), userID, model.UserUnitStateFilter{})
+	if err != nil {
+		t.Fatalf("ListByUser() error = %v", err)
+	}
+	if len(states) != 1 {
+		t.Fatalf("states len = %d, want 1", len(states))
+	}
+	if states[0].Status != "reviewing" || states[0].StrongEventCount != 2 || states[0].ReviewCount != 1 {
+		t.Fatalf("unexpected final state after replay+record serialization: %+v", states[0])
+	}
+
+	replayed, err := service.NewReplayUserStatesUsecase(baseManager).Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("final replay Execute() error = %v", err)
+	}
+	if replayed.ProcessedEventCount != 2 {
+		t.Fatalf("ProcessedEventCount after final replay = %d, want 2", replayed.ProcessedEventCount)
+	}
+}
+
 var errForcedBatchUpsertFailure = errors.New("forced batch upsert failure")
 
 type failingBatchUpsertTxManager struct {
@@ -275,6 +359,10 @@ func (m *failingBatchUpsertTxManager) WithinTx(ctx context.Context, fn func(ctx 
 	}
 
 	return tx.Commit(ctx)
+}
+
+func (m *failingBatchUpsertTxManager) WithinUserTx(ctx context.Context, _ string, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	return m.WithinTx(ctx, fn)
 }
 
 type failingBatchUpsertRepositories struct {
@@ -324,4 +412,35 @@ func indexStatesByUnit(states []model.UserUnitState) map[int64]model.UserUnitSta
 		indexed[state.CoarseUnitID] = state
 	}
 	return indexed
+}
+
+type blockingUserTxManager struct {
+	inner   service.TxManager
+	userID  string
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func newBlockingUserTxManager(inner service.TxManager, userID string) *blockingUserTxManager {
+	return &blockingUserTxManager{
+		inner:   inner,
+		userID:  userID,
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+}
+
+func (m *blockingUserTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	return m.inner.WithinTx(ctx, fn)
+}
+
+func (m *blockingUserTxManager) WithinUserTx(ctx context.Context, userID string, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	return m.inner.WithinUserTx(ctx, userID, func(ctx context.Context, repos service.TransactionalRepositories) error {
+		if userID == m.userID {
+			m.once.Do(func() { close(m.started) })
+			<-m.release
+		}
+		return fn(ctx, repos)
+	})
 }

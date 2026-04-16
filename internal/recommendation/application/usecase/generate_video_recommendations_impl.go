@@ -4,11 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
 	"learning-video-recommendation-system/internal/recommendation/application/dto"
-	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	domainaggregator "learning-video-recommendation-system/internal/recommendation/domain/aggregator"
 	domainassembler "learning-video-recommendation-system/internal/recommendation/domain/assembler"
@@ -31,16 +31,13 @@ type GenerateVideoRecommendationsService struct {
 	ranker             domainranking.VideoRanker
 	selector           domainselector.VideoSelector
 	explainer          domainexplain.ExplanationBuilder
-	videoServing       apprepo.VideoServingStateRepository
-	videoUserStates    apprepo.VideoUserStateReader
+	videoStateEnricher appservice.VideoStateEnricher
 	resultWriter       appservice.RecommendationResultWriter
 }
 
 var _ GenerateVideoRecommendationsUsecase = (*GenerateVideoRecommendationsService)(nil)
 
-func NewGenerateVideoRecommendationsService(assembler domainassembler.ContextAssembler) *GenerateVideoRecommendationsService {
-	return &GenerateVideoRecommendationsService{assembler: assembler}
-}
+var ErrIncompletePipeline = errors.New("recommendation pipeline requires all dependencies")
 
 func NewGenerateVideoRecommendationsPipeline(
 	assembler domainassembler.ContextAssembler,
@@ -51,10 +48,13 @@ func NewGenerateVideoRecommendationsPipeline(
 	ranker domainranking.VideoRanker,
 	selector domainselector.VideoSelector,
 	explainer domainexplain.ExplanationBuilder,
-	videoServing apprepo.VideoServingStateRepository,
-	videoUserStates apprepo.VideoUserStateReader,
+	videoStateEnricher appservice.VideoStateEnricher,
 	resultWriter appservice.RecommendationResultWriter,
-) *GenerateVideoRecommendationsService {
+) (*GenerateVideoRecommendationsService, error) {
+	if assembler == nil || planner == nil || candidateGenerator == nil || resolver == nil || aggregator == nil || ranker == nil || selector == nil || explainer == nil || videoStateEnricher == nil {
+		return nil, ErrIncompletePipeline
+	}
+
 	return &GenerateVideoRecommendationsService{
 		assembler:          assembler,
 		planner:            planner,
@@ -64,10 +64,9 @@ func NewGenerateVideoRecommendationsPipeline(
 		ranker:             ranker,
 		selector:           selector,
 		explainer:          explainer,
-		videoServing:       videoServing,
-		videoUserStates:    videoUserStates,
+		videoStateEnricher: videoStateEnricher,
 		resultWriter:       resultWriter,
-	}
+	}, nil
 }
 
 func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, request dto.GenerateVideoRecommendationsRequest) (dto.GenerateVideoRecommendationsResponse, error) {
@@ -82,21 +81,17 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	if u.planner == nil || u.candidateGenerator == nil || u.resolver == nil || u.aggregator == nil || u.ranker == nil || u.selector == nil || u.explainer == nil {
-		return shellResponse(contextModel)
-	}
-
 	demandBundle, err := u.planner.Plan(contextModel)
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	candidates, err := u.candidateGenerator.Generate(contextModel, demandBundle)
+	candidates, err := u.candidateGenerator.Generate(ctx, contextModel, demandBundle)
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	resolvedEvidence, err := u.resolver.Resolve(contextModel, candidates, demandBundle)
+	resolvedEvidence, err := u.resolver.Resolve(ctx, contextModel, candidates, demandBundle)
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
@@ -106,7 +101,7 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	contextModel, err = u.enrichVideoStates(ctx, contextModel, videoCandidates)
+	contextModel, err = u.videoStateEnricher.Enrich(ctx, contextModel, videoCandidates)
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
@@ -131,11 +126,14 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
+	targetCount := targetVideoCount(contextModel.Request, demandBundle)
+	underfilled := len(finalItems) < targetCount
+	demandBundle.Flags.ExtremeSparse = hasDemand(demandBundle) && underfilled
 	selectorMode := selectorModeForDemand(demandBundle)
 	response := dto.GenerateVideoRecommendationsResponse{
 		RunID:        runID,
 		SelectorMode: selectorMode,
-		Underfilled:  len(finalItems) < contextModel.Request.TargetVideoCount,
+		Underfilled:  underfilled,
 		Videos:       mapFinalItems(finalItems),
 	}
 
@@ -150,20 +148,6 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 	}
 
 	return response, nil
-}
-
-func shellResponse(contextModel model.RecommendationContext) (dto.GenerateVideoRecommendationsResponse, error) {
-	runID, err := newRunID()
-	if err != nil {
-		return dto.GenerateVideoRecommendationsResponse{}, err
-	}
-
-	return dto.GenerateVideoRecommendationsResponse{
-		RunID:        runID,
-		SelectorMode: "",
-		Underfilled:  len(contextModel.ActiveUnitStates) > 0,
-		Videos:       []dto.RecommendationVideo{},
-	}, nil
 }
 
 func newRunID() (string, error) {
@@ -185,43 +169,6 @@ func newRunID() (string, error) {
 	), nil
 }
 
-func (u *GenerateVideoRecommendationsService) enrichVideoStates(ctx context.Context, contextModel model.RecommendationContext, videos []model.VideoCandidate) (model.RecommendationContext, error) {
-	if len(videos) == 0 {
-		return contextModel, nil
-	}
-
-	videoIDs := uniqueVideoIDs(videos)
-	if u.videoServing != nil {
-		videoServingStates, err := u.videoServing.ListByUserAndVideoIDs(ctx, contextModel.Request.UserID, videoIDs)
-		if err != nil {
-			return model.RecommendationContext{}, err
-		}
-		contextModel.VideoServingStates = videoServingStates
-	}
-	if u.videoUserStates != nil {
-		videoUserStates, err := u.videoUserStates.ListByUserAndVideoIDs(ctx, contextModel.Request.UserID, videoIDs)
-		if err != nil {
-			return model.RecommendationContext{}, err
-		}
-		contextModel.VideoUserStates = videoUserStates
-	}
-	return contextModel, nil
-}
-
-func uniqueVideoIDs(videos []model.VideoCandidate) []string {
-	seen := make(map[string]struct{}, len(videos))
-	result := make([]string, 0, len(videos))
-	for _, video := range videos {
-		if _, ok := seen[video.VideoID]; ok {
-			continue
-		}
-		seen[video.VideoID] = struct{}{}
-		result = append(result, video.VideoID)
-	}
-	sort.Strings(result)
-	return result
-}
-
 func selectorModeForDemand(demand model.DemandBundle) string {
 	if demand.Flags.ExtremeSparse {
 		return string(policy.SelectorModeExtremeSparse)
@@ -232,24 +179,44 @@ func selectorModeForDemand(demand model.DemandBundle) string {
 	return string(policy.SelectorModeNormal)
 }
 
+func targetVideoCount(request model.RecommendationRequest, demand model.DemandBundle) int {
+	if request.TargetVideoCount > 0 {
+		return request.TargetVideoCount
+	}
+	if demand.TargetVideoCount > 0 {
+		return demand.TargetVideoCount
+	}
+	return 8
+}
+
+func hasDemand(demand model.DemandBundle) bool {
+	return len(demand.HardReview)+len(demand.NewNow)+len(demand.SoftReview)+len(demand.NearFuture) > 0
+}
+
 func mapFinalItems(items []model.FinalRecommendationItem) []dto.RecommendationVideo {
 	result := make([]dto.RecommendationVideo, 0, len(items))
 	for _, item := range items {
+		var bestEvidence *dto.BestEvidence
+		if item.BestEvidenceSentenceIndex != nil || item.BestEvidenceSpanIndex != nil || item.BestEvidenceStartMs != nil || item.BestEvidenceEndMs != nil {
+			bestEvidence = &dto.BestEvidence{
+				SentenceIndex: item.BestEvidenceSentenceIndex,
+				SpanIndex:     item.BestEvidenceSpanIndex,
+				StartMs:       item.BestEvidenceStartMs,
+				EndMs:         item.BestEvidenceEndMs,
+			}
+		}
 		result = append(result, dto.RecommendationVideo{
-			VideoID:                   item.VideoID,
-			Rank:                      item.Rank,
-			Score:                     item.Score,
-			ReasonCodes:               item.ReasonCodes,
-			CoveredUnits:              item.CoveredUnits,
-			CoveredHardReviewUnits:    item.CoveredHardReviewUnits,
-			CoveredNewNowUnits:        item.CoveredNewNowUnits,
-			CoveredSoftReviewUnits:    item.CoveredSoftReviewUnits,
-			CoveredNearFutureUnits:    item.CoveredNearFutureUnits,
-			BestEvidenceSentenceIndex: item.BestEvidenceSentenceIndex,
-			BestEvidenceSpanIndex:     item.BestEvidenceSpanIndex,
-			BestEvidenceStartMs:       item.BestEvidenceStartMs,
-			BestEvidenceEndMs:         item.BestEvidenceEndMs,
-			Explanation:               item.Explanation,
+			VideoID:                item.VideoID,
+			Rank:                   item.Rank,
+			Score:                  item.Score,
+			ReasonCodes:            item.ReasonCodes,
+			CoveredUnits:           item.CoveredUnits,
+			CoveredHardReviewUnits: item.CoveredHardReviewUnits,
+			CoveredNewNowUnits:     item.CoveredNewNowUnits,
+			CoveredSoftReviewUnits: item.CoveredSoftReviewUnits,
+			CoveredNearFutureUnits: item.CoveredNearFutureUnits,
+			BestEvidence:           bestEvidence,
+			Explanation:            item.Explanation,
 		})
 	}
 	return result

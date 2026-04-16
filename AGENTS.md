@@ -6,6 +6,7 @@
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
+You can ignore the git change of this directory.
 
 Rules:
 

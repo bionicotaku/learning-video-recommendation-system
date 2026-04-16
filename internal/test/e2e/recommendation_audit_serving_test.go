@@ -43,7 +43,11 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	if len(response.Videos) != 1 {
 		t.Fatalf("expected exactly one video, got %d", len(response.Videos))
 	}
-	if response.Videos[0].BestEvidenceSentenceIndex == nil || response.Videos[0].BestEvidenceSpanIndex == nil || response.Videos[0].BestEvidenceStartMs == nil || response.Videos[0].BestEvidenceEndMs == nil {
+	if response.Videos[0].BestEvidence == nil ||
+		response.Videos[0].BestEvidence.SentenceIndex == nil ||
+		response.Videos[0].BestEvidence.SpanIndex == nil ||
+		response.Videos[0].BestEvidence.StartMs == nil ||
+		response.Videos[0].BestEvidence.EndMs == nil {
 		t.Fatalf("missing best evidence in response: %+v", response.Videos[0])
 	}
 
@@ -61,10 +65,10 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	}
 
 	auditSentence, auditSpan, auditStart, auditEnd := h.LoadAuditEvidence(t, response.RunID, 1)
-	if *auditSentence != *response.Videos[0].BestEvidenceSentenceIndex ||
-		*auditSpan != *response.Videos[0].BestEvidenceSpanIndex ||
-		*auditStart != *response.Videos[0].BestEvidenceStartMs ||
-		*auditEnd != *response.Videos[0].BestEvidenceEndMs {
+	if *auditSentence != *response.Videos[0].BestEvidence.SentenceIndex ||
+		*auditSpan != *response.Videos[0].BestEvidence.SpanIndex ||
+		*auditStart != *response.Videos[0].BestEvidence.StartMs ||
+		*auditEnd != *response.Videos[0].BestEvidence.EndMs {
 		t.Fatalf("audit evidence mismatch: response=%+v audit=(%v,%v,%v,%v)", response.Videos[0], auditSentence, auditSpan, auditStart, auditEnd)
 	}
 }

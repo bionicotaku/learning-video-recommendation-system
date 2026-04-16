@@ -44,6 +44,47 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 	if ranked[1].RecentWatchedPenalty <= 0 {
 		t.Fatalf("expected recent watched penalty, got %#v", ranked[1])
 	}
+	if ranked[0].BaseScore == ranked[1].BaseScore {
+		t.Fatalf("expected ranking score difference, got %#v", ranked)
+	}
+}
+
+func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *testing.T) {
+	now := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
+	recentWatchedAt := now.Add(-3 * time.Hour)
+
+	ranker := recommendationranking.NewDefaultVideoRanker()
+	ranked, err := ranker.Rank(model.RecommendationContext{
+		Now: now,
+		Request: model.RecommendationRequest{
+			TargetVideoCount:     1,
+			PreferredDurationSec: [2]int{45, 180},
+		},
+		VideoUserStates: []model.VideoUserState{
+			{VideoID: "video-1", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxWatchRatio: 0.95},
+		},
+	}, []model.VideoCandidate{
+		videoCandidate("video-1", string(policy.BucketHardReview), 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
+	}, recommendationDemand())
+	if err != nil {
+		t.Fatalf("rank: %v", err)
+	}
+
+	got := ranked[0]
+	demandCoverage := 0.50*got.HardReviewCover + 0.20*got.NewNowCover + 0.20*got.SoftReviewCover + 0.10*got.NearFutureCover
+	want := round4ForTest(
+		0.40*demandCoverage +
+			0.18*got.CoverageStrengthScore +
+			0.15*got.BundleValueScore +
+			0.15*got.EducationalFitScore +
+			0.05*got.FutureValueScore +
+			0.05*got.FreshnessScore -
+			0.03*got.RecentServedPenalty -
+			0.02*got.OverloadPenalty,
+	)
+	if got.BaseScore != want {
+		t.Fatalf("expected base score without direct recent watched subtraction, got=%0.4f want=%0.4f candidate=%+v", got.BaseScore, want, got)
+	}
 }
 
 func TestDefaultVideoRankerAddsOverloadPenaltyForOverstuffedLongVideo(t *testing.T) {
@@ -99,4 +140,12 @@ func videoCandidate(videoID string, dominantBucket string, hardCover float64, co
 
 func int64Ptr(value int64) *int64 {
 	return &value
+}
+
+func int32Ptr(value int32) *int32 {
+	return &value
+}
+
+func round4ForTest(value float64) float64 {
+	return float64(int(value*10000+0.5)) / 10000
 }

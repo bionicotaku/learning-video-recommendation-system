@@ -15,7 +15,12 @@ import (
 
 func TestEnsureTargetUnitsExecute(t *testing.T) {
 	targetRepo := &fakeTargetStateCommandRepository{}
-	usecase := service.NewEnsureTargetUnitsUsecase(targetRepo)
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			targetCommands: targetRepo,
+		},
+	}
+	usecase := service.NewEnsureTargetUnitsUsecase(txManager)
 
 	response, err := usecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
 		UserID: "11111111-1111-1111-1111-111111111111",
@@ -31,6 +36,9 @@ func TestEnsureTargetUnitsExecute(t *testing.T) {
 	if response.TargetCount != 2 {
 		t.Fatalf("TargetCount = %d, want 2", response.TargetCount)
 	}
+	if !txManager.withinUserCalled || txManager.lastLockedUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("expected user-scoped transaction lock, got called=%v user=%q", txManager.withinUserCalled, txManager.lastLockedUserID)
+	}
 	if len(targetRepo.targets) != 2 {
 		t.Fatalf("targets forwarded = %d, want 2", len(targetRepo.targets))
 	}
@@ -38,7 +46,12 @@ func TestEnsureTargetUnitsExecute(t *testing.T) {
 
 func TestSetTargetInactiveExecute(t *testing.T) {
 	targetRepo := &fakeTargetStateCommandRepository{}
-	usecase := service.NewSetTargetInactiveUsecase(targetRepo)
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			targetCommands: targetRepo,
+		},
+	}
+	usecase := service.NewSetTargetInactiveUsecase(txManager)
 
 	_, err := usecase.Execute(context.Background(), dto.SetTargetInactiveRequest{
 		UserID:       "11111111-1111-1111-1111-111111111111",
@@ -50,6 +63,9 @@ func TestSetTargetInactiveExecute(t *testing.T) {
 
 	if targetRepo.inactiveUnitID != 101 {
 		t.Fatalf("inactive unit = %d, want 101", targetRepo.inactiveUnitID)
+	}
+	if !txManager.withinUserCalled || txManager.lastLockedUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("expected user-scoped transaction lock, got called=%v user=%q", txManager.withinUserCalled, txManager.lastLockedUserID)
 	}
 }
 
@@ -79,8 +95,8 @@ func TestSuspendTargetUnitExecute(t *testing.T) {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	if !txManager.called {
-		t.Fatalf("transaction manager was not used")
+	if !txManager.withinUserCalled || txManager.lastLockedUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("expected user-scoped transaction lock, got called=%v user=%q", txManager.withinUserCalled, txManager.lastLockedUserID)
 	}
 	if stateRepo.upserted == nil {
 		t.Fatalf("state was not upserted")
@@ -380,12 +396,20 @@ func TestReplayUserStatesExecutePreservesControlSliceAndTargetOnlyRows(t *testin
 }
 
 type fakeTxManager struct {
-	called       bool
-	repositories fakeTransactionalRepositories
+	called           bool
+	withinUserCalled bool
+	lastLockedUserID string
+	repositories     fakeTransactionalRepositories
 }
 
 func (f *fakeTxManager) WithinTx(ctx context.Context, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
 	f.called = true
+	return fn(ctx, f.repositories)
+}
+
+func (f *fakeTxManager) WithinUserTx(ctx context.Context, userID string, fn func(ctx context.Context, repos service.TransactionalRepositories) error) error {
+	f.withinUserCalled = true
+	f.lastLockedUserID = userID
 	return fn(ctx, f.repositories)
 }
 

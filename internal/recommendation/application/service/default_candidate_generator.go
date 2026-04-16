@@ -23,8 +23,8 @@ func NewDefaultCandidateGenerator(recommendable apprepo.RecommendableVideoUnitRe
 	}
 }
 
-func (g *DefaultCandidateGenerator) Generate(recommendationContext model.RecommendationContext, demand model.DemandBundle) ([]model.VideoUnitCandidate, error) {
-	rows, err := g.loadRecommendableRows(context.Background(), recommendationContext, demand)
+func (g *DefaultCandidateGenerator) Generate(ctx context.Context, recommendationContext model.RecommendationContext, demand model.DemandBundle) ([]model.VideoUnitCandidate, error) {
+	rows, err := g.loadRecommendableRows(ctx, recommendationContext, demand)
 	if err != nil {
 		return nil, err
 	}
