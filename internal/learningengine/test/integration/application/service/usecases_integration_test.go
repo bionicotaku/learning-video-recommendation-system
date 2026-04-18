@@ -1,3 +1,5 @@
+//go:build integration
+
 package service_test
 
 import (
@@ -16,11 +18,12 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	persistrepo "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/repository"
 	persisttx "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/tx"
-	"learning-video-recommendation-system/internal/learningengine/testutil"
 )
 
 func TestTargetControlUsecasesWithDatabase(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	db.SeedUser(t, "11111111-1111-1111-1111-111111111111")
 	db.SeedCoarseUnit(t, 101)
 
@@ -96,7 +99,9 @@ func TestTargetControlUsecasesWithDatabase(t *testing.T) {
 }
 
 func TestRecordLearningEventsWithDatabase(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -135,7 +140,9 @@ func TestRecordLearningEventsWithDatabase(t *testing.T) {
 }
 
 func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -164,7 +171,9 @@ func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
 }
 
 func TestReplayUserStatesWithDatabase(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -248,7 +257,9 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 }
 
 func TestReplayAndRecordSerializeForSameUser(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)

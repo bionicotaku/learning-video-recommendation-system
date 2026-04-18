@@ -23,17 +23,13 @@ type execer interface {
 }
 
 func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
-	pool := fixture.OpenPool(t)
-	tx := fixture.BeginTestTx(t, pool)
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
-
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, tx); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
 
 	userID := "00000000-0000-0000-0000-000000000101"
 	videoID := "00000000-0000-0000-0000-000000000201"
-	seedBaseRefs(t, ctx, tx, userID, videoID, 301)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID, 301)
 
 	if _, err := tx.Exec(ctx, `insert into catalog.video_user_states (user_id, video_id, watch_count, completed_count, last_watch_ratio, max_watch_ratio) values ($1, $2, 3, 1, 0.65000, 0.90000)`, userID, videoID); err != nil {
 		t.Fatalf("seed video_user_states: %v", err)
@@ -53,20 +49,16 @@ func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
 }
 
 func TestServingStateRepositoriesListAndUpsert(t *testing.T) {
-	pool := fixture.OpenPool(t)
-	tx := fixture.BeginTestTx(t, pool)
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
-
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, tx); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
 
 	userID := "00000000-0000-0000-0000-000000000102"
 	videoID := "00000000-0000-0000-0000-000000000202"
 	unitID := int64(301)
 	runID := "00000000-0000-0000-0000-000000000401"
 	now := time.Now().UTC()
-	seedBaseRefs(t, ctx, tx, userID, videoID, unitID)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID, unitID)
 
 	unitRepo := repository.NewUnitServingStateRepository(tx)
 	videoRepo := repository.NewVideoServingStateRepository(tx)
@@ -109,19 +101,15 @@ func TestServingStateRepositoriesListAndUpsert(t *testing.T) {
 }
 
 func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
-	pool := fixture.OpenPool(t)
-	tx := fixture.BeginTestTx(t, pool)
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
-
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, tx); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
 
 	userID := "00000000-0000-0000-0000-000000000103"
 	videoID := "00000000-0000-0000-0000-000000000203"
 	runID := "00000000-0000-0000-0000-000000000403"
 	unitID := int64(301)
-	seedBaseRefs(t, ctx, tx, userID, videoID, unitID)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID, unitID)
 
 	if _, err := tx.Exec(ctx, `insert into recommendation.video_recommendation_runs (run_id, user_id, request_context, planner_snapshot, lane_budget_snapshot, candidate_summary, underfilled, result_count) values ($1, $2, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, '{}'::jsonb, false, 2)`, runID, userID); err != nil {
 		t.Fatalf("seed run: %v", err)
@@ -167,18 +155,14 @@ func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
 }
 
 func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
-	pool := fixture.OpenPool(t)
-	tx := fixture.BeginTestTx(t, pool)
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
-
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, tx); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
 
 	userID := "00000000-0000-0000-0000-000000000104"
 	videoID := "00000000-0000-0000-0000-000000000204"
 	unitID := int64(401)
-	seedBaseRefs(t, ctx, tx, userID, videoID, unitID)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID, unitID)
 
 	if _, err := tx.Exec(ctx, `insert into catalog.video_transcripts (video_id, mapped_span_ratio) values ($1, 0.70000)`, videoID); err != nil {
 		t.Fatalf("seed transcript: %v", err)
@@ -232,32 +216,28 @@ func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 }
 
 func TestUnitInventoryReadModelCoversSupplyGradesAndNone(t *testing.T) {
-	pool := fixture.OpenPool(t)
-	tx := fixture.BeginTestTx(t, pool)
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
 
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, tx); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
-
 	userID := "00000000-0000-0000-0000-000000000105"
-	seedUser(t, ctx, tx, userID)
-	seedCoarseUnit(t, ctx, tx, 501)
-	seedCoarseUnit(t, ctx, tx, 502)
-	seedCoarseUnit(t, ctx, tx, 503)
-	seedCoarseUnit(t, ctx, tx, 504)
-	seedCoarseUnit(t, ctx, tx, 505)
+	seedUser(t, ctx, db, tx, userID)
+	seedCoarseUnit(t, ctx, db, tx, 501)
+	seedCoarseUnit(t, ctx, db, tx, 502)
+	seedCoarseUnit(t, ctx, db, tx, 503)
+	seedCoarseUnit(t, ctx, db, tx, 504)
+	seedCoarseUnit(t, ctx, db, tx, 505)
 
-	seedInventoryVideo(t, ctx, tx, "00000000-0000-0000-0000-000000000301", 501, 2, 0.05000, 0.60000)
-	seedInventoryVideo(t, ctx, tx, "00000000-0000-0000-0000-000000000302", 502, 2, 0.05000, 0.60000)
-	seedInventoryVideo(t, ctx, tx, "00000000-0000-0000-0000-000000000303", 502, 2, 0.05000, 0.60000)
+	seedInventoryVideo(t, ctx, db, tx, "00000000-0000-0000-0000-000000000301", 501, 2, 0.05000, 0.60000)
+	seedInventoryVideo(t, ctx, db, tx, "00000000-0000-0000-0000-000000000302", 502, 2, 0.05000, 0.60000)
+	seedInventoryVideo(t, ctx, db, tx, "00000000-0000-0000-0000-000000000303", 502, 2, 0.05000, 0.60000)
 	for i := 0; i < 4; i++ {
 		videoID := videoIDFromIndex(400 + i)
-		seedInventoryVideo(t, ctx, tx, videoID, 503, 2, 0.05000, 0.60000)
+		seedInventoryVideo(t, ctx, db, tx, videoID, 503, 2, 0.05000, 0.60000)
 	}
 	for i := 0; i < 4; i++ {
 		videoID := videoIDFromIndex(500 + i)
-		seedInventoryVideo(t, ctx, tx, videoID, 504, 2, 0.05000, 0.60000)
+		seedInventoryVideo(t, ctx, db, tx, videoID, 504, 2, 0.05000, 0.60000)
 	}
 
 	queries := recommendationsqlc.New(tx)
@@ -297,33 +277,29 @@ func TestUnitInventoryReadModelCoversSupplyGradesAndNone(t *testing.T) {
 }
 
 func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *testing.T) {
-	pool := fixture.OpenPool(t)
+	db := testDB(t)
 	ctx := context.Background()
 
-	conn, err := pool.Acquire(ctx)
+	conn, err := db.Pool.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("acquire connection: %v", err)
 	}
 	defer conn.Release()
 
-	if err := fixture.EnsureRecommendationStep1Schema(ctx, conn.Conn()); err != nil {
-		t.Fatalf("ensure schema: %v", err)
-	}
-
-	manager := tx.NewManager(pool)
+	manager := tx.NewManager(db.Pool)
 	writer := appservice.NewDefaultRecommendationResultWriter(
 		manager,
-		appservice.NewDefaultAuditWriter(repository.NewRecommendationAuditRepository(pool)),
+		appservice.NewDefaultAuditWriter(repository.NewRecommendationAuditRepository(db.Pool)),
 		appservice.NewDefaultServingStateManager(
-			repository.NewUnitServingStateRepository(pool),
-			repository.NewVideoServingStateRepository(pool),
+			repository.NewUnitServingStateRepository(db.Pool),
+			repository.NewVideoServingStateRepository(db.Pool),
 		),
 	)
 
 	runID := "00000000-0000-0000-0000-000000000501"
 	userID := "00000000-0000-0000-0000-000000000111"
 	videoID := "00000000-0000-0000-0000-000000000211"
-	seedBaseRefs(t, ctx, conn.Conn(), userID, videoID, 301)
+	seedBaseRefs(t, ctx, db, conn.Conn(), userID, videoID, 301)
 
 	err = writer.Persist(ctx, model.RecommendationRun{
 		RunID:              runID,
@@ -357,7 +333,7 @@ func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *
 	}
 
 	var runCount int
-	if err := pool.QueryRow(ctx, `select count(*) from recommendation.video_recommendation_runs where run_id = $1`, runID).Scan(&runCount); err != nil {
+	if err := db.Pool.QueryRow(ctx, `select count(*) from recommendation.video_recommendation_runs where run_id = $1`, runID).Scan(&runCount); err != nil {
 		t.Fatalf("count runs: %v", err)
 	}
 	if runCount != 1 {
@@ -365,7 +341,7 @@ func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *
 	}
 
 	var itemCount int
-	if err := pool.QueryRow(ctx, `select count(*) from recommendation.video_recommendation_items where run_id = $1`, runID).Scan(&itemCount); err != nil {
+	if err := db.Pool.QueryRow(ctx, `select count(*) from recommendation.video_recommendation_items where run_id = $1`, runID).Scan(&itemCount); err != nil {
 		t.Fatalf("count items: %v", err)
 	}
 	if itemCount != 1 {
@@ -373,7 +349,7 @@ func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *
 	}
 
 	var servedCount int
-	if err := pool.QueryRow(ctx, `select served_count from recommendation.user_video_serving_states where user_id = $1 and video_id = $2`, userID, videoID).Scan(&servedCount); err != nil {
+	if err := db.Pool.QueryRow(ctx, `select served_count from recommendation.user_video_serving_states where user_id = $1 and video_id = $2`, userID, videoID).Scan(&servedCount); err != nil {
 		t.Fatalf("video serving state: %v", err)
 	}
 	if servedCount != 1 {
@@ -381,35 +357,27 @@ func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *
 	}
 }
 
-func seedBaseRefs(t *testing.T, ctx context.Context, db execer, userID string, videoID string, unitID int64) {
+func seedBaseRefs(t *testing.T, ctx context.Context, testDB *fixture.TestDatabase, db execer, userID string, videoID string, unitID int64) {
 	t.Helper()
-	seedUser(t, ctx, db, userID)
-	seedCoarseUnit(t, ctx, db, unitID)
-	if _, err := db.Exec(ctx, `insert into catalog.videos (video_id, duration_ms, status, visibility_status) values ($1, 120000, 'active', 'public') on conflict (video_id) do nothing`, videoID); err != nil {
-		t.Fatalf("seed video: %v", err)
-	}
+	seedUser(t, ctx, testDB, db, userID)
+	seedCoarseUnit(t, ctx, testDB, db, unitID)
+	testDB.SeedVideo(t, videoID)
 }
 
-func seedUser(t *testing.T, ctx context.Context, db execer, userID string) {
+func seedUser(t *testing.T, ctx context.Context, testDB *fixture.TestDatabase, db execer, userID string) {
 	t.Helper()
-	if _, err := db.Exec(ctx, `insert into auth.users (id) values ($1) on conflict (id) do nothing`, userID); err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
+	testDB.SeedUser(t, userID)
 }
 
-func seedCoarseUnit(t *testing.T, ctx context.Context, db execer, unitID int64) {
+func seedCoarseUnit(t *testing.T, ctx context.Context, testDB *fixture.TestDatabase, db execer, unitID int64) {
 	t.Helper()
-	if _, err := db.Exec(ctx, `insert into semantic.coarse_unit (id) values ($1) on conflict (id) do nothing`, unitID); err != nil {
-		t.Fatalf("seed coarse_unit: %v", err)
-	}
+	testDB.SeedCoarseUnit(t, unitID)
 }
 
-func seedInventoryVideo(t *testing.T, ctx context.Context, db execer, videoID string, unitID int64, mentionCount int, coverageRatio float64, mappedSpanRatio float64) {
+func seedInventoryVideo(t *testing.T, ctx context.Context, testDB *fixture.TestDatabase, db execer, videoID string, unitID int64, mentionCount int, coverageRatio float64, mappedSpanRatio float64) {
 	t.Helper()
-	seedCoarseUnit(t, ctx, db, unitID)
-	if _, err := db.Exec(ctx, `insert into catalog.videos (video_id, duration_ms, status, visibility_status) values ($1, 120000, 'active', 'public') on conflict (video_id) do nothing`, videoID); err != nil {
-		t.Fatalf("seed inventory video metadata: %v", err)
-	}
+	seedCoarseUnit(t, ctx, testDB, db, unitID)
+	testDB.SeedVideo(t, videoID)
 	if _, err := db.Exec(ctx, `insert into catalog.video_transcripts (video_id, mapped_span_ratio) values ($1, $2) on conflict (video_id) do update set mapped_span_ratio = excluded.mapped_span_ratio`, videoID, mappedSpanRatio); err != nil {
 		t.Fatalf("seed inventory transcript: %v", err)
 	}

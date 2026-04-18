@@ -27,4 +27,5 @@ coverage.out
 .air.toml
 
 graphify-out/cache/
-.codex/
+.codex/**/__pycache__/
+.codex/**/*.py[cod]

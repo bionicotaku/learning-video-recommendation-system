@@ -68,7 +68,11 @@
 - `test`
   - Recommendation 自己的 unit / golden / integration 测试
   - integration 测试使用外部依赖 stub + 真实 Recommendation migration / 物化视图 / refresh 路径
-  - 默认 `make check` 已包含 Recommendation integration；E2E 仍通过 `make e2e-test` 单独运行
+  - `test/fixture` 是模块内 integration 的唯一共享测试基座入口
+  - 当前 integration 基座已对齐 `learningengine`：每个 integration 测试包共享一个 embedded Postgres server，template database 只初始化一次，每个测试 case clone 独立数据库
+  - 当前测试结构已经对齐模块级集中测试规范，不在业务实现目录旁散落 `*_test.go`
+  - 日常编码可先运行 `make quick-check`
+  - 默认 `make check` 已通过一次 `go test -tags=integration ...` 调用并行调度 Learning engine + Recommendation integration；E2E 仍通过 `make e2e-test` 单独运行
 
 ## 当前未实现
 

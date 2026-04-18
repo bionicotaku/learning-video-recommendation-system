@@ -1,3 +1,5 @@
+//go:build integration
+
 package tx_test
 
 import (
@@ -11,11 +13,12 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/application/service"
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	persisttx "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/tx"
-	"learning-video-recommendation-system/internal/learningengine/testutil"
 )
 
 func TestManagerRollsBackTransactionOnError(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -71,7 +74,9 @@ func TestManagerRollsBackTransactionOnError(t *testing.T) {
 }
 
 func TestManagerWithinUserTxSerializesSameUser(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	manager := persisttx.NewManager(db.Pool)
 
 	firstStarted := make(chan struct{})
@@ -126,7 +131,9 @@ func TestManagerWithinUserTxSerializesSameUser(t *testing.T) {
 }
 
 func TestManagerWithinUserTxAllowsDifferentUsersConcurrently(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	manager := persisttx.NewManager(db.Pool)
 
 	startBarrier := make(chan struct{})

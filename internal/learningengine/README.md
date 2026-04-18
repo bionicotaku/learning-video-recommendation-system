@@ -69,7 +69,10 @@ internal/learningengine/
       schema/
       sqlcgen/
       tx/
-  testutil/
+  test/
+    fixture/
+    unit/
+    integration/
 ```
 
 ## 主要边界
@@ -136,16 +139,47 @@ first learning event for unseen unit
 
 ## 测试布局
 
-当前测试分三层：
+当前测试统一收口到模块 `test/` 目录：
 
-- 领域测试：`domain/aggregate`
-- usecase 测试：`application/service`
-- real Postgres 测试：
-  - `application/service/*_integration_test.go`
-  - `infrastructure/persistence/repository/*_integration_test.go`
-  - `infrastructure/persistence/tx/*_integration_test.go`
+- `test/unit`
+  - 纯内存 / fake / stub 测试
+  - 当前包括：
+    - `application/service`
+    - `domain/aggregate`
+- `test/integration`
+  - 真实 Postgres、真实 repository、真实 tx、真实 usecase 测试
+  - 当前包括：
+    - `application/service`
+    - `infrastructure/persistence/repository`
+    - `infrastructure/persistence/tx`
+- `test/fixture`
+  - 模块共享测试基座
+  - 负责 shared embedded Postgres、template database、schema apply 和 seed helper
 
-测试数据库当前使用 embedded Postgres。当前环境没有可用 Docker daemon，因此模块内连库测试没有使用容器，但仍然是对真实 Postgres 的数据库验证。
+当前模块内真实数据库测试使用 shared embedded Postgres server + 测试级独立 database：
+
+- 每个 integration 测试包只启动一次 embedded Postgres
+- schema / migration 只在 template database 上初始化一次
+- 每个测试 case 从 template clone 自己的数据库
+- 测完关闭连接并删除该数据库
+
+这样做的目的是：
+
+- 保持真实 Postgres 验证不变
+- 避免每个测试 case 各自起库、各自跑 migration
+- 在不共享脏数据的前提下缩短 `learningengine` 集成测试耗时
+
+当前推荐的本地检查方式：
+
+- `make quick-check`
+  - 日常编码时快速执行 `gofmt + go vet + go test ./...`
+  - 不包含带 `integration` tag 的真实数据库慢测试
+- `make learningengine-test-integration`
+  - 单独执行 Learning engine 模块内真实数据库测试
+- `make check`
+  - 作为完整仓库级验收
+  - 先执行 `quick-check`
+  - 再通过一次 `go test -tags=integration ...` 调用并行调度 Learning engine 与 Recommendation 的模块内 integration 测试
 
 ## 当前约束
 

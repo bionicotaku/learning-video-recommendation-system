@@ -1,3 +1,5 @@
+//go:build integration
+
 package repository_test
 
 import (
@@ -7,11 +9,12 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/domain/model"
 	persistrepo "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/repository"
-	"learning-video-recommendation-system/internal/learningengine/testutil"
 )
 
 func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -47,7 +50,9 @@ func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
 }
 
 func TestUserUnitStateRepositoryUpsertListAndDelete(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
@@ -90,7 +95,9 @@ func TestUserUnitStateRepositoryUpsertListAndDelete(t *testing.T) {
 }
 
 func TestTargetStateCommandRepositoryEnsureAndSetInactive(t *testing.T) {
-	db := testutil.StartPostgres(t)
+	t.Parallel()
+
+	db := testDB(t)
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
