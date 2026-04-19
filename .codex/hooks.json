@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .codex/graphify_pretool_hook.py"
+            "command": "sh -lc '[ -f .codex/graphify_pretool_hook.py ] || exit 0; exec python3 .codex/graphify_pretool_hook.py'"
           }
         ]
       }
