@@ -1,12 +1,12 @@
-# Graph Report - .  (2026-04-17)
+# Graph Report - .  (2026-04-19)
 
 ## Corpus Check
-- 160 files · ~82,509 words
+- 161 files · ~83,152 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 893 nodes · 2178 edges · 85 communities detected
-- Extraction: 54% EXTRACTED · 46% INFERRED · 0% AMBIGUOUS · INFERRED: 995 edges (avg confidence: 0.75)
+- 910 nodes · 2236 edges · 90 communities detected
+- Extraction: 53% EXTRACTED · 47% INFERRED · 0% AMBIGUOUS · INFERRED: 1040 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -95,11 +95,16 @@
 - [[_COMMUNITY_Community 82|Community 82]]
 - [[_COMMUNITY_Community 83|Community 83]]
 - [[_COMMUNITY_Community 84|Community 84]]
+- [[_COMMUNITY_Community 85|Community 85]]
+- [[_COMMUNITY_Community 86|Community 86]]
+- [[_COMMUNITY_Community 87|Community 87]]
+- [[_COMMUNITY_Community 88|Community 88]]
+- [[_COMMUNITY_Community 89|Community 89]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `CatalogIngestError` - 53 edges
 2. `Harness` - 45 edges
-3. `LoadedClipInput` - 26 edges
+3. `LoadedClipInput` - 31 edges
 4. `CatalogRepository` - 26 edges
 5. `TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` - 23 edges
 6. `TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply()` - 23 edges
@@ -152,7 +157,7 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
-Nodes (107): Exception, build_normalized_clip_data(), _build_transcript_row(), _build_unit_index_rows(), _dedupe_surface_forms(), _merge_intervals_and_measure(), 基于基础行构建完整写库数据。      这个阶段负责两类派生结果：     - transcript 顶层摘要     - video_unit_index 聚, 按 `(video_id, coarse_unit_id)` 的逻辑构建视频级 unit 索引。      这里虽然还没有真正的 video_id，但聚合维度和 (+99 more)
+Nodes (116): Exception, build_normalized_clip_data(), _build_transcript_row(), _build_unit_index_rows(), _dedupe_surface_forms(), _evidence_pick_key(), _merge_intervals_and_measure(), 按当前设计规则选出稳定的 evidence spans。 (+108 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.04
@@ -452,46 +457,66 @@ Nodes (0):
 
 ### Community 75 - "Community 75"
 Cohesion: 1.0
-Nodes (1): Single Reducer Rule
+Nodes (1): 表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于
 
 ### Community 76 - "Community 76"
 Cohesion: 1.0
-Nodes (1): RecordLearningEvents Pipeline
+Nodes (1): 表示 normalizer 和 index_builder 产出的完整写库数据。
 
 ### Community 77 - "Community 77"
 Cohesion: 1.0
-Nodes (1): ReplayUserStates Pipeline
+Nodes (1): 表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生
 
 ### Community 78 - "Community 78"
 Cohesion: 1.0
-Nodes (1): Short Final-Write Transactions
+Nodes (1): 表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完
 
 ### Community 79 - "Community 79"
 Cohesion: 1.0
-Nodes (1): Run/Item Audit Center Policy
+Nodes (1): 表示 main 汇总时使用的单 clip 最终结果。
 
 ### Community 80 - "Community 80"
 Cohesion: 1.0
-Nodes (1): Read-Only Upstream Data Policy
+Nodes (1): Single Reducer Rule
 
 ### Community 81 - "Community 81"
 Cohesion: 1.0
-Nodes (1): video_recommendation_runs / video_recommendation_items
+Nodes (1): RecordLearningEvents Pipeline
 
 ### Community 82 - "Community 82"
 Cohesion: 1.0
-Nodes (1): user_unit_serving_states
+Nodes (1): ReplayUserStates Pipeline
 
 ### Community 83 - "Community 83"
 Cohesion: 1.0
-Nodes (1): user_video_serving_states
+Nodes (1): Short Final-Write Transactions
 
 ### Community 84 - "Community 84"
+Cohesion: 1.0
+Nodes (1): Run/Item Audit Center Policy
+
+### Community 85 - "Community 85"
+Cohesion: 1.0
+Nodes (1): Read-Only Upstream Data Policy
+
+### Community 86 - "Community 86"
+Cohesion: 1.0
+Nodes (1): video_recommendation_runs / video_recommendation_items
+
+### Community 87 - "Community 87"
+Cohesion: 1.0
+Nodes (1): user_unit_serving_states
+
+### Community 88 - "Community 88"
+Cohesion: 1.0
+Nodes (1): user_video_serving_states
+
+### Community 89 - "Community 89"
 Cohesion: 1.0
 Nodes (1): Cross-Module E2E Test Scope
 
 ## Knowledge Gaps
-- **135 isolated node(s):** `DATABASE_URL Loader`, `candidateSummary`, `Explanation Builder Unit Test Suite`, `Demand Planner Unit Test Suite`, `Video Evidence Aggregator Unit Test Suite` (+130 more)
+- **141 isolated node(s):** `DATABASE_URL Loader`, `candidateSummary`, `Explanation Builder Unit Test Suite`, `Demand Planner Unit Test Suite`, `Video Evidence Aggregator Unit Test Suite` (+136 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 30`** (2 nodes): `RecommendableVideoUnitReader`, `UnitInventoryReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -583,25 +608,35 @@ Nodes (1): Cross-Module E2E Test Scope
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 74`** (1 nodes): `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `Single Reducer Rule`
+- **Thin community `Community 75`** (1 nodes): `表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `RecordLearningEvents Pipeline`
+- **Thin community `Community 76`** (1 nodes): `表示 normalizer 和 index_builder 产出的完整写库数据。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `ReplayUserStates Pipeline`
+- **Thin community `Community 77`** (1 nodes): `表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `Short Final-Write Transactions`
+- **Thin community `Community 78`** (1 nodes): `表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `Run/Item Audit Center Policy`
+- **Thin community `Community 79`** (1 nodes): `表示 main 汇总时使用的单 clip 最终结果。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `Read-Only Upstream Data Policy`
+- **Thin community `Community 80`** (1 nodes): `Single Reducer Rule`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `video_recommendation_runs / video_recommendation_items`
+- **Thin community `Community 81`** (1 nodes): `RecordLearningEvents Pipeline`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `user_unit_serving_states`
+- **Thin community `Community 82`** (1 nodes): `ReplayUserStates Pipeline`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `user_video_serving_states`
+- **Thin community `Community 83`** (1 nodes): `Short Final-Write Transactions`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `Cross-Module E2E Test Scope`
+- **Thin community `Community 84`** (1 nodes): `Run/Item Audit Center Policy`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 85`** (1 nodes): `Read-Only Upstream Data Policy`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 86`** (1 nodes): `video_recommendation_runs / video_recommendation_items`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 87`** (1 nodes): `user_unit_serving_states`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 88`** (1 nodes): `user_video_serving_states`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 89`** (1 nodes): `Cross-Module E2E Test Scope`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
@@ -610,13 +645,13 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `Reduce()` connect `Community 15` to `Community 1`?**
   _High betweenness centrality (0.024) - this node is a cross-community bridge._
 - **Why does `_load_from_parent_file()` connect `Community 0` to `Community 4`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Are the 49 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
   _`CatalogIngestError` has 49 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 20 inferred relationships involving `Harness` (e.g. with `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` and `TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty()`) actually correct?**
   _`Harness` has 20 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 24 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
-  _`LoadedClipInput` has 24 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 29 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
+  _`LoadedClipInput` has 29 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `CatalogRepository` (e.g. with `脚本主入口。      main 只负责总编排：     - 读取参数     - 初始化 repository     - 调用 loader / valid` and `判断当前 clip 是否可直接 skipped。      这里严格按 README 中的“无变化跳过”规则比较。     只要 transcript chec`) actually correct?**
   _`CatalogRepository` has 10 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 22 inferred relationships involving `TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` (e.g. with `Harness` and `.LearningSuite()`) actually correct?**

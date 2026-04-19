@@ -541,11 +541,10 @@ class CatalogRepository:
                   coverage_ms,
                   coverage_ratio,
                   sentence_indexes,
-                  evidence_sentence_indexes,
-                  evidence_span_indexes,
+                  evidence_span_refs,
                   sample_surface_forms
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -558,8 +557,15 @@ class CatalogRepository:
                         unit.coverage_ms,
                         unit.coverage_ratio,
                         list(unit.sentence_indexes),
-                        list(unit.evidence_sentence_indexes),
-                        list(unit.evidence_span_indexes),
+                        Jsonb(
+                            [
+                                {
+                                    "sentence_index": ref.sentence_index,
+                                    "span_index": ref.span_index,
+                                }
+                                for ref in unit.evidence_span_refs
+                            ]
+                        ),
                         list(unit.sample_surface_forms),
                     )
                     for unit in normalized_data.unit_indexes

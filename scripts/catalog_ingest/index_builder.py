@@ -4,6 +4,7 @@ from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import (
+    EvidenceSpanRef,
     LoadedClipInput,
     NormalizedClipData,
     NormalizedCoreRows,
@@ -88,18 +89,18 @@ def _build_unit_index_rows(
         coverage_ms = _merge_intervals_and_measure([(span.start_ms, span.end_ms) for span in spans])
         coverage_ratio = _safe_ratio(coverage_ms, video_duration_ms)
 
-        # 当前 evidence 策略保持简单且稳定：
-        # 先按时间顺序排序，再取前 3 个代表 span。
-        # 这足够支撑 recall 的轻量证据定位，不额外引入复杂评分。
-        evidence_spans = sorted(spans, key=lambda span: (span.start_ms, span.end_ms, span.sentence_index, span.span_index))[:3]
-
-        # 这里必须明确遵守 README 里的约定：
-        # evidence_sentence_indexes[i] 与 evidence_span_indexes[i] 按位置配对解释。
-        evidence_sentence_indexes = tuple(span.sentence_index for span in evidence_spans)
-        evidence_span_indexes = tuple(span.span_index for span in evidence_spans)
+        selected_evidence_spans = _select_evidence_spans(spans)
+        evidence_span_refs = tuple(
+            EvidenceSpanRef(
+                sentence_index=span.sentence_index,
+                span_index=span.span_index,
+            )
+            for span in selected_evidence_spans
+        )
 
         # sample_surface_forms 只保留去重后的前几个表面形式，避免数组无限膨胀。
-        sample_surface_forms = _dedupe_surface_forms([span.text for span in evidence_spans] + [span.text for span in spans])
+        evidence_surface_forms = [span.text for span in selected_evidence_spans]
+        sample_surface_forms = _dedupe_surface_forms(evidence_surface_forms + [span.text for span in spans])
 
         rows.append(
             VideoUnitIndexRow(
@@ -111,13 +112,36 @@ def _build_unit_index_rows(
                 coverage_ms=coverage_ms,
                 coverage_ratio=coverage_ratio,
                 sentence_indexes=sentence_indexes,
-                evidence_sentence_indexes=evidence_sentence_indexes,
-                evidence_span_indexes=evidence_span_indexes,
+                evidence_span_refs=evidence_span_refs,
                 sample_surface_forms=sample_surface_forms,
             )
         )
 
     return tuple(rows)
+
+
+def _select_evidence_spans(spans: list[VideoSemanticSpanRow], limit: int = 5) -> tuple[VideoSemanticSpanRow, ...]:
+    """按当前设计规则选出稳定的 evidence spans。"""
+
+    earliest_span_by_sentence: dict[int, VideoSemanticSpanRow] = {}
+    for span in spans:
+        current = earliest_span_by_sentence.get(span.sentence_index)
+        if current is None or _evidence_pick_key(span) < _evidence_pick_key(current):
+            earliest_span_by_sentence[span.sentence_index] = span
+
+    return tuple(
+        sorted(
+            earliest_span_by_sentence.values(),
+            key=lambda span: (span.sentence_index, span.span_index, span.start_ms, span.end_ms),
+        )
+        [:limit]
+    )
+
+
+def _evidence_pick_key(span: VideoSemanticSpanRow) -> tuple[int, int, int]:
+    """在同一句内选择最早的一个 span。"""
+
+    return (span.span_index, span.start_ms, span.end_ms)
 
 
 def _merge_intervals_and_measure(intervals: list[tuple[int, int]]) -> int:

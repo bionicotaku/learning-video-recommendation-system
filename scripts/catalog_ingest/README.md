@@ -521,7 +521,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 完全由 `video_semantic_spans` 聚合生成，不直接从原始 JSON 写入。
 
-聚合规则沿用 `docs/archive/Catalog-数据库设计.md`：
+聚合规则以当前 `docs/Catalog-数据库设计.md` 为准：
 
 - `(video_id, coarse_unit_id)` 分组
 - 统计 `mention_count`
@@ -531,15 +531,16 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 合并 span 区间得到 `coverage_ms`
 - 计算 `coverage_ratio`
 - 生成 `sentence_indexes`
-- 生成 `evidence_sentence_indexes`
-- 生成 `evidence_span_indexes`
+- 生成 `evidence_span_refs`
 - 生成 `sample_surface_forms`
 
-这里需要补一个实现约定：
+这里需要补一个实现约定，保持和当前 Catalog 最终设计一致：
 
-- `evidence_sentence_indexes` 与 `evidence_span_indexes` 必须按相同位置一一对应解释
-
-原因是单独的 `span_index` 在不同 sentence 内可能重复；当前 schema 没有单独的复合 evidence 结构，所以脚本实现里必须保证两组数组等长，且第 `i` 个 sentence index 与第 `i` 个 span index 组成一条 evidence。
+- `evidence_span_refs` 的每个元素至少包含 `sentence_index` 与 `span_index`
+- 对同一 `(video_id, coarse_unit_id, sentence_index)` 只保留该 sentence 中最早的一个 span
+- 再按 `sentence_index ASC, span_index ASC` 排序
+- 最后取前 `K` 个，当前固定 `K = 5`
+- 这些 refs 只承诺稳定回查，不承诺“best evidence”
 
 ---
 
@@ -648,7 +649,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 空 transcript 直接视为失败，不写入空内容视频
 - sentence 可以没有 token
 - token 可以没有 `coarse_id`
-- 当前已知上游 `AssemblyAI -> 1transcript-raw -> 2cleaned-data` 可能产生 `token.end > sentence.end` 的脏时间；该类问题当前固定记 `warning_code = token_time_outside_sentence`
+- 当前已知上游 `AssemblyAI -> 1transcript-raw -> 2cleaned-data` 偶尔会保留原始边界异常，例如 `token.end > sentence.end`；该类问题当前固定记 `warning_code = token_time_outside_sentence`，不断入库
 
 ### 7.5 coarse_unit 校验
 
@@ -773,11 +774,11 @@ transcript 文件负责：
 
 这份方案当前只剩 1 个已知设计口子需要记录。
 
-### 10.1.1 evidence 字段的表达力仍然偏弱
+### 10.1.1 evidence 字段已切到结构化 refs
 
-当前 schema 只能存 `evidence_sentence_indexes` 和 `evidence_span_indexes` 两个数组。
-即使脚本里按位置配对解释，也不如结构化 evidence 对象清晰。
-这不阻塞 MVP，但后续如果 evidence 要直接返回给上层接口，可能需要在主设计文档里进一步收紧或调整表示方式。
+当前 schema 以 `evidence_span_refs jsonb` 作为唯一 evidence 表达。
+每个元素至少包含 `sentence_index` 与 `span_index`，可以无歧义回查到 `catalog.video_semantic_spans`。
+因此脚本实现也必须直接生成结构化 refs，不再保留旧的双数组模型。
 
 ---
 

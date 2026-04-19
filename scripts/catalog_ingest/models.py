@@ -203,6 +203,14 @@ class VideoSemanticSpanRow:
 
 
 @dataclass(slots=True, frozen=True)
+class EvidenceSpanRef:
+    """表示 video_unit_index 中的一条可回查 span 引用。"""
+
+    sentence_index: int
+    span_index: int
+
+
+@dataclass(slots=True, frozen=True)
 class VideoUnitIndexRow:
     """表示将写入 catalog.video_unit_index 的一行聚合结果。"""
 
@@ -214,8 +222,7 @@ class VideoUnitIndexRow:
     coverage_ms: int
     coverage_ratio: Decimal
     sentence_indexes: tuple[int, ...]
-    evidence_sentence_indexes: tuple[int, ...]
-    evidence_span_indexes: tuple[int, ...]
+    evidence_span_refs: tuple[EvidenceSpanRef, ...]
     sample_surface_forms: tuple[str, ...]
 
 
