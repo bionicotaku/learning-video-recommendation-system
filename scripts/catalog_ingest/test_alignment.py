@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
 from scripts.catalog_ingest.index_builder import build_normalized_clip_data
+from scripts.catalog_ingest.manifest_loader import load_clip_inputs
 from scripts.catalog_ingest.models import (
     LoadedClipInput,
     NormalizedCoreRows,
@@ -19,6 +22,72 @@ from scripts.catalog_ingest.validator import validate_loaded_clip
 
 
 class CatalogIngestAlignmentTest(unittest.TestCase):
+    def test_load_clip_inputs_parses_snake_case_semantic_element(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            parents_dir = root / "parents"
+            transcripts_dir = root / "transcripts"
+            parents_dir.mkdir()
+            transcripts_dir.mkdir()
+
+            (parents_dir / "demo.json").write_text(
+                json.dumps(
+                    {
+                        "clips": [
+                            {
+                                "clip_id": 1,
+                                "start_index": 0,
+                                "end_index": 0,
+                                "start_time": 100,
+                                "end_time": 200,
+                                "buffered_start_time": 100,
+                                "buffered_end_time": 200,
+                                "reasoning": "demo",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            (transcripts_dir / "demo-clip1.json").write_text(
+                json.dumps(
+                    {
+                        "sentences": [
+                            {
+                                "index": 0,
+                                "text": "Pam!",
+                                "explanation": "call Pam",
+                                "start": 110,
+                                "end": 150,
+                                "tokens": [
+                                    {
+                                        "index": 0,
+                                        "text": "Pam!",
+                                        "explanation": "Pam",
+                                        "start": 110,
+                                        "end": 150,
+                                        "semantic_element": {
+                                            "base_form": "Pam",
+                                            "dictionary": "Pam",
+                                            "coarse_id": 7,
+                                            "reason": "name",
+                                        },
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            loaded = load_clip_inputs(parents_dir=parents_dir, transcripts_dir=transcripts_dir)
+
+        token = loaded[0].transcript_sentences[0].tokens[0]
+        self.assertIsNotNone(token.semantic_element)
+        self.assertEqual(token.semantic_element.base_form, "Pam")
+        self.assertEqual(token.semantic_element.coarse_id, 7)
+
     def test_unit_index_uses_structured_refs_sentence_dedup_and_limit_five(self) -> None:
         clip_input = _build_clip_input()
         core_rows = NormalizedCoreRows(

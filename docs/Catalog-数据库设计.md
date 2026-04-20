@@ -145,7 +145,7 @@ catalog.videos
 
 必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及 Recommendation 证据回查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
 
-`semanticElement.reason` 不建议进入主查询表。它可以保留在对象存储中的 transcript 原始 JSON 里，若未来需要更强调试链路，可另建 debug 对象，不应污染当前主事实表。
+`semantic_element.reason` 不建议进入主查询表。它可以保留在对象存储中的 transcript 原始 JSON 里，若未来需要更强调试链路，可另建 debug 对象，不应污染当前主事实表。
 
 ## 9. `catalog.video_unit_index`
 

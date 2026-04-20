@@ -396,14 +396,14 @@ def _parse_transcript_sentences(
                     context={"transcript_file_path": str(transcript_file_path)},
                 )
 
-            semantic_payload = raw_token.get("semanticElement")
+            semantic_payload = raw_token.get("semantic_element")
             semantic_element = None
             if semantic_payload is not None:
                 if not isinstance(semantic_payload, dict):
                     raise CatalogIngestError(
                         code="transcript_invalid",
                         stage="manifest_loader",
-                        message="semanticElement 必须是对象",
+                        message="semantic_element 必须是对象",
                         context={
                             "transcript_file_path": str(transcript_file_path),
                             "sentence_index": raw_sentence.get("index"),
@@ -411,7 +411,7 @@ def _parse_transcript_sentences(
                         },
                     )
                 semantic_element = TranscriptSemanticElement(
-                    base_form=_optional_str(semantic_payload.get("baseForm")),
+                    base_form=_optional_str(semantic_payload.get("base_form")),
                     dictionary_text=_optional_str(semantic_payload.get("dictionary")),
                     coarse_id=_optional_int(semantic_payload.get("coarse_id")),
                     reason=_optional_str(semantic_payload.get("reason")),

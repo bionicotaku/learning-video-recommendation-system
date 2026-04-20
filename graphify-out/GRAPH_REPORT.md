@@ -1,12 +1,12 @@
-# Graph Report - .  (2026-04-19)
+# Graph Report - .  (2026-04-20)
 
 ## Corpus Check
-- 161 files · ~83,152 words
+- 161 files · ~83,276 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 910 nodes · 2236 edges · 90 communities detected
-- Extraction: 53% EXTRACTED · 47% INFERRED · 0% AMBIGUOUS · INFERRED: 1040 edges (avg confidence: 0.74)
+- 911 nodes · 2238 edges · 90 communities detected
+- Extraction: 53% EXTRACTED · 47% INFERRED · 0% AMBIGUOUS · INFERRED: 1041 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -161,7 +161,7 @@ Nodes (116): Exception, build_normalized_clip_data(), _build_transcript_row(), _
 
 ### Community 1 - "Community 1"
 Cohesion: 0.04
-Nodes (74): TestDatabase, execer, TestManagerRollsBackTransactionOnError(), TestManagerWithinUserTxAllowsDifferentUsersConcurrently(), TestManagerWithinUserTxSerializesSameUser(), NewManager(), flattenGroupedEvents(), groupAndSortEvents() (+66 more)
+Nodes (61): TestManagerRollsBackTransactionOnError(), TestManagerWithinUserTxAllowsDifferentUsersConcurrently(), TestManagerWithinUserTxSerializesSameUser(), NewManager(), flattenGroupedEvents(), groupAndSortEvents(), NewRecordLearningEventsUsecase(), RecomputeActiveStatus() (+53 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.13
@@ -172,16 +172,16 @@ Cohesion: 0.05
 Nodes (37): buildAuditPayload(), candidateSummary(), hasDemand(), lanePriority(), mapFinalItems(), NewGenerateVideoRecommendationsPipeline(), newRunID(), primaryLane() (+29 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.12
-Nodes (42): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+34 more)
+Cohesion: 0.07
+Nodes (34): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), NewDefaultDemandPlanner(), NewDefaultVideoStateEnricher() (+26 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.12
-Nodes (38): Agent Rules, Module Boundary Rules, Catalog Delta Migration Doc, Deprecated Catalog Design Doc, Deprecated Learning Engine Doc, Deprecated Overall MVP Doc, Historical Docs Index, Deprecated Recommendation Scheduler Doc (+30 more)
+Cohesion: 0.14
+Nodes (41): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+33 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.09
-Nodes (21): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), NewDefaultDemandPlanner(), NewDefaultVideoStateEnricher() (+13 more)
+Cohesion: 0.12
+Nodes (38): Agent Rules, Module Boundary Rules, Catalog Delta Migration Doc, Deprecated Catalog Design Doc, Deprecated Learning Engine Doc, Deprecated Overall MVP Doc, Historical Docs Index, Deprecated Recommendation Scheduler Doc (+30 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.08
@@ -212,8 +212,8 @@ Cohesion: 0.25
 Nodes (17): bucketPriority(), freshnessScore(), NewDefaultVideoRanker(), overloadPenalty(), recencyPenalty(), recentServedPenalty(), recentWatchedPenalty(), round4() (+9 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.25
-Nodes (12): execer, Suite, applyLearningEngineSchema(), applyRecommendationSchema(), execSQLFile(), freePort(), migrationFiles(), migrationVersion() (+4 more)
+Cohesion: 0.24
+Nodes (13): execer, Suite, TestDatabase, applyLearningEngineSchema(), applyRecommendationSchema(), execSQLFile(), freePort(), migrationFiles() (+5 more)
 
 ### Community 15 - "Community 15"
 Cohesion: 0.25
@@ -644,7 +644,7 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Reduce()` connect `Community 15` to `Community 1`?**
   _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 4`?**
+- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 5`?**
   _High betweenness centrality (0.022) - this node is a cross-community bridge._
 - **Are the 49 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
   _`CatalogIngestError` has 49 INFERRED edges - model-reasoned connections that need verification._

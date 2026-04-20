@@ -44,7 +44,7 @@ class ParentClipDescriptor:
 
 @dataclass(slots=True, frozen=True)
 class TranscriptSemanticElement:
-    """表示 transcript token 下的 semanticElement 结构。"""
+    """表示 transcript token 下的 semantic_element 结构。"""
 
     base_form: str | None
     dictionary_text: str | None

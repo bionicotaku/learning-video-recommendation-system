@@ -79,11 +79,11 @@
 - `index`
 - `start`
 - `end`
-- `semanticElement`
+- `semantic_element`
 
-而 `semanticElement` 至少包含：
+而 `semantic_element` 至少包含：
 
-- `baseForm`
+- `base_form`
 - `dictionary`
 - `coarse_id`
 - `reason`
@@ -509,11 +509,11 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - `start_ms`：`token.start`
 - `end_ms`：`token.end`
 - `explanation`：`token.explanation`
-- `coarse_unit_id`：`token.semanticElement.coarse_id`
-- `base_form`：`token.semanticElement.baseForm`
-- `dictionary_text`：`token.semanticElement.dictionary`
+- `coarse_unit_id`：`token.semantic_element.coarse_id`
+- `base_form`：`token.semantic_element.base_form`
+- `dictionary_text`：`token.semantic_element.dictionary`
 
-当前不把 `semanticElement.reason` 落到主表。
+当前不把 `semantic_element.reason` 落到主表。
 
 ---
 
@@ -638,7 +638,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - sentence `index / text / start / end` 必须存在
 - token `index / text / start / end` 必须存在
 - token 时间若超出 sentence 区间，不阻断入库，但必须记 warning
-- `semanticElement` 不一定所有字段都非空，但结构应存在
+- `semantic_element` 不一定所有字段都非空，但结构应存在
 - 同一视频内 `sentence.index` 必须唯一
 - 同一句内 `token.index` 必须唯一
 - `sentence.text` 不能为空字符串
@@ -744,7 +744,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 transcript 文件负责：
 
-- sentence / token / semanticElement
+- sentence / token / semantic_element
 
 这个分层和数据库设计是兼容的。
 

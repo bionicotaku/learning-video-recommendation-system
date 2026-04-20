@@ -162,7 +162,7 @@ def _validate_sentence_and_token_structure(clip_input: LoadedClipInput) -> tuple
                 raise _error(
                     clip_input,
                     "transcript_invalid",
-                    "token 必须包含 semanticElement 对象",
+                    "token 必须包含 semantic_element 对象",
                     {"sentence_index": sentence.index, "token_index": token.index},
                 )
             if token.index < 0:
