@@ -75,23 +75,20 @@ func insertItemWithQueries(ctx context.Context, queries *recommendationsqlc.Quer
 	if err != nil {
 		return err
 	}
+	learningUnits, err := mapper.LearningUnitsToJSON(item.LearningUnits)
+	if err != nil {
+		return err
+	}
 
 	return queries.InsertVideoRecommendationItem(ctx, recommendationsqlc.InsertVideoRecommendationItemParams{
-		RunID:                     pgRunID,
-		Rank:                      item.Rank,
-		VideoID:                   pgVideoID,
-		Score:                     score,
-		PrimaryLane:               mapper.StringToText(item.PrimaryLane),
-		DominantBucket:            mapper.StringToText(item.DominantBucket),
-		DominantUnitID:            mapper.Int64PointerToPG(item.DominantUnitID),
-		ReasonCodes:               item.ReasonCodes,
-		CoveredHardReviewCount:    item.CoveredHardReviewCount,
-		CoveredNewNowCount:        item.CoveredNewNowCount,
-		CoveredSoftReviewCount:    item.CoveredSoftReviewCount,
-		CoveredNearFutureCount:    item.CoveredNearFutureCount,
-		BestEvidenceSentenceIndex: mapper.Int32PointerToPG(item.BestEvidenceSentenceIndex),
-		BestEvidenceSpanIndex:     mapper.Int32PointerToPG(item.BestEvidenceSpanIndex),
-		BestEvidenceStartMs:       mapper.Int32PointerToPG(item.BestEvidenceStartMs),
-		BestEvidenceEndMs:         mapper.Int32PointerToPG(item.BestEvidenceEndMs),
+		RunID:          pgRunID,
+		Rank:           item.Rank,
+		VideoID:        pgVideoID,
+		Score:          score,
+		PrimaryLane:    mapper.StringToText(item.PrimaryLane),
+		DominantRole:   mapper.StringToText(string(item.DominantRole)),
+		DominantUnitID: mapper.Int64PointerToPG(item.DominantUnitID),
+		ReasonCodes:    item.ReasonCodes,
+		LearningUnits:  learningUnits,
 	})
 }

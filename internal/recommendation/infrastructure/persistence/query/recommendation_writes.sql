@@ -76,34 +76,20 @@ insert into recommendation.video_recommendation_items (
   video_id,
   score,
   primary_lane,
-  dominant_bucket,
+  dominant_role,
   dominant_unit_id,
   reason_codes,
-  covered_hard_review_count,
-  covered_new_now_count,
-  covered_soft_review_count,
-  covered_near_future_count,
-  best_evidence_sentence_index,
-  best_evidence_span_index,
-  best_evidence_start_ms,
-  best_evidence_end_ms
+  learning_units
 ) values (
   sqlc.arg(run_id),
   sqlc.arg(rank),
   sqlc.arg(video_id),
   sqlc.arg(score),
   sqlc.narg(primary_lane),
-  sqlc.narg(dominant_bucket),
+  sqlc.narg(dominant_role),
   sqlc.narg(dominant_unit_id),
   sqlc.arg(reason_codes),
-  sqlc.arg(covered_hard_review_count),
-  sqlc.arg(covered_new_now_count),
-  sqlc.arg(covered_soft_review_count),
-  sqlc.arg(covered_near_future_count),
-  sqlc.narg(best_evidence_sentence_index),
-  sqlc.narg(best_evidence_span_index),
-  sqlc.narg(best_evidence_start_ms),
-  sqlc.narg(best_evidence_end_ms)
+  sqlc.arg(learning_units)
 );
 
 -- name: RefreshRecommendableVideoUnits :exec

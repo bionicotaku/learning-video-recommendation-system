@@ -22,8 +22,11 @@ func TestDefaultVideoEvidenceAggregatorDeduplicatesRepeatedUnitEvidence(t *testi
 	if len(videos) != 1 {
 		t.Fatalf("expected one video candidate, got %#v", videos)
 	}
-	if len(videos[0].CoveredHardReviewUnits) != 1 || videos[0].CoveredHardReviewUnits[0] != 101 {
-		t.Fatalf("expected hard review unit to be counted once, got %#v", videos[0].CoveredHardReviewUnits)
+	if len(videos[0].LearningUnits) != 1 {
+		t.Fatalf("expected one expected learning unit, got %#v", videos[0].LearningUnits)
+	}
+	if videos[0].LearningUnits[0].CoarseUnitID != 101 || videos[0].LearningUnits[0].Role != model.LearningRoleHardReview {
+		t.Fatalf("expected hard review learning unit 101, got %#v", videos[0].LearningUnits)
 	}
 	if videos[0].CoverageStrengthScore >= 0.95 {
 		t.Fatalf("expected repeated same-unit evidence to be dampened, got %#v", videos[0].CoverageStrengthScore)
@@ -70,11 +73,55 @@ func TestDefaultVideoEvidenceAggregatorChoosesBestEvidenceFromDominantCoreWindow
 	}
 
 	video := videos[0]
-	if video.DominantBucket != string(policy.BucketHardReview) {
-		t.Fatalf("expected hard_review dominant bucket, got %#v", video.DominantBucket)
+	if video.DominantRole != model.LearningRoleHardReview {
+		t.Fatalf("expected hard_review dominant role, got %#v", video.DominantRole)
 	}
-	if video.BestEvidenceStartMs == nil || *video.BestEvidenceStartMs != 1000 {
-		t.Fatalf("expected best evidence from core window, got %#v", video.BestEvidenceStartMs)
+	if len(video.LearningUnits) == 0 || video.LearningUnits[0].Evidence == nil || video.LearningUnits[0].Evidence.StartMs == nil || *video.LearningUnits[0].Evidence.StartMs != 1000 {
+		t.Fatalf("expected best evidence from core learning unit, got %#v", video.LearningUnits)
+	}
+}
+
+func TestDefaultVideoEvidenceAggregatorMarksSupportUnitPrimaryWhenNoCoreExists(t *testing.T) {
+	aggregator := recommendationaggregator.NewDefaultVideoEvidenceAggregator()
+
+	videos, err := aggregator.Aggregate(recommendationContext(), []model.ResolvedEvidenceWindow{
+		resolvedWindow("video-4", 301, string(policy.BucketSoftReview), string(policy.LaneSoftFuture), 0.91, 1000, 1450, 120_000, 0.36),
+		resolvedWindow("video-4", 401, string(policy.BucketNearFuture), string(policy.LaneSoftFuture), 0.86, 5000, 5600, 120_000, 0.33),
+	}, recommendationDemand())
+	if err != nil {
+		t.Fatalf("aggregate: %v", err)
+	}
+
+	if len(videos) != 1 {
+		t.Fatalf("expected one video, got %#v", videos)
+	}
+	primaryCount := 0
+	for _, unit := range videos[0].LearningUnits {
+		if unit.IsPrimary {
+			primaryCount++
+		}
+	}
+	if primaryCount == 0 || primaryCount > 2 {
+		t.Fatalf("expected one or two support primary units, got %#v", videos[0].LearningUnits)
+	}
+}
+
+func TestDefaultVideoEvidenceAggregatorPreservesAllVideoLaneSources(t *testing.T) {
+	aggregator := recommendationaggregator.NewDefaultVideoEvidenceAggregator()
+
+	videos, err := aggregator.Aggregate(recommendationContext(), []model.ResolvedEvidenceWindow{
+		resolvedWindow("video-5", 101, string(policy.BucketHardReview), string(policy.LaneExactCore), 0.70, 1000, 1450, 120_000, 0.34),
+		resolvedWindow("video-5", 101, string(policy.BucketHardReview), string(policy.LaneBundle), 0.95, 2000, 2450, 120_000, 0.44),
+	}, recommendationDemand())
+	if err != nil {
+		t.Fatalf("aggregate: %v", err)
+	}
+
+	if len(videos) != 1 {
+		t.Fatalf("expected one video, got %#v", videos)
+	}
+	if !containsString(videos[0].LaneSources, string(policy.LaneExactCore)) || !containsString(videos[0].LaneSources, string(policy.LaneBundle)) {
+		t.Fatalf("expected lane sources to include exact_core and bundle, got %#v", videos[0].LaneSources)
 	}
 }
 
@@ -86,6 +133,15 @@ func recommendationContext() model.RecommendationContext {
 			PreferredDurationSec: [2]int{45, 180},
 		},
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func recommendationDemand() model.DemandBundle {

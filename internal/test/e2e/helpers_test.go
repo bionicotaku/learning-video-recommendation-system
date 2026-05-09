@@ -175,32 +175,33 @@ func assertNotContainsVideo(t interface {
 	}
 }
 
-func assertCoveredUnits(t interface {
+func assertLearningUnits(t interface {
 	Helper()
 	Fatalf(string, ...any)
-}, got []int64, want ...int64) {
+}, got []recommendationdto.ExpectedLearningUnit, role string, want ...int64) {
 	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("covered units = %v, want %v", got, want)
+	gotIDs := learningUnitIDsByRole(got, role)
+	if len(gotIDs) != len(want) {
+		t.Fatalf("learning units role=%s ids=%v, want %v", role, gotIDs, want)
 	}
 	for _, unitID := range want {
-		if !containsUnit(got, unitID) {
-			t.Fatalf("covered units = %v, want %v", got, want)
+		if !containsUnit(gotIDs, unitID) {
+			t.Fatalf("learning units role=%s ids=%v, want %v", role, gotIDs, want)
 		}
 	}
 }
 
-func assertAnyVideoCoversUnit(t interface {
+func assertAnyVideoHasLearningUnit(t interface {
 	Helper()
 	Fatalf(string, ...any)
-}, videos []recommendationdto.RecommendationVideo, unitID int64, selector func(testutil.RecommendationVideoView) []int64) {
+}, videos []recommendationdto.RecommendationVideo, unitID int64, role string) {
 	t.Helper()
 	for _, video := range videos {
-		if containsUnit(selector(video), unitID) {
+		if containsUnit(learningUnitIDsByRole(video.LearningUnits, role), unitID) {
 			return
 		}
 	}
-	t.Fatalf("expected some video to cover unit %d, got %+v", unitID, videos)
+	t.Fatalf("expected some video to include learning unit %d role=%s, got %+v", unitID, role, videos)
 }
 
 func assertContiguousRanks(t interface {
@@ -239,7 +240,7 @@ func countDominantUnit(items []testutil.RecommendationItemSummary, unitID int64)
 func countCoreDominant(items []testutil.RecommendationItemSummary) int {
 	count := 0
 	for _, item := range items {
-		if item.DominantBucket == "hard_review" || item.DominantBucket == "new_now" {
+		if item.DominantRole == "hard_review" || item.DominantRole == "new_now" {
 			count++
 		}
 	}
@@ -249,11 +250,21 @@ func countCoreDominant(items []testutil.RecommendationItemSummary) int {
 func countFutureLike(items []testutil.RecommendationItemSummary) int {
 	count := 0
 	for _, item := range items {
-		if item.DominantBucket == "soft_review" || item.DominantBucket == "near_future" {
+		if item.DominantRole == "soft_review" || item.DominantRole == "near_future" {
 			count++
 		}
 	}
 	return count
+}
+
+func learningUnitIDsByRole(units []recommendationdto.ExpectedLearningUnit, role string) []int64 {
+	result := make([]int64, 0, len(units))
+	for _, unit := range units {
+		if unit.Role == role {
+			result = append(result, unit.CoarseUnitID)
+		}
+	}
+	return result
 }
 
 func videoIDs(videos []recommendationdto.RecommendationVideo) []string {

@@ -12,22 +12,24 @@
       "recently_not_served",
       "low_supply_core_preserved"
     ],
-    "CoveredUnits": [
-      101,
-      301
+    "LearningUnits": [
+      {
+        "coarse_unit_id": 101,
+        "role": "hard_review",
+        "is_primary": true,
+        "evidence": {
+          "sentence_index": 1,
+          "span_index": 1,
+          "start_ms": 1240,
+          "end_ms": 1820
+        }
+      },
+      {
+        "coarse_unit_id": 301,
+        "role": "soft_review",
+        "is_primary": false
+      }
     ],
-    "CoveredHardReviewUnits": [
-      101
-    ],
-    "CoveredNewNowUnits": null,
-    "CoveredSoftReviewUnits": [
-      301
-    ],
-    "CoveredNearFutureUnits": null,
-    "BestEvidenceSentenceIndex": 1,
-    "BestEvidenceSpanIndex": 1,
-    "BestEvidenceStartMs": 1240,
-    "BestEvidenceEndMs": 1820,
     "Explanation": "覆盖 1 个当前应复习内容，支持 1 个近期不稳内容，主要学习证据集中在 00:01.24–00:01.82，最近未重复推荐"
   },
   {
@@ -40,19 +42,19 @@
       "good_learning_fit",
       "recently_not_served"
     ],
-    "CoveredUnits": [
-      401
+    "LearningUnits": [
+      {
+        "coarse_unit_id": 401,
+        "role": "near_future",
+        "is_primary": true,
+        "evidence": {
+          "sentence_index": 1,
+          "span_index": 1,
+          "start_ms": 3000,
+          "end_ms": 3560
+        }
+      }
     ],
-    "CoveredHardReviewUnits": null,
-    "CoveredNewNowUnits": null,
-    "CoveredSoftReviewUnits": null,
-    "CoveredNearFutureUnits": [
-      401
-    ],
-    "BestEvidenceSentenceIndex": 3,
-    "BestEvidenceSpanIndex": 1,
-    "BestEvidenceStartMs": 3000,
-    "BestEvidenceEndMs": 3560,
     "Explanation": "主要学习证据集中在 00:03.00–00:03.56，最近未重复推荐"
   }
 ]

@@ -2,6 +2,7 @@ drop index if exists recommendation.idx_v_unit_video_inventory_supply_grade;
 drop index if exists recommendation.idx_v_unit_video_inventory_unit;
 drop index if exists recommendation.idx_v_recommendable_video_units_video_id;
 drop index if exists recommendation.idx_v_recommendable_video_units_unit_video;
+drop index if exists recommendation.idx_video_recommendation_items_dominant_unit;
 drop index if exists recommendation.idx_video_recommendation_items_video_id;
 drop index if exists recommendation.idx_video_recommendation_runs_user_created_at;
 drop index if exists recommendation.idx_recommendation_video_serving_states_last_served_at;

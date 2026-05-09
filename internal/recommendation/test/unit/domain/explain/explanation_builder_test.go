@@ -20,19 +20,15 @@ func TestDefaultExplanationBuilderGeneratesReasonCodesAndNarrative(t *testing.T)
 
 	items, err := builder.Build(model.RecommendationContext{}, []model.VideoCandidate{
 		{
-			VideoID:                "video-1",
-			BaseScore:              0.91,
-			LaneSources:            []string{string(policy.LaneBundle)},
-			DominantBucket:         string(policy.BucketHardReview),
-			DominantUnitID:         int64Ptr(101),
-			CoveredHardReviewUnits: []int64{101, 102},
-			CoveredNewNowUnits:     []int64{201},
-			CoveredSoftReviewUnits: []int64{301},
-			BundleValueScore:       0.7,
-			EducationalFitScore:    0.8,
-			RecentServedPenalty:    0.1,
-			BestEvidenceStartMs:    &start,
-			BestEvidenceEndMs:      &end,
+			VideoID:             "video-1",
+			BaseScore:           0.91,
+			LaneSources:         []string{string(policy.LaneBundle)},
+			DominantRole:        model.LearningRoleHardReview,
+			DominantUnitID:      int64Ptr(101),
+			LearningUnits:       learningUnitsWithEvidence(start, end, hardUnit(101), hardUnit(102), newUnit(201), softUnit(301)),
+			BundleValueScore:    0.7,
+			EducationalFitScore: 0.8,
+			RecentServedPenalty: 0.1,
 		},
 	}, recommendationDemand())
 	if err != nil {
@@ -62,32 +58,23 @@ func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
 
 	items, err := builder.Build(model.RecommendationContext{}, []model.VideoCandidate{
 		{
-			VideoID:                   "video-hard",
-			BaseScore:                 0.93,
-			LaneSources:               []string{string(policy.LaneExactCore), string(policy.LaneBundle)},
-			DominantBucket:            string(policy.BucketHardReview),
-			DominantUnitID:            int64Ptr(101),
-			CoveredHardReviewUnits:    []int64{101},
-			CoveredSoftReviewUnits:    []int64{301},
-			BundleValueScore:          0.6,
-			EducationalFitScore:       0.8,
-			BestEvidenceStartMs:       &start,
-			BestEvidenceEndMs:         &end,
-			BestEvidenceSentenceIndex: int32Ptr(1),
-			BestEvidenceSpanIndex:     int32Ptr(1),
+			VideoID:             "video-hard",
+			BaseScore:           0.93,
+			LaneSources:         []string{string(policy.LaneExactCore), string(policy.LaneBundle)},
+			DominantRole:        model.LearningRoleHardReview,
+			DominantUnitID:      int64Ptr(101),
+			LearningUnits:       learningUnitsWithEvidence(start, end, hardUnit(101), softUnit(301)),
+			BundleValueScore:    0.6,
+			EducationalFitScore: 0.8,
 		},
 		{
-			VideoID:                   "video-future",
-			BaseScore:                 0.74,
-			LaneSources:               []string{string(policy.LaneSoftFuture)},
-			DominantBucket:            string(policy.BucketNearFuture),
-			DominantUnitID:            int64Ptr(401),
-			CoveredNearFutureUnits:    []int64{401},
-			EducationalFitScore:       0.7,
-			BestEvidenceStartMs:       &start2,
-			BestEvidenceEndMs:         &end2,
-			BestEvidenceSentenceIndex: int32Ptr(3),
-			BestEvidenceSpanIndex:     int32Ptr(1),
+			VideoID:             "video-future",
+			BaseScore:           0.74,
+			LaneSources:         []string{string(policy.LaneSoftFuture)},
+			DominantRole:        model.LearningRoleNearFuture,
+			DominantUnitID:      int64Ptr(401),
+			LearningUnits:       learningUnitsWithEvidence(start2, end2, futureUnit(401)),
+			EducationalFitScore: 0.7,
 		},
 	}, recommendationDemand())
 	if err != nil {
@@ -133,6 +120,36 @@ func int64Ptr(value int64) *int64 {
 	return &value
 }
 
-func int32Ptr(value int32) *int32 {
-	return &value
+func hardUnit(unitID int64) model.ExpectedLearningUnit {
+	return model.ExpectedLearningUnit{CoarseUnitID: unitID, Role: model.LearningRoleHardReview, IsPrimary: true}
+}
+
+func newUnit(unitID int64) model.ExpectedLearningUnit {
+	return model.ExpectedLearningUnit{CoarseUnitID: unitID, Role: model.LearningRoleNewNow, IsPrimary: true}
+}
+
+func softUnit(unitID int64) model.ExpectedLearningUnit {
+	return model.ExpectedLearningUnit{CoarseUnitID: unitID, Role: model.LearningRoleSoftReview}
+}
+
+func futureUnit(unitID int64) model.ExpectedLearningUnit {
+	return model.ExpectedLearningUnit{CoarseUnitID: unitID, Role: model.LearningRoleNearFuture, IsPrimary: true}
+}
+
+func learningUnitsWithEvidence(start int32, end int32, units ...model.ExpectedLearningUnit) []model.ExpectedLearningUnit {
+	result := append([]model.ExpectedLearningUnit(nil), units...)
+	for index := range result {
+		if !result[index].IsPrimary {
+			continue
+		}
+		sentenceIndex := int32(1)
+		spanIndex := int32(1)
+		result[index].Evidence = &model.LearningUnitEvidence{
+			SentenceIndex: &sentenceIndex,
+			SpanIndex:     &spanIndex,
+			StartMs:       &start,
+			EndMs:         &end,
+		}
+	}
+	return result
 }

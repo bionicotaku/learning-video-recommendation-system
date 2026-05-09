@@ -65,8 +65,9 @@ type RecommendationItemSummary struct {
 	Rank           int
 	VideoID        string
 	PrimaryLane    string
-	DominantBucket string
+	DominantRole   string
 	DominantUnitID *int64
+	LearningUnits  []recommendationdto.ExpectedLearningUnit
 }
 
 type CatalogVideoFixture struct {
@@ -290,7 +291,30 @@ func (h *Harness) SeedCoarseUnits(t *testing.T, unitIDs ...int64) {
 		t.Helper()
 	}
 	for _, unitID := range unitIDs {
-		if _, err := h.Pool.Exec(context.Background(), `insert into semantic.coarse_unit (id) values ($1) on conflict (id) do nothing`, unitID); err != nil {
+		if _, err := h.Pool.Exec(context.Background(), `
+			insert into semantic.coarse_unit (
+				id,
+				kind,
+				label,
+				lang,
+				chinese_label,
+				english_label,
+				status,
+				version,
+				fine_unit_ids,
+				original_defs
+			) values (
+				$1::bigint,
+				'word',
+				'unit-' || $1::text,
+				'en',
+				'unit-cn-' || $1::text,
+				'unit ' || $1::text,
+				'active',
+				1,
+				'{}'::bigint[],
+				'{}'::text[]
+			) on conflict (id) do nothing`, unitID); err != nil {
 			failNow(t, "seed semantic.coarse_unit %d: %v", unitID, err)
 		}
 	}
@@ -519,10 +543,10 @@ func (h *Harness) LoadRecommendationItems(t *testing.T, runID string) []Recommen
 	t.Helper()
 	rows, err := h.Pool.Query(
 		context.Background(),
-		`select rank, video_id, primary_lane, dominant_bucket, dominant_unit_id
-		 from recommendation.video_recommendation_items
-		 where run_id = $1
-		 order by rank asc`,
+		`select rank, video_id, primary_lane, dominant_role, dominant_unit_id, learning_units
+			 from recommendation.video_recommendation_items
+			 where run_id = $1
+			 order by rank asc`,
 		runID,
 	)
 	if err != nil {
@@ -533,8 +557,12 @@ func (h *Harness) LoadRecommendationItems(t *testing.T, runID string) []Recommen
 	items := make([]RecommendationItemSummary, 0)
 	for rows.Next() {
 		var item RecommendationItemSummary
-		if err := rows.Scan(&item.Rank, &item.VideoID, &item.PrimaryLane, &item.DominantBucket, &item.DominantUnitID); err != nil {
+		var learningUnits []byte
+		if err := rows.Scan(&item.Rank, &item.VideoID, &item.PrimaryLane, &item.DominantRole, &item.DominantUnitID, &learningUnits); err != nil {
 			t.Fatalf("scan recommendation item: %v", err)
+		}
+		if err := json.Unmarshal(learningUnits, &item.LearningUnits); err != nil {
+			t.Fatalf("decode recommendation item learning_units: %v", err)
 		}
 		items = append(items, item)
 	}
@@ -559,20 +587,24 @@ func (h *Harness) LoadSupplyGrade(t *testing.T, unitID int64) string {
 	return supplyGrade
 }
 
-func (h *Harness) LoadAuditEvidence(t *testing.T, runID string, rank int) (sentenceIndex, spanIndex, startMs, endMs *int32) {
+func (h *Harness) LoadAuditLearningUnits(t *testing.T, runID string, rank int) []recommendationdto.ExpectedLearningUnit {
 	t.Helper()
-	var si, spi, sm, em *int32
+	var learningUnits []byte
 	if err := h.Pool.QueryRow(
 		context.Background(),
-		`select best_evidence_sentence_index, best_evidence_span_index, best_evidence_start_ms, best_evidence_end_ms
+		`select learning_units
 		 from recommendation.video_recommendation_items
 		 where run_id = $1 and rank = $2`,
 		runID,
 		rank,
-	).Scan(&si, &spi, &sm, &em); err != nil {
-		t.Fatalf("load recommendation audit evidence: %v", err)
+	).Scan(&learningUnits); err != nil {
+		t.Fatalf("load recommendation audit learning_units: %v", err)
 	}
-	return si, spi, sm, em
+	var result []recommendationdto.ExpectedLearningUnit
+	if err := json.Unmarshal(learningUnits, &result); err != nil {
+		t.Fatalf("decode recommendation audit learning_units: %v", err)
+	}
+	return result
 }
 
 func (h *Harness) NewUserID() string {

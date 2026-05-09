@@ -138,23 +138,16 @@ type RecommendationVUnitVideoInventory struct {
 }
 
 type RecommendationVideoRecommendationItem struct {
-	RunID                     pgtype.UUID        `json:"run_id"`
-	Rank                      int32              `json:"rank"`
-	VideoID                   pgtype.UUID        `json:"video_id"`
-	Score                     pgtype.Numeric     `json:"score"`
-	PrimaryLane               pgtype.Text        `json:"primary_lane"`
-	DominantBucket            pgtype.Text        `json:"dominant_bucket"`
-	DominantUnitID            pgtype.Int8        `json:"dominant_unit_id"`
-	ReasonCodes               []string           `json:"reason_codes"`
-	CoveredHardReviewCount    int32              `json:"covered_hard_review_count"`
-	CoveredNewNowCount        int32              `json:"covered_new_now_count"`
-	CoveredSoftReviewCount    int32              `json:"covered_soft_review_count"`
-	CoveredNearFutureCount    int32              `json:"covered_near_future_count"`
-	BestEvidenceSentenceIndex pgtype.Int4        `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex     pgtype.Int4        `json:"best_evidence_span_index"`
-	BestEvidenceStartMs       pgtype.Int4        `json:"best_evidence_start_ms"`
-	BestEvidenceEndMs         pgtype.Int4        `json:"best_evidence_end_ms"`
-	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	RunID          pgtype.UUID        `json:"run_id"`
+	Rank           int32              `json:"rank"`
+	VideoID        pgtype.UUID        `json:"video_id"`
+	Score          pgtype.Numeric     `json:"score"`
+	PrimaryLane    pgtype.Text        `json:"primary_lane"`
+	DominantRole   pgtype.Text        `json:"dominant_role"`
+	DominantUnitID pgtype.Int8        `json:"dominant_unit_id"`
+	ReasonCodes    []string           `json:"reason_codes"`
+	LearningUnits  []byte             `json:"learning_units"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type RecommendationVideoRecommendationRun struct {
@@ -172,5 +165,21 @@ type RecommendationVideoRecommendationRun struct {
 }
 
 type SemanticCoarseUnit struct {
-	ID int64 `json:"id"`
+	ID              int64              `json:"id"`
+	Kind            string             `json:"kind"`
+	Label           string             `json:"label"`
+	Lang            string             `json:"lang"`
+	Pos             pgtype.Text        `json:"pos"`
+	EnglishDef      pgtype.Text        `json:"english_def"`
+	ChineseDef      pgtype.Text        `json:"chinese_def"`
+	ChineseCriteria pgtype.Text        `json:"chinese_criteria"`
+	ChineseLabel    pgtype.Text        `json:"chinese_label"`
+	EnglishLabel    pgtype.Text        `json:"english_label"`
+	Pattern         []byte             `json:"pattern"`
+	Status          string             `json:"status"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	Version         int32              `json:"version"`
+	FineUnitIds     []int64            `json:"fine_unit_ids"`
+	OriginalDefs    []string           `json:"original_defs"`
 }

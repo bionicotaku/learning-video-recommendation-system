@@ -118,26 +118,26 @@ func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
 	repo := repository.NewRecommendationAuditRepository(tx)
 	items := []model.RecommendationItem{
 		{
-			RunID:                  runID,
-			Rank:                   1,
-			VideoID:                videoID,
-			Score:                  0.91,
-			PrimaryLane:            "exact_core",
-			DominantBucket:         "hard_review",
-			DominantUnitID:         &unitID,
-			ReasonCodes:            []string{"hard_review_covered"},
-			CoveredHardReviewCount: 1,
+			RunID:          runID,
+			Rank:           1,
+			VideoID:        videoID,
+			Score:          0.91,
+			PrimaryLane:    "exact_core",
+			DominantRole:   model.LearningRoleHardReview,
+			DominantUnitID: &unitID,
+			ReasonCodes:    []string{"hard_review_covered"},
+			LearningUnits:  []model.ExpectedLearningUnit{learningUnit(unitID, model.LearningRoleHardReview)},
 		},
 		{
-			RunID:                  runID,
-			Rank:                   2,
-			VideoID:                videoID,
-			Score:                  0.67,
-			PrimaryLane:            "bundle",
-			DominantBucket:         "soft_review",
-			DominantUnitID:         &unitID,
-			ReasonCodes:            []string{"bundle_coverage_high"},
-			CoveredSoftReviewCount: 1,
+			RunID:          runID,
+			Rank:           2,
+			VideoID:        videoID,
+			Score:          0.67,
+			PrimaryLane:    "bundle",
+			DominantRole:   model.LearningRoleSoftReview,
+			DominantUnitID: &unitID,
+			ReasonCodes:    []string{"bundle_coverage_high"},
+			LearningUnits:  []model.ExpectedLearningUnit{learningUnit(unitID, model.LearningRoleSoftReview)},
 		},
 	}
 
@@ -151,6 +151,14 @@ func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
 	}
 	if count != 2 {
 		t.Fatalf("expected 2 items, got %d", count)
+	}
+
+	var learningUnitCount int
+	if err := tx.QueryRow(ctx, `select jsonb_array_length(learning_units) from recommendation.video_recommendation_items where run_id = $1 and rank = 1`, runID).Scan(&learningUnitCount); err != nil {
+		t.Fatalf("read learning_units: %v", err)
+	}
+	if learningUnitCount != 1 {
+		t.Fatalf("expected 1 learning unit in audit item, got %d", learningUnitCount)
 	}
 }
 
@@ -311,21 +319,20 @@ func TestRecommendationResultWriterPersistsAuditAndServingStatesInSingleFlow(t *
 		ResultCount:        1,
 	}, []model.RecommendationItem{
 		{
-			RunID:                  runID,
-			Rank:                   1,
-			VideoID:                videoID,
-			Score:                  0.91,
-			PrimaryLane:            "exact_core",
-			DominantBucket:         "hard_review",
-			DominantUnitID:         int64Ptr(301),
-			ReasonCodes:            []string{"hard_review_covered"},
-			CoveredHardReviewCount: 1,
+			RunID:          runID,
+			Rank:           1,
+			VideoID:        videoID,
+			Score:          0.91,
+			PrimaryLane:    "exact_core",
+			DominantRole:   model.LearningRoleHardReview,
+			DominantUnitID: int64Ptr(301),
+			ReasonCodes:    []string{"hard_review_covered"},
+			LearningUnits:  []model.ExpectedLearningUnit{learningUnit(301, model.LearningRoleHardReview)},
 		},
 	}, userID, []model.FinalRecommendationItem{
 		{
-			VideoID:                videoID,
-			CoveredUnits:           []int64{301},
-			CoveredHardReviewUnits: []int64{301},
+			VideoID:       videoID,
+			LearningUnits: []model.ExpectedLearningUnit{learningUnit(301, model.LearningRoleHardReview)},
 		},
 	})
 	if err != nil {
@@ -398,4 +405,12 @@ func videoIDFromIndex(index int) string {
 
 func int64Ptr(value int64) *int64 {
 	return &value
+}
+
+func learningUnit(unitID int64, role model.LearningRole) model.ExpectedLearningUnit {
+	return model.ExpectedLearningUnit{
+		CoarseUnitID: unitID,
+		Role:         role,
+		IsPrimary:    model.IsCoreLearningRole(role),
+	}
 }

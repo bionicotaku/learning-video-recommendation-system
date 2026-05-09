@@ -14,20 +14,13 @@ type RecommendationRun struct {
 }
 
 type RecommendationItem struct {
-	RunID                     string
-	Rank                      int32
-	VideoID                   string
-	Score                     float64
-	PrimaryLane               string
-	DominantBucket            string
-	DominantUnitID            *int64
-	ReasonCodes               []string
-	CoveredHardReviewCount    int32
-	CoveredNewNowCount        int32
-	CoveredSoftReviewCount    int32
-	CoveredNearFutureCount    int32
-	BestEvidenceSentenceIndex *int32
-	BestEvidenceSpanIndex     *int32
-	BestEvidenceStartMs       *int32
-	BestEvidenceEndMs         *int32
+	RunID          string
+	Rank           int32
+	VideoID        string
+	Score          float64
+	PrimaryLane    string
+	DominantRole   LearningRole
+	DominantUnitID *int64
+	ReasonCodes    []string
+	LearningUnits  []ExpectedLearningUnit
 }

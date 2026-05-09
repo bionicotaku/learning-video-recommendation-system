@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
-	"learning-video-recommendation-system/internal/recommendation/domain/policy"
 	recommendationranking "learning-video-recommendation-system/internal/recommendation/domain/ranking"
 )
 
@@ -28,8 +27,8 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 			{VideoID: "video-penalized", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxWatchRatio: 0.95},
 		},
 	}, []model.VideoCandidate{
-		videoCandidate("video-fresh", string(policy.BucketHardReview), 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, nil),
-		videoCandidate("video-penalized", string(policy.BucketHardReview), 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
+		videoCandidate("video-fresh", model.LearningRoleHardReview, 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, nil),
+		videoCandidate("video-penalized", model.LearningRoleHardReview, 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
 	}, recommendationDemand())
 	if err != nil {
 		t.Fatalf("rank: %v", err)
@@ -64,7 +63,7 @@ func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *t
 			{VideoID: "video-1", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxWatchRatio: 0.95},
 		},
 	}, []model.VideoCandidate{
-		videoCandidate("video-1", string(policy.BucketHardReview), 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
+		videoCandidate("video-1", model.LearningRoleHardReview, 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
 	}, recommendationDemand())
 	if err != nil {
 		t.Fatalf("rank: %v", err)
@@ -96,8 +95,8 @@ func TestDefaultVideoRankerAddsOverloadPenaltyForOverstuffedLongVideo(t *testing
 			PreferredDurationSec: [2]int{45, 180},
 		},
 	}, []model.VideoCandidate{
-		videoCandidate("video-compact", string(policy.BucketHardReview), 0.7, 0.6, 0.4, 0.6, 0.2, 140_000, []int64{101, 201}, int64Ptr(101)),
-		videoCandidate("video-overloaded", string(policy.BucketHardReview), 0.7, 0.6, 0.4, 0.6, 0.2, 420_000, []int64{101, 201, 301, 401}, int64Ptr(101)),
+		videoCandidate("video-compact", model.LearningRoleHardReview, 0.7, 0.6, 0.4, 0.6, 0.2, 140_000, []int64{101, 201}, int64Ptr(101)),
+		videoCandidate("video-overloaded", model.LearningRoleHardReview, 0.7, 0.6, 0.4, 0.6, 0.2, 420_000, []int64{101, 201, 301, 401}, int64Ptr(101)),
 	}, recommendationDemand())
 	if err != nil {
 		t.Fatalf("rank: %v", err)
@@ -121,20 +120,30 @@ func recommendationDemand() model.DemandBundle {
 	}
 }
 
-func videoCandidate(videoID string, dominantBucket string, hardCover float64, coverageStrength float64, bundleValue float64, fit float64, future float64, bestEndMs int32, coveredUnits []int64, dominantUnitID *int64) model.VideoCandidate {
+func videoCandidate(videoID string, dominantRole model.LearningRole, hardCover float64, coverageStrength float64, bundleValue float64, fit float64, future float64, bestEndMs int32, coveredUnits []int64, dominantUnitID *int64) model.VideoCandidate {
 	start := int32(1000)
+	learningUnits := make([]model.ExpectedLearningUnit, 0, len(coveredUnits))
+	for _, unitID := range coveredUnits {
+		learningUnits = append(learningUnits, model.ExpectedLearningUnit{
+			CoarseUnitID: unitID,
+			Role:         dominantRole,
+			IsPrimary:    unitID == coveredUnits[0],
+			Evidence: &model.LearningUnitEvidence{
+				StartMs: &start,
+				EndMs:   &bestEndMs,
+			},
+		})
+	}
 	return model.VideoCandidate{
-		VideoID:                videoID,
-		DominantBucket:         dominantBucket,
-		DominantUnitID:         dominantUnitID,
-		CoveredHardReviewUnits: append([]int64(nil), coveredUnits...),
-		HardReviewCover:        hardCover,
-		CoverageStrengthScore:  coverageStrength,
-		BundleValueScore:       bundleValue,
-		EducationalFitScore:    fit,
-		FutureValueScore:       future,
-		BestEvidenceStartMs:    &start,
-		BestEvidenceEndMs:      &bestEndMs,
+		VideoID:               videoID,
+		DominantRole:          dominantRole,
+		DominantUnitID:        dominantUnitID,
+		LearningUnits:         learningUnits,
+		HardReviewCover:       hardCover,
+		CoverageStrengthScore: coverageStrength,
+		BundleValueScore:      bundleValue,
+		EducationalFitScore:   fit,
+		FutureValueScore:      future,
 	}
 }
 

@@ -59,10 +59,10 @@ func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testi
 	assertContainsVideo(t, response.Videos, softMasteryVideo)
 	assertContainsVideo(t, response.Videos, softQualityVideo)
 
-	assertAnyVideoCoversUnit(t, response.Videos, hardUnit, func(video testutil.RecommendationVideoView) []int64 { return video.CoveredHardReviewUnits })
-	assertAnyVideoCoversUnit(t, response.Videos, newUnit, func(video testutil.RecommendationVideoView) []int64 { return video.CoveredNewNowUnits })
-	assertAnyVideoCoversUnit(t, response.Videos, softMasteryUnit, func(video testutil.RecommendationVideoView) []int64 { return video.CoveredSoftReviewUnits })
-	assertAnyVideoCoversUnit(t, response.Videos, softQualityUnit, func(video testutil.RecommendationVideoView) []int64 { return video.CoveredSoftReviewUnits })
+	assertAnyVideoHasLearningUnit(t, response.Videos, hardUnit, "hard_review")
+	assertAnyVideoHasLearningUnit(t, response.Videos, newUnit, "new_now")
+	assertAnyVideoHasLearningUnit(t, response.Videos, softMasteryUnit, "soft_review")
+	assertAnyVideoHasLearningUnit(t, response.Videos, softQualityUnit, "soft_review")
 }
 
 func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSparse(t *testing.T) {

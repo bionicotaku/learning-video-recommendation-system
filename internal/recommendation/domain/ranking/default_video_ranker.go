@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
-	"learning-video-recommendation-system/internal/recommendation/domain/policy"
 )
 
 type DefaultVideoRanker struct{}
@@ -56,8 +55,8 @@ func (r *DefaultVideoRanker) Rank(recommendationContext model.RecommendationCont
 		if ranked[i].BaseScore != ranked[j].BaseScore {
 			return ranked[i].BaseScore > ranked[j].BaseScore
 		}
-		if bucketPriority(ranked[i].DominantBucket) != bucketPriority(ranked[j].DominantBucket) {
-			return bucketPriority(ranked[i].DominantBucket) < bucketPriority(ranked[j].DominantBucket)
+		if rolePriority(ranked[i].DominantRole) != rolePriority(ranked[j].DominantRole) {
+			return rolePriority(ranked[i].DominantRole) < rolePriority(ranked[j].DominantRole)
 		}
 		return ranked[i].VideoID < ranked[j].VideoID
 	})
@@ -97,14 +96,14 @@ func recentWatchedPenalty(state model.VideoUserState, now time.Time) float64 {
 }
 
 func overloadPenalty(candidate model.VideoCandidate, preferredDurationSec [2]int) float64 {
-	coveredUnits := len(uniqueCoveredUnits(candidate))
+	coveredUnits := len(model.LearningUnitIDs(candidate.LearningUnits))
 	penalty := 0.0
 	if coveredUnits > 3 {
 		penalty += math.Min(0.5, float64(coveredUnits-3)*0.25)
 	}
 
-	if candidate.BestEvidenceStartMs != nil && candidate.BestEvidenceEndMs != nil {
-		if durationMs := *candidate.BestEvidenceEndMs - *candidate.BestEvidenceStartMs; durationMs > 0 {
+	if evidence := model.PrimaryLearningUnitEvidence(candidate.LearningUnits); evidence != nil && evidence.StartMs != nil && evidence.EndMs != nil {
+		if durationMs := *evidence.EndMs - *evidence.StartMs; durationMs > 0 {
 			windowRatio := float64(durationMs) / float64(preferredDurationSec[1]*1000)
 			if windowRatio > 1 {
 				penalty += math.Min(0.25, windowRatio-1)
@@ -125,33 +124,13 @@ func recencyPenalty(delta time.Duration, horizon time.Duration) float64 {
 	return round4(1.0 - (float64(delta) / float64(horizon)))
 }
 
-func uniqueCoveredUnits(candidate model.VideoCandidate) []int64 {
-	seen := make(map[int64]struct{})
-	result := make([]int64, 0)
-	for _, units := range [][]int64{
-		candidate.CoveredHardReviewUnits,
-		candidate.CoveredNewNowUnits,
-		candidate.CoveredSoftReviewUnits,
-		candidate.CoveredNearFutureUnits,
-	} {
-		for _, unitID := range units {
-			if _, ok := seen[unitID]; ok {
-				continue
-			}
-			seen[unitID] = struct{}{}
-			result = append(result, unitID)
-		}
-	}
-	return result
-}
-
-func bucketPriority(bucket string) int {
-	switch bucket {
-	case string(policy.BucketHardReview):
+func rolePriority(role model.LearningRole) int {
+	switch role {
+	case model.LearningRoleHardReview:
 		return 0
-	case string(policy.BucketNewNow):
+	case model.LearningRoleNewNow:
 		return 1
-	case string(policy.BucketSoftReview):
+	case model.LearningRoleSoftReview:
 		return 2
 	default:
 		return 3

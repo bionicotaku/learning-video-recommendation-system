@@ -105,7 +105,7 @@ func TestE2E_RecommendationNormalModeWithBundleCoverage(t *testing.T) {
 		t.Fatalf("expected bundle video in result set, got %v", videoIDs(response.Videos))
 	}
 	bundle := response.Videos[videoIndex(response.Videos, bundleID)]
-	if !containsUnit(bundle.CoveredHardReviewUnits, hardUnit) || !containsUnit(bundle.CoveredNewNowUnits, newUnit) {
+	if !containsUnit(learningUnitIDsByRole(bundle.LearningUnits, "hard_review"), hardUnit) || !containsUnit(learningUnitIDsByRole(bundle.LearningUnits, "new_now"), newUnit) {
 		t.Fatalf("bundle coverage incomplete: %+v", bundle)
 	}
 }
@@ -201,7 +201,7 @@ func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 
 	coreCovered := false
 	for _, video := range response.Videos {
-		if containsUnit(video.CoveredHardReviewUnits, hardUnit) {
+		if containsUnit(learningUnitIDsByRole(video.LearningUnits, "hard_review"), hardUnit) {
 			coreCovered = true
 			break
 		}

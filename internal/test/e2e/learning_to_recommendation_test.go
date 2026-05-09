@@ -55,8 +55,8 @@ func TestE2E_EnsureTargetWithoutEventsFeedsRecommendation(t *testing.T) {
 	if !containsReason(response.Videos[0].ReasonCodes, "new_unit_introduced") {
 		t.Fatalf("reason codes = %#v, want new_unit_introduced", response.Videos[0].ReasonCodes)
 	}
-	if !containsUnit(response.Videos[0].CoveredNewNowUnits, unitID) {
-		t.Fatalf("covered_new_now_units = %#v, want %d", response.Videos[0].CoveredNewNowUnits, unitID)
+	if !containsUnit(learningUnitIDsByRole(response.Videos[0].LearningUnits, "new_now"), unitID) {
+		t.Fatalf("learning_units = %#v, want new_now unit %d", response.Videos[0].LearningUnits, unitID)
 	}
 }
 

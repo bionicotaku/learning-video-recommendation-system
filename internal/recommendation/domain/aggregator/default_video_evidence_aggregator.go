@@ -26,25 +26,18 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 	videos := make([]model.VideoCandidate, 0, len(grouped))
 	for videoID, videoWindows := range grouped {
 		unitWindows := make(map[int64][]model.ResolvedEvidenceWindow)
+		laneSources := make(map[string]struct{})
 		for _, window := range videoWindows {
 			unitWindows[window.Candidate.CoarseUnitID] = append(unitWindows[window.Candidate.CoarseUnitID], window)
+			laneSources[window.Candidate.Lane] = struct{}{}
 		}
 
-		laneSources := make(map[string]struct{})
-		coveredHard := make(map[int64]struct{})
-		coveredNew := make(map[int64]struct{})
-		coveredSoft := make(map[int64]struct{})
-		coveredFuture := make(map[int64]struct{})
-
-		bestVideoWindow := model.ResolvedEvidenceWindow{}
 		bestVideoScore := -1.0
+		dominantStartMs := int32(math.MaxInt32)
 		var dominantUnitID *int64
-		dominantBucket := ""
+		dominantRole := model.LearningRole("")
 
-		totalCoverageStrength := 0.0
-		totalEducationalFit := 0.0
-		totalFutureValue := 0.0
-		unitCount := 0
+		learningUnitCandidates := make([]aggregatedLearningUnit, 0, len(unitWindows))
 
 		for unitID, candidates := range unitWindows {
 			sort.SliceStable(candidates, func(i, j int) bool {
@@ -58,66 +51,81 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 			})
 
 			best := candidates[0]
+			role := roleFromBucket(best.Candidate.Bucket)
 			unitStrength := evidenceStrength(best, recommendationContext.Request.PreferredDurationSec)
 			if len(candidates) > 1 {
 				unitStrength += evidenceStrength(candidates[1], recommendationContext.Request.PreferredDurationSec) * 0.15
 			}
 			unitStrength = math.Min(1, unitStrength)
 
-			totalCoverageStrength += unitStrength
-			totalEducationalFit += educationalFit(best, recommendationContext.Request.PreferredDurationSec)
-			totalFutureValue += futureValue(best.Candidate.Bucket)
-			unitCount++
-
-			switch best.Candidate.Bucket {
-			case string(policy.BucketHardReview):
-				coveredHard[unitID] = struct{}{}
-			case string(policy.BucketNewNow):
-				coveredNew[unitID] = struct{}{}
-			case string(policy.BucketSoftReview):
-				coveredSoft[unitID] = struct{}{}
-			case string(policy.BucketNearFuture):
-				coveredFuture[unitID] = struct{}{}
-			}
-
-			laneSources[best.Candidate.Lane] = struct{}{}
-			if pickAsBestVideoWindow(best, dominantBucket, bestVideoScore, unitStrength, bestVideoWindow, recommendationContext.Request.PreferredDurationSec) {
-				bestVideoWindow = best
+			if pickAsDominantLearningUnit(best, dominantRole, bestVideoScore, dominantStartMs, unitStrength, recommendationContext.Request.PreferredDurationSec) {
 				bestVideoScore = unitStrength
-				dominantBucket = best.Candidate.Bucket
+				dominantStartMs = bestStart(best)
+				dominantRole = role
 				unitIDCopy := unitID
 				dominantUnitID = &unitIDCopy
 			}
+			learningUnitCandidates = append(learningUnitCandidates, aggregatedLearningUnit{
+				unit: model.ExpectedLearningUnit{
+					CoarseUnitID: unitID,
+					Role:         role,
+					Evidence:     evidenceFromWindow(best),
+				},
+				strength:       unitStrength,
+				educationalFit: educationalFit(best, recommendationContext.Request.PreferredDurationSec),
+				futureValue:    futureValue(best.Candidate.Bucket),
+				startMs:        bestStart(best),
+			})
 		}
 
-		distinctMatchedUnitCount := len(unitWindows)
+		sort.SliceStable(learningUnitCandidates, func(i, j int) bool {
+			if rolePriority(learningUnitCandidates[i].unit.Role) != rolePriority(learningUnitCandidates[j].unit.Role) {
+				return rolePriority(learningUnitCandidates[i].unit.Role) < rolePriority(learningUnitCandidates[j].unit.Role)
+			}
+			if learningUnitCandidates[i].strength != learningUnitCandidates[j].strength {
+				return learningUnitCandidates[i].strength > learningUnitCandidates[j].strength
+			}
+			if learningUnitCandidates[i].startMs != learningUnitCandidates[j].startMs {
+				return learningUnitCandidates[i].startMs < learningUnitCandidates[j].startMs
+			}
+			return learningUnitCandidates[i].unit.CoarseUnitID < learningUnitCandidates[j].unit.CoarseUnitID
+		})
+		if len(learningUnitCandidates) > 8 {
+			learningUnitCandidates = learningUnitCandidates[:8]
+		}
+		learningUnits := finalizePrimaryLearningUnits(learningUnitCandidates)
+		totalCoverageStrength := 0.0
+		totalEducationalFit := 0.0
+		totalFutureValue := 0.0
+		for _, candidate := range learningUnitCandidates {
+			totalCoverageStrength += candidate.strength
+			totalEducationalFit += candidate.educationalFit
+			totalFutureValue += candidate.futureValue
+		}
+		unitCount := maxInt(1, len(learningUnits))
+		hasCore := hasAnyRole(learningUnits, model.LearningRoleHardReview, model.LearningRoleNewNow)
+		hasSupportingUnits := hasAnyRole(learningUnits, model.LearningRoleSoftReview, model.LearningRoleNearFuture)
+
 		videos = append(videos, model.VideoCandidate{
-			VideoID:                   videoID,
-			LaneSources:               sortedKeys(laneSources),
-			DominantBucket:            dominantBucket,
-			DominantUnitID:            dominantUnitID,
-			CoveredHardReviewUnits:    sortedInt64Keys(coveredHard),
-			CoveredNewNowUnits:        sortedInt64Keys(coveredNew),
-			CoveredSoftReviewUnits:    sortedInt64Keys(coveredSoft),
-			CoveredNearFutureUnits:    sortedInt64Keys(coveredFuture),
-			HardReviewCover:           coverageRatio(len(coveredHard), demandCounts[string(policy.BucketHardReview)]),
-			NewNowCover:               coverageRatio(len(coveredNew), demandCounts[string(policy.BucketNewNow)]),
-			SoftReviewCover:           coverageRatio(len(coveredSoft), demandCounts[string(policy.BucketSoftReview)]),
-			NearFutureCover:           coverageRatio(len(coveredFuture), demandCounts[string(policy.BucketNearFuture)]),
-			CoverageStrengthScore:     round4(totalCoverageStrength / float64(maxInt(1, unitCount))),
-			BundleValueScore:          bundleValueScore(distinctMatchedUnitCount, len(coveredHard)+len(coveredNew) > 0, len(coveredSoft)+len(coveredFuture) > 0),
-			EducationalFitScore:       round4(totalEducationalFit / float64(maxInt(1, unitCount))),
-			FutureValueScore:          round4(totalFutureValue / float64(maxInt(1, unitCount))),
-			BestEvidenceSentenceIndex: bestSentenceIndex(bestVideoWindow.BestEvidenceRef),
-			BestEvidenceSpanIndex:     bestSpanIndex(bestVideoWindow.BestEvidenceRef),
-			BestEvidenceStartMs:       bestVideoWindow.BestEvidenceStartMs,
-			BestEvidenceEndMs:         bestVideoWindow.BestEvidenceEndMs,
+			VideoID:               videoID,
+			LaneSources:           sortedKeys(laneSources),
+			DominantRole:          dominantRole,
+			DominantUnitID:        dominantUnitID,
+			LearningUnits:         learningUnits,
+			HardReviewCover:       coverageRatio(model.CountLearningUnitsByRole(learningUnits, model.LearningRoleHardReview), demandCounts[string(policy.BucketHardReview)]),
+			NewNowCover:           coverageRatio(model.CountLearningUnitsByRole(learningUnits, model.LearningRoleNewNow), demandCounts[string(policy.BucketNewNow)]),
+			SoftReviewCover:       coverageRatio(model.CountLearningUnitsByRole(learningUnits, model.LearningRoleSoftReview), demandCounts[string(policy.BucketSoftReview)]),
+			NearFutureCover:       coverageRatio(model.CountLearningUnitsByRole(learningUnits, model.LearningRoleNearFuture), demandCounts[string(policy.BucketNearFuture)]),
+			CoverageStrengthScore: round4(totalCoverageStrength / float64(unitCount)),
+			BundleValueScore:      bundleValueScore(len(learningUnits), hasCore, hasSupportingUnits),
+			EducationalFitScore:   round4(totalEducationalFit / float64(unitCount)),
+			FutureValueScore:      round4(totalFutureValue / float64(unitCount)),
 		})
 	}
 
 	sort.SliceStable(videos, func(i, j int) bool {
-		if bucketPriority(videos[i].DominantBucket) != bucketPriority(videos[j].DominantBucket) {
-			return bucketPriority(videos[i].DominantBucket) < bucketPriority(videos[j].DominantBucket)
+		if rolePriority(videos[i].DominantRole) != rolePriority(videos[j].DominantRole) {
+			return rolePriority(videos[i].DominantRole) < rolePriority(videos[j].DominantRole)
 		}
 		if videos[i].CoverageStrengthScore != videos[j].CoverageStrengthScore {
 			return videos[i].CoverageStrengthScore > videos[j].CoverageStrengthScore
@@ -128,17 +136,26 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 	return videos, nil
 }
 
-func pickAsBestVideoWindow(candidate model.ResolvedEvidenceWindow, currentBucket string, currentScore float64, candidateScore float64, current model.ResolvedEvidenceWindow, preferredDurationSec [2]int) bool {
+type aggregatedLearningUnit struct {
+	unit           model.ExpectedLearningUnit
+	strength       float64
+	educationalFit float64
+	futureValue    float64
+	startMs        int32
+}
+
+func pickAsDominantLearningUnit(candidate model.ResolvedEvidenceWindow, currentRole model.LearningRole, currentScore float64, currentStartMs int32, candidateScore float64, preferredDurationSec [2]int) bool {
 	if currentScore < 0 {
 		return true
 	}
-	if bucketPriority(candidate.Candidate.Bucket) != bucketPriority(currentBucket) {
-		return bucketPriority(candidate.Candidate.Bucket) < bucketPriority(currentBucket)
+	candidateRole := roleFromBucket(candidate.Candidate.Bucket)
+	if rolePriority(candidateRole) != rolePriority(currentRole) {
+		return rolePriority(candidateRole) < rolePriority(currentRole)
 	}
 	if candidateScore != currentScore {
 		return candidateScore > currentScore
 	}
-	return bestStart(candidate) < bestStart(current)
+	return bestStart(candidate) < currentStartMs
 }
 
 func evidenceStrength(window model.ResolvedEvidenceWindow, preferredDurationSec [2]int) float64 {
@@ -246,6 +263,19 @@ func sortedInt64Keys(values map[int64]struct{}) []int64 {
 	return result
 }
 
+func evidenceFromWindow(window model.ResolvedEvidenceWindow) *model.LearningUnitEvidence {
+	evidence := &model.LearningUnitEvidence{
+		SentenceIndex: bestSentenceIndex(window.BestEvidenceRef),
+		SpanIndex:     bestSpanIndex(window.BestEvidenceRef),
+		StartMs:       window.BestEvidenceStartMs,
+		EndMs:         window.BestEvidenceEndMs,
+	}
+	if evidence.SentenceIndex == nil && evidence.SpanIndex == nil && evidence.StartMs == nil && evidence.EndMs == nil {
+		return nil
+	}
+	return evidence
+}
+
 func bestSentenceIndex(ref *model.EvidenceRef) *int32 {
 	if ref == nil {
 		return nil
@@ -269,13 +299,63 @@ func bestStart(window model.ResolvedEvidenceWindow) int32 {
 	return *window.BestEvidenceStartMs
 }
 
-func bucketPriority(bucket string) int {
+func roleFromBucket(bucket string) model.LearningRole {
 	switch bucket {
 	case string(policy.BucketHardReview):
-		return 0
+		return model.LearningRoleHardReview
 	case string(policy.BucketNewNow):
-		return 1
+		return model.LearningRoleNewNow
 	case string(policy.BucketSoftReview):
+		return model.LearningRoleSoftReview
+	default:
+		return model.LearningRoleNearFuture
+	}
+}
+
+func finalizePrimaryLearningUnits(candidates []aggregatedLearningUnit) []model.ExpectedLearningUnit {
+	result := make([]model.ExpectedLearningUnit, 0, len(candidates))
+	hasCore := false
+	for _, candidate := range candidates {
+		unit := candidate.unit
+		if model.IsCoreLearningRole(unit.Role) {
+			unit.IsPrimary = true
+			hasCore = true
+		}
+		result = append(result, unit)
+	}
+	if hasCore {
+		return result
+	}
+
+	primaryCount := 0
+	for index := range result {
+		if primaryCount >= 2 {
+			break
+		}
+		if model.IsFutureLikeLearningRole(result[index].Role) {
+			result[index].IsPrimary = true
+			primaryCount++
+		}
+	}
+	return result
+}
+
+func hasAnyRole(units []model.ExpectedLearningUnit, roles ...model.LearningRole) bool {
+	for _, role := range roles {
+		if model.HasLearningRole(units, role) {
+			return true
+		}
+	}
+	return false
+}
+
+func rolePriority(role model.LearningRole) int {
+	switch role {
+	case model.LearningRoleHardReview:
+		return 0
+	case model.LearningRoleNewNow:
+		return 1
+	case model.LearningRoleSoftReview:
 		return 2
 	default:
 		return 3

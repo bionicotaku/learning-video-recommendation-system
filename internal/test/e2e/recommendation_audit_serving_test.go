@@ -43,12 +43,13 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	if len(response.Videos) != 1 {
 		t.Fatalf("expected exactly one video, got %d", len(response.Videos))
 	}
-	if response.Videos[0].BestEvidence == nil ||
-		response.Videos[0].BestEvidence.SentenceIndex == nil ||
-		response.Videos[0].BestEvidence.SpanIndex == nil ||
-		response.Videos[0].BestEvidence.StartMs == nil ||
-		response.Videos[0].BestEvidence.EndMs == nil {
-		t.Fatalf("missing best evidence in response: %+v", response.Videos[0])
+	if len(response.Videos[0].LearningUnits) != 1 ||
+		response.Videos[0].LearningUnits[0].Evidence == nil ||
+		response.Videos[0].LearningUnits[0].Evidence.SentenceIndex == nil ||
+		response.Videos[0].LearningUnits[0].Evidence.SpanIndex == nil ||
+		response.Videos[0].LearningUnits[0].Evidence.StartMs == nil ||
+		response.Videos[0].LearningUnits[0].Evidence.EndMs == nil {
+		t.Fatalf("missing learning unit evidence in response: %+v", response.Videos[0])
 	}
 
 	if got := h.CountRecommendationRuns(t, userID); got != 1 {
@@ -64,12 +65,22 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 		t.Fatalf("video served_count = %d, want 1", got)
 	}
 
-	auditSentence, auditSpan, auditStart, auditEnd := h.LoadAuditEvidence(t, response.RunID, 1)
-	if *auditSentence != *response.Videos[0].BestEvidence.SentenceIndex ||
-		*auditSpan != *response.Videos[0].BestEvidence.SpanIndex ||
-		*auditStart != *response.Videos[0].BestEvidence.StartMs ||
-		*auditEnd != *response.Videos[0].BestEvidence.EndMs {
-		t.Fatalf("audit evidence mismatch: response=%+v audit=(%v,%v,%v,%v)", response.Videos[0], auditSentence, auditSpan, auditStart, auditEnd)
+	auditUnits := h.LoadAuditLearningUnits(t, response.RunID, 1)
+	if len(auditUnits) != 1 {
+		t.Fatalf("audit learning_units = %+v, want one unit", auditUnits)
+	}
+	responseEvidence := response.Videos[0].LearningUnits[0].Evidence
+	auditEvidence := auditUnits[0].Evidence
+	if auditEvidence == nil ||
+		auditEvidence.SentenceIndex == nil ||
+		auditEvidence.SpanIndex == nil ||
+		auditEvidence.StartMs == nil ||
+		auditEvidence.EndMs == nil ||
+		*auditEvidence.SentenceIndex != *responseEvidence.SentenceIndex ||
+		*auditEvidence.SpanIndex != *responseEvidence.SpanIndex ||
+		*auditEvidence.StartMs != *responseEvidence.StartMs ||
+		*auditEvidence.EndMs != *responseEvidence.EndMs {
+		t.Fatalf("audit learning unit evidence mismatch: response=%+v audit=%+v", response.Videos[0].LearningUnits, auditUnits)
 	}
 }
 

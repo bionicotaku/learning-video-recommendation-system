@@ -1,24 +1,23 @@
 {
-  "RunID": "fixed-run-id",
-  "SelectorMode": "normal",
-  "Underfilled": true,
-  "Videos": [
+  "run_id": "fixed-run-id",
+  "selector_mode": "normal",
+  "underfilled": true,
+  "videos": [
     {
-      "VideoID": "video-1",
-      "Rank": 1,
-      "Score": 0.91,
-      "ReasonCodes": [
+      "video_id": "video-1",
+      "rank": 1,
+      "score": 0.91,
+      "reason_codes": [
         "hard_review_covered"
       ],
-      "CoveredUnits": null,
-      "CoveredHardReviewUnits": [
-        101
+      "learning_units": [
+        {
+          "coarse_unit_id": 101,
+          "role": "hard_review",
+          "is_primary": true
+        }
       ],
-      "CoveredNewNowUnits": null,
-      "CoveredSoftReviewUnits": null,
-      "CoveredNearFutureUnits": null,
-      "BestEvidence": null,
-      "Explanation": "ok"
+      "explanation": "ok"
     }
   ]
 }

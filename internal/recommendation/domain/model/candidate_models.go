@@ -36,29 +36,22 @@ type ResolvedEvidenceWindow struct {
 }
 
 type VideoCandidate struct {
-	VideoID                   string
-	LaneSources               []string
-	DominantBucket            string
-	DominantUnitID            *int64
-	CoveredHardReviewUnits    []int64
-	CoveredNewNowUnits        []int64
-	CoveredSoftReviewUnits    []int64
-	CoveredNearFutureUnits    []int64
-	HardReviewCover           float64
-	NewNowCover               float64
-	SoftReviewCover           float64
-	NearFutureCover           float64
-	CoverageStrengthScore     float64
-	BundleValueScore          float64
-	EducationalFitScore       float64
-	FutureValueScore          float64
-	FreshnessScore            float64
-	RecentServedPenalty       float64
-	RecentWatchedPenalty      float64
-	OverloadPenalty           float64
-	BaseScore                 float64
-	BestEvidenceSentenceIndex *int32
-	BestEvidenceSpanIndex     *int32
-	BestEvidenceStartMs       *int32
-	BestEvidenceEndMs         *int32
+	VideoID               string
+	LaneSources           []string
+	DominantRole          LearningRole
+	DominantUnitID        *int64
+	LearningUnits         []ExpectedLearningUnit
+	HardReviewCover       float64
+	NewNowCover           float64
+	SoftReviewCover       float64
+	NearFutureCover       float64
+	CoverageStrengthScore float64
+	BundleValueScore      float64
+	EducationalFitScore   float64
+	FutureValueScore      float64
+	FreshnessScore        float64
+	RecentServedPenalty   float64
+	RecentWatchedPenalty  float64
+	OverloadPenalty       float64
+	BaseScore             float64
 }

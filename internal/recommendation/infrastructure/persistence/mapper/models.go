@@ -1,9 +1,18 @@
 package mapper
 
 import (
+	"encoding/json"
+
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
 	recommendationsqlc "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/sqlcgen"
 )
+
+func LearningUnitsToJSON(units []model.ExpectedLearningUnit) ([]byte, error) {
+	if units == nil {
+		units = []model.ExpectedLearningUnit{}
+	}
+	return json.Marshal(units)
+}
 
 func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (model.LearningStateSnapshot, error) {
 	targetPriority, err := NumericToFloat64(row.TargetPriority)

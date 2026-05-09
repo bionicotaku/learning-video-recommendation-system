@@ -66,7 +66,7 @@
   - `status != active` / `visibility_status != public` / `publish_at > now()` 的视频不会进入推荐
   - `v_unit_video_inventory` 的 `none / weak / ok / strong` 分级契约
 - `recommendation_audit_serving_test.go`
-  - response `best_evidence_*` 与 audit item 一致
+  - response `learning_units[].evidence` 与 audit item 的 `learning_units` 一致
   - `video_recommendation_runs` / `video_recommendation_items` 写入
   - `user_unit_serving_states` / `user_video_serving_states` 写入
   - 第二次推荐时 serving penalty 与 watched penalty 生效
@@ -98,12 +98,12 @@
   - `underfilled`
   - selected `video_id` 顺序或关键包含关系
   - `reason_codes` 的稳定子集
-  - `covered_*_units`
-  - `best_evidence`
+  - `learning_units`
+  - unit-level `evidence`
 - Recommendation 落库对象：
   - run / item 数量
   - run 的 `selector_mode / underfilled / result_count`
-  - item 的 `rank / primary_lane / dominant_bucket / dominant_unit_id`
+  - item 的 `rank / primary_lane / dominant_role / dominant_unit_id / learning_units`
   - serving state `served_count`
   - `v_unit_video_inventory.supply_grade`
 

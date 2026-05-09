@@ -49,6 +49,10 @@ on recommendation.video_recommendation_runs (user_id, created_at desc);
 create index if not exists idx_video_recommendation_items_video_id
 on recommendation.video_recommendation_items (video_id);
 
+create index if not exists idx_video_recommendation_items_dominant_unit
+on recommendation.video_recommendation_items (dominant_unit_id)
+where dominant_unit_id is not null;
+
 create unique index if not exists idx_v_recommendable_video_units_unit_video
 on recommendation.v_recommendable_video_units (coarse_unit_id, video_id);
 

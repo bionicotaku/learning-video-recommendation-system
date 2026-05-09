@@ -56,7 +56,7 @@
 - `domain/planner`
   - 需求分桶、lane budget、mix quota
 - `domain/aggregator`
-  - video-level 聚合与覆盖特征
+  - video-level 聚合、expected learning units 构造与覆盖特征
 - `domain/ranking`
   - 第一版规则排序与 penalty
 - `domain/selector`
@@ -88,12 +88,15 @@
 - `catalog.video_user_states` 只作为轻量 penalty 输入，不承载 Recommendation own 的投放状态。
 - Candidate Generator 和 Evidence Resolver 必须沿调用方 `ctx` 传播取消、超时和 trace 上下文。
 - `selector_mode=extreme_sparse` 由 selection 结果 underfill 后置判定，而不是 planner 预判。
-- `GenerateVideoRecommendations` 对外响应使用 `best_evidence` 对象，而不是 4 个扁平字段；audit 表仍保留扁平存储字段。
+- `GenerateVideoRecommendations` 对外响应是 video learning plan：每个 video 通过 `learning_units` 暴露本轮预期学习 unit、role、primary 标记和 unit-level evidence；不再暴露 `Covered*` 或 video-level `best_evidence`。
+- `video_recommendation_items` 审计表以 `dominant_role`、`dominant_unit_id` 和 `learning_units jsonb` 保存 item 快照；不再保存 covered count 或 video-level best evidence 字段。
+- `LaneSources` 是 video 级所有命中候选 lane 的集合，不是 per-unit winning candidate 的 lane 集合；`primary_lane` 从完整 `LaneSources` 按 lane priority 派生。
+- Selector 的 same-unit 硬上限只按 `learning_units` 中 `is_primary=true` 的 unit 计数；非 primary support units 只参与边际覆盖、解释和 serving state。
 - Recommendation 的输入装配边界是显式两阶段：
   - `DefaultContextAssembler` 只装配 request-scope / unit-scope 输入：active learning states、unit inventory、unit serving states
   - `DefaultVideoStateEnricher` 负责 candidate-derived video-scope 输入：video serving states、catalog video user states
 - `DefaultVideoRanker` 仍计算 `RecentWatchedPenalty` 作为辅助观测值，但 MVP `BaseScore` 不再直接扣这一项，避免与 `FreshnessScore` 重复惩罚。
-- `best_evidence` 只允许从 `evidence_span_refs` 命中结果中派生；如果 refs 无法命中 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并返回空 `best_evidence`，不会再兜底选“最早 span”。
+- `learning_units[].evidence` 只允许从 `evidence_span_refs` 命中结果中派生；如果 refs 无法命中 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并让该 unit 的 evidence 为空，不会再兜底选“最早 span”。
 - 当前 Recommendation 的真实验证分两层：
   - 模块内 integration：owner migration、物化视图、refresh、repository 契约
   - 跨模块 E2E：demand mapping、selector constraints、read model visibility、write-side consistency、Replay 交互、多用户隔离

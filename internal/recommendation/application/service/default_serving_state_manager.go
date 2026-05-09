@@ -38,7 +38,7 @@ func (m *DefaultServingStateManager) ApplySelection(ctx context.Context, runID s
 	unitIDs := make([]int64, 0, len(videos))
 	for _, video := range videos {
 		videoIDs = append(videoIDs, video.VideoID)
-		unitIDs = appendUniqueInt64(unitIDs, video.CoveredUnits...)
+		unitIDs = appendUniqueInt64(unitIDs, model.LearningUnitIDs(video.LearningUnits)...)
 	}
 
 	now := m.now()

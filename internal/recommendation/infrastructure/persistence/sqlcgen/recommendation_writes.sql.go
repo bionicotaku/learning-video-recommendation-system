@@ -18,17 +18,10 @@ insert into recommendation.video_recommendation_items (
   video_id,
   score,
   primary_lane,
-  dominant_bucket,
+  dominant_role,
   dominant_unit_id,
   reason_codes,
-  covered_hard_review_count,
-  covered_new_now_count,
-  covered_soft_review_count,
-  covered_near_future_count,
-  best_evidence_sentence_index,
-  best_evidence_span_index,
-  best_evidence_start_ms,
-  best_evidence_end_ms
+  learning_units
 ) values (
   $1,
   $2,
@@ -38,34 +31,20 @@ insert into recommendation.video_recommendation_items (
   $6,
   $7,
   $8,
-  $9,
-  $10,
-  $11,
-  $12,
-  $13,
-  $14,
-  $15,
-  $16
+  $9
 )
 `
 
 type InsertVideoRecommendationItemParams struct {
-	RunID                     pgtype.UUID    `json:"run_id"`
-	Rank                      int32          `json:"rank"`
-	VideoID                   pgtype.UUID    `json:"video_id"`
-	Score                     pgtype.Numeric `json:"score"`
-	PrimaryLane               pgtype.Text    `json:"primary_lane"`
-	DominantBucket            pgtype.Text    `json:"dominant_bucket"`
-	DominantUnitID            pgtype.Int8    `json:"dominant_unit_id"`
-	ReasonCodes               []string       `json:"reason_codes"`
-	CoveredHardReviewCount    int32          `json:"covered_hard_review_count"`
-	CoveredNewNowCount        int32          `json:"covered_new_now_count"`
-	CoveredSoftReviewCount    int32          `json:"covered_soft_review_count"`
-	CoveredNearFutureCount    int32          `json:"covered_near_future_count"`
-	BestEvidenceSentenceIndex pgtype.Int4    `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex     pgtype.Int4    `json:"best_evidence_span_index"`
-	BestEvidenceStartMs       pgtype.Int4    `json:"best_evidence_start_ms"`
-	BestEvidenceEndMs         pgtype.Int4    `json:"best_evidence_end_ms"`
+	RunID          pgtype.UUID    `json:"run_id"`
+	Rank           int32          `json:"rank"`
+	VideoID        pgtype.UUID    `json:"video_id"`
+	Score          pgtype.Numeric `json:"score"`
+	PrimaryLane    pgtype.Text    `json:"primary_lane"`
+	DominantRole   pgtype.Text    `json:"dominant_role"`
+	DominantUnitID pgtype.Int8    `json:"dominant_unit_id"`
+	ReasonCodes    []string       `json:"reason_codes"`
+	LearningUnits  []byte         `json:"learning_units"`
 }
 
 func (q *Queries) InsertVideoRecommendationItem(ctx context.Context, arg InsertVideoRecommendationItemParams) error {
@@ -75,17 +54,10 @@ func (q *Queries) InsertVideoRecommendationItem(ctx context.Context, arg InsertV
 		arg.VideoID,
 		arg.Score,
 		arg.PrimaryLane,
-		arg.DominantBucket,
+		arg.DominantRole,
 		arg.DominantUnitID,
 		arg.ReasonCodes,
-		arg.CoveredHardReviewCount,
-		arg.CoveredNewNowCount,
-		arg.CoveredSoftReviewCount,
-		arg.CoveredNearFutureCount,
-		arg.BestEvidenceSentenceIndex,
-		arg.BestEvidenceSpanIndex,
-		arg.BestEvidenceStartMs,
-		arg.BestEvidenceEndMs,
+		arg.LearningUnits,
 	)
 	return err
 }

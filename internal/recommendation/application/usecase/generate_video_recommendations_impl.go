@@ -196,27 +196,35 @@ func hasDemand(demand model.DemandBundle) bool {
 func mapFinalItems(items []model.FinalRecommendationItem) []dto.RecommendationVideo {
 	result := make([]dto.RecommendationVideo, 0, len(items))
 	for _, item := range items {
-		var bestEvidence *dto.BestEvidence
-		if item.BestEvidenceSentenceIndex != nil || item.BestEvidenceSpanIndex != nil || item.BestEvidenceStartMs != nil || item.BestEvidenceEndMs != nil {
-			bestEvidence = &dto.BestEvidence{
-				SentenceIndex: item.BestEvidenceSentenceIndex,
-				SpanIndex:     item.BestEvidenceSpanIndex,
-				StartMs:       item.BestEvidenceStartMs,
-				EndMs:         item.BestEvidenceEndMs,
+		result = append(result, dto.RecommendationVideo{
+			VideoID:       item.VideoID,
+			Rank:          item.Rank,
+			Score:         item.Score,
+			ReasonCodes:   item.ReasonCodes,
+			LearningUnits: mapLearningUnits(item.LearningUnits),
+			Explanation:   item.Explanation,
+		})
+	}
+	return result
+}
+
+func mapLearningUnits(units []model.ExpectedLearningUnit) []dto.ExpectedLearningUnit {
+	result := make([]dto.ExpectedLearningUnit, 0, len(units))
+	for _, unit := range units {
+		var evidence *dto.LearningUnitEvidence
+		if unit.Evidence != nil {
+			evidence = &dto.LearningUnitEvidence{
+				SentenceIndex: unit.Evidence.SentenceIndex,
+				SpanIndex:     unit.Evidence.SpanIndex,
+				StartMs:       unit.Evidence.StartMs,
+				EndMs:         unit.Evidence.EndMs,
 			}
 		}
-		result = append(result, dto.RecommendationVideo{
-			VideoID:                item.VideoID,
-			Rank:                   item.Rank,
-			Score:                  item.Score,
-			ReasonCodes:            item.ReasonCodes,
-			CoveredUnits:           item.CoveredUnits,
-			CoveredHardReviewUnits: item.CoveredHardReviewUnits,
-			CoveredNewNowUnits:     item.CoveredNewNowUnits,
-			CoveredSoftReviewUnits: item.CoveredSoftReviewUnits,
-			CoveredNearFutureUnits: item.CoveredNearFutureUnits,
-			BestEvidence:           bestEvidence,
-			Explanation:            item.Explanation,
+		result = append(result, dto.ExpectedLearningUnit{
+			CoarseUnitID: unit.CoarseUnitID,
+			Role:         string(unit.Role),
+			IsPrimary:    unit.IsPrimary,
+			Evidence:     evidence,
 		})
 	}
 	return result
@@ -268,22 +276,15 @@ func buildAuditPayload(
 	for _, finalItem := range finalItems {
 		selected := selectedByVideo[finalItem.VideoID]
 		items = append(items, model.RecommendationItem{
-			RunID:                     runID,
-			Rank:                      int32(finalItem.Rank),
-			VideoID:                   finalItem.VideoID,
-			Score:                     finalItem.Score,
-			PrimaryLane:               primaryLane(selected.LaneSources),
-			DominantBucket:            selected.DominantBucket,
-			DominantUnitID:            selected.DominantUnitID,
-			ReasonCodes:               finalItem.ReasonCodes,
-			CoveredHardReviewCount:    int32(len(finalItem.CoveredHardReviewUnits)),
-			CoveredNewNowCount:        int32(len(finalItem.CoveredNewNowUnits)),
-			CoveredSoftReviewCount:    int32(len(finalItem.CoveredSoftReviewUnits)),
-			CoveredNearFutureCount:    int32(len(finalItem.CoveredNearFutureUnits)),
-			BestEvidenceSentenceIndex: finalItem.BestEvidenceSentenceIndex,
-			BestEvidenceSpanIndex:     finalItem.BestEvidenceSpanIndex,
-			BestEvidenceStartMs:       finalItem.BestEvidenceStartMs,
-			BestEvidenceEndMs:         finalItem.BestEvidenceEndMs,
+			RunID:          runID,
+			Rank:           int32(finalItem.Rank),
+			VideoID:        finalItem.VideoID,
+			Score:          finalItem.Score,
+			PrimaryLane:    primaryLane(selected.LaneSources),
+			DominantRole:   selected.DominantRole,
+			DominantUnitID: selected.DominantUnitID,
+			ReasonCodes:    finalItem.ReasonCodes,
+			LearningUnits:  append([]model.ExpectedLearningUnit(nil), finalItem.LearningUnits...),
 		})
 	}
 

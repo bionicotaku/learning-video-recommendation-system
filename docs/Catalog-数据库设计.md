@@ -241,7 +241,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 ## 16. 与 Recommendation / Recall 的数据契约
 
-当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 explanation/jump-to/精细证据时，再通过 `evidence_span_refs` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 只保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`sample_surface_forms`、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证高层语义标签，也不返回“最终 best evidence”；最终 `best_evidence_start_ms/end_ms` 等字段应由 Recommendation 在本轮 run 的聚合与解释阶段动态选出。
+当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 explanation/jump-to/精细证据时，再通过 `evidence_span_refs` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 只保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`sample_surface_forms`、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证高层语义标签，也不返回“最终 best evidence”；最终 unit-level evidence 应由 Recommendation 在本轮 run 的聚合与解释阶段动态选出，并保存在 `video_recommendation_items.learning_units` 中。
 
 同时要明确：Recommendation 需要的 `v_recommendable_video_units`、`v_unit_video_inventory`、`user_video_serving_states`、`video_recommendation_runs`、`video_recommendation_items` 都属于 `recommendation` schema，而不是 Catalog 的一部分。Catalog 只提供内容事实与内容索引，不拥有 Recommendation serving/audit 对象。
 

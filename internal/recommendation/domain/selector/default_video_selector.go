@@ -27,7 +27,7 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 
 	selected := make([]model.VideoCandidate, 0, minInt(targetCount, len(ranked)))
 	selectedIDs := make(map[string]struct{}, len(ranked))
-	dominantUnitCount := make(map[int64]int)
+	primaryUnitCount := make(map[int64]int)
 	coreCovered := make(map[int64]struct{})
 	softCovered := make(map[int64]struct{})
 
@@ -47,15 +47,14 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 		if !isCoreDominant(candidate) {
 			continue
 		}
-		if !canSelect(candidate, selected, demand, mode, dominantUnitCount) {
+		if !canSelect(candidate, selected, demand, mode, primaryUnitCount) {
 			continue
 		}
 		selected = append(selected, candidate)
 		selectedIDs[candidate.VideoID] = struct{}{}
-		incrementDominantUnitCount(candidate, dominantUnitCount)
-		markCovered(candidate.CoveredHardReviewUnits, coreCovered)
-		markCovered(candidate.CoveredNewNowUnits, coreCovered)
-		markCovered(candidate.CoveredSoftReviewUnits, softCovered)
+		markPrimaryUnitsSelected(candidate, primaryUnitCount)
+		markCovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleHardReview, model.LearningRoleNewNow), coreCovered)
+		markCovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleSoftReview), softCovered)
 	}
 
 	for len(selected) < targetCount {
@@ -65,11 +64,11 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 			if _, exists := selectedIDs[candidate.VideoID]; exists {
 				continue
 			}
-			if !canSelect(candidate, selected, demand, mode, dominantUnitCount) {
+			if !canSelect(candidate, selected, demand, mode, primaryUnitCount) {
 				continue
 			}
 
-			score := marginalScore(candidate, coreCovered, softCovered, dominantUnitCount)
+			score := marginalScore(candidate, coreCovered, softCovered, primaryUnitCount)
 			if score > bestMarginalScore {
 				bestMarginalScore = score
 				bestIndex = index
@@ -82,10 +81,9 @@ func (s *DefaultVideoSelector) Select(recommendationContext model.Recommendation
 		candidate := ranked[bestIndex]
 		selected = append(selected, candidate)
 		selectedIDs[candidate.VideoID] = struct{}{}
-		incrementDominantUnitCount(candidate, dominantUnitCount)
-		markCovered(candidate.CoveredHardReviewUnits, coreCovered)
-		markCovered(candidate.CoveredNewNowUnits, coreCovered)
-		markCovered(candidate.CoveredSoftReviewUnits, softCovered)
+		markPrimaryUnitsSelected(candidate, primaryUnitCount)
+		markCovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleHardReview, model.LearningRoleNewNow), coreCovered)
+		markCovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleSoftReview), softCovered)
 	}
 
 	return selected, nil
@@ -98,9 +96,12 @@ func selectorMode(demand model.DemandBundle) string {
 	return string(policy.SelectorModeNormal)
 }
 
-func canSelect(candidate model.VideoCandidate, selected []model.VideoCandidate, demand model.DemandBundle, mode string, dominantUnitCount map[int64]int) bool {
-	if candidate.DominantUnitID != nil && dominantUnitCount[*candidate.DominantUnitID] >= maxInt(1, demand.MixQuota.SameUnitMax) {
-		return false
+func canSelect(candidate model.VideoCandidate, selected []model.VideoCandidate, demand model.DemandBundle, mode string, primaryUnitCount map[int64]int) bool {
+	sameUnitMax := maxInt(1, demand.MixQuota.SameUnitMax)
+	for _, unitID := range model.PrimaryLearningUnitIDs(candidate.LearningUnits) {
+		if primaryUnitCount[unitID] >= sameUnitMax {
+			return false
+		}
 	}
 
 	if isFallback(candidate) && countFallback(selected) >= maxInt(1, demand.MixQuota.FallbackMax) {
@@ -109,7 +110,7 @@ func canSelect(candidate model.VideoCandidate, selected []model.VideoCandidate, 
 
 	switch mode {
 	case string(policy.SelectorModeNormal):
-		if candidate.DominantBucket == string(policy.BucketNearFuture) && countFutureDominant(selected) >= demand.MixQuota.FutureDominantMax {
+		if candidate.DominantRole == model.LearningRoleNearFuture && countFutureDominant(selected) >= demand.MixQuota.FutureDominantMax {
 			return false
 		}
 	case string(policy.SelectorModeLowSupply):
@@ -121,28 +122,28 @@ func canSelect(candidate model.VideoCandidate, selected []model.VideoCandidate, 
 	return true
 }
 
-func marginalScore(candidate model.VideoCandidate, coreCovered map[int64]struct{}, softCovered map[int64]struct{}, dominantUnitCount map[int64]int) float64 {
-	uncoveredCoreGain := countUncovered(candidate.CoveredHardReviewUnits, coreCovered) + countUncovered(candidate.CoveredNewNowUnits, coreCovered)
-	uncoveredSoftGain := countUncovered(candidate.CoveredSoftReviewUnits, softCovered)
+func marginalScore(candidate model.VideoCandidate, coreCovered map[int64]struct{}, softCovered map[int64]struct{}, primaryUnitCount map[int64]int) float64 {
+	uncoveredCoreGain := countUncovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleHardReview, model.LearningRoleNewNow), coreCovered)
+	uncoveredSoftGain := countUncovered(model.LearningUnitIDsByRoles(candidate.LearningUnits, model.LearningRoleSoftReview), softCovered)
 	redundancyPenalty := 0.0
 	if uncoveredCoreGain == 0 && uncoveredSoftGain == 0 {
 		redundancyPenalty = 0.08
 	}
 
 	repeatPenalty := 0.0
-	if candidate.DominantUnitID != nil {
-		repeatPenalty = float64(dominantUnitCount[*candidate.DominantUnitID]) * 0.04
+	for _, unitID := range model.PrimaryLearningUnitIDs(candidate.LearningUnits) {
+		repeatPenalty += float64(primaryUnitCount[unitID]) * 0.04
 	}
 
 	return candidate.BaseScore + float64(uncoveredCoreGain)*0.10 + float64(uncoveredSoftGain)*0.04 - redundancyPenalty - repeatPenalty
 }
 
 func isCoreDominant(candidate model.VideoCandidate) bool {
-	return candidate.DominantBucket == string(policy.BucketHardReview) || candidate.DominantBucket == string(policy.BucketNewNow)
+	return model.IsCoreLearningRole(candidate.DominantRole)
 }
 
 func isFutureLike(candidate model.VideoCandidate) bool {
-	return candidate.DominantBucket == string(policy.BucketSoftReview) || candidate.DominantBucket == string(policy.BucketNearFuture)
+	return model.IsFutureLikeLearningRole(candidate.DominantRole)
 }
 
 func isFallback(candidate model.VideoCandidate) bool {
@@ -162,7 +163,7 @@ func countCoreDominant(selected []model.VideoCandidate) int {
 func countFutureDominant(selected []model.VideoCandidate) int {
 	count := 0
 	for _, candidate := range selected {
-		if candidate.DominantBucket == string(policy.BucketNearFuture) {
+		if candidate.DominantRole == model.LearningRoleNearFuture {
 			count++
 		}
 	}
@@ -189,11 +190,10 @@ func countFallback(selected []model.VideoCandidate) int {
 	return count
 }
 
-func incrementDominantUnitCount(candidate model.VideoCandidate, dominantUnitCount map[int64]int) {
-	if candidate.DominantUnitID == nil {
-		return
+func markPrimaryUnitsSelected(candidate model.VideoCandidate, primaryUnitCount map[int64]int) {
+	for _, unitID := range model.PrimaryLearningUnitIDs(candidate.LearningUnits) {
+		primaryUnitCount[unitID]++
 	}
-	dominantUnitCount[*candidate.DominantUnitID]++
 }
 
 func markCovered(unitIDs []int64, covered map[int64]struct{}) {

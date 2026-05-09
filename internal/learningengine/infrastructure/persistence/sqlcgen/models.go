@@ -65,5 +65,21 @@ type LearningUserUnitState struct {
 }
 
 type SemanticCoarseUnit struct {
-	ID int64 `json:"id"`
+	ID              int64              `json:"id"`
+	Kind            string             `json:"kind"`
+	Label           string             `json:"label"`
+	Lang            string             `json:"lang"`
+	Pos             pgtype.Text        `json:"pos"`
+	EnglishDef      pgtype.Text        `json:"english_def"`
+	ChineseDef      pgtype.Text        `json:"chinese_def"`
+	ChineseCriteria pgtype.Text        `json:"chinese_criteria"`
+	ChineseLabel    pgtype.Text        `json:"chinese_label"`
+	EnglishLabel    pgtype.Text        `json:"english_label"`
+	Pattern         []byte             `json:"pattern"`
+	Status          string             `json:"status"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	Version         int32              `json:"version"`
+	FineUnitIds     []int64            `json:"fine_unit_ids"`
+	OriginalDefs    []string           `json:"original_defs"`
 }

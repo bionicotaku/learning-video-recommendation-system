@@ -26,14 +26,7 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	writer := &spyResultWriter{}
 	ranker := &stubRanker{
 		ranked: []model.VideoCandidate{
-			{
-				VideoID:                "video-1",
-				BaseScore:              0.91,
-				DominantBucket:         "hard_review",
-				DominantUnitID:         int64Ptr(101),
-				LaneSources:            []string{"exact_core"},
-				CoveredHardReviewUnits: []int64{101},
-			},
+			testVideoCandidate("video-1", 101, model.LearningRoleHardReview),
 		},
 	}
 
@@ -51,10 +44,10 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 		},
 		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
 		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
-		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		ranker,
 		&stubSelector{selected: ranker.ranked},
-		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
+		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{
 			videoServingStates: []model.UserVideoServingState{{VideoID: "video-1"}},
 			videoUserStates:    []model.VideoUserState{{VideoID: "video-1", WatchCount: 1}},
@@ -104,10 +97,10 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 2}},
 		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
 		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
-		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
+		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
 		&spyResultWriter{},
 	)
@@ -160,10 +153,10 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 		},
 		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
 		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
-		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubExplainer{items: []model.FinalRecommendationItem{{VideoID: "video-1", Rank: 1, Score: 0.91, ReasonCodes: []string{"hard_review_covered"}, CoveredHardReviewUnits: []int64{101}, Explanation: "ok"}}},
+		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
 		&spyResultWriter{},
 	)
@@ -188,7 +181,7 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 	}
 }
 
-func TestGenerateVideoRecommendationsPipelineMapsBestEvidenceObject(t *testing.T) {
+func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing.T) {
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
@@ -198,20 +191,26 @@ func TestGenerateVideoRecommendationsPipelineMapsBestEvidenceObject(t *testing.T
 		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 1}},
 		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
 		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
-		&stubAggregator{videos: []model.VideoCandidate{{VideoID: "video-1", DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubRanker{ranked: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
-		&stubSelector{selected: []model.VideoCandidate{{VideoID: "video-1", BaseScore: 0.91, DominantBucket: "hard_review", DominantUnitID: int64Ptr(101), LaneSources: []string{"exact_core"}, CoveredHardReviewUnits: []int64{101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubExplainer{items: []model.FinalRecommendationItem{{
-			VideoID:                   "video-1",
-			Rank:                      1,
-			Score:                     0.91,
-			ReasonCodes:               []string{"hard_review_covered"},
-			CoveredHardReviewUnits:    []int64{101},
-			BestEvidenceSentenceIndex: int32Ptr(1),
-			BestEvidenceSpanIndex:     int32Ptr(2),
-			BestEvidenceStartMs:       int32Ptr(1240),
-			BestEvidenceEndMs:         int32Ptr(1820),
-			Explanation:               "ok",
+			VideoID:     "video-1",
+			Rank:        1,
+			Score:       0.91,
+			ReasonCodes: []string{"hard_review_covered"},
+			LearningUnits: []model.ExpectedLearningUnit{{
+				CoarseUnitID: 101,
+				Role:         model.LearningRoleHardReview,
+				IsPrimary:    true,
+				Evidence: &model.LearningUnitEvidence{
+					SentenceIndex: int32Ptr(1),
+					SpanIndex:     int32Ptr(2),
+					StartMs:       int32Ptr(1240),
+					EndMs:         int32Ptr(1820),
+				},
+			}},
+			Explanation: "ok",
 		}}},
 		&stubVideoStateEnricher{},
 		&spyResultWriter{},
@@ -232,11 +231,52 @@ func TestGenerateVideoRecommendationsPipelineMapsBestEvidenceObject(t *testing.T
 	if len(response.Videos) != 1 {
 		t.Fatalf("expected 1 video, got %#v", response.Videos)
 	}
-	if response.Videos[0].BestEvidence == nil {
-		t.Fatalf("expected best evidence object, got %#v", response.Videos[0])
+	if len(response.Videos[0].LearningUnits) != 1 || response.Videos[0].LearningUnits[0].Evidence == nil {
+		t.Fatalf("expected learning unit evidence, got %#v", response.Videos[0])
 	}
-	if response.Videos[0].BestEvidence.StartMs == nil || *response.Videos[0].BestEvidence.StartMs != 1240 {
-		t.Fatalf("unexpected best evidence bounds: %#v", response.Videos[0].BestEvidence)
+	if response.Videos[0].LearningUnits[0].Evidence.StartMs == nil || *response.Videos[0].LearningUnits[0].Evidence.StartMs != 1240 {
+		t.Fatalf("unexpected learning unit evidence bounds: %#v", response.Videos[0].LearningUnits[0].Evidence)
+	}
+}
+
+func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSources(t *testing.T) {
+	writer := &spyResultWriter{}
+	selected := testVideoCandidate("video-1", 101, model.LearningRoleHardReview)
+	selected.LaneSources = []string{"bundle", "exact_core"}
+
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
+			context: model.RecommendationContext{
+				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1, PreferredDurationSec: [2]int{45, 180}},
+			},
+		},
+		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 1}},
+		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
+		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{selected}},
+		&stubRanker{ranked: []model.VideoCandidate{selected}},
+		&stubSelector{selected: []model.VideoCandidate{selected}},
+		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
+		&stubVideoStateEnricher{},
+		writer,
+	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
+
+	if _, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
+		UserID:               "user-1",
+		TargetVideoCount:     1,
+		PreferredDurationSec: [2]int{45, 180},
+	}); err != nil {
+		t.Fatalf("execute pipeline: %v", err)
+	}
+
+	if len(writer.items) != 1 {
+		t.Fatalf("expected one audit item, got %#v", writer.items)
+	}
+	if writer.items[0].PrimaryLane != "exact_core" {
+		t.Fatalf("expected exact_core primary lane, got %#v", writer.items[0])
 	}
 }
 
@@ -321,14 +361,46 @@ var _ appservice.VideoStateEnricher = (*stubVideoStateEnricher)(nil)
 
 type spyResultWriter struct {
 	called bool
+	items  []model.RecommendationItem
 }
 
-func (s *spyResultWriter) Persist(context.Context, model.RecommendationRun, []model.RecommendationItem, string, []model.FinalRecommendationItem) error {
+func (s *spyResultWriter) Persist(_ context.Context, _ model.RecommendationRun, items []model.RecommendationItem, _ string, _ []model.FinalRecommendationItem) error {
 	s.called = true
+	s.items = append([]model.RecommendationItem(nil), items...)
 	return nil
 }
 
 var _ appservice.RecommendationResultWriter = (*spyResultWriter)(nil)
+
+func testVideoCandidate(videoID string, unitID int64, role model.LearningRole) model.VideoCandidate {
+	return model.VideoCandidate{
+		VideoID:        videoID,
+		BaseScore:      0.91,
+		DominantRole:   role,
+		DominantUnitID: int64Ptr(unitID),
+		LaneSources:    []string{"exact_core"},
+		LearningUnits: []model.ExpectedLearningUnit{{
+			CoarseUnitID: unitID,
+			Role:         role,
+			IsPrimary:    true,
+		}},
+	}
+}
+
+func testFinalItem(videoID string, unitID int64, role model.LearningRole) model.FinalRecommendationItem {
+	return model.FinalRecommendationItem{
+		VideoID:     videoID,
+		Rank:        1,
+		Score:       0.91,
+		ReasonCodes: []string{"hard_review_covered"},
+		LearningUnits: []model.ExpectedLearningUnit{{
+			CoarseUnitID: unitID,
+			Role:         role,
+			IsPrimary:    true,
+		}},
+		Explanation: "ok",
+	}
+}
 
 func int64Ptr(value int64) *int64 {
 	return &value
