@@ -1,6 +1,13 @@
 create materialized view if not exists recommendation.v_unit_video_inventory as
 with recommendable as (
-  select *
+  select
+    video_id,
+    coarse_unit_id,
+    mention_count,
+    sentence_count,
+    coverage_ms,
+    coverage_ratio,
+    mapped_span_ratio
   from recommendation.v_recommendable_video_units
 ),
 aggregated as (

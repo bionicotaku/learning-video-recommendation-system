@@ -53,8 +53,7 @@ create table if not exists catalog.video_unit_index (
   coverage_ms integer not null,
   coverage_ratio numeric(6,5) not null,
   sentence_indexes integer[] not null,
-  evidence_span_refs jsonb not null,
-  sample_surface_forms text[] not null
+  evidence_span_refs jsonb not null
 );
 
 create table if not exists catalog.video_semantic_spans (
@@ -63,18 +62,14 @@ create table if not exists catalog.video_semantic_spans (
   span_index integer not null,
   coarse_unit_id bigint,
   start_ms integer not null,
-  end_ms integer not null,
-  text text not null,
-  explanation text
+  end_ms integer not null
 );
 
 create table if not exists catalog.video_transcript_sentences (
   video_id uuid not null,
   sentence_index integer not null,
-  text text not null,
   start_ms integer not null,
-  end_ms integer not null,
-  explanation text
+  end_ms integer not null
 );
 
 create table if not exists catalog.video_user_states (
@@ -116,7 +111,6 @@ select
   null::numeric(6,5) as coverage_ratio,
   '{}'::integer[] as sentence_indexes,
   '[]'::jsonb as evidence_span_refs,
-  '{}'::text[] as sample_surface_forms,
   null::integer as duration_ms,
   null::numeric(6,5) as mapped_span_ratio,
   null::text as status,

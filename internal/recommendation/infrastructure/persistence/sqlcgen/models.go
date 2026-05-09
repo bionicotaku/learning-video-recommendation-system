@@ -27,8 +27,6 @@ type CatalogVideoSemanticSpan struct {
 	CoarseUnitID  pgtype.Int8 `json:"coarse_unit_id"`
 	StartMs       int32       `json:"start_ms"`
 	EndMs         int32       `json:"end_ms"`
-	Text          string      `json:"text"`
-	Explanation   pgtype.Text `json:"explanation"`
 }
 
 type CatalogVideoTranscript struct {
@@ -39,24 +37,21 @@ type CatalogVideoTranscript struct {
 type CatalogVideoTranscriptSentence struct {
 	VideoID       pgtype.UUID `json:"video_id"`
 	SentenceIndex int32       `json:"sentence_index"`
-	Text          string      `json:"text"`
 	StartMs       int32       `json:"start_ms"`
 	EndMs         int32       `json:"end_ms"`
-	Explanation   pgtype.Text `json:"explanation"`
 }
 
 type CatalogVideoUnitIndex struct {
-	VideoID            pgtype.UUID    `json:"video_id"`
-	CoarseUnitID       int64          `json:"coarse_unit_id"`
-	MentionCount       int32          `json:"mention_count"`
-	SentenceCount      int32          `json:"sentence_count"`
-	FirstStartMs       int32          `json:"first_start_ms"`
-	LastEndMs          int32          `json:"last_end_ms"`
-	CoverageMs         int32          `json:"coverage_ms"`
-	CoverageRatio      pgtype.Numeric `json:"coverage_ratio"`
-	SentenceIndexes    []int32        `json:"sentence_indexes"`
-	EvidenceSpanRefs   []byte         `json:"evidence_span_refs"`
-	SampleSurfaceForms []string       `json:"sample_surface_forms"`
+	VideoID          pgtype.UUID    `json:"video_id"`
+	CoarseUnitID     int64          `json:"coarse_unit_id"`
+	MentionCount     int32          `json:"mention_count"`
+	SentenceCount    int32          `json:"sentence_count"`
+	FirstStartMs     int32          `json:"first_start_ms"`
+	LastEndMs        int32          `json:"last_end_ms"`
+	CoverageMs       int32          `json:"coverage_ms"`
+	CoverageRatio    pgtype.Numeric `json:"coverage_ratio"`
+	SentenceIndexes  []int32        `json:"sentence_indexes"`
+	EvidenceSpanRefs []byte         `json:"evidence_span_refs"`
 }
 
 type CatalogVideoUserState struct {
@@ -107,22 +102,21 @@ type RecommendationUserVideoServingState struct {
 }
 
 type RecommendationVRecommendableVideoUnit struct {
-	VideoID            pgtype.UUID        `json:"video_id"`
-	CoarseUnitID       pgtype.Int8        `json:"coarse_unit_id"`
-	MentionCount       pgtype.Int4        `json:"mention_count"`
-	SentenceCount      pgtype.Int4        `json:"sentence_count"`
-	FirstStartMs       pgtype.Int4        `json:"first_start_ms"`
-	LastEndMs          pgtype.Int4        `json:"last_end_ms"`
-	CoverageMs         pgtype.Int4        `json:"coverage_ms"`
-	CoverageRatio      pgtype.Numeric     `json:"coverage_ratio"`
-	SentenceIndexes    []int32            `json:"sentence_indexes"`
-	EvidenceSpanRefs   []byte             `json:"evidence_span_refs"`
-	SampleSurfaceForms []string           `json:"sample_surface_forms"`
-	DurationMs         pgtype.Int4        `json:"duration_ms"`
-	MappedSpanRatio    pgtype.Numeric     `json:"mapped_span_ratio"`
-	Status             pgtype.Text        `json:"status"`
-	VisibilityStatus   pgtype.Text        `json:"visibility_status"`
-	PublishAt          pgtype.Timestamptz `json:"publish_at"`
+	VideoID          pgtype.UUID        `json:"video_id"`
+	CoarseUnitID     pgtype.Int8        `json:"coarse_unit_id"`
+	MentionCount     pgtype.Int4        `json:"mention_count"`
+	SentenceCount    pgtype.Int4        `json:"sentence_count"`
+	FirstStartMs     pgtype.Int4        `json:"first_start_ms"`
+	LastEndMs        pgtype.Int4        `json:"last_end_ms"`
+	CoverageMs       pgtype.Int4        `json:"coverage_ms"`
+	CoverageRatio    pgtype.Numeric     `json:"coverage_ratio"`
+	SentenceIndexes  []int32            `json:"sentence_indexes"`
+	EvidenceSpanRefs []byte             `json:"evidence_span_refs"`
+	DurationMs       pgtype.Int4        `json:"duration_ms"`
+	MappedSpanRatio  pgtype.Numeric     `json:"mapped_span_ratio"`
+	Status           pgtype.Text        `json:"status"`
+	VisibilityStatus pgtype.Text        `json:"visibility_status"`
+	PublishAt        pgtype.Timestamptz `json:"publish_at"`
 }
 
 type RecommendationVUnitVideoInventory struct {

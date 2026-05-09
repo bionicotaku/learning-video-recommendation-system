@@ -88,6 +88,10 @@
 - `coarse_id`
 - `reason`
 
+其中 `text`、`explanation`、`base_form`、`dictionary`、`reason` 以及未来可能出现的 `translation`
+都属于 transcript / mapped JSON 的展示或调试信息。当前入库脚本可以读取它们做输入完整性检查，
+但不会把这些字段写入 Catalog 数据库；数据库只保存推荐索引、时间定位和原始 JSON 引用。
+
 ### 2.3 时间单位确认
 
 样本中的时间字段和 `Catalog` 文档是一致的，使用**毫秒**。
@@ -476,7 +480,6 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 由 transcript 内容派生：
 
-- `full_text`
 - `sentence_count`
 - `semantic_span_count`
 - `mapped_span_count`
@@ -491,10 +494,10 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 - `video_id`：回填
 - `sentence_index`：`sentence.index`
-- `text`：`sentence.text`
 - `start_ms`：`sentence.start`
 - `end_ms`：`sentence.end`
-- `explanation`：`sentence.explanation`
+
+`sentence.text` 与 `sentence.explanation` 保留在 transcript JSON 中，不写入数据库。
 
 ---
 
@@ -505,15 +508,13 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - `video_id`：回填
 - `sentence_index`：所属 sentence 的 `index`
 - `span_index`：`token.index`
-- `text`：`token.text`
 - `start_ms`：`token.start`
 - `end_ms`：`token.end`
-- `explanation`：`token.explanation`
 - `coarse_unit_id`：`token.semantic_element.coarse_id`
-- `base_form`：`token.semantic_element.base_form`
-- `dictionary_text`：`token.semantic_element.dictionary`
 
-当前不把 `semantic_element.reason` 落到主表。
+`token.text`、`token.explanation`、`semantic_element.base_form`、`semantic_element.dictionary`、
+`semantic_element.reason`、`semantic_element.translation` 都不落库。它们继续由 transcript / mapped JSON
+承担字幕展示、词典、解释、翻译和映射调试职责。
 
 ---
 
@@ -532,7 +533,6 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 计算 `coverage_ratio`
 - 生成 `sentence_indexes`
 - 生成 `evidence_span_refs`
-- 生成 `sample_surface_forms`
 
 这里需要补一个实现约定，保持和当前 Catalog 最终设计一致：
 

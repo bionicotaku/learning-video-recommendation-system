@@ -85,22 +85,21 @@ func ToRecommendableVideoUnit(row recommendationsqlc.RecommendationVRecommendabl
 	}
 
 	return model.RecommendableVideoUnit{
-		VideoID:            UUIDToString(row.VideoID),
-		CoarseUnitID:       coarseUnitID,
-		MentionCount:       mentionCount,
-		SentenceCount:      sentenceCount,
-		FirstStartMs:       firstStartMs,
-		LastEndMs:          lastEndMs,
-		CoverageMs:         coverageMs,
-		CoverageRatio:      coverageRatio,
-		SentenceIndexes:    row.SentenceIndexes,
-		EvidenceSpanRefs:   row.EvidenceSpanRefs,
-		SampleSurfaceForms: row.SampleSurfaceForms,
-		DurationMs:         durationMs,
-		MappedSpanRatio:    mappedSpanRatio,
-		Status:             TextToString(row.Status),
-		VisibilityStatus:   TextToString(row.VisibilityStatus),
-		PublishAt:          TimePointerFromPG(row.PublishAt),
+		VideoID:          UUIDToString(row.VideoID),
+		CoarseUnitID:     coarseUnitID,
+		MentionCount:     mentionCount,
+		SentenceCount:    sentenceCount,
+		FirstStartMs:     firstStartMs,
+		LastEndMs:        lastEndMs,
+		CoverageMs:       coverageMs,
+		CoverageRatio:    coverageRatio,
+		SentenceIndexes:  row.SentenceIndexes,
+		EvidenceSpanRefs: row.EvidenceSpanRefs,
+		DurationMs:       durationMs,
+		MappedSpanRatio:  mappedSpanRatio,
+		Status:           TextToString(row.Status),
+		VisibilityStatus: TextToString(row.VisibilityStatus),
+		PublishAt:        TimePointerFromPG(row.PublishAt),
 	}, nil
 }
 
@@ -155,8 +154,6 @@ func ToSemanticSpan(row recommendationsqlc.CatalogVideoSemanticSpan) model.Seman
 		CoarseUnitID:  Int64PointerFromPG(row.CoarseUnitID),
 		StartMs:       row.StartMs,
 		EndMs:         row.EndMs,
-		Text:          row.Text,
-		Explanation:   TextToString(row.Explanation),
 	}
 }
 
@@ -164,10 +161,8 @@ func ToTranscriptSentence(row recommendationsqlc.CatalogVideoTranscriptSentence)
 	return model.TranscriptSentence{
 		VideoID:       UUIDToString(row.VideoID),
 		SentenceIndex: row.SentenceIndex,
-		Text:          row.Text,
 		StartMs:       row.StartMs,
 		EndMs:         row.EndMs,
-		Explanation:   TextToString(row.Explanation),
 	}
 }
 

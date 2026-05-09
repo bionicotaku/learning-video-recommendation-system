@@ -445,21 +445,19 @@ class CatalogRepository:
               transcript_object_path,
               transcript_checksum,
               transcript_format_version,
-              full_text,
               sentence_count,
               semantic_span_count,
               mapped_span_count,
               unmapped_span_count,
               mapped_span_ratio
             )
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 video_id,
                 transcript.transcript_object_path,
                 transcript.transcript_checksum,
                 transcript.transcript_format_version,
-                transcript.full_text,
                 transcript.sentence_count,
                 transcript.semantic_span_count,
                 transcript.mapped_span_count,
@@ -474,21 +472,17 @@ class CatalogRepository:
                 insert into catalog.video_transcript_sentences (
                   video_id,
                   sentence_index,
-                  text,
                   start_ms,
-                  end_ms,
-                  explanation
+                  end_ms
                 )
-                values (%s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s)
                 """,
                 [
                     (
                         video_id,
                         sentence.sentence_index,
-                        sentence.text,
                         sentence.start_ms,
                         sentence.end_ms,
-                        sentence.explanation,
                     )
                     for sentence in normalized_data.sentences
                 ],
@@ -501,28 +495,20 @@ class CatalogRepository:
                   video_id,
                   sentence_index,
                   span_index,
-                  text,
                   start_ms,
                   end_ms,
-                  explanation,
-                  coarse_unit_id,
-                  base_form,
-                  dictionary_text
+                  coarse_unit_id
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
                         video_id,
                         span.sentence_index,
                         span.span_index,
-                        span.text,
                         span.start_ms,
                         span.end_ms,
-                        span.explanation,
                         span.coarse_unit_id,
-                        span.base_form,
-                        span.dictionary_text,
                     )
                     for span in normalized_data.spans
                 ],
@@ -541,10 +527,9 @@ class CatalogRepository:
                   coverage_ms,
                   coverage_ratio,
                   sentence_indexes,
-                  evidence_span_refs,
-                  sample_surface_forms
+                  evidence_span_refs
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -566,7 +551,6 @@ class CatalogRepository:
                                 for ref in unit.evidence_span_refs
                             ]
                         ),
-                        list(unit.sample_surface_forms),
                     )
                     for unit in normalized_data.unit_indexes
                 ],

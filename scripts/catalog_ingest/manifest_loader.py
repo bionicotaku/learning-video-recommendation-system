@@ -411,10 +411,7 @@ def _parse_transcript_sentences(
                         },
                     )
                 semantic_element = TranscriptSemanticElement(
-                    base_form=_optional_str(semantic_payload.get("base_form")),
-                    dictionary_text=_optional_str(semantic_payload.get("dictionary")),
                     coarse_id=_optional_int(semantic_payload.get("coarse_id")),
-                    reason=_optional_str(semantic_payload.get("reason")),
                 )
 
             try:

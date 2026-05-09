@@ -1,12 +1,12 @@
-# Graph Report - .  (2026-05-08)
+# Graph Report - .  (2026-05-09)
 
 ## Corpus Check
-- 162 files · ~89,264 words
+- 162 files · ~89,727 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1031 nodes · 2573 edges · 98 communities detected
-- Extraction: 54% EXTRACTED · 46% INFERRED · 0% AMBIGUOUS · INFERRED: 1181 edges (avg confidence: 0.75)
+- 1056 nodes · 2613 edges · 119 communities detected
+- Extraction: 53% EXTRACTED · 47% INFERRED · 0% AMBIGUOUS · INFERRED: 1223 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -108,18 +108,39 @@
 - [[_COMMUNITY_Community 95|Community 95]]
 - [[_COMMUNITY_Community 96|Community 96]]
 - [[_COMMUNITY_Community 97|Community 97]]
+- [[_COMMUNITY_Community 98|Community 98]]
+- [[_COMMUNITY_Community 99|Community 99]]
+- [[_COMMUNITY_Community 100|Community 100]]
+- [[_COMMUNITY_Community 101|Community 101]]
+- [[_COMMUNITY_Community 102|Community 102]]
+- [[_COMMUNITY_Community 103|Community 103]]
+- [[_COMMUNITY_Community 104|Community 104]]
+- [[_COMMUNITY_Community 105|Community 105]]
+- [[_COMMUNITY_Community 106|Community 106]]
+- [[_COMMUNITY_Community 107|Community 107]]
+- [[_COMMUNITY_Community 108|Community 108]]
+- [[_COMMUNITY_Community 109|Community 109]]
+- [[_COMMUNITY_Community 110|Community 110]]
+- [[_COMMUNITY_Community 111|Community 111]]
+- [[_COMMUNITY_Community 112|Community 112]]
+- [[_COMMUNITY_Community 113|Community 113]]
+- [[_COMMUNITY_Community 114|Community 114]]
+- [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
+- [[_COMMUNITY_Community 117|Community 117]]
+- [[_COMMUNITY_Community 118|Community 118]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `CatalogIngestError` - 53 edges
+1. `CatalogIngestError` - 54 edges
 2. `Harness` - 48 edges
-3. `LoadedClipInput` - 31 edges
+3. `LoadedClipInput` - 34 edges
 4. `CatalogRepository` - 26 edges
-5. `TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` - 23 edges
-6. `TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply()` - 23 edges
-7. `MustEnsureTarget()` - 23 edges
-8. `IngestionRecordPayload` - 23 edges
-9. `testDB()` - 22 edges
-10. `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` - 22 edges
+5. `NormalizedClipData` - 24 edges
+6. `TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` - 23 edges
+7. `TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply()` - 23 edges
+8. `MustEnsureTarget()` - 23 edges
+9. `IngestionRecordPayload` - 23 edges
+10. `testDB()` - 22 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Module Registry` --conceptually_related_to--> `Three-Domain Boundary`  [INFERRED]
@@ -165,39 +186,39 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
-Nodes (116): Exception, build_normalized_clip_data(), _build_transcript_row(), _build_unit_index_rows(), _dedupe_surface_forms(), _evidence_pick_key(), _merge_intervals_and_measure(), 按当前设计规则选出稳定的 evidence spans。 (+108 more)
+Nodes (118): Exception, build_normalized_clip_data(), _build_transcript_row(), _build_unit_index_rows(), _evidence_pick_key(), _merge_intervals_and_measure(), 按当前设计规则选出稳定的 evidence spans。, 按当前设计规则选出稳定的 evidence spans。 (+110 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.03
-Nodes (78): NewDefaultAuditWriter(), NewDefaultDemandPlanner(), NewDefaultServingStateManager(), execer, TestManagerRollsBackTransactionOnError(), TestManagerWithinUserTxAllowsDifferentUsersConcurrently(), TestManagerWithinUserTxSerializesSameUser(), NewManager() (+70 more)
+Cohesion: 0.04
+Nodes (61): TestManagerRollsBackTransactionOnError(), TestManagerWithinUserTxAllowsDifferentUsersConcurrently(), TestManagerWithinUserTxSerializesSameUser(), NewManager(), flattenGroupedEvents(), groupAndSortEvents(), NewRecordLearningEventsUsecase(), RecomputeActiveStatus() (+53 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.13
-Nodes (58): failingAuditWriter, failNow(), MustEnsureTarget(), MustRecommend(), assertAnyVideoHasLearningUnit(), assertContainsVideo(), assertContiguousRanks(), assertLearningUnits() (+50 more)
+Nodes (57): failingAuditWriter, failNow(), MustEnsureTarget(), MustRecommend(), assertAnyVideoHasLearningUnit(), assertContainsVideo(), assertContiguousRanks(), assertLearningUnits() (+49 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.05
-Nodes (39): buildAuditPayload(), candidateSummary(), hasDemand(), lanePriority(), mapFinalItems(), mapLearningUnits(), NewGenerateVideoRecommendationsPipeline(), newRunID() (+31 more)
+Nodes (43): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), NewDefaultAuditWriter(), NewDefaultDemandPlanner() (+35 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.13
-Nodes (42): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+34 more)
+Cohesion: 0.05
+Nodes (39): buildAuditPayload(), candidateSummary(), hasDemand(), lanePriority(), mapFinalItems(), mapLearningUnits(), NewGenerateVideoRecommendationsPipeline(), newRunID() (+31 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.11
-Nodes (38): finalizePrimaryLearningUnits(), canSelect(), countCoreDominant(), countFallback(), countFutureDominant(), countFutureLike(), countUncovered(), isCoreDominant() (+30 more)
+Cohesion: 0.13
+Nodes (41): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+33 more)
 
 ### Community 6 - "Community 6"
+Cohesion: 0.11
+Nodes (36): canSelect(), countCoreDominant(), countFallback(), countFutureDominant(), countFutureLike(), countUncovered(), isCoreDominant(), isFallback() (+28 more)
+
+### Community 7 - "Community 7"
 Cohesion: 0.12
 Nodes (38): Agent Rules, Module Boundary Rules, Catalog Delta Migration Doc, Deprecated Catalog Design Doc, Deprecated Learning Engine Doc, Deprecated Overall MVP Doc, Historical Docs Index, Deprecated Recommendation Scheduler Doc (+30 more)
 
-### Community 7 - "Community 7"
+### Community 8 - "Community 8"
 Cohesion: 0.14
 Nodes (33): aggregatedLearningUnit, DefaultVideoEvidenceAggregator, bestSentenceIndex(), bestSpanIndex(), bestStart(), bucketDemandCounts(), bundleValueScore(), coverageRatio() (+25 more)
-
-### Community 8 - "Community 8"
-Cohesion: 0.09
-Nodes (10): insertItemWithQueries(), insertRunWithQueries(), appendUniqueInt64(), unitServedCounts(), videoServedCounts(), LearningUnitsToJSON(), RecommendationAuditRepository, DefaultAuditWriter (+2 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.09
@@ -208,72 +229,72 @@ Cohesion: 0.21
 Nodes (18): appendUniqueInt32(), NewDefaultEvidenceResolver(), parseEvidenceRefs(), resolveBestBounds(), resolveWindowBounds(), resolveWindowSentenceIndexes(), selectBestEvidence(), int64Ptr() (+10 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.12
-Nodes (19): applySchemaSequence(), freePort(), migrationFiles(), migrationFilesForMain(), nullIfEmpty(), OpenHarness(), repoRoot(), repoRootFromRuntime() (+11 more)
+Cohesion: 0.17
+Nodes (20): buildReasonCodes(), explanationText(), formatMs(), NewDefaultExplanationBuilder(), uniqueStrings(), DefaultExplanationBuilder, contains(), futureUnit() (+12 more)
 
 ### Community 12 - "Community 12"
+Cohesion: 0.12
+Nodes (18): applySchemaSequence(), freePort(), migrationFiles(), migrationFilesForMain(), OpenHarness(), repoRoot(), repoRootFromRuntime(), StartHarness() (+10 more)
+
+### Community 13 - "Community 13"
+Cohesion: 0.12
+Nodes (5): insertItemWithQueries(), insertRunWithQueries(), LearningUnitsToJSON(), RecommendationAuditRepository, DefaultAuditWriter
+
+### Community 14 - "Community 14"
 Cohesion: 0.23
 Nodes (17): freshnessScore(), NewDefaultVideoRanker(), overloadPenalty(), recencyPenalty(), recentServedPenalty(), recentWatchedPenalty(), rolePriority(), round4() (+9 more)
 
-### Community 13 - "Community 13"
-Cohesion: 0.1
-Nodes (22): Demand Bundle, Demand Unit, Lane Budget, Mix Quota, Planner Flags, Demand Planner Interface, Learning State Snapshot, Demand Planning Logic (+14 more)
+### Community 15 - "Community 15"
+Cohesion: 0.11
+Nodes (21): Demand Bundle, Demand Unit, Lane Budget, Mix Quota, Planner Flags, Demand Planner Interface, Learning State Snapshot, Demand Planning Logic (+13 more)
 
-### Community 14 - "Community 14"
+### Community 16 - "Community 16"
 Cohesion: 0.24
 Nodes (13): execer, Suite, TestDatabase, applyLearningEngineSchema(), applyRecommendationSchema(), execSQLFile(), freePort(), migrationFiles() (+5 more)
 
-### Community 15 - "Community 15"
-Cohesion: 0.1
-Nodes (21): Recommendation Postgres Type Converters, Recommendation Materialized Read Models, Recommendation Owner Boundary, Recommendation Migrations, recommendation_schema_migrations Tracking Table, Learning State Reader, Recommendable Video Unit Reader, Semantic Span Reader (+13 more)
-
-### Community 16 - "Community 16"
-Cohesion: 0.21
-Nodes (17): buildReasonCodes(), explanationText(), formatMs(), NewDefaultExplanationBuilder(), uniqueStrings(), DefaultExplanationBuilder, contains(), futureUnit() (+9 more)
-
 ### Community 17 - "Community 17"
-Cohesion: 0.23
-Nodes (18): finalizeState(), initState(), int16Pointer(), RecomputeActiveStatus(), Reduce(), emptyState(), learningEvent(), masteredState() (+10 more)
+Cohesion: 0.25
+Nodes (17): finalizeState(), initState(), int16Pointer(), Reduce(), emptyState(), learningEvent(), masteredState(), TestReduce_FailureAfterMasteredFallsBackToReviewing() (+9 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.13
 Nodes (16): AuthUser, CatalogVideo, CatalogVideoSemanticSpan, CatalogVideoTranscript, CatalogVideoTranscriptSentence, CatalogVideoUnitIndex, CatalogVideoUserState, LearningUnitLearningEvent (+8 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.2
-Nodes (9): NewDefaultVideoStateEnricher(), uniqueVideoIDs(), DefaultVideoStateEnricher, spyVideoServingRepository, spyVideoUserStateReader, stubVideoStateEnricher, TestDefaultVideoStateEnricherLoadsVideoScopedStateWithCallerContext(), TestDefaultVideoStateEnricherPropagatesContextCancellation() (+1 more)
-
-### Community 20 - "Community 20"
-Cohesion: 0.2
-Nodes (10): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), DefaultContextAssembler, stubLearningStateReader (+2 more)
-
-### Community 21 - "Community 21"
 Cohesion: 0.23
 Nodes (14): bucketBaseWeight(), ceilFraction(), classifyDemandUnit(), floorFraction(), isHardReview(), isSoftReview(), plannerFlags(), plannerLaneBudget() (+6 more)
 
-### Community 22 - "Community 22"
+### Community 20 - "Community 20"
 Cohesion: 0.17
 Nodes (16): Stable Learning Engine Enums, Weak vs Strong Event Classification, Learning Event Validation, Learning Event Types, Learning Event, Learning Event Row Mapper, User Unit State Row Mapper, Postgres Type Converters (+8 more)
 
-### Community 23 - "Community 23"
+### Community 21 - "Community 21"
 Cohesion: 0.33
 Nodes (7): LearningStateReader, learning.unit_learning_events, learning.user_unit_states, sqlc Query Facade, TargetStateCommandRepository, UnitLearningEventRepository, UserUnitStateRepository
 
-### Community 24 - "Community 24"
+### Community 22 - "Community 22"
 Cohesion: 0.33
 Nodes (5): ExpectedLearningUnit, GenerateVideoRecommendationsRequest, GenerateVideoRecommendationsResponse, LearningUnitEvidence, RecommendationVideo
 
-### Community 25 - "Community 25"
+### Community 23 - "Community 23"
+Cohesion: 0.33
+Nodes (5): ListSemanticSpansByVideoAndUnitParams, ListTranscriptSentencesByVideoAndIndexesParams, ListUserUnitServingStatesByUnitIDsParams, ListUserVideoServingStatesByVideoIDsParams, ListVideoUserStatesByUserAndVideoIDsParams
+
+### Community 24 - "Community 24"
 Cohesion: 0.4
 Nodes (4): AuditWriter, RecommendationResultWriter, ServingStateManager, VideoStateEnricher
 
-### Community 26 - "Community 26"
+### Community 25 - "Community 25"
 Cohesion: 0.4
 Nodes (4): InsertVideoRecommendationItemParams, InsertVideoRecommendationRunParams, UpsertUserUnitServingStateParams, UpsertUserVideoServingStateParams
 
-### Community 27 - "Community 27"
+### Community 26 - "Community 26"
 Cohesion: 0.4
 Nodes (4): EvidenceRef, ResolvedEvidenceWindow, VideoCandidate, VideoUnitCandidate
+
+### Community 27 - "Community 27"
+Cohesion: 0.4
+Nodes (5): Recommendation Materialized Read Models, Recommendation Owner Boundary, Recommendation Migrations, recommendation_schema_migrations Tracking Table, Learning State Reader
 
 ### Community 28 - "Community 28"
 Cohesion: 0.5
@@ -289,416 +310,540 @@ Nodes (3): Atomic Recommendation Persistence, Default Recommendation Result Writ
 
 ### Community 31 - "Community 31"
 Cohesion: 0.67
-Nodes (2): RecommendationItem, RecommendationRun
+Nodes (2): SemanticSpan, TranscriptSentence
 
 ### Community 32 - "Community 32"
 Cohesion: 0.67
-Nodes (3): ListUserUnitStatesRequest, UserUnitStateRepository Port, ListUserUnitStatesUsecase
+Nodes (2): RecommendationItem, RecommendationRun
 
 ### Community 33 - "Community 33"
 Cohesion: 0.67
-Nodes (2): TransactionalRepositories, TxManager
+Nodes (3): ListUserUnitStatesRequest, UserUnitStateRepository Port, ListUserUnitStatesUsecase
 
 ### Community 34 - "Community 34"
 Cohesion: 0.67
-Nodes (3): Finding F-LE-001, docs/全新设计-学习引擎设计.md, User-level Replay/Write Mutex
+Nodes (2): TransactionalRepositories, TxManager
 
 ### Community 35 - "Community 35"
-Cohesion: 1.0
-Nodes (2): RecommendableVideoUnitReader, UnitInventoryReader
+Cohesion: 0.67
+Nodes (3): Finding F-LE-001, docs/全新设计-学习引擎设计.md, User-level Replay/Write Mutex
 
 ### Community 36 - "Community 36"
 Cohesion: 1.0
-Nodes (2): SemanticSpanReader, TranscriptSentenceReader
+Nodes (2): RecommendableVideoUnitReader, UnitInventoryReader
 
 ### Community 37 - "Community 37"
 Cohesion: 1.0
-Nodes (2): Recommendation Transaction Manager, WithinTx Flow
+Nodes (2): SemanticSpanReader, TranscriptSentenceReader
 
 ### Community 38 - "Community 38"
 Cohesion: 1.0
-Nodes (1): CandidateGenerator
+Nodes (2): Recommendation Postgres Type Converters, Video User State Reader
 
 ### Community 39 - "Community 39"
 Cohesion: 1.0
-Nodes (2): Recommendation Selection Logic, Video Selector Interface
+Nodes (2): Recommendation Transaction Manager, WithinTx Flow
 
 ### Community 40 - "Community 40"
 Cohesion: 1.0
-Nodes (1): FinalRecommendationItem
+Nodes (2): Recommendation SQLC Querier Contract, SQLC Queries Wrapper
 
 ### Community 41 - "Community 41"
 Cohesion: 1.0
-Nodes (1): EvidenceResolver
+Nodes (1): CandidateGenerator
 
 ### Community 42 - "Community 42"
 Cohesion: 1.0
-Nodes (1): Querier
+Nodes (2): Recommendation Selection Logic, Video Selector Interface
 
 ### Community 43 - "Community 43"
 Cohesion: 1.0
-Nodes (2): Embedded Postgres Test Deviation, Real Postgres Test Layout
+Nodes (1): FinalRecommendationItem
 
 ### Community 44 - "Community 44"
 Cohesion: 1.0
-Nodes (1): DATABASE_URL Loader
+Nodes (1): RecommendableVideoUnit
 
 ### Community 45 - "Community 45"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): EvidenceResolver
 
 ### Community 46 - "Community 46"
 Cohesion: 1.0
-Nodes (1): Demand Planner Unit Test Suite
+Nodes (1): Querier
 
 ### Community 47 - "Community 47"
 Cohesion: 1.0
-Nodes (1): VideoUserStateReader
+Nodes (2): Embedded Postgres Test Deviation, Real Postgres Test Layout
 
 ### Community 48 - "Community 48"
 Cohesion: 1.0
-Nodes (1): RecommendationAuditRepository
+Nodes (1): DATABASE_URL Loader
 
 ### Community 49 - "Community 49"
 Cohesion: 1.0
-Nodes (1): UnitServingStateRepository
+Nodes (0): 
 
 ### Community 50 - "Community 50"
 Cohesion: 1.0
-Nodes (1): VideoServingStateRepository
+Nodes (1): Demand Planner Unit Test Suite
 
 ### Community 51 - "Community 51"
 Cohesion: 1.0
-Nodes (1): Generate Video Recommendations Usecase
+Nodes (1): VideoUserStateReader
 
 ### Community 52 - "Community 52"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): RecommendationAuditRepository
 
 ### Community 53 - "Community 53"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): UnitServingStateRepository
 
 ### Community 54 - "Community 54"
 Cohesion: 1.0
-Nodes (1): Explanation Builder Interface
+Nodes (1): VideoServingStateRepository
 
 ### Community 55 - "Community 55"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Generate Video Recommendations Usecase
 
 ### Community 56 - "Community 56"
 Cohesion: 1.0
-Nodes (1): Context Assembler Interface
+Nodes (1): Recommendable Video Unit Reader
 
 ### Community 57 - "Community 57"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Unit Inventory Reader
 
 ### Community 58 - "Community 58"
 Cohesion: 1.0
-Nodes (1): Video Evidence Aggregator Interface
+Nodes (1): Semantic Span Reader
 
 ### Community 59 - "Community 59"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Transcript Sentence Reader
 
 ### Community 60 - "Community 60"
 Cohesion: 1.0
-Nodes (1): Semantic Span
+Nodes (1): Serving State Repositories
 
 ### Community 61 - "Community 61"
 Cohesion: 1.0
-Nodes (1): Transcript Sentence
+Nodes (0): 
 
 ### Community 62 - "Community 62"
 Cohesion: 1.0
-Nodes (1): Evidence Resolution Scope
+Nodes (0): 
 
 ### Community 63 - "Community 63"
 Cohesion: 1.0
-Nodes (1): Selector Mode
+Nodes (1): Explanation Builder Interface
 
 ### Community 64 - "Community 64"
 Cohesion: 1.0
-Nodes (1): Shared E2E Harness Bootstrap
+Nodes (0): 
 
 ### Community 65 - "Community 65"
 Cohesion: 1.0
-Nodes (1): Content Facts and Recall-ready Indexes
+Nodes (1): Context Assembler Interface
 
 ### Community 66 - "Community 66"
 Cohesion: 1.0
-Nodes (1): TargetUnitSpec
+Nodes (0): 
 
 ### Community 67 - "Community 67"
 Cohesion: 1.0
-Nodes (1): RecordLearningEventsRequest
+Nodes (1): Video Evidence Aggregator Interface
 
 ### Community 68 - "Community 68"
 Cohesion: 1.0
-Nodes (1): ReplayUserStatesRequest
+Nodes (0): 
 
 ### Community 69 - "Community 69"
 Cohesion: 1.0
-Nodes (1): TargetStateCommandRepository Port
+Nodes (1): Evidence Resolution Scope
 
 ### Community 70 - "Community 70"
 Cohesion: 1.0
-Nodes (1): UnitLearningEventRepository Port
+Nodes (1): Selector Mode
 
 ### Community 71 - "Community 71"
 Cohesion: 1.0
-Nodes (1): ErrLateStrongEvent
+Nodes (1): Shared E2E Harness Bootstrap
 
 ### Community 72 - "Community 72"
 Cohesion: 1.0
-Nodes (1): List User Unit States Usecase
+Nodes (1): Content Facts and Recall-ready Indexes
 
 ### Community 73 - "Community 73"
 Cohesion: 1.0
-Nodes (1): Ensure Target Units Usecase
+Nodes (1): TargetUnitSpec
 
 ### Community 74 - "Community 74"
 Cohesion: 1.0
-Nodes (1): Set Target Inactive Usecase
+Nodes (1): RecordLearningEventsRequest
 
 ### Community 75 - "Community 75"
 Cohesion: 1.0
-Nodes (1): Resume Target Unit Usecase
+Nodes (1): ReplayUserStatesRequest
 
 ### Community 76 - "Community 76"
 Cohesion: 1.0
-Nodes (1): Record Learning Events Usecase
+Nodes (1): TargetStateCommandRepository Port
 
 ### Community 77 - "Community 77"
 Cohesion: 1.0
-Nodes (1): Replay User States Usecase
+Nodes (1): UnitLearningEventRepository Port
 
 ### Community 78 - "Community 78"
 Cohesion: 1.0
-Nodes (1): Reducer and Aggregate Root Package Scope
+Nodes (1): ErrLateStrongEvent
 
 ### Community 79 - "Community 79"
 Cohesion: 1.0
-Nodes (1): User Unit State Filter
+Nodes (1): List User Unit States Usecase
 
 ### Community 80 - "Community 80"
 Cohesion: 1.0
-Nodes (1): Target Unit Spec
+Nodes (1): Ensure Target Units Usecase
 
 ### Community 81 - "Community 81"
 Cohesion: 1.0
-Nodes (1): 生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。
+Nodes (1): Set Target Inactive Usecase
 
 ### Community 82 - "Community 82"
 Cohesion: 1.0
-Nodes (0): 
+Nodes (1): Resume Target Unit Usecase
 
 ### Community 83 - "Community 83"
 Cohesion: 1.0
-Nodes (1): 表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于
+Nodes (1): Record Learning Events Usecase
 
 ### Community 84 - "Community 84"
 Cohesion: 1.0
-Nodes (1): 表示 normalizer 和 index_builder 产出的完整写库数据。
+Nodes (1): Replay User States Usecase
 
 ### Community 85 - "Community 85"
 Cohesion: 1.0
-Nodes (1): 表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生
+Nodes (1): Reducer and Aggregate Root Package Scope
 
 ### Community 86 - "Community 86"
 Cohesion: 1.0
-Nodes (1): 表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完
+Nodes (1): User Unit State Filter
 
 ### Community 87 - "Community 87"
 Cohesion: 1.0
-Nodes (1): 表示 main 汇总时使用的单 clip 最终结果。
+Nodes (1): Target Unit Spec
 
 ### Community 88 - "Community 88"
 Cohesion: 1.0
-Nodes (1): Single Reducer Rule
+Nodes (1): 生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。
 
 ### Community 89 - "Community 89"
 Cohesion: 1.0
-Nodes (1): RecordLearningEvents Pipeline
+Nodes (0): 
 
 ### Community 90 - "Community 90"
 Cohesion: 1.0
-Nodes (1): ReplayUserStates Pipeline
+Nodes (1): 表示 transcript 中的单个语义 span。      虽然上游 JSON 字段名叫 token，但按当前 catalog 设计，     它在数据库里
 
 ### Community 91 - "Community 91"
 Cohesion: 1.0
-Nodes (1): Short Final-Write Transactions
+Nodes (1): 表示 transcript 中的单个 sentence。
 
 ### Community 92 - "Community 92"
 Cohesion: 1.0
-Nodes (1): Run/Item Audit Center Policy
+Nodes (1): 表示 loader 阶段输出的“单 clip 原始输入对象”。      这是整个脚本后续流程的主输入。     它同时持有：     - 由父文件推导出的 c
 
 ### Community 93 - "Community 93"
 Cohesion: 1.0
-Nodes (1): Read-Only Upstream Data Policy
+Nodes (1): 生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。
 
 ### Community 94 - "Community 94"
 Cohesion: 1.0
-Nodes (1): video_recommendation_runs / video_recommendation_items
+Nodes (1): 表示将写入 catalog.videos 的一行数据。
 
 ### Community 95 - "Community 95"
 Cohesion: 1.0
-Nodes (1): user_unit_serving_states
+Nodes (1): 表示将写入 catalog.video_transcripts 的一行数据。
 
 ### Community 96 - "Community 96"
 Cohesion: 1.0
-Nodes (1): user_video_serving_states
+Nodes (1): 表示将写入 catalog.video_transcript_sentences 的一行数据。
 
 ### Community 97 - "Community 97"
+Cohesion: 1.0
+Nodes (1): 表示将写入 catalog.video_semantic_spans 的一行数据。
+
+### Community 98 - "Community 98"
+Cohesion: 1.0
+Nodes (1): 表示将写入 catalog.video_unit_index 的一行聚合结果。
+
+### Community 99 - "Community 99"
+Cohesion: 1.0
+Nodes (1): 表示将写入 catalog.video_unit_index 的一行聚合结果。
+
+### Community 100 - "Community 100"
+Cohesion: 1.0
+Nodes (1): 表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于
+
+### Community 101 - "Community 101"
+Cohesion: 1.0
+Nodes (1): 表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生
+
+### Community 102 - "Community 102"
+Cohesion: 1.0
+Nodes (1): 表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完
+
+### Community 103 - "Community 103"
+Cohesion: 1.0
+Nodes (1): 表示 main 汇总时使用的单 clip 最终结果。
+
+### Community 104 - "Community 104"
+Cohesion: 1.0
+Nodes (1): 表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于
+
+### Community 105 - "Community 105"
+Cohesion: 1.0
+Nodes (1): 表示 normalizer 和 index_builder 产出的完整写库数据。
+
+### Community 106 - "Community 106"
+Cohesion: 1.0
+Nodes (1): 表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生
+
+### Community 107 - "Community 107"
+Cohesion: 1.0
+Nodes (1): 表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完
+
+### Community 108 - "Community 108"
+Cohesion: 1.0
+Nodes (1): 表示 main 汇总时使用的单 clip 最终结果。
+
+### Community 109 - "Community 109"
+Cohesion: 1.0
+Nodes (1): Single Reducer Rule
+
+### Community 110 - "Community 110"
+Cohesion: 1.0
+Nodes (1): RecordLearningEvents Pipeline
+
+### Community 111 - "Community 111"
+Cohesion: 1.0
+Nodes (1): ReplayUserStates Pipeline
+
+### Community 112 - "Community 112"
+Cohesion: 1.0
+Nodes (1): Short Final-Write Transactions
+
+### Community 113 - "Community 113"
+Cohesion: 1.0
+Nodes (1): Run/Item Audit Center Policy
+
+### Community 114 - "Community 114"
+Cohesion: 1.0
+Nodes (1): Read-Only Upstream Data Policy
+
+### Community 115 - "Community 115"
+Cohesion: 1.0
+Nodes (1): video_recommendation_runs / video_recommendation_items
+
+### Community 116 - "Community 116"
+Cohesion: 1.0
+Nodes (1): user_unit_serving_states
+
+### Community 117 - "Community 117"
+Cohesion: 1.0
+Nodes (1): user_video_serving_states
+
+### Community 118 - "Community 118"
 Cohesion: 1.0
 Nodes (1): Cross-Module E2E Test Scope
 
 ## Knowledge Gaps
-- **169 isolated node(s):** `DATABASE_URL Loader`, `candidateSummary`, `Demand Planner Unit Test Suite`, `execer`, `GenerateVideoRecommendationsRequest` (+164 more)
+- **191 isolated node(s):** `DATABASE_URL Loader`, `candidateSummary`, `Demand Planner Unit Test Suite`, `execer`, `GenerateVideoRecommendationsRequest` (+186 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 35`** (2 nodes): `RecommendableVideoUnitReader`, `UnitInventoryReader`
+- **Thin community `Community 36`** (2 nodes): `RecommendableVideoUnitReader`, `UnitInventoryReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 36`** (2 nodes): `SemanticSpanReader`, `TranscriptSentenceReader`
+- **Thin community `Community 37`** (2 nodes): `SemanticSpanReader`, `TranscriptSentenceReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 37`** (2 nodes): `Recommendation Transaction Manager`, `WithinTx Flow`
+- **Thin community `Community 38`** (2 nodes): `Recommendation Postgres Type Converters`, `Video User State Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 38`** (2 nodes): `CandidateGenerator`, `candidate_generator.go`
+- **Thin community `Community 39`** (2 nodes): `Recommendation Transaction Manager`, `WithinTx Flow`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 39`** (2 nodes): `Recommendation Selection Logic`, `Video Selector Interface`
+- **Thin community `Community 40`** (2 nodes): `Recommendation SQLC Querier Contract`, `SQLC Queries Wrapper`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 40`** (2 nodes): `final_recommendation_item.go`, `FinalRecommendationItem`
+- **Thin community `Community 41`** (2 nodes): `CandidateGenerator`, `candidate_generator.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 41`** (2 nodes): `evidence_resolver.go`, `EvidenceResolver`
+- **Thin community `Community 42`** (2 nodes): `Recommendation Selection Logic`, `Video Selector Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (2 nodes): `querier.go`, `Querier`
+- **Thin community `Community 43`** (2 nodes): `final_recommendation_item.go`, `FinalRecommendationItem`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (2 nodes): `Embedded Postgres Test Deviation`, `Real Postgres Test Layout`
+- **Thin community `Community 44`** (2 nodes): `recommendable_video_unit.go`, `RecommendableVideoUnit`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 44`** (1 nodes): `DATABASE_URL Loader`
+- **Thin community `Community 45`** (2 nodes): `evidence_resolver.go`, `EvidenceResolver`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (1 nodes): `doc.go`
+- **Thin community `Community 46`** (2 nodes): `querier.go`, `Querier`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (1 nodes): `Demand Planner Unit Test Suite`
+- **Thin community `Community 47`** (2 nodes): `Embedded Postgres Test Deviation`, `Real Postgres Test Layout`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (1 nodes): `VideoUserStateReader`
+- **Thin community `Community 48`** (1 nodes): `DATABASE_URL Loader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 48`** (1 nodes): `RecommendationAuditRepository`
+- **Thin community `Community 49`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (1 nodes): `UnitServingStateRepository`
+- **Thin community `Community 50`** (1 nodes): `Demand Planner Unit Test Suite`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 50`** (1 nodes): `VideoServingStateRepository`
+- **Thin community `Community 51`** (1 nodes): `VideoUserStateReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 51`** (1 nodes): `Generate Video Recommendations Usecase`
+- **Thin community `Community 52`** (1 nodes): `RecommendationAuditRepository`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 52`** (1 nodes): `doc.go`
+- **Thin community `Community 53`** (1 nodes): `UnitServingStateRepository`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 53`** (1 nodes): `doc.go`
+- **Thin community `Community 54`** (1 nodes): `VideoServingStateRepository`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 54`** (1 nodes): `Explanation Builder Interface`
+- **Thin community `Community 55`** (1 nodes): `Generate Video Recommendations Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (1 nodes): `doc.go`
+- **Thin community `Community 56`** (1 nodes): `Recommendable Video Unit Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 56`** (1 nodes): `Context Assembler Interface`
+- **Thin community `Community 57`** (1 nodes): `Unit Inventory Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (1 nodes): `doc.go`
+- **Thin community `Community 58`** (1 nodes): `Semantic Span Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 58`** (1 nodes): `Video Evidence Aggregator Interface`
+- **Thin community `Community 59`** (1 nodes): `Transcript Sentence Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 59`** (1 nodes): `doc.go`
+- **Thin community `Community 60`** (1 nodes): `Serving State Repositories`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (1 nodes): `Semantic Span`
+- **Thin community `Community 61`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (1 nodes): `Transcript Sentence`
+- **Thin community `Community 62`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 62`** (1 nodes): `Evidence Resolution Scope`
+- **Thin community `Community 63`** (1 nodes): `Explanation Builder Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (1 nodes): `Selector Mode`
+- **Thin community `Community 64`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 64`** (1 nodes): `Shared E2E Harness Bootstrap`
+- **Thin community `Community 65`** (1 nodes): `Context Assembler Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 65`** (1 nodes): `Content Facts and Recall-ready Indexes`
+- **Thin community `Community 66`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 66`** (1 nodes): `TargetUnitSpec`
+- **Thin community `Community 67`** (1 nodes): `Video Evidence Aggregator Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 67`** (1 nodes): `RecordLearningEventsRequest`
+- **Thin community `Community 68`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 68`** (1 nodes): `ReplayUserStatesRequest`
+- **Thin community `Community 69`** (1 nodes): `Evidence Resolution Scope`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 69`** (1 nodes): `TargetStateCommandRepository Port`
+- **Thin community `Community 70`** (1 nodes): `Selector Mode`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 70`** (1 nodes): `UnitLearningEventRepository Port`
+- **Thin community `Community 71`** (1 nodes): `Shared E2E Harness Bootstrap`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 71`** (1 nodes): `ErrLateStrongEvent`
+- **Thin community `Community 72`** (1 nodes): `Content Facts and Recall-ready Indexes`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 72`** (1 nodes): `List User Unit States Usecase`
+- **Thin community `Community 73`** (1 nodes): `TargetUnitSpec`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 73`** (1 nodes): `Ensure Target Units Usecase`
+- **Thin community `Community 74`** (1 nodes): `RecordLearningEventsRequest`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 74`** (1 nodes): `Set Target Inactive Usecase`
+- **Thin community `Community 75`** (1 nodes): `ReplayUserStatesRequest`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 75`** (1 nodes): `Resume Target Unit Usecase`
+- **Thin community `Community 76`** (1 nodes): `TargetStateCommandRepository Port`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 76`** (1 nodes): `Record Learning Events Usecase`
+- **Thin community `Community 77`** (1 nodes): `UnitLearningEventRepository Port`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 77`** (1 nodes): `Replay User States Usecase`
+- **Thin community `Community 78`** (1 nodes): `ErrLateStrongEvent`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 78`** (1 nodes): `Reducer and Aggregate Root Package Scope`
+- **Thin community `Community 79`** (1 nodes): `List User Unit States Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 79`** (1 nodes): `User Unit State Filter`
+- **Thin community `Community 80`** (1 nodes): `Ensure Target Units Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 80`** (1 nodes): `Target Unit Spec`
+- **Thin community `Community 81`** (1 nodes): `Set Target Inactive Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 81`** (1 nodes): `生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。`
+- **Thin community `Community 82`** (1 nodes): `Resume Target Unit Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 82`** (1 nodes): `__init__.py`
+- **Thin community `Community 83`** (1 nodes): `Record Learning Events Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 83`** (1 nodes): `表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于`
+- **Thin community `Community 84`** (1 nodes): `Replay User States Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 84`** (1 nodes): `表示 normalizer 和 index_builder 产出的完整写库数据。`
+- **Thin community `Community 85`** (1 nodes): `Reducer and Aggregate Root Package Scope`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 85`** (1 nodes): `表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生`
+- **Thin community `Community 86`** (1 nodes): `User Unit State Filter`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 86`** (1 nodes): `表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完`
+- **Thin community `Community 87`** (1 nodes): `Target Unit Spec`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 87`** (1 nodes): `表示 main 汇总时使用的单 clip 最终结果。`
+- **Thin community `Community 88`** (1 nodes): `生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 88`** (1 nodes): `Single Reducer Rule`
+- **Thin community `Community 89`** (1 nodes): `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 89`** (1 nodes): `RecordLearningEvents Pipeline`
+- **Thin community `Community 90`** (1 nodes): `表示 transcript 中的单个语义 span。      虽然上游 JSON 字段名叫 token，但按当前 catalog 设计，     它在数据库里`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 90`** (1 nodes): `ReplayUserStates Pipeline`
+- **Thin community `Community 91`** (1 nodes): `表示 transcript 中的单个 sentence。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 91`** (1 nodes): `Short Final-Write Transactions`
+- **Thin community `Community 92`** (1 nodes): `表示 loader 阶段输出的“单 clip 原始输入对象”。      这是整个脚本后续流程的主输入。     它同时持有：     - 由父文件推导出的 c`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 92`** (1 nodes): `Run/Item Audit Center Policy`
+- **Thin community `Community 93`** (1 nodes): `生成统一审计上下文。          审计上下文尽量只放排障需要的信息，不放整坨 transcript。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 93`** (1 nodes): `Read-Only Upstream Data Policy`
+- **Thin community `Community 94`** (1 nodes): `表示将写入 catalog.videos 的一行数据。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (1 nodes): `video_recommendation_runs / video_recommendation_items`
+- **Thin community `Community 95`** (1 nodes): `表示将写入 catalog.video_transcripts 的一行数据。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (1 nodes): `user_unit_serving_states`
+- **Thin community `Community 96`** (1 nodes): `表示将写入 catalog.video_transcript_sentences 的一行数据。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (1 nodes): `user_video_serving_states`
+- **Thin community `Community 97`** (1 nodes): `表示将写入 catalog.video_semantic_spans 的一行数据。`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (1 nodes): `Cross-Module E2E Test Scope`
+- **Thin community `Community 98`** (1 nodes): `表示将写入 catalog.video_unit_index 的一行聚合结果。`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 99`** (1 nodes): `表示将写入 catalog.video_unit_index 的一行聚合结果。`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 100`** (1 nodes): `表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 101`** (1 nodes): `表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 102`** (1 nodes): `表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 103`** (1 nodes): `表示 main 汇总时使用的单 clip 最终结果。`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 104`** (1 nodes): `表示 normalizer 阶段产出的基础行集合。      这里故意不包含 transcript 摘要和 unit index。     原因是这两类数据属于`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 105`** (1 nodes): `表示 normalizer 和 index_builder 产出的完整写库数据。`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 106`** (1 nodes): `表示写入审计表时需要的字段集合。      这里不包含 ingestion_record_id 和时间戳，因为这两个值应由 repository 在真正写库时生`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 107`** (1 nodes): `表示数据库里已存在的 clip 快照。      这个对象专门给 main 做“是否可以 skipped”判断用。     它只保留幂等判断所需的字段，不承担完`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 108`** (1 nodes): `表示 main 汇总时使用的单 clip 最终结果。`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 109`** (1 nodes): `Single Reducer Rule`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 110`** (1 nodes): `RecordLearningEvents Pipeline`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 111`** (1 nodes): `ReplayUserStates Pipeline`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 112`** (1 nodes): `Short Final-Write Transactions`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 113`** (1 nodes): `Run/Item Audit Center Policy`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 114`** (1 nodes): `Read-Only Upstream Data Policy`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 115`** (1 nodes): `video_recommendation_runs / video_recommendation_items`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 116`** (1 nodes): `user_unit_serving_states`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 117`** (1 nodes): `user_video_serving_states`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 118`** (1 nodes): `Cross-Module E2E Test Scope`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `normalize_clip_input()` connect `Community 0` to `Community 4`?**
-  _High betweenness centrality (0.027) - this node is a cross-community bridge._
-- **Why does `main()` connect `Community 0` to `Community 1`, `Community 4`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Are the 49 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
-  _`CatalogIngestError` has 49 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 3`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
+- **Why does `_parse_transcript_sentences()` connect `Community 0` to `Community 3`?**
+  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Are the 50 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
+  _`CatalogIngestError` has 50 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 23 inferred relationships involving `Harness` (e.g. with `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` and `TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty()`) actually correct?**
   _`Harness` has 23 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 29 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
-  _`LoadedClipInput` has 29 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 32 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
+  _`LoadedClipInput` has 32 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 10 inferred relationships involving `CatalogRepository` (e.g. with `脚本主入口。      main 只负责总编排：     - 读取参数     - 初始化 repository     - 调用 loader / valid` and `判断当前 clip 是否可直接 skipped。      这里严格按 README 中的“无变化跳过”规则比较。     只要 transcript chec`) actually correct?**
   _`CatalogRepository` has 10 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 22 inferred relationships involving `TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` (e.g. with `Harness` and `.LearningSuite()`) actually correct?**
-  _`TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin()` has 22 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 22 inferred relationships involving `NormalizedClipData` (e.g. with `基于基础行构建完整写库数据。      这个阶段负责两类派生结果：     - transcript 顶层摘要     - video_unit_index 聚` and `按 `(video_id, coarse_unit_id)` 的逻辑构建视频级 unit 索引。      这里虽然还没有真正的 video_id，但聚合维度和`) actually correct?**
+  _`NormalizedClipData` has 22 INFERRED edges - model-reasoned connections that need verification._

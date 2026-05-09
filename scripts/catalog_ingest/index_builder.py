@@ -51,13 +51,11 @@ def _build_transcript_row(
     mapped_span_count = sum(1 for span in core_rows.spans if span.coarse_unit_id is not None)
     unmapped_span_count = semantic_span_count - mapped_span_count
     mapped_span_ratio = _safe_ratio(mapped_span_count, semantic_span_count)
-    full_text = " ".join(sentence.text.strip() for sentence in core_rows.sentences if sentence.text.strip())
 
     return VideoTranscriptRow(
         transcript_object_path=clip_input.transcript_object_path or "",
         transcript_checksum=clip_input.transcript_checksum or "",
         transcript_format_version=clip_input.transcript_format_version,
-        full_text=full_text,
         sentence_count=sentence_count,
         semantic_span_count=semantic_span_count,
         mapped_span_count=mapped_span_count,
@@ -98,10 +96,6 @@ def _build_unit_index_rows(
             for span in selected_evidence_spans
         )
 
-        # sample_surface_forms 只保留去重后的前几个表面形式，避免数组无限膨胀。
-        evidence_surface_forms = [span.text for span in selected_evidence_spans]
-        sample_surface_forms = _dedupe_surface_forms(evidence_surface_forms + [span.text for span in spans])
-
         rows.append(
             VideoUnitIndexRow(
                 coarse_unit_id=coarse_unit_id,
@@ -113,7 +107,6 @@ def _build_unit_index_rows(
                 coverage_ratio=coverage_ratio,
                 sentence_indexes=sentence_indexes,
                 evidence_span_refs=evidence_span_refs,
-                sample_surface_forms=sample_surface_forms,
             )
         )
 
@@ -167,19 +160,3 @@ def _safe_ratio(numerator: int, denominator: int) -> Decimal:
     if denominator <= 0:
         return Decimal("0").quantize(RATIO_PRECISION)
     return (Decimal(numerator) / Decimal(denominator)).quantize(RATIO_PRECISION, rounding=ROUND_HALF_UP)
-
-
-def _dedupe_surface_forms(surface_forms: list[str], limit: int = 5) -> tuple[str, ...]:
-    """对表面形式去重并限制个数。"""
-
-    deduped: list[str] = []
-    seen: set[str] = set()
-    for text in surface_forms:
-        normalized = text.strip()
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        deduped.append(normalized)
-        if len(deduped) >= limit:
-            break
-    return tuple(deduped)

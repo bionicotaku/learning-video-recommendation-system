@@ -84,10 +84,8 @@ type CatalogVideoFixture struct {
 
 type TranscriptSentenceFixture struct {
 	SentenceIndex int32
-	Text          string
 	StartMs       int32
 	EndMs         int32
-	Explanation   string
 }
 
 type SemanticSpanFixture struct {
@@ -96,8 +94,6 @@ type SemanticSpanFixture struct {
 	CoarseUnitID  *int64
 	StartMs       int32
 	EndMs         int32
-	Text          string
-	Explanation   string
 }
 
 type EvidenceRefFixture struct {
@@ -106,16 +102,15 @@ type EvidenceRefFixture struct {
 }
 
 type VideoUnitIndexFixture struct {
-	CoarseUnitID       int64
-	MentionCount       int32
-	SentenceCount      int32
-	FirstStartMs       int32
-	LastEndMs          int32
-	CoverageMs         int32
-	CoverageRatio      float64
-	SentenceIndexes    []int32
-	EvidenceSpanRefs   []EvidenceRefFixture
-	SampleSurfaceForms []string
+	CoarseUnitID     int64
+	MentionCount     int32
+	SentenceCount    int32
+	FirstStartMs     int32
+	LastEndMs        int32
+	CoverageMs       int32
+	CoverageRatio    float64
+	SentenceIndexes  []int32
+	EvidenceSpanRefs []EvidenceRefFixture
 }
 
 func StartHarness(t *testing.T) *Harness {
@@ -366,14 +361,12 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	for _, sentence := range fixture.TranscriptEntries {
 		if _, err := h.Pool.Exec(
 			context.Background(),
-			`insert into catalog.video_transcript_sentences (video_id, sentence_index, text, start_ms, end_ms, explanation)
-			 values ($1, $2, $3, $4, $5, $6)`,
+			`insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms)
+			 values ($1, $2, $3, $4)`,
 			fixture.VideoID,
 			sentence.SentenceIndex,
-			sentence.Text,
 			sentence.StartMs,
 			sentence.EndMs,
-			nullIfEmpty(sentence.Explanation),
 		); err != nil {
 			failNow(t, "seed catalog.video_transcript_sentences: %v", err)
 		}
@@ -382,16 +375,14 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	for _, span := range fixture.SemanticSpans {
 		if _, err := h.Pool.Exec(
 			context.Background(),
-			`insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, text, explanation)
-			 values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			`insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms)
+			 values ($1, $2, $3, $4, $5, $6)`,
 			fixture.VideoID,
 			span.SentenceIndex,
 			span.SpanIndex,
 			span.CoarseUnitID,
 			span.StartMs,
 			span.EndMs,
-			span.Text,
-			nullIfEmpty(span.Explanation),
 		); err != nil {
 			failNow(t, "seed catalog.video_semantic_spans: %v", err)
 		}
@@ -414,9 +405,8 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 				coverage_ms,
 				coverage_ratio,
 				sentence_indexes,
-				evidence_span_refs,
-				sample_surface_forms
-			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				evidence_span_refs
+			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 			fixture.VideoID,
 			entry.CoarseUnitID,
 			entry.MentionCount,
@@ -427,7 +417,6 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 			entry.CoverageRatio,
 			entry.SentenceIndexes,
 			evidenceBytes,
-			entry.SampleSurfaceForms,
 		); err != nil {
 			failNow(t, "seed catalog.video_unit_index: %v", err)
 		}
@@ -631,24 +620,23 @@ func happyPathVideo(videoID string, unitID int64, startMs, endMs int32, sentence
 		DurationMs:      120_000,
 		MappedSpanRatio: 0.82,
 		TranscriptEntries: []TranscriptSentenceFixture{
-			{SentenceIndex: sentenceIndex, Text: surface + " sentence", StartMs: startMs, EndMs: endMs},
-			{SentenceIndex: sentenceIndex + 1, Text: surface + " follow up", StartMs: endMs, EndMs: endMs + 1_500},
+			{SentenceIndex: sentenceIndex, StartMs: startMs, EndMs: endMs},
+			{SentenceIndex: sentenceIndex + 1, StartMs: endMs, EndMs: endMs + 1_500},
 		},
 		SemanticSpans: []SemanticSpanFixture{
-			{SentenceIndex: sentenceIndex, SpanIndex: 0, CoarseUnitID: &unitID, StartMs: startMs, EndMs: endMs, Text: surface},
+			{SentenceIndex: sentenceIndex, SpanIndex: 0, CoarseUnitID: &unitID, StartMs: startMs, EndMs: endMs},
 		},
 		UnitIndexes: []VideoUnitIndexFixture{
 			{
-				CoarseUnitID:       unitID,
-				MentionCount:       3,
-				SentenceCount:      2,
-				FirstStartMs:       startMs,
-				LastEndMs:          endMs + 1_500,
-				CoverageMs:         endMs + 1_500 - startMs,
-				CoverageRatio:      0.08,
-				SentenceIndexes:    []int32{sentenceIndex, sentenceIndex + 1},
-				EvidenceSpanRefs:   []EvidenceRefFixture{{SentenceIndex: sentenceIndex, SpanIndex: 0}},
-				SampleSurfaceForms: []string{surface},
+				CoarseUnitID:     unitID,
+				MentionCount:     3,
+				SentenceCount:    2,
+				FirstStartMs:     startMs,
+				LastEndMs:        endMs + 1_500,
+				CoverageMs:       endMs + 1_500 - startMs,
+				CoverageRatio:    0.08,
+				SentenceIndexes:  []int32{sentenceIndex, sentenceIndex + 1},
+				EvidenceSpanRefs: []EvidenceRefFixture{{SentenceIndex: sentenceIndex, SpanIndex: 0}},
 			},
 		},
 	}

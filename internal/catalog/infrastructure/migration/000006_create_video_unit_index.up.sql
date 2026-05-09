@@ -11,7 +11,6 @@ create table if not exists catalog.video_unit_index (
   coverage_ratio numeric(6,5) not null,
   sentence_indexes integer[] not null default '{}',
   evidence_span_refs jsonb not null default '[]'::jsonb,
-  sample_surface_forms text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 

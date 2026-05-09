@@ -4,7 +4,6 @@ create table if not exists catalog.video_transcripts (
   transcript_object_path text not null,
   transcript_checksum text not null,
   transcript_format_version integer not null default 1,
-  full_text text not null,
   sentence_count integer not null,
   semantic_span_count integer not null,
   mapped_span_count integer not null,

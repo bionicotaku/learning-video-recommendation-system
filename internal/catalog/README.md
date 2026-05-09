@@ -5,7 +5,7 @@
 当前模块边界包括：
 
 - 切片视频内容资产主记录
-- transcript 标准化读模型
+- transcript 元数据、时间定位与索引模型
 - Recall-ready 的视频级 coarse unit 索引
 - 单视频入库审计
 - 用户对视频的互动状态投影

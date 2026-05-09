@@ -70,7 +70,22 @@ func (q *Queries) ListLearningStatesForRecommendation(ctx context.Context, userI
 }
 
 const listRecommendableVideoUnitsByUnitIDs = `-- name: ListRecommendableVideoUnitsByUnitIDs :many
-select video_id, coarse_unit_id, mention_count, sentence_count, first_start_ms, last_end_ms, coverage_ms, coverage_ratio, sentence_indexes, evidence_span_refs, sample_surface_forms, duration_ms, mapped_span_ratio, status, visibility_status, publish_at
+select
+  video_id,
+  coarse_unit_id,
+  mention_count,
+  sentence_count,
+  first_start_ms,
+  last_end_ms,
+  coverage_ms,
+  coverage_ratio,
+  sentence_indexes,
+  evidence_span_refs,
+  duration_ms,
+  mapped_span_ratio,
+  status,
+  visibility_status,
+  publish_at
 from recommendation.v_recommendable_video_units
 where coarse_unit_id = any($1::bigint[])
 order by coarse_unit_id asc, coverage_ratio desc, mention_count desc
@@ -96,7 +111,6 @@ func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coar
 			&i.CoverageRatio,
 			&i.SentenceIndexes,
 			&i.EvidenceSpanRefs,
-			&i.SampleSurfaceForms,
 			&i.DurationMs,
 			&i.MappedSpanRatio,
 			&i.Status,
@@ -114,7 +128,7 @@ func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coar
 }
 
 const listSemanticSpansByVideoAndUnit = `-- name: ListSemanticSpansByVideoAndUnit :many
-select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, text, explanation
+select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms
 from catalog.video_semantic_spans
 where video_id = $1
   and coarse_unit_id = $2
@@ -142,8 +156,6 @@ func (q *Queries) ListSemanticSpansByVideoAndUnit(ctx context.Context, arg ListS
 			&i.CoarseUnitID,
 			&i.StartMs,
 			&i.EndMs,
-			&i.Text,
-			&i.Explanation,
 		); err != nil {
 			return nil, err
 		}
@@ -156,7 +168,7 @@ func (q *Queries) ListSemanticSpansByVideoAndUnit(ctx context.Context, arg ListS
 }
 
 const listTranscriptSentencesByVideoAndIndexes = `-- name: ListTranscriptSentencesByVideoAndIndexes :many
-select video_id, sentence_index, text, start_ms, end_ms, explanation
+select video_id, sentence_index, start_ms, end_ms
 from catalog.video_transcript_sentences
 where video_id = $1
   and sentence_index = any($2::integer[])
@@ -180,10 +192,8 @@ func (q *Queries) ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, 
 		if err := rows.Scan(
 			&i.VideoID,
 			&i.SentenceIndex,
-			&i.Text,
 			&i.StartMs,
 			&i.EndMs,
-			&i.Explanation,
 		); err != nil {
 			return nil, err
 		}
@@ -196,7 +206,16 @@ func (q *Queries) ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, 
 }
 
 const listUnitVideoInventoryByUnitIDs = `-- name: ListUnitVideoInventoryByUnitIDs :many
-select coarse_unit_id, distinct_video_count, avg_mention_count, avg_sentence_count, avg_coverage_ms, avg_coverage_ratio, strong_video_count, supply_grade, updated_at
+select
+  coarse_unit_id,
+  distinct_video_count,
+  avg_mention_count,
+  avg_sentence_count,
+  avg_coverage_ms,
+  avg_coverage_ratio,
+  strong_video_count,
+  supply_grade,
+  updated_at
 from recommendation.v_unit_video_inventory
 where coarse_unit_id = any($1::bigint[])
 order by coarse_unit_id asc

@@ -22,7 +22,7 @@ from scripts.catalog_ingest.validator import validate_loaded_clip
 
 
 class CatalogIngestAlignmentTest(unittest.TestCase):
-    def test_load_clip_inputs_parses_snake_case_semantic_element(self) -> None:
+    def test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             parents_dir = root / "parents"
@@ -68,6 +68,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                                         "end": 150,
                                         "semantic_element": {
                                             "base_form": "Pam",
+                                            "translation": "帕姆",
                                             "dictionary": "Pam",
                                             "coarse_id": 7,
                                             "reason": "name",
@@ -85,10 +86,49 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
 
         token = loaded[0].transcript_sentences[0].tokens[0]
         self.assertIsNotNone(token.semantic_element)
-        self.assertEqual(token.semantic_element.base_form, "Pam")
         self.assertEqual(token.semantic_element.coarse_id, 7)
+        core_rows = NormalizedCoreRows(
+            video=VideoRow(
+                source_clip_key=loaded[0].source_clip_key,
+                parent_video_name=loaded[0].parent_video_name,
+                parent_video_slug=loaded[0].parent_video_slug,
+                clip_seq=loaded[0].clip_seq,
+                source_start_ms=loaded[0].source_start_ms,
+                source_end_ms=loaded[0].source_end_ms,
+                title=loaded[0].title,
+                description=loaded[0].description,
+                clip_reason=loaded[0].clip_reason,
+                language=loaded[0].language,
+                duration_ms=loaded[0].duration_ms,
+                hls_master_playlist_path=loaded[0].hls_master_playlist_path,
+                thumbnail_url=loaded[0].thumbnail_url,
+                status="active",
+                visibility_status="public",
+                publish_at=loaded[0].publish_at,
+            ),
+            sentences=(
+                VideoTranscriptSentenceRow(
+                    sentence_index=0,
+                    start_ms=110,
+                    end_ms=150,
+                ),
+            ),
+            spans=(
+                VideoSemanticSpanRow(
+                    sentence_index=0,
+                    span_index=0,
+                    start_ms=110,
+                    end_ms=150,
+                    coarse_unit_id=7,
+                ),
+            ),
+        )
+        normalized = build_normalized_clip_data(loaded[0], core_rows)
+        self.assertFalse(hasattr(normalized.spans[0], "base_form"))
+        self.assertFalse(hasattr(normalized.spans[0], "dictionary_text"))
+        self.assertFalse(hasattr(normalized.spans[0], "translation"))
 
-    def test_unit_index_uses_structured_refs_sentence_dedup_and_limit_five(self) -> None:
+    def test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms(self) -> None:
         clip_input = _build_clip_input()
         core_rows = NormalizedCoreRows(
             video=VideoRow(
@@ -112,23 +152,21 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
             sentences=tuple(
                 VideoTranscriptSentenceRow(
                     sentence_index=index,
-                    text=f"sentence-{index}",
                     start_ms=index * 100,
                     end_ms=index * 100 + 90,
-                    explanation=None,
                 )
                 for index in range(6)
             ),
             spans=(
-                VideoSemanticSpanRow(2, 3, "two-late", 230, 240, None, 42, "two", "two"),
-                VideoSemanticSpanRow(0, 4, "zero-late", 40, 50, None, 42, "zero", "zero"),
-                VideoSemanticSpanRow(5, 1, "five-keep", 510, 520, None, 42, "five", "five"),
-                VideoSemanticSpanRow(1, 7, "one-drop", 170, 180, None, 42, "one", "one"),
-                VideoSemanticSpanRow(4, 2, "four-keep", 420, 430, None, 42, "four", "four"),
-                VideoSemanticSpanRow(3, 0, "three-keep", 300, 310, None, 42, "three", "three"),
-                VideoSemanticSpanRow(1, 2, "one-keep", 120, 130, None, 42, "one", "one"),
-                VideoSemanticSpanRow(0, 1, "zero-keep", 10, 20, None, 42, "zero", "zero"),
-                VideoSemanticSpanRow(2, 1, "two-keep", 210, 220, None, 42, "two", "two"),
+                VideoSemanticSpanRow(2, 3, 230, 240, 42),
+                VideoSemanticSpanRow(0, 4, 40, 50, 42),
+                VideoSemanticSpanRow(5, 1, 510, 520, 42),
+                VideoSemanticSpanRow(1, 7, 170, 180, 42),
+                VideoSemanticSpanRow(4, 2, 420, 430, 42),
+                VideoSemanticSpanRow(3, 0, 300, 310, 42),
+                VideoSemanticSpanRow(1, 2, 120, 130, 42),
+                VideoSemanticSpanRow(0, 1, 10, 20, 42),
+                VideoSemanticSpanRow(2, 1, 210, 220, 42),
             ),
         )
 
@@ -140,7 +178,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
             tuple((ref.sentence_index, ref.span_index) for ref in unit_index.evidence_span_refs),
             ((0, 1), (1, 2), (2, 1), (3, 0), (4, 2)),
         )
-        self.assertEqual(unit_index.sample_surface_forms, ("zero-keep", "one-keep", "two-keep", "three-keep", "four-keep"))
+        self.assertFalse(hasattr(unit_index, "sample_surface_forms"))
 
     def test_token_outside_sentence_stays_warning_for_assemblyai_edge_case(self) -> None:
         clip_input = _build_clip_input(
@@ -159,10 +197,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                             start_ms=110,
                             end_ms=205,
                             semantic_element=TranscriptSemanticElement(
-                                base_form="edge",
-                                dictionary_text="edge",
                                 coarse_id=7,
-                                reason=None,
                             ),
                         ),
                     ),
@@ -198,10 +233,7 @@ def _build_clip_input(
                     start_ms=0,
                     end_ms=50,
                     semantic_element=TranscriptSemanticElement(
-                        base_form="default",
-                        dictionary_text="default",
                         coarse_id=1,
-                        reason=None,
                     ),
                 ),
             ),

@@ -278,21 +278,20 @@ func (g *DefaultCandidateGenerator) generateQualityFallback(rows []model.Recomme
 
 func videoUnitCandidateFromRow(row model.RecommendableVideoUnit, demandUnit model.DemandUnit, lane string, candidateScore float64) model.VideoUnitCandidate {
 	return model.VideoUnitCandidate{
-		VideoID:            row.VideoID,
-		CoarseUnitID:       row.CoarseUnitID,
-		Lane:               lane,
-		Bucket:             demandUnit.Bucket,
-		UnitWeight:         demandUnit.Weight,
-		MentionCount:       row.MentionCount,
-		SentenceCount:      row.SentenceCount,
-		CoverageMs:         row.CoverageMs,
-		CoverageRatio:      row.CoverageRatio,
-		SentenceIndexes:    row.SentenceIndexes,
-		EvidenceSpanRefs:   row.EvidenceSpanRefs,
-		SampleSurfaceForms: row.SampleSurfaceForms,
-		DurationMs:         row.DurationMs,
-		MappedSpanRatio:    row.MappedSpanRatio,
-		CandidateScore:     candidateScore,
+		VideoID:          row.VideoID,
+		CoarseUnitID:     row.CoarseUnitID,
+		Lane:             lane,
+		Bucket:           demandUnit.Bucket,
+		UnitWeight:       demandUnit.Weight,
+		MentionCount:     row.MentionCount,
+		SentenceCount:    row.SentenceCount,
+		CoverageMs:       row.CoverageMs,
+		CoverageRatio:    row.CoverageRatio,
+		SentenceIndexes:  row.SentenceIndexes,
+		EvidenceSpanRefs: row.EvidenceSpanRefs,
+		DurationMs:       row.DurationMs,
+		MappedSpanRatio:  row.MappedSpanRatio,
+		CandidateScore:   candidateScore,
 	}
 }
 

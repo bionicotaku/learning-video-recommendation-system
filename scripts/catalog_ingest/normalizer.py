@@ -47,10 +47,8 @@ def normalize_clip_input(clip_input: LoadedClipInput) -> NormalizedCoreRows:
         sentence_rows.append(
             VideoTranscriptSentenceRow(
                 sentence_index=sentence.index,
-                text=sentence.text,
                 start_ms=sentence.start_ms,
                 end_ms=sentence.end_ms,
-                explanation=sentence.explanation,
             )
         )
 
@@ -60,13 +58,9 @@ def normalize_clip_input(clip_input: LoadedClipInput) -> NormalizedCoreRows:
                 VideoSemanticSpanRow(
                     sentence_index=sentence.index,
                     span_index=token.index,
-                    text=token.text,
                     start_ms=token.start_ms,
                     end_ms=token.end_ms,
-                    explanation=token.explanation,
                     coarse_unit_id=semantic_element.coarse_id if semantic_element else None,
-                    base_form=semantic_element.base_form if semantic_element else None,
-                    dictionary_text=semantic_element.dictionary_text if semantic_element else None,
                 )
             )
 

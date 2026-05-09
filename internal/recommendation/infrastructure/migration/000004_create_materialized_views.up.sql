@@ -10,7 +10,6 @@ select
   vui.coverage_ratio,
   vui.sentence_indexes,
   vui.evidence_span_refs,
-  vui.sample_surface_forms,
   v.duration_ms,
   vt.mapped_span_ratio,
   v.status,

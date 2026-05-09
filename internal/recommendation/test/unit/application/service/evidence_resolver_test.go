@@ -56,16 +56,16 @@ func TestDefaultEvidenceResolverResolvesReferencedSpansAndSentences(t *testing.T
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
 				spanKey("video-1", 101): {
-					{VideoID: "video-1", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1800, Text: "earlier"},
-					{VideoID: "video-1", CoarseUnitID: int64Ptr(101), SentenceIndex: 2, SpanIndex: 1, StartMs: 2100, EndMs: 2600, Text: "later"},
+					{VideoID: "video-1", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1800},
+					{VideoID: "video-1", CoarseUnitID: int64Ptr(101), SentenceIndex: 2, SpanIndex: 1, StartMs: 2100, EndMs: 2600},
 				},
 			},
 		},
 		&stubTranscriptSentenceReader{
 			rows: map[string][]model.TranscriptSentence{
 				"video-1": {
-					{VideoID: "video-1", SentenceIndex: 1, StartMs: 900, EndMs: 1900, Text: "Sentence 1"},
-					{VideoID: "video-1", SentenceIndex: 2, StartMs: 2000, EndMs: 2700, Text: "Sentence 2"},
+					{VideoID: "video-1", SentenceIndex: 1, StartMs: 900, EndMs: 1900},
+					{VideoID: "video-1", SentenceIndex: 2, StartMs: 2000, EndMs: 2700},
 				},
 			},
 		},
@@ -103,8 +103,8 @@ func TestDefaultEvidenceResolverPrefersEarlierSpanWhenRefsShareSentence(t *testi
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
 				spanKey("video-2", 101): {
-					{VideoID: "video-2", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400, Text: "earlier"},
-					{VideoID: "video-2", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 2, StartMs: 1300, EndMs: 1600, Text: "later"},
+					{VideoID: "video-2", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400},
+					{VideoID: "video-2", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 2, StartMs: 1300, EndMs: 1600},
 				},
 			},
 		},
@@ -132,14 +132,14 @@ func TestDefaultEvidenceResolverLeavesBestEvidenceEmptyWhenReferencedSpanIsMissi
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
 				spanKey("video-3", 101): {
-					{VideoID: "video-3", CoarseUnitID: int64Ptr(101), SentenceIndex: 3, SpanIndex: 1, StartMs: 3200, EndMs: 3600, Text: "fallback"},
+					{VideoID: "video-3", CoarseUnitID: int64Ptr(101), SentenceIndex: 3, SpanIndex: 1, StartMs: 3200, EndMs: 3600},
 				},
 			},
 		},
 		&stubTranscriptSentenceReader{
 			rows: map[string][]model.TranscriptSentence{
 				"video-3": {
-					{VideoID: "video-3", SentenceIndex: 3, StartMs: 3000, EndMs: 3800, Text: "Sentence 3"},
+					{VideoID: "video-3", SentenceIndex: 3, StartMs: 3000, EndMs: 3800},
 				},
 			},
 		},
@@ -170,7 +170,7 @@ func TestDefaultEvidenceResolverToleratesMissingSentences(t *testing.T) {
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
 				spanKey("video-4", 101): {
-					{VideoID: "video-4", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1100, EndMs: 1700, Text: "only-span"},
+					{VideoID: "video-4", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1100, EndMs: 1700},
 				},
 			},
 		},
@@ -205,14 +205,14 @@ func TestDefaultEvidenceResolverPropagatesContextToReaders(t *testing.T) {
 	spanReader := &stubSemanticSpanReader{
 		rows: map[string][]model.SemanticSpan{
 			spanKey("video-ctx", 101): {
-				{VideoID: "video-ctx", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400, Text: "ctx"},
+				{VideoID: "video-ctx", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400},
 			},
 		},
 	}
 	sentenceReader := &stubTranscriptSentenceReader{
 		rows: map[string][]model.TranscriptSentence{
 			"video-ctx": {
-				{VideoID: "video-ctx", SentenceIndex: 1, StartMs: 900, EndMs: 1500, Text: "Sentence 1"},
+				{VideoID: "video-ctx", SentenceIndex: 1, StartMs: 900, EndMs: 1500},
 			},
 		},
 	}

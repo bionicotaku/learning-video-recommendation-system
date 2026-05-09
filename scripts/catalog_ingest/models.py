@@ -46,10 +46,7 @@ class ParentClipDescriptor:
 class TranscriptSemanticElement:
     """表示 transcript token 下的 semantic_element 结构。"""
 
-    base_form: str | None
-    dictionary_text: str | None
     coarse_id: int | None
-    reason: str | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -168,7 +165,6 @@ class VideoTranscriptRow:
     transcript_object_path: str
     transcript_checksum: str
     transcript_format_version: int
-    full_text: str
     sentence_count: int
     semantic_span_count: int
     mapped_span_count: int
@@ -181,10 +177,8 @@ class VideoTranscriptSentenceRow:
     """表示将写入 catalog.video_transcript_sentences 的一行数据。"""
 
     sentence_index: int
-    text: str
     start_ms: int
     end_ms: int
-    explanation: str | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -193,13 +187,9 @@ class VideoSemanticSpanRow:
 
     sentence_index: int
     span_index: int
-    text: str
     start_ms: int
     end_ms: int
-    explanation: str | None
     coarse_unit_id: int | None
-    base_form: str | None
-    dictionary_text: str | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -223,7 +213,6 @@ class VideoUnitIndexRow:
     coverage_ratio: Decimal
     sentence_indexes: tuple[int, ...]
     evidence_span_refs: tuple[EvidenceSpanRef, ...]
-    sample_surface_forms: tuple[str, ...]
 
 
 @dataclass(slots=True, frozen=True)
