@@ -56,7 +56,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                             {
                                 "index": 0,
                                 "text": "Pam!",
-                                "explanation": "call Pam",
+                                "translation": "帕姆！",
                                 "start": 110,
                                 "end": 150,
                                 "tokens": [
@@ -85,6 +85,9 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
             loaded = load_clip_inputs(parents_dir=parents_dir, transcripts_dir=transcripts_dir)
 
         token = loaded[0].transcript_sentences[0].tokens[0]
+        sentence = loaded[0].transcript_sentences[0]
+        self.assertEqual(sentence.translation, "帕姆！")
+        self.assertFalse(hasattr(sentence, "explanation"))
         self.assertIsNotNone(token.semantic_element)
         self.assertEqual(token.semantic_element.coarse_id, 7)
         core_rows = NormalizedCoreRows(
@@ -124,6 +127,8 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
             ),
         )
         normalized = build_normalized_clip_data(loaded[0], core_rows)
+        self.assertFalse(hasattr(normalized.sentences[0], "translation"))
+        self.assertFalse(hasattr(normalized.sentences[0], "explanation"))
         self.assertFalse(hasattr(normalized.spans[0], "base_form"))
         self.assertFalse(hasattr(normalized.spans[0], "dictionary_text"))
         self.assertFalse(hasattr(normalized.spans[0], "translation"))
@@ -186,7 +191,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                 TranscriptSentence(
                     index=0,
                     text="edge case",
-                    explanation=None,
+                    translation="边界情况",
                     start_ms=100,
                     end_ms=200,
                     tokens=(
@@ -222,7 +227,7 @@ def _build_clip_input(
         TranscriptSentence(
             index=0,
             text="default sentence",
-            explanation=None,
+            translation="默认句子",
             start_ms=0,
             end_ms=100,
             tokens=(

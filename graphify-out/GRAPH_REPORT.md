@@ -1,7 +1,7 @@
 # Graph Report - .  (2026-05-09)
 
 ## Corpus Check
-- 162 files · ~89,727 words
+- 162 files · ~92,689 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -833,10 +833,10 @@ Nodes (1): Cross-Module E2E Test Scope
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 3`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `_parse_transcript_sentences()` connect `Community 0` to `Community 3`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
+- **Why does `_build_unit_index_rows()` connect `Community 0` to `Community 3`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `Reduce()` connect `Community 17` to `Community 1`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
 - **Are the 50 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
   _`CatalogIngestError` has 50 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 23 inferred relationships involving `Harness` (e.g. with `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` and `TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty()`) actually correct?**

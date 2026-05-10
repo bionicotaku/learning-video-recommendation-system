@@ -8414,108 +8414,108 @@
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L54",
-      "id": "models_rationale_54",
       "community": 0,
-      "norm_label": "\u8868\u793a transcript \u4e2d\u7684\u5355\u4e2a\u8bed\u4e49 span\u3002      \u867d\u7136\u4e0a\u6e38 json \u5b57\u6bb5\u540d\u53eb token,\u4f46\u6309\u5f53\u524d catalog \u8bbe\u8ba1,     \u5b83\u5728\u6570\u636e\u5e93\u91cc"
+      "norm_label": "\u8868\u793a transcript \u4e2d\u7684\u5355\u4e2a\u8bed\u4e49 span\u3002      \u867d\u7136\u4e0a\u6e38 json \u5b57\u6bb5\u540d\u53eb token,\u4f46\u6309\u5f53\u524d catalog \u8bbe\u8ba1,     \u5b83\u5728\u6570\u636e\u5e93\u91cc",
+      "id": "models_rationale_54"
     },
     {
       "label": "\u8868\u793a transcript \u4e2d\u7684\u5355\u4e2a sentence\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L70",
-      "id": "models_rationale_70",
       "community": 0,
-      "norm_label": "\u8868\u793a transcript \u4e2d\u7684\u5355\u4e2a sentence\u3002"
+      "norm_label": "\u8868\u793a transcript \u4e2d\u7684\u5355\u4e2a sentence\u3002",
+      "id": "models_rationale_70"
     },
     {
       "label": "\u8868\u793a loader \u9636\u6bb5\u8f93\u51fa\u7684\u201c\u5355 clip \u539f\u59cb\u8f93\u5165\u5bf9\u8c61\u201d\u3002      \u8fd9\u662f\u6574\u4e2a\u811a\u672c\u540e\u7eed\u6d41\u7a0b\u7684\u4e3b\u8f93\u5165\u3002     \u5b83\u540c\u65f6\u6301\u6709\uff1a     - \u7531\u7236\u6587\u4ef6\u63a8\u5bfc\u51fa\u7684 c",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L82",
-      "id": "models_rationale_82",
       "community": 0,
-      "norm_label": "\u8868\u793a loader \u9636\u6bb5\u8f93\u51fa\u7684\u201c\u5355 clip \u539f\u59cb\u8f93\u5165\u5bf9\u8c61\u201d\u3002      \u8fd9\u662f\u6574\u4e2a\u811a\u672c\u540e\u7eed\u6d41\u7a0b\u7684\u4e3b\u8f93\u5165\u3002     \u5b83\u540c\u65f6\u6301\u6709:     - \u7531\u7236\u6587\u4ef6\u63a8\u5bfc\u51fa\u7684 c"
+      "norm_label": "\u8868\u793a loader \u9636\u6bb5\u8f93\u51fa\u7684\u201c\u5355 clip \u539f\u59cb\u8f93\u5165\u5bf9\u8c61\u201d\u3002      \u8fd9\u662f\u6574\u4e2a\u811a\u672c\u540e\u7eed\u6d41\u7a0b\u7684\u4e3b\u8f93\u5165\u3002     \u5b83\u540c\u65f6\u6301\u6709:     - \u7531\u7236\u6587\u4ef6\u63a8\u5bfc\u51fa\u7684 c",
+      "id": "models_rationale_82"
     },
     {
       "label": "\u751f\u6210\u7edf\u4e00\u5ba1\u8ba1\u4e0a\u4e0b\u6587\u3002          \u5ba1\u8ba1\u4e0a\u4e0b\u6587\u5c3d\u91cf\u53ea\u653e\u6392\u969c\u9700\u8981\u7684\u4fe1\u606f\uff0c\u4e0d\u653e\u6574\u5768 transcript\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L124",
-      "id": "models_rationale_124",
       "community": 88,
-      "norm_label": "\u751f\u6210\u7edf\u4e00\u5ba1\u8ba1\u4e0a\u4e0b\u6587\u3002          \u5ba1\u8ba1\u4e0a\u4e0b\u6587\u5c3d\u91cf\u53ea\u653e\u6392\u969c\u9700\u8981\u7684\u4fe1\u606f,\u4e0d\u653e\u6574\u5768 transcript\u3002"
+      "norm_label": "\u751f\u6210\u7edf\u4e00\u5ba1\u8ba1\u4e0a\u4e0b\u6587\u3002          \u5ba1\u8ba1\u4e0a\u4e0b\u6587\u5c3d\u91cf\u53ea\u653e\u6392\u969c\u9700\u8981\u7684\u4fe1\u606f,\u4e0d\u653e\u6574\u5768 transcript\u3002",
+      "id": "models_rationale_124"
     },
     {
       "label": "\u8868\u793a\u5c06\u5199\u5165 catalog.videos \u7684\u4e00\u884c\u6570\u636e\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L141",
-      "id": "models_rationale_141",
       "community": 0,
-      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.videos \u7684\u4e00\u884c\u6570\u636e\u3002"
+      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.videos \u7684\u4e00\u884c\u6570\u636e\u3002",
+      "id": "models_rationale_141"
     },
     {
       "label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcripts \u7684\u4e00\u884c\u6570\u636e\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L163",
-      "id": "models_rationale_163",
       "community": 0,
-      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcripts \u7684\u4e00\u884c\u6570\u636e\u3002"
+      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcripts \u7684\u4e00\u884c\u6570\u636e\u3002",
+      "id": "models_rationale_163"
     },
     {
       "label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcript_sentences \u7684\u4e00\u884c\u6570\u636e\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L177",
-      "id": "models_rationale_177",
       "community": 0,
-      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcript_sentences \u7684\u4e00\u884c\u6570\u636e\u3002"
+      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_transcript_sentences \u7684\u4e00\u884c\u6570\u636e\u3002",
+      "id": "models_rationale_177"
     },
     {
       "label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_semantic_spans \u7684\u4e00\u884c\u6570\u636e\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L186",
-      "id": "models_rationale_186",
       "community": 0,
-      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_semantic_spans \u7684\u4e00\u884c\u6570\u636e\u3002"
+      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_semantic_spans \u7684\u4e00\u884c\u6570\u636e\u3002",
+      "id": "models_rationale_186"
     },
     {
       "label": "\u8868\u793a video_unit_index \u4e2d\u7684\u4e00\u6761\u53ef\u56de\u67e5 span \u5f15\u7528\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L197",
-      "id": "models_rationale_197",
       "community": 0,
-      "norm_label": "\u8868\u793a video_unit_index \u4e2d\u7684\u4e00\u6761\u53ef\u56de\u67e5 span \u5f15\u7528\u3002"
+      "norm_label": "\u8868\u793a video_unit_index \u4e2d\u7684\u4e00\u6761\u53ef\u56de\u67e5 span \u5f15\u7528\u3002",
+      "id": "models_rationale_197"
     },
     {
       "label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_unit_index \u7684\u4e00\u884c\u805a\u5408\u7ed3\u679c\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L205",
-      "id": "models_rationale_205",
       "community": 0,
-      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_unit_index \u7684\u4e00\u884c\u805a\u5408\u7ed3\u679c\u3002"
+      "norm_label": "\u8868\u793a\u5c06\u5199\u5165 catalog.video_unit_index \u7684\u4e00\u884c\u805a\u5408\u7ed3\u679c\u3002",
+      "id": "models_rationale_205"
     },
     {
       "label": "\u8868\u793a normalizer \u9636\u6bb5\u4ea7\u51fa\u7684\u57fa\u7840\u884c\u96c6\u5408\u3002      \u8fd9\u91cc\u6545\u610f\u4e0d\u5305\u542b transcript \u6458\u8981\u548c unit index\u3002     \u539f\u56e0\u662f\u8fd9\u4e24\u7c7b\u6570\u636e\u5c5e\u4e8e",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L220",
-      "id": "models_rationale_220",
       "community": 0,
-      "norm_label": "\u8868\u793a normalizer \u9636\u6bb5\u4ea7\u51fa\u7684\u57fa\u7840\u884c\u96c6\u5408\u3002      \u8fd9\u91cc\u6545\u610f\u4e0d\u5305\u542b transcript \u6458\u8981\u548c unit index\u3002     \u539f\u56e0\u662f\u8fd9\u4e24\u7c7b\u6570\u636e\u5c5e\u4e8e"
+      "norm_label": "\u8868\u793a normalizer \u9636\u6bb5\u4ea7\u51fa\u7684\u57fa\u7840\u884c\u96c6\u5408\u3002      \u8fd9\u91cc\u6545\u610f\u4e0d\u5305\u542b transcript \u6458\u8981\u548c unit index\u3002     \u539f\u56e0\u662f\u8fd9\u4e24\u7c7b\u6570\u636e\u5c5e\u4e8e",
+      "id": "models_rationale_220"
     },
     {
       "label": "\u8868\u793a normalizer \u548c index_builder \u4ea7\u51fa\u7684\u5b8c\u6574\u5199\u5e93\u6570\u636e\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L233",
-      "id": "models_rationale_233",
       "community": 0,
-      "norm_label": "\u8868\u793a normalizer \u548c index_builder \u4ea7\u51fa\u7684\u5b8c\u6574\u5199\u5e93\u6570\u636e\u3002"
+      "norm_label": "\u8868\u793a normalizer \u548c index_builder \u4ea7\u51fa\u7684\u5b8c\u6574\u5199\u5e93\u6570\u636e\u3002",
+      "id": "models_rationale_233"
     },
     {
       "label": "\u8868\u793a normalizer \u548c index_builder \u4ea7\u51fa\u7684\u5b8c\u6574\u5199\u5e93\u6570\u636e\u3002",
@@ -8531,18 +8531,18 @@
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L264",
-      "id": "models_rationale_264",
       "community": 0,
-      "norm_label": "\u8868\u793a\u6570\u636e\u5e93\u91cc\u5df2\u5b58\u5728\u7684 clip \u5feb\u7167\u3002      \u8fd9\u4e2a\u5bf9\u8c61\u4e13\u95e8\u7ed9 main \u505a\u201c\u662f\u5426\u53ef\u4ee5 skipped\u201d\u5224\u65ad\u7528\u3002     \u5b83\u53ea\u4fdd\u7559\u5e42\u7b49\u5224\u65ad\u6240\u9700\u7684\u5b57\u6bb5,\u4e0d\u627f\u62c5\u5b8c"
+      "norm_label": "\u8868\u793a\u6570\u636e\u5e93\u91cc\u5df2\u5b58\u5728\u7684 clip \u5feb\u7167\u3002      \u8fd9\u4e2a\u5bf9\u8c61\u4e13\u95e8\u7ed9 main \u505a\u201c\u662f\u5426\u53ef\u4ee5 skipped\u201d\u5224\u65ad\u7528\u3002     \u5b83\u53ea\u4fdd\u7559\u5e42\u7b49\u5224\u65ad\u6240\u9700\u7684\u5b57\u6bb5,\u4e0d\u627f\u62c5\u5b8c",
+      "id": "models_rationale_264"
     },
     {
       "label": "\u8868\u793a main \u6c47\u603b\u65f6\u4f7f\u7528\u7684\u5355 clip \u6700\u7ec8\u7ed3\u679c\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/models.py",
       "source_location": "L289",
-      "id": "models_rationale_289",
       "community": 0,
-      "norm_label": "\u8868\u793a main \u6c47\u603b\u65f6\u4f7f\u7528\u7684\u5355 clip \u6700\u7ec8\u7ed3\u679c\u3002"
+      "norm_label": "\u8868\u793a main \u6c47\u603b\u65f6\u4f7f\u7528\u7684\u5355 clip \u6700\u7ec8\u7ed3\u679c\u3002",
+      "id": "models_rationale_289"
     },
     {
       "label": "__init__.py",
@@ -8584,7 +8584,7 @@
       "label": ".test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms()",
       "file_type": "code",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L131",
+      "source_location": "L136",
       "id": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "community": 0,
       "norm_label": ".test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms()"
@@ -8593,7 +8593,7 @@
       "label": ".test_token_outside_sentence_stays_warning_for_assemblyai_edge_case()",
       "file_type": "code",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L183",
+      "source_location": "L188",
       "id": "test_alignment_catalogingestalignmenttest_test_token_outside_sentence_stays_warning_for_assemblyai_edge_case",
       "community": 0,
       "norm_label": ".test_token_outside_sentence_stays_warning_for_assemblyai_edge_case()"
@@ -8602,7 +8602,7 @@
       "label": "_build_clip_input()",
       "file_type": "code",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L218",
+      "source_location": "L223",
       "id": "test_alignment_build_clip_input",
       "community": 0,
       "norm_label": "_build_clip_input()"
@@ -8774,9 +8774,9 @@
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L463",
-      "id": "manifest_loader_rationale_463",
       "community": 0,
-      "norm_label": "\u5bf9 transcript \u539f\u59cb\u5b57\u8282\u8ba1\u7b97 sha256\u3002      \u6309 readme \u7684\u89c4\u5219,\u8fd9\u91cc\u5fc5\u987b\u57fa\u4e8e\u539f\u59cb\u5b57\u8282,\u800c\u4e0d\u662f\u57fa\u4e8e\u91cd\u6392\u540e\u7684 json \u6587\u672c\u3002"
+      "norm_label": "\u5bf9 transcript \u539f\u59cb\u5b57\u8282\u8ba1\u7b97 sha256\u3002      \u6309 readme \u7684\u89c4\u5219,\u8fd9\u91cc\u5fc5\u987b\u57fa\u4e8e\u539f\u59cb\u5b57\u8282,\u800c\u4e0d\u662f\u57fa\u4e8e\u91cd\u6392\u540e\u7684 json \u6587\u672c\u3002",
+      "id": "manifest_loader_rationale_463"
     },
     {
       "label": "index_builder.py",
@@ -8864,18 +8864,18 @@
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L71",
-      "id": "index_builder_rationale_71",
       "community": 0,
-      "norm_label": "\u6309 `(video_id, coarse_unit_id)` \u7684\u903b\u8f91\u6784\u5efa\u89c6\u9891\u7ea7 unit \u7d22\u5f15\u3002      \u8fd9\u91cc\u867d\u7136\u8fd8\u6ca1\u6709\u771f\u6b63\u7684 video_id,\u4f46\u805a\u5408\u7ef4\u5ea6\u548c"
+      "norm_label": "\u6309 `(video_id, coarse_unit_id)` \u7684\u903b\u8f91\u6784\u5efa\u89c6\u9891\u7ea7 unit \u7d22\u5f15\u3002      \u8fd9\u91cc\u867d\u7136\u8fd8\u6ca1\u6709\u771f\u6b63\u7684 video_id,\u4f46\u805a\u5408\u7ef4\u5ea6\u548c",
+      "id": "index_builder_rationale_71"
     },
     {
       "label": "\u6309\u5f53\u524d\u8bbe\u8ba1\u89c4\u5219\u9009\u51fa\u7a33\u5b9a\u7684 evidence spans\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L117",
-      "id": "index_builder_rationale_117",
       "community": 0,
-      "norm_label": "\u6309\u5f53\u524d\u8bbe\u8ba1\u89c4\u5219\u9009\u51fa\u7a33\u5b9a\u7684 evidence spans\u3002"
+      "norm_label": "\u6309\u5f53\u524d\u8bbe\u8ba1\u89c4\u5219\u9009\u51fa\u7a33\u5b9a\u7684 evidence spans\u3002",
+      "id": "index_builder_rationale_117"
     },
     {
       "label": "normalizer.py",
@@ -35945,11 +35945,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_catalogingesterror",
+      "_src": "models_catalogingesterror",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_catalogingesterror",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "uses",
@@ -36461,11 +36461,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_parentclipdescriptor",
+      "_src": "models_parentclipdescriptor",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_parentclipdescriptor",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "calls",
@@ -36605,11 +36605,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_transcriptsemanticelement",
+      "_src": "models_transcriptsemanticelement",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_transcriptsemanticelement",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "calls",
@@ -36761,11 +36761,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_transcripttoken",
+      "_src": "models_transcripttoken",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_transcripttoken",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "calls",
@@ -36917,11 +36917,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_transcriptsentence",
+      "_src": "models_transcriptsentence",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_transcriptsentence",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "calls",
@@ -37073,11 +37073,11 @@
       "source_file": "scripts/catalog_ingest/manifest_loader.py",
       "source_location": "L10",
       "weight": 0.8,
-      "_src": "manifest_loader_rationale_463",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "manifest_loader_rationale_463",
+      "confidence_score": 0.5,
       "source": "models_loadedclipinput",
-      "target": "manifest_loader_rationale_463",
-      "confidence_score": 0.5
+      "target": "manifest_loader_rationale_463"
     },
     {
       "relation": "uses",
@@ -37097,11 +37097,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_loadedclipinput",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37109,11 +37109,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_loadedclipinput",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "uses",
@@ -37314,8 +37314,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L91",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
-      "_tgt": "models_videorow",
+      "_src": "models_videorow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
       "source": "models_videorow",
       "target": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows"
     },
@@ -37326,8 +37326,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L134",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
-      "_tgt": "models_videorow",
+      "_src": "models_videorow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "source": "models_videorow",
       "target": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms"
     },
@@ -37373,11 +37373,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_videotranscriptrow",
+      "_src": "models_videotranscriptrow",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_videotranscriptrow",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37385,11 +37385,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_videotranscriptrow",
+      "_src": "models_videotranscriptrow",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_videotranscriptrow",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "calls",
@@ -37494,8 +37494,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L110",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
-      "_tgt": "models_videotranscriptsentencerow",
+      "_src": "models_videotranscriptsentencerow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
       "source": "models_videotranscriptsentencerow",
       "target": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows"
     },
@@ -37506,8 +37506,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L153",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
-      "_tgt": "models_videotranscriptsentencerow",
+      "_src": "models_videotranscriptsentencerow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "source": "models_videotranscriptsentencerow",
       "target": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms"
     },
@@ -37565,11 +37565,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_videosemanticspanrow",
+      "_src": "models_videosemanticspanrow",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_videosemanticspanrow",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37577,11 +37577,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_videosemanticspanrow",
+      "_src": "models_videosemanticspanrow",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_videosemanticspanrow",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "uses",
@@ -37602,8 +37602,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L117",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
-      "_tgt": "models_videosemanticspanrow",
+      "_src": "models_videosemanticspanrow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
       "source": "models_videosemanticspanrow",
       "target": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows"
     },
@@ -37614,8 +37614,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L161",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
-      "_tgt": "models_videosemanticspanrow",
+      "_src": "models_videosemanticspanrow",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "source": "models_videosemanticspanrow",
       "target": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms"
     },
@@ -37709,11 +37709,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_evidencespanref",
+      "_src": "models_evidencespanref",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_evidencespanref",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37721,11 +37721,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_evidencespanref",
+      "_src": "models_evidencespanref",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_evidencespanref",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "calls",
@@ -37793,11 +37793,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_videounitindexrow",
+      "_src": "models_videounitindexrow",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_videounitindexrow",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37805,11 +37805,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_videounitindexrow",
+      "_src": "models_videounitindexrow",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_videounitindexrow",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "calls",
@@ -37913,11 +37913,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_normalizedcorerows",
+      "_src": "models_normalizedcorerows",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_normalizedcorerows",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -37925,11 +37925,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_normalizedcorerows",
+      "_src": "models_normalizedcorerows",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_normalizedcorerows",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "uses",
@@ -37950,8 +37950,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L90",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
-      "_tgt": "models_normalizedcorerows",
+      "_src": "models_normalizedcorerows",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows",
       "source": "models_normalizedcorerows",
       "target": "test_alignment_catalogingestalignmenttest_test_load_clip_inputs_accepts_extra_semantic_display_fields_without_db_rows"
     },
@@ -37962,8 +37962,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L133",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
-      "_tgt": "models_normalizedcorerows",
+      "_src": "models_normalizedcorerows",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "source": "models_normalizedcorerows",
       "target": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms"
     },
@@ -38057,11 +38057,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_71",
-      "_tgt": "models_normalizedclipdata",
+      "_src": "models_normalizedclipdata",
+      "_tgt": "index_builder_rationale_71",
+      "confidence_score": 0.5,
       "source": "models_normalizedclipdata",
-      "target": "index_builder_rationale_71",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_71"
     },
     {
       "relation": "uses",
@@ -38069,11 +38069,11 @@
       "source_file": "scripts/catalog_ingest/index_builder.py",
       "source_location": "L6",
       "weight": 0.8,
-      "_src": "index_builder_rationale_117",
-      "_tgt": "models_normalizedclipdata",
+      "_src": "models_normalizedclipdata",
+      "_tgt": "index_builder_rationale_117",
+      "confidence_score": 0.5,
       "source": "models_normalizedclipdata",
-      "target": "index_builder_rationale_117",
-      "confidence_score": 0.5
+      "target": "index_builder_rationale_117"
     },
     {
       "relation": "uses",
@@ -38919,7 +38919,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L218",
+      "source_location": "L223",
       "weight": 1.0,
       "_src": "scripts_catalog_ingest_test_alignment_py",
       "_tgt": "test_alignment_build_clip_input",
@@ -38943,7 +38943,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L131",
+      "source_location": "L136",
       "weight": 1.0,
       "_src": "test_alignment_catalogingestalignmenttest",
       "_tgt": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
@@ -38955,7 +38955,7 @@
       "relation": "method",
       "confidence": "EXTRACTED",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L183",
+      "source_location": "L188",
       "weight": 1.0,
       "_src": "test_alignment_catalogingestalignmenttest",
       "_tgt": "test_alignment_catalogingestalignmenttest_test_token_outside_sentence_stays_warning_for_assemblyai_edge_case",
@@ -38991,7 +38991,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L132",
+      "source_location": "L137",
       "weight": 1.0,
       "_src": "test_alignment_catalogingestalignmenttest_test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms",
       "_tgt": "test_alignment_build_clip_input",
@@ -39015,7 +39015,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "scripts/catalog_ingest/test_alignment.py",
-      "source_location": "L184",
+      "source_location": "L189",
       "weight": 1.0,
       "_src": "test_alignment_catalogingestalignmenttest_test_token_outside_sentence_stays_warning_for_assemblyai_edge_case",
       "_tgt": "test_alignment_build_clip_input",

@@ -442,7 +442,7 @@ def _parse_transcript_sentences(
                 TranscriptSentence(
                     index=int(raw_sentence["index"]),
                     text=str(raw_sentence["text"]),
-                    explanation=_optional_str(raw_sentence.get("explanation")),
+                    translation=_optional_str(raw_sentence.get("translation")),
                     start_ms=int(raw_sentence["start"]),
                     end_ms=int(raw_sentence["end"]),
                     tokens=tuple(parsed_tokens),

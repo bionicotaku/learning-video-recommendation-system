@@ -17,7 +17,7 @@ Catalog 的设计目标有五个。第一，数据库中的视频对象必须直
 
 旧式 `catalog.videos` 往往围绕“上传后处理流水线”组织，表内既保存原始文件信息，也保存媒体转码状态、AI 分析状态、产出状态和发布状态。这种模式适合“平台内自己接收原始视频并驱动流水线”的系统，但与当前场景不匹配。当前现实情况是：原始视频不进数据库，长视频在库外已完成切片，每个切片的视频 HLS 与 transcript JSON 也已经生成。因此，数据库应从“流水线状态机”收缩为“内容资产与索引层”。
 
-Catalog 只负责以下五类内容：切片视频内容资产主记录、transcript 的标准化读模型、从 semantic span 聚合而来的 Recall-ready 视频级 coarse unit 索引、单 clip 入库审计、用户对视频互动状态的聚合投影。Catalog 不负责 Learning state、Recommendation serving state、Recommendation audit、原始视频实体、媒体 / AI 流水线状态机，也不提前维护高层语义评分字段。Recommendation 自己的 serving state 与 recommendation audit 必须留在 `recommendation` schema，Learning engine 自己的学习事件与学习状态必须留在 `learning` schema。
+Catalog 只负责以下五类内容：切片视频内容资产主记录、transcript 元数据、sentence/span 时间定位与索引模型、从 semantic span 聚合而来的 Recall-ready 视频级 coarse unit 索引、单 clip 入库审计、用户对视频互动状态的聚合投影。Catalog 不负责 Learning state、Recommendation serving state、Recommendation audit、原始视频实体、媒体 / AI 流水线状态机，也不提前维护高层语义评分字段。Recommendation 自己的 serving state 与 recommendation audit 必须留在 `recommendation` schema，Learning engine 自己的学习事件与学习状态必须留在 `learning` schema。
 
 ## 3. 核心设计原则
 
@@ -138,7 +138,7 @@ catalog.videos
 
 必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及 Recommendation 证据回查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
 
-`semantic_element.base_form`、`semantic_element.dictionary`、`semantic_element.translation`、`semantic_element.reason` 与 token / sentence 的展示文本都不进入主查询表。它们保留在对象存储中的 transcript 原始 JSON 里；若未来需要后端返回字幕展示内容，应通过读取 JSON 或独立字幕服务实现，而不是重新塞回 Catalog 主表。
+sentence-level `translation`、`semantic_element.base_form`、`semantic_element.dictionary`、`semantic_element.translation`、`semantic_element.reason` 与 token / sentence 的展示文本都不进入主查询表。它们保留在对象存储中的 transcript 原始 JSON 里；若未来需要后端返回字幕展示内容，应通过读取 JSON 或独立字幕服务实现，而不是重新塞回 Catalog 主表。
 
 ## 9. `catalog.video_unit_index`
 

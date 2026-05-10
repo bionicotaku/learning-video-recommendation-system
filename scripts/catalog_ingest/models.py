@@ -71,7 +71,7 @@ class TranscriptSentence:
 
     index: int
     text: str
-    explanation: str | None
+    translation: str | None
     start_ms: int
     end_ms: int
     tokens: tuple[TranscriptToken, ...]

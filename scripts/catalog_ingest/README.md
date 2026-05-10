@@ -67,7 +67,7 @@
 
 - `index`
 - `text`
-- `explanation`
+- `translation`
 - `tokens`
 - `start`
 - `end`
@@ -88,7 +88,8 @@
 - `coarse_id`
 - `reason`
 
-其中 `text`、`explanation`、`base_form`、`dictionary`、`reason` 以及未来可能出现的 `translation`
+其中 sentence 的 `text / translation`、token 的 `text / explanation`，以及
+`base_form`、`dictionary`、`reason`、`semantic_element.translation`
 都属于 transcript / mapped JSON 的展示或调试信息。当前入库脚本可以读取它们做输入完整性检查，
 但不会把这些字段写入 Catalog 数据库；数据库只保存推荐索引、时间定位和原始 JSON 引用。
 
@@ -497,7 +498,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - `start_ms`：`sentence.start`
 - `end_ms`：`sentence.end`
 
-`sentence.text` 与 `sentence.explanation` 保留在 transcript JSON 中，不写入数据库。
+`sentence.text` 与 `sentence.translation` 保留在 transcript JSON 中，不写入数据库。
 
 ---
 
