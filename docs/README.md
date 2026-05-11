@@ -44,7 +44,11 @@ Catalog 的权威最终设计文档。定义 `catalog` schema 的最终边界、
 
 ### [学习互动信号语义设计.md](学习互动信号语义设计.md)
 
-视频学习互动信号的 MVP 语义设计草案。它从 Recommendation 返回的 `learning_units` 出发，定义字幕曝光、字幕 lookup、弹窗反馈、习题答题、analytics raw interaction log 与 Learning engine 标准学习事件之间的边界；暂不定稿具体 API、存储或代码模块。
+视频学习互动信号的 MVP 语义设计草案。它从 Recommendation 返回的 `learning_units` 出发，定义字幕曝光、字幕 lookup、lookup 弹窗附加行为、习题答题、analytics raw interaction log、learning evidence 与后续 reducer 之间的边界；暂不定稿具体 API、存储或代码模块。
+
+### [学习互动信号架构图.md](学习互动信号架构图.md)
+
+学习互动信号链路的 MVP 架构图草案。它用简化图和详细设计图说明前端互动收集、后端接入、`analytics.learning_interaction_events`、`analytics.quiz_events`、标准化分流、Practice attempt、learning evidence 与 Learning engine 之间的组件关系。
 
 ## 运行时现状参考
 

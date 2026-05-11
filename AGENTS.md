@@ -56,3 +56,7 @@ Rules:
 2. `learningengine` 维护 `learning.*` 学习域表。
 3. `recommendation` 只读 `learning.*`，只写 `recommendation.*`。
 4. 不要重新引入混合 owner 的 `scheduler` 模块。
+
+## 额外信息
+
+1. 数据库可以使用 .env 文件直接连接访问查看

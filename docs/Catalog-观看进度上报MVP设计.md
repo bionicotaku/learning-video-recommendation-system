@@ -1,17 +1,19 @@
-# Catalog 观看进度上报 MVP 设计
+# 观看进度上报 MVP 设计
 
-本文档描述 Catalog 中“用户观看视频进度”的 MVP 设计方案。它是待实施设计，不代表当前仓库已经落地。
+本文档描述“用户观看视频进度”的 MVP 设计方案。它是待实施设计，不代表当前仓库已经落地。
 
-当前仓库已经存在 `catalog.video_user_states`，它是用户与视频互动状态的聚合投影表，不是观看流水表。当前没有专门的 append-only 观看流水表。MVP 不建议新增高频 `play_started / progress / paused / resumed / seeked / completed` 全量事件流水，因为这会带来较高写入量，也会让 reduce 逻辑被 seek、重试、后台切换、重复 progress 上报等细节拖复杂。
+当前仓库已经存在 `catalog.video_user_states`，它是用户与视频互动状态的聚合投影表，不是观看流水表。当前没有专门的观看流水表。MVP 不建议新增高频 `play_started / progress / paused / resumed / seeked / completed` 全量事件流水，因为这会带来较高写入量，也会让 reduce 逻辑被 seek、重试、后台切换、重复 progress 上报等细节拖复杂。
 
-推荐方案是新增一张低频 session summary 表，并继续维护现有 `catalog.video_user_states`：
+推荐方案是新增一张低频观看事件表，并继续维护现有 `catalog.video_user_states`：
 
 ```text
-catalog.video_watch_sessions  -- 每次观看 session 的摘要
+analytics.video_watch_events  -- 每次观看 session 的低频摘要事件
 catalog.video_user_states     -- 用户 x 视频的聚合状态
 ```
 
-`video_watch_sessions` 用来提供幂等、去重、完成次数依据和有限可追溯能力；`video_user_states` 继续作为 Recommendation 读取的轻量消费状态投影。
+`analytics.video_watch_events` 用来保存原始观看事实，提供幂等、去重、完成次数依据和有限可追溯能力。`catalog.video_user_states` 继续作为 Recommendation 读取的轻量消费状态投影。
+
+因为本方案还没有执行，后续落地时应直接使用 `analytics.video_watch_events`，不需要保留旧的 `catalog.video_watch_sessions` 表名或兼容迁移。
 
 ## 1. 设计目标
 
@@ -21,7 +23,7 @@ catalog.video_user_states     -- 用户 x 视频的聚合状态
 2. 避免高频事件流水带来的写入和归约复杂度。
 3. 让 `watch_count` 和 `completed_count` 有明确去重依据。
 4. 保持 Recommendation 只读 `catalog.video_user_states`，不直接依赖观看 session 表。
-5. 保持 Catalog / Learning engine / Recommendation 边界清晰。
+5. 保持 Analytics / Catalog / Learning engine / Recommendation 边界清晰。
 
 本方案不解决：
 
@@ -33,22 +35,24 @@ catalog.video_user_states     -- 用户 x 视频的聚合状态
 
 ## 2. 模块边界
 
-观看进度属于用户对 Catalog 视频内容资产的消费状态，因此 owner 应归属 `catalog`。
+观看进度有两层语义：原始观看事实和聚合消费状态。
 
-`catalog.video_watch_sessions` 只记录用户观看某个视频的一次播放会话摘要。它不记录推荐曝光。推荐曝光和冷却仍属于 `recommendation.user_video_serving_states`。
+原始观看事实属于 Analytics owner。`analytics.video_watch_events` 只记录用户观看某个视频的一次播放会话摘要。它不是逐秒播放器日志，也不记录推荐曝光。推荐曝光和冷却仍属于 `recommendation.user_video_serving_states`。
 
-`catalog.video_user_states` 继续作为用户与视频的聚合投影。Recommendation 当前只需要读取其中的 `last_watched_at`、`watch_count`、`completed_count`、`last_watch_ratio` 和 `max_watch_ratio` 作为轻量 penalty 输入。
+聚合消费状态属于 Catalog owner。`catalog.video_user_states` 继续作为用户与视频的聚合投影。Recommendation 当前只需要读取其中的 `last_watched_at`、`watch_count`、`completed_count`、`last_watch_ratio` 和 `max_watch_ratio` 作为轻量 penalty 输入。
 
 `learning.unit_learning_events` 只记录学习事件，例如正式学习、复习、测验、查词或 exposure。普通观看进度不应自动写入 Learning engine。只有当产品层明确把一次观看行为解释成学习行为时，才应由上层业务另行调用 Learning engine 的学习事件接口。
 
 ## 3. 数据库设计
 
-### 3.1 `catalog.video_watch_sessions`
+### 3.1 `analytics.video_watch_events`
 
 建议新增表：
 
 ```sql
-create table catalog.video_watch_sessions (
+create schema if not exists analytics;
+
+create table analytics.video_watch_events (
   watch_session_id uuid primary key,
 
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -103,14 +107,14 @@ create table catalog.video_watch_sessions (
 推荐索引：
 
 ```sql
-create index idx_video_watch_sessions_user_video_updated_at
-on catalog.video_watch_sessions (user_id, video_id, updated_at desc);
+create index idx_video_watch_events_user_video_updated_at
+on analytics.video_watch_events (user_id, video_id, updated_at desc);
 
-create index idx_video_watch_sessions_user_updated_at
-on catalog.video_watch_sessions (user_id, updated_at desc);
+create index idx_video_watch_events_user_updated_at
+on analytics.video_watch_events (user_id, updated_at desc);
 
-create index idx_video_watch_sessions_video_updated_at
-on catalog.video_watch_sessions (video_id, updated_at desc);
+create index idx_video_watch_events_video_updated_at
+on analytics.video_watch_events (video_id, updated_at desc);
 ```
 
 索引用途：
@@ -324,7 +328,7 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
 1. 从认证上下文获取 `user_id`。
 2. 校验 `video_id` 存在。
 3. 校验请求体字段。
-4. 在短事务内 upsert `catalog.video_watch_sessions`。
+4. 在短事务内 upsert `analytics.video_watch_events`。
 5. 判断本次是否创建了新 session。
 6. 判断本次是否首次完成该 session。
 7. 在同一事务内 upsert `catalog.video_user_states`。
@@ -451,7 +455,7 @@ await reportWatchProgress({
 
 数据库层应验证：
 
-1. `video_watch_sessions` 可以创建、重复 upsert，并保持 `watch_session_id` 唯一。
+1. `video_watch_events` 可以创建、重复 upsert，并保持 `watch_session_id` 唯一。
 2. `position_ms` 回退不会降低 `max_position_ms` 和 `max_watch_ratio`。
 3. 同一个 session 首次完成会设置 `completed_at`，后续完成上报不重复计数。
 4. 同一个 `watch_session_id` 绑定不同用户或不同视频时返回冲突。
@@ -468,16 +472,16 @@ API / usecase 层应验证：
 集成验收：
 
 1. 前端按 10 到 15 秒频率上报时，数据库只保留 session summary，不产生高频事件流水。
-2. Recommendation 继续只读 `catalog.video_user_states`，无需感知 `video_watch_sessions`。
+2. Recommendation 继续只读 `catalog.video_user_states`，无需感知 `analytics.video_watch_events`。
 3. 普通观看进度不会自动写入 `learning.unit_learning_events`。
 
 ## 8. 后续扩展
 
 如果未来需要更细粒度分析，可以在不破坏当前 API 的前提下新增：
 
-1. `catalog.video_watch_events`：高频事件流水，仅用于分析，不进入 MVP。
-2. `catalog.video_reaction_events`：点赞、收藏、分享等低频互动审计。
+1. `analytics.video_player_events`：高频播放器事件流水，仅用于分析，不进入 MVP。
+2. `analytics.video_reaction_events`：点赞、收藏、分享等低频互动审计。
 3. session 级有效观看时长估算：基于服务端规则限制 progress 上报间隔与单次增量。
-4. 后台重建任务：从 `video_watch_sessions` 重算 `video_user_states`。
+4. 后台重建任务：从 `analytics.video_watch_events` 重算 `catalog.video_user_states`。
 
-这些扩展都不应改变当前三域边界：Catalog 负责视频消费事实与投影，Learning engine 负责学习事件与学习状态，Recommendation 负责推荐曝光、冷却与审计。
+这些扩展都不应改变当前边界：Analytics 负责原始行为事实，Catalog 负责视频消费状态投影，Learning engine 负责学习证据与学习状态，Recommendation 负责推荐曝光、冷却与审计。
