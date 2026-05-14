@@ -13,7 +13,7 @@
 | `auth` | 存在，Supabase Auth 系统表存在 |
 | `semantic` | 存在，包含 `coarse_unit`、`fine_unit` |
 | `catalog` | 存在，包含当前 Catalog 内容表与 `catalog.questions` |
-| `analytics` | 存在，包含 `analytics.quiz_events` |
+| `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events` |
 | `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
 | `learning` | 不存在 |
 
@@ -43,10 +43,11 @@
 
 ## 3. Analytics Migration 状态
 
-`analytics_schema_migrations` 当前有 2 条记录，对应仓库内 2 个 Analytics migration：
+`analytics_schema_migrations` 当前有 3 条记录，对应仓库内 3 个 Analytics migration：
 
 - `000001_create_analytics_schema`
 - `000002_create_quiz_events`
+- `000003_create_video_watch_events`
 
 当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 15 个字段，并包含以下索引：
 
@@ -56,6 +57,13 @@
 - `idx_quiz_events_question_completed_at`
 - `idx_quiz_events_unit_completed_at`
 - `idx_quiz_events_video_completed_at`
+
+当前新增的 `analytics.video_watch_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
+
+- `video_watch_events_pkey`
+- `idx_video_watch_events_user_video_updated_at`
+- `idx_video_watch_events_user_updated_at`
+- `idx_video_watch_events_video_updated_at`
 
 ## 4. Recommendation Migration 状态
 

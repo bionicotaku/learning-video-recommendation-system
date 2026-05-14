@@ -8418,27 +8418,27 @@
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L316",
-      "id": "validator_rationale_316",
       "community": 0,
-      "norm_label": "\u6821\u9a8c\u524d\u7aef\u9898\u76ee payload \u7684\u6700\u4f4e\u7a33\u5b9a\u5951\u7ea6\u3002"
+      "norm_label": "\u6821\u9a8c\u524d\u7aef\u9898\u76ee payload \u7684\u6700\u4f4e\u7a33\u5b9a\u5951\u7ea6\u3002",
+      "id": "validator_rationale_316"
     },
     {
       "label": "\u6821\u9a8c selected refs \u4e0e transcript \u4e2d mapped coarse unit \u4e25\u683c\u4e00\u5bf9\u4e00\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L351",
-      "id": "validator_rationale_351",
       "community": 0,
-      "norm_label": "\u6821\u9a8c selected refs \u4e0e transcript \u4e2d mapped coarse unit \u4e25\u683c\u4e00\u5bf9\u4e00\u3002"
+      "norm_label": "\u6821\u9a8c selected refs \u4e0e transcript \u4e2d mapped coarse unit \u4e25\u683c\u4e00\u5bf9\u4e00\u3002",
+      "id": "validator_rationale_351"
     },
     {
       "label": "\u7edf\u4e00\u6784\u9020\u5e26 clip \u4e0a\u4e0b\u6587\u7684\u7ed3\u6784\u5316\u9519\u8bef\u3002",
       "file_type": "rationale",
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L423",
-      "id": "validator_rationale_423",
       "community": 0,
-      "norm_label": "\u7edf\u4e00\u6784\u9020\u5e26 clip \u4e0a\u4e0b\u6587\u7684\u7ed3\u6784\u5316\u9519\u8bef\u3002"
+      "norm_label": "\u7edf\u4e00\u6784\u9020\u5e26 clip \u4e0a\u4e0b\u6587\u7684\u7ed3\u6784\u5316\u9519\u8bef\u3002",
+      "id": "validator_rationale_423"
     },
     {
       "label": "models.py",
@@ -37618,8 +37618,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L336",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions",
-      "_tgt": "validator_validate_loaded_clip",
+      "_src": "validator_validate_loaded_clip",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions",
       "source": "validator_validate_loaded_clip",
       "target": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions"
     },
@@ -38051,9 +38051,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_316",
       "_tgt": "models_catalogingesterror",
+      "confidence_score": 0.5,
       "source": "validator_rationale_316",
-      "target": "models_catalogingesterror",
-      "confidence_score": 0.5
+      "target": "models_catalogingesterror"
     },
     {
       "relation": "uses",
@@ -38063,9 +38063,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_316",
       "_tgt": "models_loadedclipinput",
+      "confidence_score": 0.5,
       "source": "validator_rationale_316",
-      "target": "models_loadedclipinput",
-      "confidence_score": 0.5
+      "target": "models_loadedclipinput"
     },
     {
       "relation": "uses",
@@ -38075,9 +38075,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_351",
       "_tgt": "models_catalogingesterror",
+      "confidence_score": 0.5,
       "source": "validator_rationale_351",
-      "target": "models_catalogingesterror",
-      "confidence_score": 0.5
+      "target": "models_catalogingesterror"
     },
     {
       "relation": "uses",
@@ -38087,9 +38087,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_351",
       "_tgt": "models_loadedclipinput",
+      "confidence_score": 0.5,
       "source": "validator_rationale_351",
-      "target": "models_loadedclipinput",
-      "confidence_score": 0.5
+      "target": "models_loadedclipinput"
     },
     {
       "relation": "uses",
@@ -38099,9 +38099,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_423",
       "_tgt": "models_catalogingesterror",
+      "confidence_score": 0.5,
       "source": "validator_rationale_423",
-      "target": "models_catalogingesterror",
-      "confidence_score": 0.5
+      "target": "models_catalogingesterror"
     },
     {
       "relation": "uses",
@@ -38111,9 +38111,9 @@
       "weight": 0.8,
       "_src": "validator_rationale_423",
       "_tgt": "models_loadedclipinput",
+      "confidence_score": 0.5,
       "source": "validator_rationale_423",
-      "target": "models_loadedclipinput",
-      "confidence_score": 0.5
+      "target": "models_loadedclipinput"
     },
     {
       "relation": "contains",
@@ -39117,8 +39117,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_313",
-      "_tgt": "models_catalogingesterror",
+      "_src": "models_catalogingesterror",
+      "_tgt": "validator_rationale_313",
       "confidence_score": 0.5,
       "source": "models_catalogingesterror",
       "target": "validator_rationale_313"
@@ -39129,8 +39129,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_348",
-      "_tgt": "models_catalogingesterror",
+      "_src": "models_catalogingesterror",
+      "_tgt": "validator_rationale_348",
       "confidence_score": 0.5,
       "source": "models_catalogingesterror",
       "target": "validator_rationale_348"
@@ -39141,8 +39141,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_420",
-      "_tgt": "models_catalogingesterror",
+      "_src": "models_catalogingesterror",
+      "_tgt": "validator_rationale_420",
       "confidence_score": 0.5,
       "source": "models_catalogingesterror",
       "target": "validator_rationale_420"
@@ -40762,8 +40762,8 @@
       "source_file": "scripts/catalog_ingest/test_alignment.py",
       "source_location": "L320",
       "weight": 1.0,
-      "_src": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions",
-      "_tgt": "models_questioninput",
+      "_src": "models_questioninput",
+      "_tgt": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions",
       "source": "models_questioninput",
       "target": "test_alignment_catalogingestalignmenttest_test_ingest_rejects_non_video_unit_questions"
     },
@@ -41517,8 +41517,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_313",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "validator_rationale_313",
       "confidence_score": 0.5,
       "source": "models_loadedclipinput",
       "target": "validator_rationale_313"
@@ -41529,8 +41529,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_348",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "validator_rationale_348",
       "confidence_score": 0.5,
       "source": "models_loadedclipinput",
       "target": "validator_rationale_348"
@@ -41541,8 +41541,8 @@
       "source_file": "scripts/catalog_ingest/validator.py",
       "source_location": "L7",
       "weight": 0.8,
-      "_src": "validator_rationale_420",
-      "_tgt": "models_loadedclipinput",
+      "_src": "models_loadedclipinput",
+      "_tgt": "validator_rationale_420",
       "confidence_score": 0.5,
       "source": "models_loadedclipinput",
       "target": "validator_rationale_420"

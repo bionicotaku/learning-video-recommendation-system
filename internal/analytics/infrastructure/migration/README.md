@@ -6,6 +6,7 @@
 
 - `analytics` schema
 - `analytics.quiz_events`
+- `analytics.video_watch_events`
 - Analytics 自己的索引
 
 它不定义：

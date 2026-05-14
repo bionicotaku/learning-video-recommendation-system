@@ -1,0 +1,38 @@
+create table if not exists analytics.video_watch_events (
+  watch_session_id uuid primary key,
+
+  user_id uuid not null references auth.users(id) on delete cascade,
+  video_id uuid not null references catalog.videos(video_id) on delete cascade,
+
+  started_at timestamptz not null,
+  last_seen_at timestamptz not null,
+  completed_at timestamptz,
+
+  last_position_ms integer not null default 0,
+  max_position_ms integer not null default 0,
+  duration_ms integer,
+  max_watch_ratio numeric(6,5) not null default 0,
+  is_completed boolean not null default false,
+
+  progress_report_count integer not null default 0,
+  source text not null default 'app',
+  metadata jsonb not null default '{}'::jsonb,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  check (last_position_ms >= 0),
+  check (max_position_ms >= 0),
+  check (duration_ms is null or duration_ms > 0),
+  check (max_watch_ratio >= 0 and max_watch_ratio <= 1),
+  check (progress_report_count >= 0)
+);
+
+create index if not exists idx_video_watch_events_user_video_updated_at
+on analytics.video_watch_events (user_id, video_id, updated_at desc);
+
+create index if not exists idx_video_watch_events_user_updated_at
+on analytics.video_watch_events (user_id, updated_at desc);
+
+create index if not exists idx_video_watch_events_video_updated_at
+on analytics.video_watch_events (video_id, updated_at desc);

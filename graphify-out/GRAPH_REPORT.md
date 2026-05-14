@@ -1,7 +1,7 @@
 # Graph Report - .  (2026-05-13)
 
 ## Corpus Check
-- 163 files · ~99,309 words
+- 163 files · ~99,329 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -891,11 +891,11 @@ Nodes (1): Cross-Module E2E Test Scope
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `CatalogIngestError` connect `Community 0` to `Community 4`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+  _High betweenness centrality (0.051) - this node is a cross-community bridge._
 - **Why does `_FakeCursor` connect `Community 0` to `Community 1`, `Community 4`?**
-  _High betweenness centrality (0.030) - this node is a cross-community bridge._
-- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 3`?**
-  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._
+- **Why does `TestGenerateVideoRecommendationsPipelinePropagatesAssemblerError()` connect `Community 1` to `Community 7`?**
+  _High betweenness centrality (0.023) - this node is a cross-community bridge._
 - **Are the 91 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
   _`CatalogIngestError` has 91 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 66 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
