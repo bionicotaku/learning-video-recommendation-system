@@ -244,7 +244,6 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
     if clip_input.selected_coarse_unit_refs is None:
         raise _error(clip_input, "question_invalid", "selected_coarse_unit_refs 不能为空")
 
-    valid_scope_types = {"unit", "video_unit"}
     valid_question_types = {
         "context_meaning_choice",
         "unit_meaning_choice",
@@ -254,8 +253,13 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
     valid_statuses = {"draft", "active", "retired", "rejected"}
 
     for question in clip_input.questions:
-        if question.scope_type not in valid_scope_types:
-            raise _error(clip_input, "question_invalid", "question.scope_type 不合法", {"scope_type": question.scope_type})
+        if question.scope_type != "video_unit":
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "Catalog ingest 只允许写入 video_unit question",
+                {"scope_type": question.scope_type},
+            )
         if question.question_type not in valid_question_types:
             raise _error(
                 clip_input,
@@ -275,24 +279,23 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
         if not question.target_text.strip():
             raise _error(clip_input, "question_invalid", "question.target_text 不能为空")
         _validate_content_payload(clip_input, question.content_payload)
-        if question.scope_type == "video_unit":
-            missing_context_fields = [
-                name
-                for name, value in (
-                    ("context_sentence_index", question.context_sentence_index),
-                    ("context_span_index", question.context_span_index),
-                    ("context_start_ms", question.context_start_ms),
-                    ("context_end_ms", question.context_end_ms),
-                )
-                if value is None
-            ]
-            if missing_context_fields:
-                raise _error(
-                    clip_input,
-                    "question_invalid",
-                    "video_unit question 必须包含完整 context 字段",
-                    {"missing_context_fields": missing_context_fields},
-                )
+        missing_context_fields = [
+            name
+            for name, value in (
+                ("context_sentence_index", question.context_sentence_index),
+                ("context_span_index", question.context_span_index),
+                ("context_start_ms", question.context_start_ms),
+                ("context_end_ms", question.context_end_ms),
+            )
+            if value is None
+        ]
+        if missing_context_fields:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "video_unit question 必须包含完整 context 字段",
+                {"missing_context_fields": missing_context_fields},
+            )
         if (
             question.context_start_ms is not None
             and question.context_end_ms is not None

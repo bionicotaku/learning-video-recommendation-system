@@ -570,7 +570,6 @@ class CatalogRepository:
         current_video_unit_question_ids = [
             question.question_id
             for question in normalized_data.questions
-            if question.scope_type == "video_unit"
         ]
 
         if normalized_data.questions:
@@ -612,7 +611,7 @@ class CatalogRepository:
                         question.question_type,
                         question.coarse_unit_id,
                         question.target_text,
-                        video_id if question.scope_type == "video_unit" else None,
+                        video_id,
                         question.context_sentence_index,
                         question.context_span_index,
                         question.context_start_ms,

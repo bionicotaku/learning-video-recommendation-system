@@ -107,9 +107,8 @@
 - `audit`
 - `selected_coarse_unit_refs`
 
-`questions[]` 中每一项直接对齐 `catalog.questions` 的内容字段：
+`questions[]` 中每一项写入 `catalog.questions`。本 ingest 入口只负责视频上下文题，写库时固定使用 `scope_type = 'video_unit'` 并绑定当前 clip 的 `video_id`；question JSON 中可以省略 `scope_type`，如果显式提供则必须是 `video_unit`。
 
-- `scope_type`
 - `question_type`
 - `coarse_unit_id`
 - `target_text`
@@ -607,6 +606,7 @@ question JSON 的 `questions[]` 写入 `catalog.questions`。
 入库规则：
 
 - `video_id` 由当前 clip 的 `catalog.videos` upsert 结果回填
+- `scope_type` 固定写为 `video_unit`，所有题目必须绑定当前视频
 - `question_id` 由脚本确定性生成，避免重复跑产生重复题
 - deterministic id 基于 `source_clip_key + coarse_unit_id + question_type + context_sentence_index + context_span_index + canonical content_payload hash`
 - `content_payload` 原样作为前端题目 payload 写入
@@ -739,8 +739,9 @@ question JSON 的 `questions[]` 写入 `catalog.questions`。
 - refs 的 coarse unit 集合必须等于 transcript 中所有 mapped coarse unit 集合
 - 每个 ref 的 `(sentence_index, token_index)` 必须能在 transcript 中找到
 - 对应 token 的 `semantic_element.coarse_id` 必须等于 ref 的 `coarse_unit_id`
-- `questions[]` 必须符合 `catalog.questions` 当前 schema
-- `scope_type = video_unit` 的题必须带完整 context 字段
+- `questions[]` 必须符合 `catalog.questions` 当前 schema 中视频上下文题所需字段
+- Catalog ingest 固定写入 `scope_type = video_unit`；question JSON 显式提供其他 `scope_type` 时当前 clip 记 `failed`
+- 每道题必须带完整 context 字段，并必须绑定当前 clip 写入得到的 `video_id`
 - question payload 或 refs 不合法时，当前 clip 记 `failed`
 
 ### 7.5 coarse_unit 校验

@@ -195,7 +195,7 @@ def _build_question_rows(clip_input: LoadedClipInput) -> tuple[QuestionRow, ...]
         rows.append(
             QuestionRow(
                 question_id=_deterministic_question_id(clip_input.source_clip_key, question),
-                scope_type=question.scope_type,
+                scope_type="video_unit",
                 question_type=question.question_type,
                 coarse_unit_id=question.coarse_unit_id,
                 target_text=question.target_text,

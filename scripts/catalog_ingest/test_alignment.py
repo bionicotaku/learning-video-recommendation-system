@@ -288,6 +288,57 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertEqual(first.questions[0].question_id, second.questions[0].question_id)
         self.assertEqual(first.questions[0].scope_type, "video_unit")
 
+    def test_ingest_questions_are_video_unit_when_scope_type_is_omitted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            parents_dir = root / "parents"
+            transcripts_dir = root / "transcripts"
+            questions_dir = root / "questions"
+            parents_dir.mkdir()
+            transcripts_dir.mkdir()
+            questions_dir.mkdir()
+            _write_parent_file(parents_dir / "demo.json")
+            _write_transcript_file(transcripts_dir / "demo-clip1.json", coarse_unit_id=7)
+            question_payload = _question_payload(7, 0, 0)
+            del question_payload["questions"][0]["scope_type"]
+            (questions_dir / "demo-clip1.json").write_text(
+                json.dumps(question_payload),
+                encoding="utf-8",
+            )
+
+            loaded = load_clip_inputs(
+                parents_dir=parents_dir,
+                transcripts_dir=transcripts_dir,
+                questions_dir=questions_dir,
+            )
+
+        self.assertEqual(loaded[0].questions[0].scope_type, "video_unit")
+
+    def test_ingest_rejects_non_video_unit_questions(self) -> None:
+        clip_input = _build_clip_input(
+            questions=(
+                QuestionInput(
+                    scope_type="unit",
+                    question_type="context_meaning_choice",
+                    coarse_unit_id=1,
+                    target_text="demo",
+                    context_sentence_index=0,
+                    context_span_index=0,
+                    context_start_ms=0,
+                    context_end_ms=50,
+                    content_payload=_content_payload(),
+                    status="active",
+                ),
+            )
+        )
+
+        with self.assertRaisesRegex(Exception, "Catalog ingest 只允许写入 video_unit"):
+            validate_loaded_clip(
+                clip_input=clip_input,
+                known_coarse_unit_ids={1},
+                time_tolerance_ms=0,
+            )
+
     def test_repository_upserts_questions_and_retires_stale_video_questions(self) -> None:
         clip_input = _build_clip_input()
         core_rows = NormalizedCoreRows(
@@ -366,6 +417,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
 def _build_clip_input(
     transcript_sentences: tuple[TranscriptSentence, ...] | None = None,
     selected_refs: tuple[SelectedCoarseUnitRef, ...] | None = None,
+    questions: tuple[QuestionInput, ...] | None = None,
 ) -> LoadedClipInput:
     sentences = transcript_sentences or (
         TranscriptSentence(
@@ -425,7 +477,8 @@ def _build_clip_input(
         raw_transcript_payload={"sentences": []},
         expected_question_filename="parent-clip1.json",
         question_file_path=Path("parent-clip1.json"),
-        questions=(
+        questions=questions
+        or (
             QuestionInput(
                 scope_type="video_unit",
                 question_type="context_meaning_choice",

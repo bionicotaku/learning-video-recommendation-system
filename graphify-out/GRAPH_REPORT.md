@@ -1,12 +1,12 @@
 # Graph Report - .  (2026-05-13)
 
 ## Corpus Check
-- 163 files · ~98,727 words
+- 163 files · ~99,309 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1155 nodes · 3064 edges · 128 communities detected
-- Extraction: 48% EXTRACTED · 52% INFERRED · 0% AMBIGUOUS · INFERRED: 1586 edges (avg confidence: 0.72)
+- 1160 nodes · 3080 edges · 128 communities detected
+- Extraction: 48% EXTRACTED · 52% INFERRED · 0% AMBIGUOUS · INFERRED: 1595 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -140,8 +140,8 @@
 - [[_COMMUNITY_Community 127|Community 127]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `CatalogIngestError` - 92 edges
-2. `LoadedClipInput` - 65 edges
+1. `CatalogIngestError` - 95 edges
+2. `LoadedClipInput` - 68 edges
 3. `Harness` - 48 edges
 4. `NormalizedClipData` - 36 edges
 5. `CatalogRepository` - 35 edges
@@ -194,12 +194,12 @@
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.03
-Nodes (99): NewDefaultAuditWriter(), demandUnitIDs(), NewDefaultDemandPlanner(), NewDefaultServingStateManager(), NewSemanticSpanReader(), NewTranscriptSentenceReader(), TestDatabase, NewGenerateVideoRecommendationsPipeline() (+91 more)
+Cohesion: 0.05
+Nodes (127): Exception, build_normalized_clip_data(), _build_question_rows(), _build_transcript_row(), _build_unit_index_rows(), _deterministic_question_id(), _merge_intervals_and_measure(), 按当前 deterministic 规则选出稳定的 best evidence span。 (+119 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.05
-Nodes (124): Exception, build_normalized_clip_data(), _build_question_rows(), _build_transcript_row(), _build_unit_index_rows(), _deterministic_question_id(), _merge_intervals_and_measure(), 按当前 deterministic 规则选出稳定的 best evidence span。 (+116 more)
+Cohesion: 0.04
+Nodes (75): NewGenerateVideoRecommendationsPipeline(), int32Ptr(), int64Ptr(), testFinalItem(), TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(), TestGenerateVideoRecommendationsPipelineGoldenResponse(), TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(), TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnderfill() (+67 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.13
@@ -207,7 +207,7 @@ Nodes (58): failingAuditWriter, failNow(), MustEnsureTarget(), MustRecommend(), 
 
 ### Community 3 - "Community 3"
 Cohesion: 0.05
-Nodes (41): insertItemWithQueries(), insertRunWithQueries(), appendUniqueInt64(), unitServedCounts(), videoServedCounts(), NewDefaultVideoStateEnricher(), uniqueVideoIDs(), LearningUnitsToJSON() (+33 more)
+Nodes (49): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), NewDefaultAuditWriter(), demandUnitIDs() (+41 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.09
@@ -219,63 +219,63 @@ Nodes (40): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDi
 
 ### Community 6 - "Community 6"
 Cohesion: 0.11
-Nodes (38): finalizePrimaryLearningUnits(), canSelect(), countCoreDominant(), countFallback(), countFutureDominant(), countFutureLike(), countUncovered(), isCoreDominant() (+30 more)
+Nodes (37): finalizePrimaryLearningUnits(), canSelect(), countCoreDominant(), countFallback(), countFutureDominant(), countFutureLike(), countUncovered(), isCoreDominant() (+29 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.07
 Nodes (24): buildAuditPayload(), candidateSummary(), hasDemand(), lanePriority(), mapFinalItems(), mapLearningUnits(), newRunID(), primaryLane() (+16 more)
 
 ### Community 8 - "Community 8"
+Cohesion: 0.11
+Nodes (25): insertItemWithQueries(), insertRunWithQueries(), LearningUnitsToJSON(), ToLearningStateSnapshot(), ToRecommendableVideoUnit(), ToSemanticSpan(), ToTranscriptSentence(), ToUnitVideoInventory() (+17 more)
+
+### Community 9 - "Community 9"
 Cohesion: 0.14
 Nodes (33): aggregatedLearningUnit, DefaultVideoEvidenceAggregator, bestSentenceIndex(), bestSpanIndex(), bestStart(), bucketDemandCounts(), bundleValueScore(), coverageRatio() (+25 more)
 
-### Community 9 - "Community 9"
+### Community 10 - "Community 10"
 Cohesion: 0.12
 Nodes (36): Agent Rules, Module Boundary Rules, Catalog Delta Migration Doc, Deprecated Catalog Design Doc, Deprecated Learning Engine Doc, Deprecated Overall MVP Doc, Historical Docs Index, Deprecated Recommendation Scheduler Doc (+28 more)
 
-### Community 10 - "Community 10"
+### Community 11 - "Community 11"
 Cohesion: 0.09
 Nodes (27): Catalog Clean Baseline Migration Policy, Catalog Module, Finding F-REC-001, Finding F-REC-002, Finding F-REC-003, Finding F-REC-004, docs/全新设计-推荐模块设计.md, docs/全新设计-总设计.md (+19 more)
 
-### Community 11 - "Community 11"
+### Community 12 - "Community 12"
 Cohesion: 0.21
 Nodes (16): NewDefaultEvidenceResolver(), resolveBestBounds(), resolvedSpans(), resolveWindowBounds(), resolveWindowSentenceIndexes(), int64Ptr(), spanKey(), TestDefaultEvidenceResolverLeavesBestEvidenceEmptyWhenReferencedSpanIsMissing() (+8 more)
 
-### Community 12 - "Community 12"
+### Community 13 - "Community 13"
 Cohesion: 0.23
 Nodes (17): freshnessScore(), NewDefaultVideoRanker(), overloadPenalty(), recencyPenalty(), recentServedPenalty(), recentWatchedPenalty(), rolePriority(), round4() (+9 more)
 
-### Community 13 - "Community 13"
+### Community 14 - "Community 14"
 Cohesion: 0.13
 Nodes (17): applySchemaSequence(), freePort(), migrationFiles(), migrationFilesForMain(), OpenHarness(), repoRoot(), repoRootFromRuntime(), StartHarness() (+9 more)
 
-### Community 14 - "Community 14"
+### Community 15 - "Community 15"
+Cohesion: 0.24
+Nodes (13): execer, Suite, TestDatabase, applyLearningEngineSchema(), applyRecommendationSchema(), execSQLFile(), freePort(), migrationFiles() (+5 more)
+
+### Community 16 - "Community 16"
 Cohesion: 0.11
 Nodes (21): Demand Bundle, Demand Unit, Lane Budget, Mix Quota, Planner Flags, Demand Planner Interface, Learning State Snapshot, Demand Planning Logic (+13 more)
 
-### Community 15 - "Community 15"
-Cohesion: 0.25
-Nodes (12): execer, Suite, applyLearningEngineSchema(), applyRecommendationSchema(), execSQLFile(), freePort(), migrationFiles(), migrationVersion() (+4 more)
-
-### Community 16 - "Community 16"
+### Community 17 - "Community 17"
 Cohesion: 0.21
 Nodes (17): buildReasonCodes(), explanationText(), formatMs(), NewDefaultExplanationBuilder(), uniqueStrings(), DefaultExplanationBuilder, contains(), futureUnit() (+9 more)
 
-### Community 17 - "Community 17"
-Cohesion: 0.25
-Nodes (17): finalizeState(), initState(), int16Pointer(), Reduce(), emptyState(), learningEvent(), masteredState(), TestReduce_FailureAfterMasteredFallsBackToReviewing() (+9 more)
-
 ### Community 18 - "Community 18"
+Cohesion: 0.23
+Nodes (18): finalizeState(), initState(), int16Pointer(), RecomputeActiveStatus(), Reduce(), emptyState(), learningEvent(), masteredState() (+10 more)
+
+### Community 19 - "Community 19"
 Cohesion: 0.13
 Nodes (16): AuthUser, CatalogVideo, CatalogVideoSemanticSpan, CatalogVideoTranscript, CatalogVideoTranscriptSentence, CatalogVideoUnitIndex, CatalogVideoUserState, LearningUnitLearningEvent (+8 more)
 
-### Community 19 - "Community 19"
+### Community 20 - "Community 20"
 Cohesion: 0.23
 Nodes (14): bucketBaseWeight(), ceilFraction(), classifyDemandUnit(), floorFraction(), isHardReview(), isSoftReview(), plannerFlags(), plannerLaneBudget() (+6 more)
-
-### Community 20 - "Community 20"
-Cohesion: 0.2
-Nodes (10): NewDefaultContextAssembler(), normalizeRequest(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors(), TestNormalizeDurationResetsInvalidRange(), uniqueUnitIDs(), DefaultContextAssembler, stubLearningStateReader (+2 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.17
@@ -890,17 +890,17 @@ Nodes (1): Cross-Module E2E Test Scope
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `CatalogIngestError` connect `Community 1` to `Community 4`?**
-  _High betweenness centrality (0.053) - this node is a cross-community bridge._
-- **Why does `_FakeCursor` connect `Community 1` to `Community 0`, `Community 4`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Are the 88 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
-  _`CatalogIngestError` has 88 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 63 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
-  _`LoadedClipInput` has 63 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `CatalogIngestError` connect `Community 0` to `Community 4`?**
+  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+- **Why does `_FakeCursor` connect `Community 0` to `Community 1`, `Community 4`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `_load_from_parent_file()` connect `Community 0` to `Community 3`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **Are the 91 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
+  _`CatalogIngestError` has 91 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 66 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
+  _`LoadedClipInput` has 66 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 23 inferred relationships involving `Harness` (e.g. with `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` and `TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty()`) actually correct?**
   _`Harness` has 23 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 34 inferred relationships involving `NormalizedClipData` (e.g. with `基于基础行构建完整写库数据。      这个阶段负责三类派生结果：     - transcript 顶层摘要     - video_unit_index 聚` and `按 `(video_id, coarse_unit_id)` 的逻辑构建视频级 unit 索引。      这里虽然还没有真正的 video_id，但聚合维度和`) actually correct?**
   _`NormalizedClipData` has 34 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 18 inferred relationships involving `CatalogRepository` (e.g. with `CatalogIngestAlignmentTest` and `_FakeCursor`) actually correct?**
-  _`CatalogRepository` has 18 INFERRED edges - model-reasoned connections that need verification._

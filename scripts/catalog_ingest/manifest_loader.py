@@ -580,7 +580,7 @@ def _parse_questions(
         try:
             parsed_questions.append(
                 QuestionInput(
-                    scope_type=str(raw_question["scope_type"]),
+                    scope_type=str(raw_question.get("scope_type", "video_unit")),
                     question_type=str(raw_question["question_type"]),
                     coarse_unit_id=int(raw_question["coarse_unit_id"]),
                     target_text=str(raw_question["target_text"]),
