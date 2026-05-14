@@ -13,6 +13,11 @@ type moduleSpec struct {
 
 func moduleSpecs() map[string]moduleSpec {
 	return map[string]moduleSpec{
+		"analytics": {
+			Name:          "analytics",
+			MigrationDir:  filepath.FromSlash("internal/analytics/infrastructure/migration"),
+			TrackingTable: "analytics_schema_migrations",
+		},
 		"catalog": {
 			Name:          "catalog",
 			MigrationDir:  filepath.FromSlash("internal/catalog/infrastructure/migration"),

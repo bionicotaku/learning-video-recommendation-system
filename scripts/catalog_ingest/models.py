@@ -78,6 +78,42 @@ class TranscriptSentence:
 
 
 @dataclass(slots=True, frozen=True)
+class QuestionInput:
+    """表示 question JSON 中的一道题。"""
+
+    scope_type: str
+    question_type: str
+    coarse_unit_id: int
+    target_text: str
+    context_sentence_index: int | None
+    context_span_index: int | None
+    context_start_ms: int | None
+    context_end_ms: int | None
+    content_payload: dict[str, Any]
+    status: str
+
+
+@dataclass(slots=True, frozen=True)
+class SelectedCoarseUnitRef:
+    """表示 question JSON 中为 coarse unit 选出的 best evidence 引用。"""
+
+    coarse_unit_id: int
+    sentence_index: int
+    token_index: int
+
+
+@dataclass(slots=True, frozen=True)
+class SelectedCoarseUnitRefs:
+    """表示 selected_coarse_unit_refs 顶层结构。"""
+
+    version: int
+    selection_model: str | None
+    selection_top_k: int | None
+    allowed_question_types: tuple[str, ...]
+    refs: tuple[SelectedCoarseUnitRef, ...]
+
+
+@dataclass(slots=True, frozen=True)
 class LoadedClipInput:
     """表示 loader 阶段输出的“单 clip 原始输入对象”。
 
@@ -85,9 +121,10 @@ class LoadedClipInput:
     它同时持有：
     - 由父文件推导出的 clip 元数据
     - transcript 文件路径与原文
+    - question 文件路径、题目与 selected refs
     - 为写审计记录准备的上下文
 
-    注意：如果 transcript 文件缺失，这个对象仍然会被创建，
+    注意：如果 transcript 或 question 文件缺失，这个对象仍然会被创建，
     但会带上 skip_reason_code，供 main 直接走 skipped 分支。
     """
 
@@ -111,11 +148,16 @@ class LoadedClipInput:
     source_name: str | None
     parent_file_path: Path
     expected_transcript_filename: str
+    expected_question_filename: str
     transcript_file_path: Path | None
+    question_file_path: Path | None
     parent_clip: ParentClipDescriptor
     transcript_sentences: tuple[TranscriptSentence, ...]
+    questions: tuple[QuestionInput, ...]
+    selected_coarse_unit_refs: SelectedCoarseUnitRefs | None
     raw_parent_payload: dict[str, Any]
     raw_transcript_payload: dict[str, Any] | None
+    raw_question_payload: dict[str, Any] | None
     skip_reason_code: str | None = None
     skip_reason_message: str | None = None
 
@@ -129,7 +171,9 @@ class LoadedClipInput:
         return {
             "parent_file_path": str(self.parent_file_path),
             "expected_transcript_filename": self.expected_transcript_filename,
+            "expected_question_filename": self.expected_question_filename,
             "transcript_file_path": str(self.transcript_file_path) if self.transcript_file_path else None,
+            "question_file_path": str(self.question_file_path) if self.question_file_path else None,
             "clip_id": self.parent_clip.clip_id,
             "parent_video_name": self.parent_video_name,
             "source_clip_key": self.source_clip_key,
@@ -193,8 +237,8 @@ class VideoSemanticSpanRow:
 
 
 @dataclass(slots=True, frozen=True)
-class EvidenceSpanRef:
-    """表示 video_unit_index 中的一条可回查 span 引用。"""
+class BestEvidenceRef:
+    """表示 video_unit_index 中已选定的 best evidence span 引用。"""
 
     sentence_index: int
     span_index: int
@@ -212,7 +256,28 @@ class VideoUnitIndexRow:
     coverage_ms: int
     coverage_ratio: Decimal
     sentence_indexes: tuple[int, ...]
-    evidence_span_refs: tuple[EvidenceSpanRef, ...]
+    best_evidence_ref: BestEvidenceRef
+    best_evidence_source: str
+    best_evidence_model: str | None
+    best_evidence_version: int
+    best_evidence_metadata: dict[str, Any]
+
+
+@dataclass(slots=True, frozen=True)
+class QuestionRow:
+    """表示将写入 catalog.questions 的一行题目内容。"""
+
+    question_id: str
+    scope_type: str
+    question_type: str
+    coarse_unit_id: int
+    target_text: str
+    context_sentence_index: int | None
+    context_span_index: int | None
+    context_start_ms: int | None
+    context_end_ms: int | None
+    content_payload: dict[str, Any]
+    status: str
 
 
 @dataclass(slots=True, frozen=True)
@@ -237,6 +302,7 @@ class NormalizedClipData:
     sentences: tuple[VideoTranscriptSentenceRow, ...]
     spans: tuple[VideoSemanticSpanRow, ...]
     unit_indexes: tuple[VideoUnitIndexRow, ...]
+    questions: tuple[QuestionRow, ...]
 
 
 @dataclass(slots=True, frozen=True)

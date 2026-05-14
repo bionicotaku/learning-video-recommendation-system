@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
@@ -33,15 +32,16 @@ func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationCon
 
 	resolved := make([]model.ResolvedEvidenceWindow, 0, len(candidates))
 	for _, candidate := range candidates {
-		spans, err := r.spanReader.ListByVideoAndUnit(ctx, candidate.VideoID, candidate.CoarseUnitID)
+		bestRef := candidate.BestEvidenceRef
+		bestSpan, err := r.resolveBestSpan(ctx, candidate)
 		if err != nil {
 			return nil, err
 		}
+		if bestSpan == nil {
+			bestRef = nil
+		}
 
-		refs := parseEvidenceRefs(candidate.EvidenceSpanRefs)
-		bestRef, bestSpan := selectBestEvidence(refs, spans)
-
-		windowSentenceIndexes := resolveWindowSentenceIndexes(candidate.SentenceIndexes, refs, bestSpan)
+		windowSentenceIndexes := resolveWindowSentenceIndexes(bestSpan)
 		sentences, err := r.sentenceReader.ListByVideoAndIndexes(ctx, candidate.VideoID, windowSentenceIndexes)
 		if err != nil {
 			return nil, err
@@ -61,7 +61,7 @@ func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationCon
 			WindowSentenceIndexes: windowSentenceIndexes,
 			WindowStartMs:         windowStartMs,
 			WindowEndMs:           windowEndMs,
-			ResolvedSpans:         spans,
+			ResolvedSpans:         resolvedSpans(bestSpan),
 			ResolvedSentences:     sentences,
 		})
 	}
@@ -69,83 +69,18 @@ func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationCon
 	return resolved, nil
 }
 
-func parseEvidenceRefs(raw []byte) []model.EvidenceRef {
-	if len(raw) == 0 {
-		return nil
-	}
-
-	var refs []model.EvidenceRef
-	if err := json.Unmarshal(raw, &refs); err != nil {
-		return nil
-	}
-	return refs
-}
-
-func selectBestEvidence(refs []model.EvidenceRef, spans []model.SemanticSpan) (*model.EvidenceRef, *model.SemanticSpan) {
-	if len(spans) == 0 {
+func (r *DefaultEvidenceResolver) resolveBestSpan(ctx context.Context, candidate model.VideoUnitCandidate) (*model.SemanticSpan, error) {
+	if candidate.BestEvidenceRef == nil {
 		return nil, nil
 	}
-
-	type matchedRef struct {
-		refIndex int
-		ref      model.EvidenceRef
-		span     model.SemanticSpan
-	}
-
-	spanByKey := make(map[[2]int32]model.SemanticSpan, len(spans))
-	for _, span := range spans {
-		spanByKey[[2]int32{span.SentenceIndex, span.SpanIndex}] = span
-	}
-
-	matches := make([]matchedRef, 0, len(refs))
-	for index, ref := range refs {
-		span, ok := spanByKey[[2]int32{ref.SentenceIndex, ref.SpanIndex}]
-		if !ok {
-			continue
-		}
-		matches = append(matches, matchedRef{refIndex: index, ref: ref, span: span})
-	}
-	if len(matches) == 0 {
-		return nil, nil
-	}
-
-	best := matches[0]
-	for _, candidate := range matches[1:] {
-		if candidate.ref.SentenceIndex == best.ref.SentenceIndex {
-			if candidate.span.StartMs < best.span.StartMs {
-				best = candidate
-				continue
-			}
-			if candidate.span.StartMs == best.span.StartMs && candidate.refIndex < best.refIndex {
-				best = candidate
-			}
-			continue
-		}
-		if candidate.refIndex < best.refIndex {
-			best = candidate
-		}
-	}
-
-	ref := best.ref
-	span := best.span
-	return &ref, &span
+	return r.spanReader.GetByVideoUnitAndRef(ctx, candidate.VideoID, candidate.CoarseUnitID, *candidate.BestEvidenceRef)
 }
 
-func resolveWindowSentenceIndexes(candidateSentenceIndexes []int32, refs []model.EvidenceRef, bestSpan *model.SemanticSpan) []int32 {
-	indexes := appendUniqueInt32(nil, candidateSentenceIndexes...)
-	if len(indexes) == 0 {
-		for _, ref := range refs {
-			indexes = appendUniqueInt32(indexes, ref.SentenceIndex)
-		}
+func resolveWindowSentenceIndexes(bestSpan *model.SemanticSpan) []int32 {
+	if bestSpan == nil {
+		return nil
 	}
-	if len(indexes) == 0 && bestSpan != nil {
-		indexes = append(indexes, bestSpan.SentenceIndex)
-	}
-
-	sort.SliceStable(indexes, func(i, j int) bool {
-		return indexes[i] < indexes[j]
-	})
-	return indexes
+	return []int32{bestSpan.SentenceIndex}
 }
 
 func resolveWindowBounds(sentences []model.TranscriptSentence, bestSpan *model.SemanticSpan) (*int32, *int32) {
@@ -167,17 +102,9 @@ func resolveBestBounds(bestSpan *model.SemanticSpan) (*int32, *int32) {
 	return &startMs, &endMs
 }
 
-func appendUniqueInt32(values []int32, additions ...int32) []int32 {
-	seen := make(map[int32]struct{}, len(values))
-	for _, value := range values {
-		seen[value] = struct{}{}
+func resolvedSpans(bestSpan *model.SemanticSpan) []model.SemanticSpan {
+	if bestSpan == nil {
+		return nil
 	}
-	for _, value := range additions {
-		if _, ok := seen[value]; ok {
-			continue
-		}
-		seen[value] = struct{}{}
-		values = append(values, value)
-	}
-	return values
+	return []model.SemanticSpan{*bestSpan}
 }

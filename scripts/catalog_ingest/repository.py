@@ -213,6 +213,7 @@ class CatalogRepository:
 
                     video_id = self._upsert_video(cursor, normalized_data)
                     self._replace_transcript_related_rows(cursor, video_id, normalized_data)
+                    self._replace_question_rows(cursor, video_id, normalized_data)
 
                     cursor.execute(
                         """
@@ -527,9 +528,14 @@ class CatalogRepository:
                   coverage_ms,
                   coverage_ratio,
                   sentence_indexes,
-                  evidence_span_refs
+                  best_evidence_sentence_index,
+                  best_evidence_span_index,
+                  best_evidence_source,
+                  best_evidence_model,
+                  best_evidence_version,
+                  best_evidence_metadata
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -542,18 +548,104 @@ class CatalogRepository:
                         unit.coverage_ms,
                         unit.coverage_ratio,
                         list(unit.sentence_indexes),
-                        Jsonb(
-                            [
-                                {
-                                    "sentence_index": ref.sentence_index,
-                                    "span_index": ref.span_index,
-                                }
-                                for ref in unit.evidence_span_refs
-                            ]
-                        ),
+                        unit.best_evidence_ref.sentence_index,
+                        unit.best_evidence_ref.span_index,
+                        unit.best_evidence_source,
+                        unit.best_evidence_model,
+                        unit.best_evidence_version,
+                        Jsonb(unit.best_evidence_metadata),
                     )
                     for unit in normalized_data.unit_indexes
                 ],
+            )
+
+    def _replace_question_rows(
+        self,
+        cursor: psycopg.Cursor,
+        video_id: str,
+        normalized_data: NormalizedClipData,
+    ) -> None:
+        """幂等写入当前 clip 的题目，并 retire 本次未出现的旧视频上下文题。"""
+
+        current_video_unit_question_ids = [
+            question.question_id
+            for question in normalized_data.questions
+            if question.scope_type == "video_unit"
+        ]
+
+        if normalized_data.questions:
+            cursor.executemany(
+                """
+                insert into catalog.questions (
+                  question_id,
+                  scope_type,
+                  question_type,
+                  coarse_unit_id,
+                  target_text,
+                  video_id,
+                  context_sentence_index,
+                  context_span_index,
+                  context_start_ms,
+                  context_end_ms,
+                  content_payload,
+                  status
+                )
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                on conflict (question_id) do update
+                set scope_type = excluded.scope_type,
+                    question_type = excluded.question_type,
+                    coarse_unit_id = excluded.coarse_unit_id,
+                    target_text = excluded.target_text,
+                    video_id = excluded.video_id,
+                    context_sentence_index = excluded.context_sentence_index,
+                    context_span_index = excluded.context_span_index,
+                    context_start_ms = excluded.context_start_ms,
+                    context_end_ms = excluded.context_end_ms,
+                    content_payload = excluded.content_payload,
+                    status = excluded.status,
+                    updated_at = now()
+                """,
+                [
+                    (
+                        question.question_id,
+                        question.scope_type,
+                        question.question_type,
+                        question.coarse_unit_id,
+                        question.target_text,
+                        video_id if question.scope_type == "video_unit" else None,
+                        question.context_sentence_index,
+                        question.context_span_index,
+                        question.context_start_ms,
+                        question.context_end_ms,
+                        Jsonb(question.content_payload),
+                        question.status,
+                    )
+                    for question in normalized_data.questions
+                ],
+            )
+
+        if current_video_unit_question_ids:
+            cursor.execute(
+                """
+                update catalog.questions
+                set status = 'retired',
+                    updated_at = now()
+                where video_id = %s
+                  and scope_type = 'video_unit'
+                  and not (question_id = any(%s::uuid[]))
+                """,
+                (video_id, current_video_unit_question_ids),
+            )
+        else:
+            cursor.execute(
+                """
+                update catalog.questions
+                set status = 'retired',
+                    updated_at = now()
+                where video_id = %s
+                  and scope_type = 'video_unit'
+                """,
+                (video_id,),
             )
 
 

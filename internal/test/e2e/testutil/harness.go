@@ -96,21 +96,17 @@ type SemanticSpanFixture struct {
 	EndMs         int32
 }
 
-type EvidenceRefFixture struct {
-	SentenceIndex int32 `json:"sentence_index"`
-	SpanIndex     int32 `json:"span_index"`
-}
-
 type VideoUnitIndexFixture struct {
-	CoarseUnitID     int64
-	MentionCount     int32
-	SentenceCount    int32
-	FirstStartMs     int32
-	LastEndMs        int32
-	CoverageMs       int32
-	CoverageRatio    float64
-	SentenceIndexes  []int32
-	EvidenceSpanRefs []EvidenceRefFixture
+	CoarseUnitID              int64
+	MentionCount              int32
+	SentenceCount             int32
+	FirstStartMs              int32
+	LastEndMs                 int32
+	CoverageMs                int32
+	CoverageRatio             float64
+	SentenceIndexes           []int32
+	BestEvidenceSentenceIndex int32
+	BestEvidenceSpanIndex     int32
 }
 
 func StartHarness(t *testing.T) *Harness {
@@ -389,10 +385,6 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	}
 
 	for _, entry := range fixture.UnitIndexes {
-		evidenceBytes, err := json.Marshal(entry.EvidenceSpanRefs)
-		if err != nil {
-			failNow(t, "marshal evidence refs: %v", err)
-		}
 		if _, err := h.Pool.Exec(
 			context.Background(),
 			`insert into catalog.video_unit_index (
@@ -405,8 +397,12 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 				coverage_ms,
 				coverage_ratio,
 				sentence_indexes,
-				evidence_span_refs
-			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+				best_evidence_sentence_index,
+				best_evidence_span_index,
+				best_evidence_source,
+				best_evidence_version,
+				best_evidence_metadata
+			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'test_fixture', 1, '{}'::jsonb)`,
 			fixture.VideoID,
 			entry.CoarseUnitID,
 			entry.MentionCount,
@@ -416,7 +412,8 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 			entry.CoverageMs,
 			entry.CoverageRatio,
 			entry.SentenceIndexes,
-			evidenceBytes,
+			entry.BestEvidenceSentenceIndex,
+			entry.BestEvidenceSpanIndex,
 		); err != nil {
 			failNow(t, "seed catalog.video_unit_index: %v", err)
 		}
@@ -628,15 +625,16 @@ func happyPathVideo(videoID string, unitID int64, startMs, endMs int32, sentence
 		},
 		UnitIndexes: []VideoUnitIndexFixture{
 			{
-				CoarseUnitID:     unitID,
-				MentionCount:     3,
-				SentenceCount:    2,
-				FirstStartMs:     startMs,
-				LastEndMs:        endMs + 1_500,
-				CoverageMs:       endMs + 1_500 - startMs,
-				CoverageRatio:    0.08,
-				SentenceIndexes:  []int32{sentenceIndex, sentenceIndex + 1},
-				EvidenceSpanRefs: []EvidenceRefFixture{{SentenceIndex: sentenceIndex, SpanIndex: 0}},
+				CoarseUnitID:              unitID,
+				MentionCount:              3,
+				SentenceCount:             2,
+				FirstStartMs:              startMs,
+				LastEndMs:                 endMs + 1_500,
+				CoverageMs:                endMs + 1_500 - startMs,
+				CoverageRatio:             0.08,
+				SentenceIndexes:           []int32{sentenceIndex, sentenceIndex + 1},
+				BestEvidenceSentenceIndex: sentenceIndex,
+				BestEvidenceSpanIndex:     0,
 			},
 		},
 	}

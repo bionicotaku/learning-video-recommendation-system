@@ -7,7 +7,7 @@ import (
 )
 
 type SemanticSpanReader interface {
-	ListByVideoAndUnit(ctx context.Context, videoID string, coarseUnitID int64) ([]model.SemanticSpan, error)
+	GetByVideoUnitAndRef(ctx context.Context, videoID string, coarseUnitID int64, ref model.EvidenceRef) (*model.SemanticSpan, error)
 }
 
 type TranscriptSentenceReader interface {

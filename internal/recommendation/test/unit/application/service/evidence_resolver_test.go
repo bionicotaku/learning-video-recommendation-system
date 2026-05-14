@@ -31,6 +31,20 @@ func (s *stubSemanticSpanReader) ListByVideoAndUnit(ctx context.Context, videoID
 	return append([]model.SemanticSpan(nil), s.rows[spanKey(videoID, coarseUnitID)]...), nil
 }
 
+func (s *stubSemanticSpanReader) GetByVideoUnitAndRef(ctx context.Context, videoID string, coarseUnitID int64, ref model.EvidenceRef) (*model.SemanticSpan, error) {
+	s.lastCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	for _, row := range s.rows[spanKey(videoID, coarseUnitID)] {
+		if row.SentenceIndex == ref.SentenceIndex && row.SpanIndex == ref.SpanIndex {
+			result := row
+			return &result, nil
+		}
+	}
+	return nil, nil
+}
+
 func (s *stubTranscriptSentenceReader) ListByVideoAndIndexes(ctx context.Context, videoID string, sentenceIndexes []int32) ([]model.TranscriptSentence, error) {
 	s.lastCtx = ctx
 	if err := ctx.Err(); err != nil {
@@ -51,7 +65,7 @@ func (s *stubTranscriptSentenceReader) ListByVideoAndIndexes(ctx context.Context
 	return result, nil
 }
 
-func TestDefaultEvidenceResolverResolvesReferencedSpansAndSentences(t *testing.T) {
+func TestDefaultEvidenceResolverResolvesBestEvidenceSpanAndSentence(t *testing.T) {
 	resolver := recommendationservice.NewDefaultEvidenceResolver(
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
@@ -73,10 +87,10 @@ func TestDefaultEvidenceResolverResolvesReferencedSpansAndSentences(t *testing.T
 
 	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
-			VideoID:          "video-1",
-			CoarseUnitID:     101,
-			SentenceIndexes:  []int32{1, 2},
-			EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":1},{"sentence_index":2,"span_index":1}]`),
+			VideoID:         "video-1",
+			CoarseUnitID:    101,
+			SentenceIndexes: []int32{1, 2},
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
 		},
 	}, model.DemandBundle{})
 	if err != nil {
@@ -90,15 +104,15 @@ func TestDefaultEvidenceResolverResolvesReferencedSpansAndSentences(t *testing.T
 	if window.BestEvidenceRef == nil || window.BestEvidenceRef.SentenceIndex != 1 || window.BestEvidenceRef.SpanIndex != 1 {
 		t.Fatalf("unexpected best evidence ref: %#v", window.BestEvidenceRef)
 	}
-	if len(window.ResolvedSentences) != 2 {
-		t.Fatalf("expected two resolved sentences, got %#v", window.ResolvedSentences)
+	if len(window.ResolvedSentences) != 1 {
+		t.Fatalf("expected one resolved sentence, got %#v", window.ResolvedSentences)
 	}
 	if window.WindowStartMs == nil || *window.WindowStartMs != 900 {
 		t.Fatalf("expected sentence-backed window start, got %#v", window.WindowStartMs)
 	}
 }
 
-func TestDefaultEvidenceResolverPrefersEarlierSpanWhenRefsShareSentence(t *testing.T) {
+func TestDefaultEvidenceResolverUsesExplicitBestEvidenceRef(t *testing.T) {
 	resolver := recommendationservice.NewDefaultEvidenceResolver(
 		&stubSemanticSpanReader{
 			rows: map[string][]model.SemanticSpan{
@@ -113,17 +127,17 @@ func TestDefaultEvidenceResolverPrefersEarlierSpanWhenRefsShareSentence(t *testi
 
 	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
-			VideoID:          "video-2",
-			CoarseUnitID:     101,
-			EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":2},{"sentence_index":1,"span_index":1}]`),
+			VideoID:         "video-2",
+			CoarseUnitID:    101,
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 1, SpanIndex: 2},
 		},
 	}, model.DemandBundle{})
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
 
-	if windows[0].BestEvidenceRef == nil || windows[0].BestEvidenceRef.SpanIndex != 1 {
-		t.Fatalf("expected earlier span in same sentence, got %#v", windows[0].BestEvidenceRef)
+	if windows[0].BestEvidenceRef == nil || windows[0].BestEvidenceRef.SpanIndex != 2 {
+		t.Fatalf("expected explicit best evidence ref, got %#v", windows[0].BestEvidenceRef)
 	}
 }
 
@@ -147,10 +161,10 @@ func TestDefaultEvidenceResolverLeavesBestEvidenceEmptyWhenReferencedSpanIsMissi
 
 	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
-			VideoID:          "video-3",
-			CoarseUnitID:     101,
-			SentenceIndexes:  []int32{3},
-			EvidenceSpanRefs: []byte(`[{"sentence_index":9,"span_index":9}]`),
+			VideoID:         "video-3",
+			CoarseUnitID:    101,
+			SentenceIndexes: []int32{3},
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 9, SpanIndex: 9},
 		},
 	}, model.DemandBundle{})
 	if err != nil {
@@ -179,10 +193,10 @@ func TestDefaultEvidenceResolverToleratesMissingSentences(t *testing.T) {
 
 	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
-			VideoID:          "video-4",
-			CoarseUnitID:     101,
-			SentenceIndexes:  []int32{1},
-			EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":1}]`),
+			VideoID:         "video-4",
+			CoarseUnitID:    101,
+			SentenceIndexes: []int32{1},
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
 		},
 	}, model.DemandBundle{})
 	if err != nil {
@@ -221,10 +235,10 @@ func TestDefaultEvidenceResolverPropagatesContextToReaders(t *testing.T) {
 	ctx := context.WithValue(context.Background(), "trace", "evidence-resolver")
 	_, err := resolver.Resolve(ctx, model.RecommendationContext{}, []model.VideoUnitCandidate{
 		{
-			VideoID:          "video-ctx",
-			CoarseUnitID:     101,
-			SentenceIndexes:  []int32{1},
-			EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":1}]`),
+			VideoID:         "video-ctx",
+			CoarseUnitID:    101,
+			SentenceIndexes: []int32{1},
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
 		},
 	}, model.DemandBundle{})
 	if err != nil {

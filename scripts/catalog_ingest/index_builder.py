@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import uuid
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
 from .models import (
-    EvidenceSpanRef,
+    BestEvidenceRef,
+    CatalogIngestError,
     LoadedClipInput,
     NormalizedClipData,
     NormalizedCoreRows,
+    QuestionRow,
     VideoSemanticSpanRow,
     VideoTranscriptRow,
     VideoUnitIndexRow,
@@ -15,6 +20,7 @@ from .models import (
 
 
 RATIO_PRECISION = Decimal("0.00001")
+QUESTION_ID_NAMESPACE = uuid.UUID("e5a7c9e1-379e-4e0f-9d3b-1c47bf07c701")
 
 
 def build_normalized_clip_data(
@@ -23,13 +29,19 @@ def build_normalized_clip_data(
 ) -> NormalizedClipData:
     """基于基础行构建完整写库数据。
 
-    这个阶段负责两类派生结果：
+    这个阶段负责三类派生结果：
     - transcript 顶层摘要
     - video_unit_index 聚合索引
+    - catalog.questions 写入行
     """
 
     transcript_row = _build_transcript_row(clip_input, core_rows)
-    unit_index_rows = _build_unit_index_rows(core_rows, video_duration_ms=clip_input.duration_ms)
+    unit_index_rows = _build_unit_index_rows(
+        clip_input=clip_input,
+        core_rows=core_rows,
+        video_duration_ms=clip_input.duration_ms,
+    )
+    question_rows = _build_question_rows(clip_input)
 
     return NormalizedClipData(
         video=core_rows.video,
@@ -37,6 +49,7 @@ def build_normalized_clip_data(
         sentences=core_rows.sentences,
         spans=core_rows.spans,
         unit_indexes=unit_index_rows,
+        questions=question_rows,
     )
 
 
@@ -65,6 +78,7 @@ def _build_transcript_row(
 
 
 def _build_unit_index_rows(
+    clip_input: LoadedClipInput,
     core_rows: NormalizedCoreRows,
     video_duration_ms: int,
 ) -> tuple[VideoUnitIndexRow, ...]:
@@ -79,6 +93,21 @@ def _build_unit_index_rows(
             continue
         grouped_spans[span.coarse_unit_id].append(span)
 
+    if clip_input.selected_coarse_unit_refs is None:
+        raise CatalogIngestError(
+            code="question_invalid",
+            stage="index_builder",
+            message="selected_coarse_unit_refs 不能为空",
+            context=clip_input.context,
+        )
+
+    selected_ref_by_unit = {
+        ref.coarse_unit_id: ref
+        for ref in clip_input.selected_coarse_unit_refs.refs
+    }
+    question_source = clip_input.raw_question_payload.get("source", {}) if clip_input.raw_question_payload else {}
+    source_model = question_source.get("model") if isinstance(question_source, dict) else None
+
     rows: list[VideoUnitIndexRow] = []
     for coarse_unit_id, spans in sorted(grouped_spans.items(), key=lambda item: item[0]):
         sentence_indexes = tuple(sorted({span.sentence_index for span in spans}))
@@ -87,13 +116,24 @@ def _build_unit_index_rows(
         coverage_ms = _merge_intervals_and_measure([(span.start_ms, span.end_ms) for span in spans])
         coverage_ratio = _safe_ratio(coverage_ms, video_duration_ms)
 
-        selected_evidence_spans = _select_evidence_spans(spans)
-        evidence_span_refs = tuple(
-            EvidenceSpanRef(
-                sentence_index=span.sentence_index,
-                span_index=span.span_index,
+        selected_ref = selected_ref_by_unit.get(coarse_unit_id)
+        if selected_ref is None:
+            raise CatalogIngestError(
+                code="question_invalid",
+                stage="index_builder",
+                message="缺少 coarse unit 对应的 selected best evidence ref",
+                context={**clip_input.context, "coarse_unit_id": coarse_unit_id},
             )
-            for span in selected_evidence_spans
+        best_evidence_span = _resolve_selected_evidence_span(
+            spans=spans,
+            coarse_unit_id=coarse_unit_id,
+            sentence_index=selected_ref.sentence_index,
+            span_index=selected_ref.token_index,
+            context=clip_input.context,
+        )
+        best_evidence_ref = BestEvidenceRef(
+            sentence_index=best_evidence_span.sentence_index,
+            span_index=best_evidence_span.span_index,
         )
 
         rows.append(
@@ -106,35 +146,91 @@ def _build_unit_index_rows(
                 coverage_ms=coverage_ms,
                 coverage_ratio=coverage_ratio,
                 sentence_indexes=sentence_indexes,
-                evidence_span_refs=evidence_span_refs,
+                best_evidence_ref=best_evidence_ref,
+                best_evidence_source="selected_coarse_unit_refs",
+                best_evidence_model=clip_input.selected_coarse_unit_refs.selection_model,
+                best_evidence_version=clip_input.selected_coarse_unit_refs.version,
+                best_evidence_metadata={
+                    "selection_top_k": clip_input.selected_coarse_unit_refs.selection_top_k,
+                    "allowed_question_types": list(clip_input.selected_coarse_unit_refs.allowed_question_types),
+                    "questions_file_path": str(clip_input.question_file_path) if clip_input.question_file_path else None,
+                    "source_model": source_model,
+                },
             )
         )
 
     return tuple(rows)
 
 
-def _select_evidence_spans(spans: list[VideoSemanticSpanRow], limit: int = 5) -> tuple[VideoSemanticSpanRow, ...]:
-    """按当前设计规则选出稳定的 evidence spans。"""
+def _resolve_selected_evidence_span(
+    spans: list[VideoSemanticSpanRow],
+    coarse_unit_id: int,
+    sentence_index: int,
+    span_index: int,
+    context: dict[str, object],
+) -> VideoSemanticSpanRow:
+    """按 selected ref 精确解析 best evidence span。"""
 
-    earliest_span_by_sentence: dict[int, VideoSemanticSpanRow] = {}
     for span in spans:
-        current = earliest_span_by_sentence.get(span.sentence_index)
-        if current is None or _evidence_pick_key(span) < _evidence_pick_key(current):
-            earliest_span_by_sentence[span.sentence_index] = span
-
-    return tuple(
-        sorted(
-            earliest_span_by_sentence.values(),
-            key=lambda span: (span.sentence_index, span.span_index, span.start_ms, span.end_ms),
-        )
-        [:limit]
+        if span.sentence_index == sentence_index and span.span_index == span_index:
+            return span
+    raise CatalogIngestError(
+        code="question_invalid",
+        stage="index_builder",
+        message="selected best evidence ref 无法回查到 semantic span",
+        context={
+            **context,
+            "coarse_unit_id": coarse_unit_id,
+            "sentence_index": sentence_index,
+            "span_index": span_index,
+        },
     )
 
 
-def _evidence_pick_key(span: VideoSemanticSpanRow) -> tuple[int, int, int]:
-    """在同一句内选择最早的一个 span。"""
+def _build_question_rows(clip_input: LoadedClipInput) -> tuple[QuestionRow, ...]:
+    """构建 catalog.questions 写入行。"""
 
-    return (span.span_index, span.start_ms, span.end_ms)
+    rows: list[QuestionRow] = []
+    for question in clip_input.questions:
+        rows.append(
+            QuestionRow(
+                question_id=_deterministic_question_id(clip_input.source_clip_key, question),
+                scope_type=question.scope_type,
+                question_type=question.question_type,
+                coarse_unit_id=question.coarse_unit_id,
+                target_text=question.target_text,
+                context_sentence_index=question.context_sentence_index,
+                context_span_index=question.context_span_index,
+                context_start_ms=question.context_start_ms,
+                context_end_ms=question.context_end_ms,
+                content_payload=question.content_payload,
+                status=question.status,
+            )
+        )
+    return tuple(rows)
+
+
+def _deterministic_question_id(source_clip_key: str, question) -> str:
+    """基于稳定输入生成可重复的 question_id。"""
+
+    canonical_payload = json.dumps(
+        question.content_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    payload_hash = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+    name = "|".join(
+        [
+            source_clip_key,
+            str(question.coarse_unit_id),
+            question.question_type,
+            str(question.context_sentence_index),
+            str(question.context_span_index),
+            payload_hash,
+        ]
+    )
+    return str(uuid.uuid5(QUESTION_ID_NAMESPACE, name))
 
 
 def _merge_intervals_and_measure(intervals: list[tuple[int, int]]) -> int:

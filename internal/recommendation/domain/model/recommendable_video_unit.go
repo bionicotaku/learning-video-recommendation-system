@@ -12,7 +12,7 @@ type RecommendableVideoUnit struct {
 	CoverageMs       int32
 	CoverageRatio    float64
 	SentenceIndexes  []int32
-	EvidenceSpanRefs []byte
+	BestEvidenceRef  EvidenceRef
 	DurationMs       int32
 	MappedSpanRatio  float64
 	Status           string

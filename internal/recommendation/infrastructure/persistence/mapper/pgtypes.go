@@ -64,6 +64,13 @@ func Int32PointerFromPG(value pgtype.Int4) *int32 {
 	return &result
 }
 
+func Int32FromPG(value pgtype.Int4) int32 {
+	if !value.Valid {
+		return 0
+	}
+	return value.Int32
+}
+
 func Int64PointerFromPG(value pgtype.Int8) *int64 {
 	if !value.Valid {
 		return nil

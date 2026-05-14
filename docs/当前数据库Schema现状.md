@@ -1,8 +1,8 @@
 # 当前数据库 Schema 现状
 
 状态：LIVE DB SNAPSHOT
-更新时间：2026-05-08
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做只读探查，并在本轮执行 `make recommendation-migrate-up` 与 `make recommendation-refresh` 后记录。
+更新时间：2026-05-14
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做只读探查，并在本轮执行 `make catalog-migrate-up` 与 `make analytics-migrate-up` 后记录。
 
 ## 1. Schema 概览
 
@@ -12,13 +12,52 @@
 | --- | --- |
 | `auth` | 存在，Supabase Auth 系统表存在 |
 | `semantic` | 存在，包含 `coarse_unit`、`fine_unit` |
-| `catalog` | 存在，包含当前 Catalog 内容表 |
-| `recommendation` | 存在，本轮按当前 migration 干净创建 |
+| `catalog` | 存在，包含当前 Catalog 内容表与 `catalog.questions` |
+| `analytics` | 存在，包含 `analytics.quiz_events` |
+| `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
 | `learning` | 不存在 |
 
-这意味着当前 live DB 已有 Recommendation 自有表、索引和物化视图，但还没有 Learning engine 的 `learning.*` 表。需要完整线上闭环时，仍必须另行应用 Learning engine migration。
+这意味着当前 live DB 已有 Catalog、Analytics、Recommendation 自有表、索引和物化视图，但还没有 Learning engine 的 `learning.*` 表。需要完整线上闭环时，仍必须另行应用 Learning engine migration。
 
-## 2. Recommendation Migration 状态
+## 2. Catalog Migration 状态
+
+`catalog_schema_migrations` 当前有 10 条记录，对应仓库内 10 个 Catalog migration：
+
+- `000001_create_catalog_schema`
+- `000002_create_videos`
+- `000003_create_video_transcripts`
+- `000004_create_video_transcript_sentences`
+- `000005_create_video_semantic_spans`
+- `000006_create_video_unit_index`
+- `000007_create_video_ingestion_records`
+- `000008_create_video_user_states`
+- `000009_create_catalog_indexes`
+- `000010_create_questions`
+
+当前新增的 `catalog.questions` 已存在。只读核对显示该表有 14 个字段，并包含以下索引：
+
+- `questions_pkey`
+- `idx_questions_video_unit_active`
+- `idx_questions_unit_active`
+- `idx_questions_status_created_at`
+
+## 3. Analytics Migration 状态
+
+`analytics_schema_migrations` 当前有 2 条记录，对应仓库内 2 个 Analytics migration：
+
+- `000001_create_analytics_schema`
+- `000002_create_quiz_events`
+
+当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 15 个字段，并包含以下索引：
+
+- `quiz_events_pkey`
+- `uq_quiz_events_user_client_event`
+- `idx_quiz_events_user_completed_at`
+- `idx_quiz_events_question_completed_at`
+- `idx_quiz_events_unit_completed_at`
+- `idx_quiz_events_video_completed_at`
+
+## 4. Recommendation Migration 状态
 
 `recommendation_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Recommendation migration：
 
@@ -28,9 +67,9 @@
 - `000004_create_materialized_views`
 - `000005_create_recommendation_indexes`
 
-本轮 preflight 查询 `to_regclass('recommendation_schema_migrations')` 返回为空，因此没有执行 down；随后执行了 `make recommendation-migrate-up` 和 `make recommendation-refresh`。
+Recommendation 本轮没有重新执行 migrate 或 refresh。
 
-## 3. Recommendation 表与视图
+## 5. Recommendation 表与视图
 
 当前 `recommendation` schema 包含：
 
@@ -46,7 +85,7 @@
 - `recommendation.v_recommendable_video_units`
 - `recommendation.v_unit_video_inventory`
 
-## 4. `video_recommendation_items`
+## 6. `video_recommendation_items`
 
 当前审计 item 表结构已经切换为 video learning plan 契约：
 
@@ -72,7 +111,7 @@
 - `learning_units` 必须是 JSON array。
 - 旧的 covered count 字段和 video-level best evidence 字段已经不再存在。
 
-## 5. Recommendation 索引
+## 7. Recommendation 索引
 
 当前 Recommendation owner 索引包括：
 
@@ -87,4 +126,3 @@
 - `idx_v_unit_video_inventory_supply_grade`
 
 MVP 阶段未给 `learning_units` 增加 GIN 索引；它目前是审计快照字段，不承担高频查询入口。
-

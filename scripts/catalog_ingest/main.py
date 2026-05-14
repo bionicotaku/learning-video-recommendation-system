@@ -38,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--parents-dir", required=True, help="父视频切片描述文件目录")
     parser.add_argument("--transcripts-dir", required=True, help="clip transcript 文件目录")
+    parser.add_argument("--questions-dir", required=True, help="clip question 文件目录")
     parser.add_argument("--source-name", default="local-json", help="写入审计记录时使用的来源名称")
     parser.add_argument("--limit", type=int, default=None, help="最多处理多少个 clip")
     parser.add_argument("--dry-run", action="store_true", help="只做读取、校验和归一化，不写数据库")
@@ -75,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         clip_inputs = load_clip_inputs(
             parents_dir=Path(args.parents_dir),
             transcripts_dir=Path(args.transcripts_dir),
+            questions_dir=Path(args.questions_dir),
             source_name=args.source_name,
             clip_key=args.clip_key,
             limit=args.limit,
@@ -274,6 +276,11 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
     """
 
     if existing_state is None:
+        return False
+    # questions 当前没有独立 checksum 投影。为了保证新/变更题目和
+    # selected best evidence 一定能写入，三目录 ingest 不走旧的 unchanged
+    # skip 优化，而是依赖单 clip 事务内的幂等 upsert。
+    if clip_input.questions:
         return False
     if existing_state.transcript_checksum != clip_input.transcript_checksum:
         return False

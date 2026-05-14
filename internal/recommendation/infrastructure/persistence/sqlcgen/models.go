@@ -42,16 +42,21 @@ type CatalogVideoTranscriptSentence struct {
 }
 
 type CatalogVideoUnitIndex struct {
-	VideoID          pgtype.UUID    `json:"video_id"`
-	CoarseUnitID     int64          `json:"coarse_unit_id"`
-	MentionCount     int32          `json:"mention_count"`
-	SentenceCount    int32          `json:"sentence_count"`
-	FirstStartMs     int32          `json:"first_start_ms"`
-	LastEndMs        int32          `json:"last_end_ms"`
-	CoverageMs       int32          `json:"coverage_ms"`
-	CoverageRatio    pgtype.Numeric `json:"coverage_ratio"`
-	SentenceIndexes  []int32        `json:"sentence_indexes"`
-	EvidenceSpanRefs []byte         `json:"evidence_span_refs"`
+	VideoID                   pgtype.UUID    `json:"video_id"`
+	CoarseUnitID              int64          `json:"coarse_unit_id"`
+	MentionCount              int32          `json:"mention_count"`
+	SentenceCount             int32          `json:"sentence_count"`
+	FirstStartMs              int32          `json:"first_start_ms"`
+	LastEndMs                 int32          `json:"last_end_ms"`
+	CoverageMs                int32          `json:"coverage_ms"`
+	CoverageRatio             pgtype.Numeric `json:"coverage_ratio"`
+	SentenceIndexes           []int32        `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex int32          `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex     int32          `json:"best_evidence_span_index"`
+	BestEvidenceSource        string         `json:"best_evidence_source"`
+	BestEvidenceModel         pgtype.Text    `json:"best_evidence_model"`
+	BestEvidenceVersion       int32          `json:"best_evidence_version"`
+	BestEvidenceMetadata      []byte         `json:"best_evidence_metadata"`
 }
 
 type CatalogVideoUserState struct {
@@ -102,21 +107,26 @@ type RecommendationUserVideoServingState struct {
 }
 
 type RecommendationVRecommendableVideoUnit struct {
-	VideoID          pgtype.UUID        `json:"video_id"`
-	CoarseUnitID     pgtype.Int8        `json:"coarse_unit_id"`
-	MentionCount     pgtype.Int4        `json:"mention_count"`
-	SentenceCount    pgtype.Int4        `json:"sentence_count"`
-	FirstStartMs     pgtype.Int4        `json:"first_start_ms"`
-	LastEndMs        pgtype.Int4        `json:"last_end_ms"`
-	CoverageMs       pgtype.Int4        `json:"coverage_ms"`
-	CoverageRatio    pgtype.Numeric     `json:"coverage_ratio"`
-	SentenceIndexes  []int32            `json:"sentence_indexes"`
-	EvidenceSpanRefs []byte             `json:"evidence_span_refs"`
-	DurationMs       pgtype.Int4        `json:"duration_ms"`
-	MappedSpanRatio  pgtype.Numeric     `json:"mapped_span_ratio"`
-	Status           pgtype.Text        `json:"status"`
-	VisibilityStatus pgtype.Text        `json:"visibility_status"`
-	PublishAt        pgtype.Timestamptz `json:"publish_at"`
+	VideoID                   pgtype.UUID        `json:"video_id"`
+	CoarseUnitID              pgtype.Int8        `json:"coarse_unit_id"`
+	MentionCount              pgtype.Int4        `json:"mention_count"`
+	SentenceCount             pgtype.Int4        `json:"sentence_count"`
+	FirstStartMs              pgtype.Int4        `json:"first_start_ms"`
+	LastEndMs                 pgtype.Int4        `json:"last_end_ms"`
+	CoverageMs                pgtype.Int4        `json:"coverage_ms"`
+	CoverageRatio             pgtype.Numeric     `json:"coverage_ratio"`
+	SentenceIndexes           []int32            `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex pgtype.Int4        `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex     pgtype.Int4        `json:"best_evidence_span_index"`
+	BestEvidenceSource        pgtype.Text        `json:"best_evidence_source"`
+	BestEvidenceModel         pgtype.Text        `json:"best_evidence_model"`
+	BestEvidenceVersion       pgtype.Int4        `json:"best_evidence_version"`
+	BestEvidenceMetadata      []byte             `json:"best_evidence_metadata"`
+	DurationMs                pgtype.Int4        `json:"duration_ms"`
+	MappedSpanRatio           pgtype.Numeric     `json:"mapped_span_ratio"`
+	Status                    pgtype.Text        `json:"status"`
+	VisibilityStatus          pgtype.Text        `json:"visibility_status"`
+	PublishAt                 pgtype.Timestamptz `json:"publish_at"`
 }
 
 type RecommendationVUnitVideoInventory struct {

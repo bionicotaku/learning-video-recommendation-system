@@ -96,7 +96,7 @@
   - `DefaultContextAssembler` 只装配 request-scope / unit-scope 输入：active learning states、unit inventory、unit serving states
   - `DefaultVideoStateEnricher` 负责 candidate-derived video-scope 输入：video serving states、catalog video user states
 - `DefaultVideoRanker` 仍计算 `RecentWatchedPenalty` 作为辅助观测值，但 MVP `BaseScore` 不再直接扣这一项，避免与 `FreshnessScore` 重复惩罚。
-- `learning_units[].evidence` 只允许从 `evidence_span_refs` 命中结果中派生；如果 refs 无法命中 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并让该 unit 的 evidence 为空，不会再兜底选“最早 span”。
+- `learning_units[].evidence` 只允许从 `video_unit_index.best_evidence_*` 精确回查结果中派生；如果 best ref 无法命中同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并让该 unit 的 evidence 为空，不会再兜底选“最早 span”。
 - 当前 Recommendation 的真实验证分两层：
   - 模块内 integration：owner migration、物化视图、refresh、repository 契约
   - 跨模块 E2E：demand mapping、selector constraints、read model visibility、write-side consistency、Replay 交互、多用户隔离

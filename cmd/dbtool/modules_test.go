@@ -5,8 +5,16 @@ import "testing"
 func TestModuleSpecsContainExpectedRegistry(t *testing.T) {
 	specs := moduleSpecs()
 
-	if len(specs) != 3 {
-		t.Fatalf("expected 3 module specs, got %d", len(specs))
+	if len(specs) != 4 {
+		t.Fatalf("expected 4 module specs, got %d", len(specs))
+	}
+
+	analytics, ok := specs["analytics"]
+	if !ok {
+		t.Fatalf("expected analytics module spec to exist")
+	}
+	if analytics.TrackingTable != "analytics_schema_migrations" {
+		t.Fatalf("unexpected analytics tracking table: %s", analytics.TrackingTable)
 	}
 
 	catalog, ok := specs["catalog"]

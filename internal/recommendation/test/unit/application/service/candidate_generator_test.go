@@ -355,16 +355,16 @@ func appendUnique(values []string, value string) []string {
 
 func recommendableRow(videoID string, unitID int64, mentions int32, sentences int32, coverageMs int32, coverageRatio float64, mappedSpanRatio float64, durationMs int32) model.RecommendableVideoUnit {
 	return model.RecommendableVideoUnit{
-		VideoID:          videoID,
-		CoarseUnitID:     unitID,
-		MentionCount:     mentions,
-		SentenceCount:    sentences,
-		CoverageMs:       coverageMs,
-		CoverageRatio:    coverageRatio,
-		SentenceIndexes:  []int32{1, 2},
-		DurationMs:       durationMs,
-		MappedSpanRatio:  mappedSpanRatio,
-		EvidenceSpanRefs: []byte(`[{"sentence_index":1,"span_index":1}]`),
+		VideoID:         videoID,
+		CoarseUnitID:    unitID,
+		MentionCount:    mentions,
+		SentenceCount:   sentences,
+		CoverageMs:      coverageMs,
+		CoverageRatio:   coverageRatio,
+		SentenceIndexes: []int32{1, 2},
+		DurationMs:      durationMs,
+		MappedSpanRatio: mappedSpanRatio,
+		BestEvidenceRef: model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
 	}
 }
 

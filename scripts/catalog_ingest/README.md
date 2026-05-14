@@ -2,12 +2,13 @@
 
 ## 1. 文档目标
 
-本文档定义当前阶段基于**两类本地 JSON 文件**的 `catalog` 入库方案。
+本文档定义当前阶段基于**三类本地 JSON 文件**的 `catalog` 入库方案。
 
 当前目标不是读取视频文件本体，也不是上传对象存储，而是：
 
 - 读取父视频切片描述文件
 - 读取每个 clip 的 transcript JSON
+- 读取每个 clip 的 question JSON
 - 将数据映射到 `catalog` schema
 - 支撑后续 Python 入库脚本实现
 
@@ -23,6 +24,8 @@
   - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence).json](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/samples/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29.json)
 - clip transcript 文件：
   - [The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json](/Users/evan/Downloads/learning-video-recommendation-system/scripts/catalog_ingest/samples/The%20Office%20%28US%29%20%282005%29%20-%20S01E01%20-%20Pilot%20%281080p%20BluRay%20x265%20Silence%29-clip1.json)
+- clip question 文件：
+  - 与 transcript 文件同名，来自 questions 目录，例如 `The Office ... Silence)-clip1.json`
 
 从样本中确认到的事实如下：
 
@@ -95,9 +98,41 @@
 
 ### 2.3 时间单位确认
 
+### 2.3 question 文件结构
+
+顶层必须包含：
+
+- `source`
+- `questions`
+- `audit`
+- `selected_coarse_unit_refs`
+
+`questions[]` 中每一项直接对齐 `catalog.questions` 的内容字段：
+
+- `scope_type`
+- `question_type`
+- `coarse_unit_id`
+- `target_text`
+- `context_sentence_index`
+- `context_span_index`
+- `context_start_ms`
+- `context_end_ms`
+- `content_payload`
+- `status`
+
+`selected_coarse_unit_refs.refs[]` 是 `video_unit_index.best_evidence_*` 的唯一来源。每个元素至少包含：
+
+- `coarse_unit_id`
+- `sentence_index`
+- `token_index`
+
+其中 `token_index` 直接映射为数据库中的 `span_index`。
+
+### 2.4 时间单位确认
+
 样本中的时间字段和 `Catalog` 文档是一致的，使用**毫秒**。
 
-### 2.4 时间轴语义确认
+### 2.5 时间轴语义确认
 
 当前 clip transcript 中 sentence / token 的 `start`、`end` 不是 clip 内相对时间，而是**沿用父视频绝对时间轴**。
 
@@ -120,7 +155,7 @@
 
 ## 3. 输入目录约定
 
-当前方案采用两个输入目录。
+当前方案采用三个输入目录。
 
 ### 3.1 目录 A：父视频切片描述目录
 
@@ -147,7 +182,20 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 
 这个文件对应一条最终会写入 `catalog.videos` 的切片视频。
 
-### 3.3 文件匹配规则
+### 3.3 目录 C：clip question 目录
+
+目录 C 中每个文件都表示一个最终 clip 的题目与 best evidence 选择结果，例如：
+
+```text
+The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
+```
+
+这个文件不单独表示视频实体。它为同名 clip 提供：
+
+- `catalog.questions` 的题目内容
+- `video_unit_index.best_evidence_*` 的 LLM-selected 来源
+
+### 3.4 文件匹配规则
 
 对目录 A 中某个父文件：
 
@@ -155,7 +203,7 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 <parent_name>.json
 ```
 
-其某个 clip 的 transcript 文件名规则为：
+其某个 clip 的 transcript 与 question 文件名规则都为：
 
 ```text
 <parent_name>-clip<clip_id>.json
@@ -166,10 +214,11 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 - 父文件：`The Office ... Silence).json`
 - `clip_id = 1`
 - transcript 文件：`The Office ... Silence)-clip1.json`
+- question 文件：`The Office ... Silence)-clip1.json`
 
 这条规则当前已在样本中成立。
 
-### 3.4 目录扫描边界
+### 3.5 目录扫描边界
 
 当前脚本应明确采用以下扫描边界：
 
@@ -180,18 +229,23 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 
 这样可以避免把临时文件、编辑器备份文件、其他调试 JSON 混进正式导入输入。
 
-### 3.5 文件匹配异常
+### 3.6 文件匹配异常
 
 当前方案还必须明确三类异常：
 
 - 父文件里存在 clip，但目录 B 中找不到对应 transcript 文件
+- 父文件里存在 clip，但目录 C 中找不到对应 question 文件
 - 目录 B 中存在 transcript 文件，但目录 A 中没有对应父文件或 clip
+- 目录 C 中存在 question 文件，但目录 A 中没有对应父文件或 clip
 - 理论上应唯一匹配的 transcript 文件，实际出现多个候选
+- 理论上应唯一匹配的 question 文件，实际出现多个候选
 
 建议当前策略为：
 
 - 缺 transcript：直接记 `skipped`
+- 缺 question：直接记 `skipped`
 - 孤儿 transcript：默认不入库，汇总到脚本结束报告
+- 孤儿 question：默认不入库，汇总到脚本结束报告
 - 多候选：直接视为失败，不做猜测匹配
 
 ---
@@ -222,6 +276,7 @@ The Office (US) (2005) - S01E01 - Pilot (1080p BluRay x265 Silence)-clip1.json
 
 - 一个父文件中的一个 `clip`
 - 一个 transcript 文件
+- 一个 question 文件
 
 ### 4.3 入库对象仍然是切片视频
 
@@ -533,19 +588,35 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - 合并 span 区间得到 `coverage_ms`
 - 计算 `coverage_ratio`
 - 生成 `sentence_indexes`
-- 生成 `evidence_span_refs`
+- 生成 `best_evidence_*`
 
 这里需要补一个实现约定，保持和当前 Catalog 最终设计一致：
 
-- `evidence_span_refs` 的每个元素至少包含 `sentence_index` 与 `span_index`
+- `best_evidence_sentence_index` 与 `best_evidence_span_index` 必须能回查到同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans`
 - 对同一 `(video_id, coarse_unit_id, sentence_index)` 只保留该 sentence 中最早的一个 span
-- 再按 `sentence_index ASC, span_index ASC` 排序
-- 最后取前 `K` 个，当前固定 `K = 5`
-- 这些 refs 只承诺稳定回查，不承诺“best evidence”
+- 再按 `sentence_index ASC, span_index ASC, start_ms ASC, end_ms ASC` 排序
+- 当前生产入库阶段不再使用 deterministic fallback
+- `best_evidence_*` 直接来自 question JSON 的 `selected_coarse_unit_refs.refs`
+- `best_evidence_source` 写为 `selected_coarse_unit_refs`
+- `best_evidence_model/version/metadata` 来自 `selected_coarse_unit_refs` 与 question JSON `source`
+
+## 5.6 `catalog.questions`
+
+question JSON 的 `questions[]` 写入 `catalog.questions`。
+
+入库规则：
+
+- `video_id` 由当前 clip 的 `catalog.videos` upsert 结果回填
+- `question_id` 由脚本确定性生成，避免重复跑产生重复题
+- deterministic id 基于 `source_clip_key + coarse_unit_id + question_type + context_sentence_index + context_span_index + canonical content_payload hash`
+- `content_payload` 原样作为前端题目 payload 写入
+- 本次未出现但属于同一 video 的旧 `video_unit` questions 更新为 `retired`，不删除
+
+当前 ingest 只写题库内容，不写 `analytics.quiz_events`。
 
 ---
 
-## 5.6 `catalog.video_ingestion_records`
+## 5.7 `catalog.video_ingestion_records`
 
 每次单 clip 执行写一条审计记录。
 
@@ -574,19 +645,21 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 1. 扫描目录 A 下所有父视频描述文件
 2. 扫描目录 B 下所有 transcript 文件，并预构造成“文件名集合 + 文件名到 Path 的索引”
-3. 对每个父文件读取 `.clips`
-4. 对每个 clip 生成 transcript 文件名
-5. 先用目录 B 的文件名集合判断对应 transcript 是否存在
-6. 若存在，再通过文件名索引拿到具体 Path 并读取 transcript JSON
-7. 若 transcript 文件不存在，则直接记 `skipped`
-8. 若存在，则进入校验和导入流程
+3. 扫描目录 C 下所有 question 文件，并预构造成“文件名集合 + 文件名到 Path 的索引”
+4. 对每个父文件读取 `.clips`
+5. 对每个 clip 生成同名 transcript / question 文件名
+6. 先用目录 B/C 的文件名集合判断对应文件是否同时存在
+7. 若 transcript 或 question 文件不存在，则直接记 `skipped`
+8. 若两者都存在，再读取 transcript JSON 与 question JSON
+9. 若两者都存在，则进入校验和导入流程
 
 此外还应增加两条收尾规则：
 
-9. 记录所有未被任何父文件消费的 transcript 文件
-10. 输出本次扫描汇总：父文件数、clip 数、成功匹配数、缺失 transcript 数、孤儿 transcript 数
+10. 记录所有未被任何父文件消费的 transcript / question 文件
+11. 输出本次扫描汇总：父文件数、clip 数、成功匹配数、缺失 transcript 数、缺失 question 数、孤儿 transcript 数、孤儿 question 数
 
 这里的“缺失 transcript 数”就是被记为 `skipped` 的 clip 数。
+这里的“缺失 question 数”同样是被记为 `skipped` 的 clip 数。
 
 ---
 
@@ -610,6 +683,13 @@ placeholder://transcript/<transcript_file_name_without_ext>
 
 - transcript 文件名必须能由父文件名和 `clip_id` 推导
 - 每个父文件中的 clip，都应该能唯一匹配到一个 transcript 文件
+
+### 7.2.1 question 文件匹配校验
+
+- question 文件名必须能由父文件名和 `clip_id` 推导
+- 每个父文件中的 clip，都应该能唯一匹配到一个 question 文件
+- question 文件缺失记 `skipped / question_missing`
+- question 文件存在但结构不合法记 `failed`
 
 ### 7.3 时间一致性校验
 
@@ -651,6 +731,17 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - sentence 可以没有 token
 - token 可以没有 `coarse_id`
 - 当前已知上游 `AssemblyAI -> 1transcript-raw -> 2cleaned-data` 偶尔会保留原始边界异常，例如 `token.end > sentence.end`；该类问题当前固定记 `warning_code = token_time_outside_sentence`，不断入库
+
+### 7.5 question 与 selected refs 校验
+
+- question JSON 顶层必须包含 `questions[]` 与 `selected_coarse_unit_refs.refs[]`
+- `selected_coarse_unit_refs.refs` 中每个 `coarse_unit_id` 只能出现一次
+- refs 的 coarse unit 集合必须等于 transcript 中所有 mapped coarse unit 集合
+- 每个 ref 的 `(sentence_index, token_index)` 必须能在 transcript 中找到
+- 对应 token 的 `semantic_element.coarse_id` 必须等于 ref 的 `coarse_unit_id`
+- `questions[]` 必须符合 `catalog.questions` 当前 schema
+- `scope_type = video_unit` 的题必须带完整 context 字段
+- question payload 或 refs 不合法时，当前 clip 记 `failed`
 
 ### 7.5 coarse_unit 校验
 
@@ -734,7 +825,7 @@ placeholder://transcript/<transcript_file_name_without_ext>
 - transcript 结构化内容
 - coarse unit 聚合索引
 
-这些都可以由两类 JSON 推导出来。
+这些都可以由三类 JSON 推导出来。
 
 ### 9.2 父文件和 transcript 文件已经天然分层
 
@@ -775,11 +866,11 @@ transcript 文件负责：
 
 这份方案当前只剩 1 个已知设计口子需要记录。
 
-### 10.1.1 evidence 字段已切到结构化 refs
+### 10.1.1 evidence 字段已切到单一 best evidence
 
-当前 schema 以 `evidence_span_refs jsonb` 作为唯一 evidence 表达。
-每个元素至少包含 `sentence_index` 与 `span_index`，可以无歧义回查到 `catalog.video_semantic_spans`。
-因此脚本实现也必须直接生成结构化 refs，不再保留旧的双数组模型。
+当前 schema 以 `best_evidence_*` 作为 `catalog.video_unit_index` 的唯一 evidence 表达。
+`best_evidence_sentence_index` 与 `best_evidence_span_index` 可以无歧义回查到同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans`。
+因此脚本实现必须直接生成单一 best evidence，不再保留旧的双数组模型或 refs 集合模型。
 
 ---
 
@@ -808,7 +899,7 @@ transcript 文件负责：
 
 当前最合适的本地入库方案是：
 
-**以父视频切片描述文件作为来源与切片边界输入，以 clip transcript 文件作为结构化内容输入，通过 `parent_name + clip_id -> transcript 文件名` 的规则完成匹配，不读取视频本体，直接构建 `catalog` 所需的内容资产、transcript 读模型、unit 索引和单视频入库审计。**
+**以父视频切片描述文件作为来源与切片边界输入，以 clip transcript 文件作为结构化内容输入，以 clip question 文件作为题目与 best evidence 输入，通过 `parent_name + clip_id -> 同名 clip 文件` 的规则完成匹配，不读取视频本体，直接构建 `catalog` 所需的内容资产、transcript 读模型、unit 索引、题库内容和单视频入库审计。**
 
 这套方案的前提已经被当前样本验证成立，可以直接作为下一步 Python 脚本实现依据。
 
@@ -826,9 +917,11 @@ transcript 文件负责：
 1. 数据库中只存切片视频，不存原始长视频实体。
 2. 每个 clip 的业务唯一键都按固定规则生成：`source_clip_key = <parent_video_slug>#clip<clip_id>`。
 3. 每个 clip 对应一个本地可读的 transcript JSON。
-4. transcript JSON 中已经包含 sentence 和 span 级时间信息。
-5. span 中的 `coarse_id` 已由上游流程产出。
-6. 数据库 schema 已按 [docs/archive/Catalog-数据库设计.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/archive/Catalog-数据库设计.md) 建好。
+4. 每个 clip 对应一个本地可读的 question JSON。
+5. transcript JSON 中已经包含 sentence 和 span 级时间信息。
+6. span 中的 `coarse_id` 已由上游流程产出。
+7. question JSON 中已经包含 `questions[]` 和 `selected_coarse_unit_refs.refs[]`。
+8. 数据库 schema 已按 [docs/Catalog-数据库设计.md](/Users/evan/Code/learning-app/learning-video-recommendation-system/docs/Catalog-数据库设计.md) 建好。
 
 因此脚本只负责导入、校验、标准化和写库，不负责生成内容。
 
@@ -838,7 +931,7 @@ transcript 文件负责：
 
 - 读取本地输入目录和 JSON 文件
 - 组装单 clip 输入对象
-- 校验输入元数据和 transcript 结构
+- 校验输入元数据、transcript 结构、question 结构和 selected refs
 - 归一化生成 `catalog` 所需行数据
 - 聚合构建 `catalog.video_unit_index`
 - 以单 clip 单事务方式写入：
@@ -847,6 +940,7 @@ transcript 文件负责：
   - `catalog.video_transcript_sentences`
   - `catalog.video_semantic_spans`
   - `catalog.video_unit_index`
+  - `catalog.questions`
 - 写 `catalog.video_ingestion_records`
 
 脚本不负责：
@@ -884,6 +978,8 @@ replace video_transcript_sentences
 replace video_semantic_spans
   ↓
 replace video_unit_index
+  ↓
+upsert/retire questions
   ↓
 写 video_ingestion_records
   ↓
@@ -1098,6 +1194,7 @@ warning 的处理方式是：
 ```text
 --parents-dir <path>
 --transcripts-dir <path>
+--questions-dir <path>
 --source-name <text>
 --limit <n>
 --dry-run
@@ -1108,6 +1205,7 @@ warning 的处理方式是：
 
 - `--parents-dir` 扫描父视频切片描述目录
 - `--transcripts-dir` 扫描 clip transcript 目录
+- `--questions-dir` 扫描 clip question 目录
 - `--clip-key` 用于单条重跑
 - `--dry-run` 只校验和归一化，不写库
 
@@ -1115,13 +1213,15 @@ warning 的处理方式是：
 
 第一阶段只做 MVP 必需能力：
 
-1. 读取两个输入目录
+1. 读取三个输入目录
 2. 按文件名规则完成父文件与 transcript 匹配
-3. 校验 transcript 结构
-4. 归一化四张内容表所需数据
-5. 构建 `video_unit_index`
-6. 单 clip 事务写库
-7. 写 `video_ingestion_records`
+3. 按同名规则完成父文件与 question 匹配
+4. 校验 transcript / question 结构与 selected refs
+5. 归一化四张内容表所需数据
+6. 构建 `video_unit_index`
+7. 写入 `catalog.questions`
+8. 单 clip 事务写库
+9. 写 `video_ingestion_records`
 8. 支持 `dry-run`
 
 当前明确不做：

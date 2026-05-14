@@ -11,11 +11,11 @@ import (
 )
 
 type Querier interface {
+	GetSemanticSpanByVideoUnitAndRef(ctx context.Context, arg GetSemanticSpanByVideoUnitAndRefParams) (CatalogVideoSemanticSpan, error)
 	InsertVideoRecommendationItem(ctx context.Context, arg InsertVideoRecommendationItemParams) error
 	InsertVideoRecommendationRun(ctx context.Context, arg InsertVideoRecommendationRunParams) error
 	ListLearningStatesForRecommendation(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
 	ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVRecommendableVideoUnit, error)
-	ListSemanticSpansByVideoAndUnit(ctx context.Context, arg ListSemanticSpansByVideoAndUnitParams) ([]CatalogVideoSemanticSpan, error)
 	ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, arg ListTranscriptSentencesByVideoAndIndexesParams) ([]CatalogVideoTranscriptSentence, error)
 	ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVUnitVideoInventory, error)
 	ListUserUnitServingStatesByUnitIDs(ctx context.Context, arg ListUserUnitServingStatesByUnitIDsParams) ([]RecommendationUserUnitServingState, error)

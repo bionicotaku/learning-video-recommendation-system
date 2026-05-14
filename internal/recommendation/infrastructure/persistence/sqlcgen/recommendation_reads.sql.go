@@ -11,6 +11,41 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getSemanticSpanByVideoUnitAndRef = `-- name: GetSemanticSpanByVideoUnitAndRef :one
+select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms
+from catalog.video_semantic_spans
+where video_id = $1
+  and coarse_unit_id = $2
+  and sentence_index = $3
+  and span_index = $4
+`
+
+type GetSemanticSpanByVideoUnitAndRefParams struct {
+	VideoID       pgtype.UUID `json:"video_id"`
+	CoarseUnitID  pgtype.Int8 `json:"coarse_unit_id"`
+	SentenceIndex int32       `json:"sentence_index"`
+	SpanIndex     int32       `json:"span_index"`
+}
+
+func (q *Queries) GetSemanticSpanByVideoUnitAndRef(ctx context.Context, arg GetSemanticSpanByVideoUnitAndRefParams) (CatalogVideoSemanticSpan, error) {
+	row := q.db.QueryRow(ctx, getSemanticSpanByVideoUnitAndRef,
+		arg.VideoID,
+		arg.CoarseUnitID,
+		arg.SentenceIndex,
+		arg.SpanIndex,
+	)
+	var i CatalogVideoSemanticSpan
+	err := row.Scan(
+		&i.VideoID,
+		&i.SentenceIndex,
+		&i.SpanIndex,
+		&i.CoarseUnitID,
+		&i.StartMs,
+		&i.EndMs,
+	)
+	return i, err
+}
+
 const listLearningStatesForRecommendation = `-- name: ListLearningStatesForRecommendation :many
 select
   user_id,
@@ -80,7 +115,12 @@ select
   coverage_ms,
   coverage_ratio,
   sentence_indexes,
-  evidence_span_refs,
+  best_evidence_sentence_index,
+  best_evidence_span_index,
+  best_evidence_source,
+  best_evidence_model,
+  best_evidence_version,
+  best_evidence_metadata,
   duration_ms,
   mapped_span_ratio,
   status,
@@ -110,52 +150,17 @@ func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coar
 			&i.CoverageMs,
 			&i.CoverageRatio,
 			&i.SentenceIndexes,
-			&i.EvidenceSpanRefs,
+			&i.BestEvidenceSentenceIndex,
+			&i.BestEvidenceSpanIndex,
+			&i.BestEvidenceSource,
+			&i.BestEvidenceModel,
+			&i.BestEvidenceVersion,
+			&i.BestEvidenceMetadata,
 			&i.DurationMs,
 			&i.MappedSpanRatio,
 			&i.Status,
 			&i.VisibilityStatus,
 			&i.PublishAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listSemanticSpansByVideoAndUnit = `-- name: ListSemanticSpansByVideoAndUnit :many
-select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms
-from catalog.video_semantic_spans
-where video_id = $1
-  and coarse_unit_id = $2
-order by sentence_index asc, span_index asc
-`
-
-type ListSemanticSpansByVideoAndUnitParams struct {
-	VideoID      pgtype.UUID `json:"video_id"`
-	CoarseUnitID pgtype.Int8 `json:"coarse_unit_id"`
-}
-
-func (q *Queries) ListSemanticSpansByVideoAndUnit(ctx context.Context, arg ListSemanticSpansByVideoAndUnitParams) ([]CatalogVideoSemanticSpan, error) {
-	rows, err := q.db.Query(ctx, listSemanticSpansByVideoAndUnit, arg.VideoID, arg.CoarseUnitID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogVideoSemanticSpan{}
-	for rows.Next() {
-		var i CatalogVideoSemanticSpan
-		if err := rows.Scan(
-			&i.VideoID,
-			&i.SentenceIndex,
-			&i.SpanIndex,
-			&i.CoarseUnitID,
-			&i.StartMs,
-			&i.EndMs,
 		); err != nil {
 			return nil, err
 		}

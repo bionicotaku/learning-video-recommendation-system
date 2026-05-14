@@ -1,4 +1,5 @@
 .PHONY: fmt lint test quick-check check sqlc-generate learningengine-test-integration integration-test recommendation-test-integration e2e-test \
+	analytics-migrate-up analytics-migrate-down analytics-migrate-version analytics-migrate-status \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
 	learningengine-migrate-up learningengine-migrate-down learningengine-migrate-version learningengine-migrate-status \
 	recommendation-migrate-up recommendation-migrate-down recommendation-migrate-version recommendation-migrate-status \
@@ -37,6 +38,18 @@ e2e-test:
 check:
 	$(MAKE) quick-check
 	$(MAKE) integration-test
+
+analytics-migrate-up:
+	go run ./cmd/dbtool migrate up --module=analytics
+
+analytics-migrate-down:
+	go run ./cmd/dbtool migrate down --module=analytics
+
+analytics-migrate-version:
+	go run ./cmd/dbtool migrate version --module=analytics
+
+analytics-migrate-status:
+	go run ./cmd/dbtool migrate status --module=analytics
 
 catalog-migrate-up:
 	go run ./cmd/dbtool migrate up --module=catalog

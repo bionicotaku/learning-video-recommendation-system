@@ -53,7 +53,12 @@ create table if not exists catalog.video_unit_index (
   coverage_ms integer not null,
   coverage_ratio numeric(6,5) not null,
   sentence_indexes integer[] not null,
-  evidence_span_refs jsonb not null
+  best_evidence_sentence_index integer not null,
+  best_evidence_span_index integer not null,
+  best_evidence_source text not null,
+  best_evidence_model text,
+  best_evidence_version integer not null,
+  best_evidence_metadata jsonb not null
 );
 
 create table if not exists catalog.video_semantic_spans (
@@ -110,7 +115,12 @@ select
   null::integer as coverage_ms,
   null::numeric(6,5) as coverage_ratio,
   '{}'::integer[] as sentence_indexes,
-  '[]'::jsonb as evidence_span_refs,
+  null::integer as best_evidence_sentence_index,
+  null::integer as best_evidence_span_index,
+  null::text as best_evidence_source,
+  null::text as best_evidence_model,
+  null::integer as best_evidence_version,
+  '{}'::jsonb as best_evidence_metadata,
   null::integer as duration_ms,
   null::numeric(6,5) as mapped_span_ratio,
   null::text as status,

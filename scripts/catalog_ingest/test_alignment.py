@@ -11,6 +11,9 @@ from scripts.catalog_ingest.models import (
     LoadedClipInput,
     NormalizedCoreRows,
     ParentClipDescriptor,
+    QuestionInput,
+    SelectedCoarseUnitRef,
+    SelectedCoarseUnitRefs,
     TranscriptSemanticElement,
     TranscriptSentence,
     TranscriptToken,
@@ -18,6 +21,7 @@ from scripts.catalog_ingest.models import (
     VideoSemanticSpanRow,
     VideoTranscriptSentenceRow,
 )
+from scripts.catalog_ingest.repository import CatalogRepository
 from scripts.catalog_ingest.validator import validate_loaded_clip
 
 
@@ -27,8 +31,10 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
             root = Path(tmp_dir)
             parents_dir = root / "parents"
             transcripts_dir = root / "transcripts"
+            questions_dir = root / "questions"
             parents_dir.mkdir()
             transcripts_dir.mkdir()
+            questions_dir.mkdir()
 
             (parents_dir / "demo.json").write_text(
                 json.dumps(
@@ -81,8 +87,16 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            (questions_dir / "demo-clip1.json").write_text(
+                json.dumps(_question_payload(coarse_unit_id=7, sentence_index=0, token_index=0)),
+                encoding="utf-8",
+            )
 
-            loaded = load_clip_inputs(parents_dir=parents_dir, transcripts_dir=transcripts_dir)
+            loaded = load_clip_inputs(
+                parents_dir=parents_dir,
+                transcripts_dir=transcripts_dir,
+                questions_dir=questions_dir,
+            )
 
         token = loaded[0].transcript_sentences[0].tokens[0]
         sentence = loaded[0].transcript_sentences[0]
@@ -133,8 +147,12 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertFalse(hasattr(normalized.spans[0], "dictionary_text"))
         self.assertFalse(hasattr(normalized.spans[0], "translation"))
 
-    def test_unit_index_uses_structured_refs_sentence_dedup_limit_five_and_no_surface_forms(self) -> None:
-        clip_input = _build_clip_input()
+    def test_unit_index_uses_selected_best_evidence_and_no_surface_forms(self) -> None:
+        clip_input = _build_clip_input(
+            selected_refs=(
+                SelectedCoarseUnitRef(coarse_unit_id=42, sentence_index=2, token_index=3),
+            )
+        )
         core_rows = NormalizedCoreRows(
             video=VideoRow(
                 source_clip_key=clip_input.source_clip_key,
@@ -179,11 +197,136 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         unit_index = normalized.unit_indexes[0]
 
         self.assertEqual(unit_index.sentence_indexes, (0, 1, 2, 3, 4, 5))
-        self.assertEqual(
-            tuple((ref.sentence_index, ref.span_index) for ref in unit_index.evidence_span_refs),
-            ((0, 1), (1, 2), (2, 1), (3, 0), (4, 2)),
-        )
+        self.assertEqual((unit_index.best_evidence_ref.sentence_index, unit_index.best_evidence_ref.span_index), (2, 3))
+        self.assertEqual(unit_index.best_evidence_source, "selected_coarse_unit_refs")
         self.assertFalse(hasattr(unit_index, "sample_surface_forms"))
+        self.assertFalse(hasattr(unit_index, "evidence_span_refs"))
+
+    def test_load_clip_inputs_skips_when_question_file_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            parents_dir = root / "parents"
+            transcripts_dir = root / "transcripts"
+            questions_dir = root / "questions"
+            parents_dir.mkdir()
+            transcripts_dir.mkdir()
+            questions_dir.mkdir()
+            _write_parent_file(parents_dir / "demo.json")
+            _write_transcript_file(transcripts_dir / "demo-clip1.json", coarse_unit_id=7)
+
+            loaded = load_clip_inputs(
+                parents_dir=parents_dir,
+                transcripts_dir=transcripts_dir,
+                questions_dir=questions_dir,
+            )
+
+        self.assertEqual(loaded[0].skip_reason_code, "question_missing")
+
+    def test_selected_refs_must_match_transcript_mapped_units(self) -> None:
+        clip_input = _build_clip_input(
+            transcript_sentences=(
+                _sentence(index=0, coarse_unit_id=7),
+                _sentence(index=1, coarse_unit_id=8),
+            ),
+            selected_refs=(
+                SelectedCoarseUnitRef(coarse_unit_id=7, sentence_index=0, token_index=0),
+            ),
+        )
+
+        with self.assertRaisesRegex(Exception, "一对一"):
+            validate_loaded_clip(
+                clip_input=clip_input,
+                known_coarse_unit_ids={7, 8},
+                time_tolerance_ms=0,
+            )
+
+    def test_selected_ref_must_point_to_matching_token(self) -> None:
+        clip_input = _build_clip_input(
+            transcript_sentences=(
+                _sentence(index=0, coarse_unit_id=7),
+            ),
+            selected_refs=(
+                SelectedCoarseUnitRef(coarse_unit_id=7, sentence_index=0, token_index=9),
+            ),
+        )
+
+        with self.assertRaisesRegex(Exception, "不存在的 token"):
+            validate_loaded_clip(
+                clip_input=clip_input,
+                known_coarse_unit_ids={7},
+                time_tolerance_ms=0,
+            )
+
+    def test_question_id_is_deterministic_for_same_question_payload(self) -> None:
+        clip_input = _build_clip_input()
+        core_rows = NormalizedCoreRows(
+            video=VideoRow(
+                source_clip_key=clip_input.source_clip_key,
+                parent_video_name=clip_input.parent_video_name,
+                parent_video_slug=clip_input.parent_video_slug,
+                clip_seq=clip_input.clip_seq,
+                source_start_ms=clip_input.source_start_ms,
+                source_end_ms=clip_input.source_end_ms,
+                title=clip_input.title,
+                description=clip_input.description,
+                clip_reason=clip_input.clip_reason,
+                language=clip_input.language,
+                duration_ms=clip_input.duration_ms,
+                hls_master_playlist_path=clip_input.hls_master_playlist_path,
+                thumbnail_url=clip_input.thumbnail_url,
+                status="active",
+                visibility_status="public",
+                publish_at=clip_input.publish_at,
+            ),
+            sentences=(VideoTranscriptSentenceRow(sentence_index=0, start_ms=0, end_ms=100),),
+            spans=(VideoSemanticSpanRow(0, 0, 0, 50, 1),),
+        )
+
+        first = build_normalized_clip_data(clip_input, core_rows)
+        second = build_normalized_clip_data(clip_input, core_rows)
+
+        self.assertEqual(first.questions[0].question_id, second.questions[0].question_id)
+        self.assertEqual(first.questions[0].scope_type, "video_unit")
+
+    def test_repository_upserts_questions_and_retires_stale_video_questions(self) -> None:
+        clip_input = _build_clip_input()
+        core_rows = NormalizedCoreRows(
+            video=VideoRow(
+                source_clip_key=clip_input.source_clip_key,
+                parent_video_name=clip_input.parent_video_name,
+                parent_video_slug=clip_input.parent_video_slug,
+                clip_seq=clip_input.clip_seq,
+                source_start_ms=clip_input.source_start_ms,
+                source_end_ms=clip_input.source_end_ms,
+                title=clip_input.title,
+                description=clip_input.description,
+                clip_reason=clip_input.clip_reason,
+                language=clip_input.language,
+                duration_ms=clip_input.duration_ms,
+                hls_master_playlist_path=clip_input.hls_master_playlist_path,
+                thumbnail_url=clip_input.thumbnail_url,
+                status="active",
+                visibility_status="public",
+                publish_at=clip_input.publish_at,
+            ),
+            sentences=(VideoTranscriptSentenceRow(sentence_index=0, start_ms=0, end_ms=100),),
+            spans=(VideoSemanticSpanRow(0, 0, 0, 50, 1),),
+        )
+        normalized = build_normalized_clip_data(clip_input, core_rows)
+        cursor = _FakeCursor()
+
+        CatalogRepository("postgresql://unused")._replace_question_rows(cursor, "video-1", normalized)
+
+        self.assertEqual(len(cursor.executemany_calls), 1)
+        insert_sql, params = cursor.executemany_calls[0]
+        self.assertIn("insert into catalog.questions", insert_sql)
+        self.assertEqual(params[0][0], normalized.questions[0].question_id)
+        self.assertEqual(params[0][5], "video-1")
+        self.assertEqual(len(cursor.execute_calls), 1)
+        retire_sql, retire_params = cursor.execute_calls[0]
+        self.assertIn("status = 'retired'", retire_sql)
+        self.assertEqual(retire_params[0], "video-1")
+        self.assertEqual(retire_params[1], [normalized.questions[0].question_id])
 
     def test_token_outside_sentence_stays_warning_for_assemblyai_edge_case(self) -> None:
         clip_input = _build_clip_input(
@@ -222,6 +365,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
 
 def _build_clip_input(
     transcript_sentences: tuple[TranscriptSentence, ...] | None = None,
+    selected_refs: tuple[SelectedCoarseUnitRef, ...] | None = None,
 ) -> LoadedClipInput:
     sentences = transcript_sentences or (
         TranscriptSentence(
@@ -279,7 +423,160 @@ def _build_clip_input(
         transcript_sentences=sentences,
         raw_parent_payload={"clips": []},
         raw_transcript_payload={"sentences": []},
+        expected_question_filename="parent-clip1.json",
+        question_file_path=Path("parent-clip1.json"),
+        questions=(
+            QuestionInput(
+                scope_type="video_unit",
+                question_type="context_meaning_choice",
+                coarse_unit_id=(selected_refs[0].coarse_unit_id if selected_refs else sentences[0].tokens[0].semantic_element.coarse_id),
+                target_text="default",
+                context_sentence_index=(selected_refs[0].sentence_index if selected_refs else sentences[0].index),
+                context_span_index=(selected_refs[0].token_index if selected_refs else sentences[0].tokens[0].index),
+                context_start_ms=sentences[0].start_ms,
+                context_end_ms=sentences[0].end_ms,
+                content_payload=_content_payload(),
+                status="draft",
+            ),
+        ),
+        selected_coarse_unit_refs=SelectedCoarseUnitRefs(
+            version=1,
+            selection_model="test-model",
+            selection_top_k=5,
+            allowed_question_types=("context_meaning_choice",),
+            refs=selected_refs
+            or (
+                SelectedCoarseUnitRef(
+                    coarse_unit_id=sentences[0].tokens[0].semantic_element.coarse_id,
+                    sentence_index=sentences[0].index,
+                    token_index=sentences[0].tokens[0].index,
+                ),
+            ),
+        ),
+        raw_question_payload={"source": {"model": "test-source"}, "questions": []},
     )
+
+
+def _write_parent_file(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "clips": [
+                    {
+                        "clip_id": 1,
+                        "buffered_start_time": 100,
+                        "buffered_end_time": 200,
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_transcript_file(path: Path, coarse_unit_id: int) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "sentences": [
+                    {
+                        "index": 0,
+                        "text": "demo",
+                        "translation": "demo",
+                        "start": 110,
+                        "end": 150,
+                        "tokens": [
+                            {
+                                "index": 0,
+                                "text": "demo",
+                                "start": 110,
+                                "end": 150,
+                                "semantic_element": {"coarse_id": coarse_unit_id},
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _question_payload(coarse_unit_id: int, sentence_index: int, token_index: int) -> dict[str, object]:
+    return {
+        "source": {"model": "test-source"},
+        "questions": [
+            {
+                "scope_type": "video_unit",
+                "question_type": "context_meaning_choice",
+                "coarse_unit_id": coarse_unit_id,
+                "target_text": "demo",
+                "context_sentence_index": sentence_index,
+                "context_span_index": token_index,
+                "context_start_ms": 110,
+                "context_end_ms": 150,
+                "content_payload": _content_payload(),
+                "status": "draft",
+            }
+        ],
+        "audit": {},
+        "selected_coarse_unit_refs": {
+            "version": 1,
+            "selection_model": "test-model",
+            "selection_top_k": 5,
+            "allowed_question_types": ["context_meaning_choice"],
+            "refs": [
+                {
+                    "coarse_unit_id": coarse_unit_id,
+                    "sentence_index": sentence_index,
+                    "token_index": token_index,
+                }
+            ],
+        },
+    }
+
+
+def _content_payload() -> dict[str, object]:
+    return {
+        "question": "demo?",
+        "options": [
+            {"id": "correct", "text": "right"},
+            {"id": "wrong_1", "text": "wrong"},
+        ],
+        "explanation": "demo",
+    }
+
+
+def _sentence(index: int, coarse_unit_id: int) -> TranscriptSentence:
+    return TranscriptSentence(
+        index=index,
+        text=f"sentence {index}",
+        translation=None,
+        start_ms=index * 100,
+        end_ms=index * 100 + 50,
+        tokens=(
+            TranscriptToken(
+                index=0,
+                text="token",
+                explanation=None,
+                start_ms=index * 100,
+                end_ms=index * 100 + 40,
+                semantic_element=TranscriptSemanticElement(coarse_id=coarse_unit_id),
+            ),
+        ),
+    )
+
+
+class _FakeCursor:
+    def __init__(self) -> None:
+        self.execute_calls: list[tuple[str, tuple[object, ...]]] = []
+        self.executemany_calls: list[tuple[str, list[tuple[object, ...]]]] = []
+
+    def execute(self, sql: str, params: tuple[object, ...]) -> None:
+        self.execute_calls.append((sql, params))
+
+    def executemany(self, sql: str, params: list[tuple[object, ...]]) -> None:
+        self.executemany_calls.append((sql, params))
 
 
 if __name__ == "__main__":

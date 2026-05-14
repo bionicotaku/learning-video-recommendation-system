@@ -48,6 +48,8 @@ def validate_loaded_clip(
     _validate_time_range(clip_input, time_tolerance_ms=time_tolerance_ms)
     warnings = _validate_sentence_and_token_structure(clip_input)
     _validate_coarse_ids(clip_input, known_coarse_set)
+    _validate_questions(clip_input, known_coarse_set)
+    _validate_selected_coarse_unit_refs(clip_input)
     return warnings
 
 
@@ -230,6 +232,183 @@ def _validate_coarse_ids(clip_input: LoadedClipInput, known_coarse_set: set[int]
                         "coarse_id": token.semantic_element.coarse_id,
                     },
                 )
+
+
+def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int]) -> None:
+    """校验 question JSON 的题目结构是否符合 catalog.questions 契约。"""
+
+    if clip_input.question_file_path is None:
+        raise _error(clip_input, "question_invalid", "question_file_path 不能为空")
+    if clip_input.raw_question_payload is None:
+        raise _error(clip_input, "question_invalid", "raw_question_payload 不能为空")
+    if clip_input.selected_coarse_unit_refs is None:
+        raise _error(clip_input, "question_invalid", "selected_coarse_unit_refs 不能为空")
+
+    valid_scope_types = {"unit", "video_unit"}
+    valid_question_types = {
+        "context_meaning_choice",
+        "unit_meaning_choice",
+        "context_cloze_choice",
+        "reverse_identification_choice",
+    }
+    valid_statuses = {"draft", "active", "retired", "rejected"}
+
+    for question in clip_input.questions:
+        if question.scope_type not in valid_scope_types:
+            raise _error(clip_input, "question_invalid", "question.scope_type 不合法", {"scope_type": question.scope_type})
+        if question.question_type not in valid_question_types:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "question.question_type 不合法",
+                {"question_type": question.question_type},
+            )
+        if question.status not in valid_statuses:
+            raise _error(clip_input, "question_invalid", "question.status 不合法", {"status": question.status})
+        if question.coarse_unit_id not in known_coarse_set:
+            raise _error(
+                clip_input,
+                "coarse_unit_missing",
+                "question.coarse_unit_id 在 semantic.coarse_unit 中不存在",
+                {"coarse_id": question.coarse_unit_id},
+            )
+        if not question.target_text.strip():
+            raise _error(clip_input, "question_invalid", "question.target_text 不能为空")
+        _validate_content_payload(clip_input, question.content_payload)
+        if question.scope_type == "video_unit":
+            missing_context_fields = [
+                name
+                for name, value in (
+                    ("context_sentence_index", question.context_sentence_index),
+                    ("context_span_index", question.context_span_index),
+                    ("context_start_ms", question.context_start_ms),
+                    ("context_end_ms", question.context_end_ms),
+                )
+                if value is None
+            ]
+            if missing_context_fields:
+                raise _error(
+                    clip_input,
+                    "question_invalid",
+                    "video_unit question 必须包含完整 context 字段",
+                    {"missing_context_fields": missing_context_fields},
+                )
+        if (
+            question.context_start_ms is not None
+            and question.context_end_ms is not None
+            and question.context_end_ms <= question.context_start_ms
+        ):
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "question.context_end_ms 必须大于 context_start_ms",
+                {
+                    "context_start_ms": question.context_start_ms,
+                    "context_end_ms": question.context_end_ms,
+                },
+            )
+
+
+def _validate_content_payload(clip_input: LoadedClipInput, content_payload: dict[str, object]) -> None:
+    """校验前端题目 payload 的最低稳定契约。"""
+
+    question_text = content_payload.get("question")
+    if not isinstance(question_text, str) or not question_text.strip():
+        raise _error(clip_input, "question_invalid", "content_payload.question 不能为空")
+
+    options = content_payload.get("options")
+    if not isinstance(options, list) or not options:
+        raise _error(clip_input, "question_invalid", "content_payload.options 必须是非空数组")
+
+    option_ids: list[str] = []
+    for option in options:
+        if not isinstance(option, dict):
+            raise _error(clip_input, "question_invalid", "content_payload.options 每一项都必须是对象")
+        option_id = option.get("id")
+        option_text = option.get("text")
+        if not isinstance(option_id, str) or not option_id.strip():
+            raise _error(clip_input, "question_invalid", "content_payload.options[].id 不能为空")
+        if not isinstance(option_text, str) or not option_text.strip():
+            raise _error(clip_input, "question_invalid", "content_payload.options[].text 不能为空")
+        option_ids.append(option_id)
+
+    if "correct" not in option_ids:
+        raise _error(clip_input, "question_invalid", "content_payload.options 必须包含 id=correct")
+    duplicated_option_ids = [option_id for option_id, count in Counter(option_ids).items() if count > 1]
+    if duplicated_option_ids:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "content_payload.options[].id 不能重复",
+            {"duplicated_option_ids": duplicated_option_ids},
+        )
+
+
+def _validate_selected_coarse_unit_refs(clip_input: LoadedClipInput) -> None:
+    """校验 selected refs 与 transcript 中 mapped coarse unit 严格一对一。"""
+
+    selected_refs = clip_input.selected_coarse_unit_refs
+    if selected_refs is None:
+        raise _error(clip_input, "question_invalid", "selected_coarse_unit_refs 不能为空")
+
+    token_by_ref: dict[tuple[int, int], int | None] = {}
+    mapped_coarse_unit_ids: set[int] = set()
+    for sentence in clip_input.transcript_sentences:
+        for token in sentence.tokens:
+            coarse_id = token.semantic_element.coarse_id if token.semantic_element else None
+            token_by_ref[(sentence.index, token.index)] = coarse_id
+            if coarse_id is not None:
+                mapped_coarse_unit_ids.add(coarse_id)
+
+    ref_coarse_unit_ids = [ref.coarse_unit_id for ref in selected_refs.refs]
+    duplicated_ref_coarse_unit_ids = [
+        coarse_unit_id for coarse_unit_id, count in Counter(ref_coarse_unit_ids).items() if count > 1
+    ]
+    if duplicated_ref_coarse_unit_ids:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs.refs 中 coarse_unit_id 不能重复",
+            {"duplicated_coarse_unit_ids": duplicated_ref_coarse_unit_ids},
+        )
+
+    ref_coarse_set = set(ref_coarse_unit_ids)
+    if ref_coarse_set != mapped_coarse_unit_ids:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs.refs 必须与 transcript mapped coarse units 一对一",
+            {
+                "missing_ref_coarse_unit_ids": sorted(mapped_coarse_unit_ids - ref_coarse_set),
+                "extra_ref_coarse_unit_ids": sorted(ref_coarse_set - mapped_coarse_unit_ids),
+            },
+        )
+
+    for ref in selected_refs.refs:
+        token_coarse_id = token_by_ref.get((ref.sentence_index, ref.token_index))
+        if (ref.sentence_index, ref.token_index) not in token_by_ref:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "selected_coarse_unit_refs ref 指向不存在的 token",
+                {
+                    "coarse_unit_id": ref.coarse_unit_id,
+                    "sentence_index": ref.sentence_index,
+                    "token_index": ref.token_index,
+                },
+            )
+        if token_coarse_id != ref.coarse_unit_id:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "selected_coarse_unit_refs ref 与 token coarse_id 不一致",
+                {
+                    "ref_coarse_unit_id": ref.coarse_unit_id,
+                    "token_coarse_unit_id": token_coarse_id,
+                    "sentence_index": ref.sentence_index,
+                    "token_index": ref.token_index,
+                },
+            )
 
 
 def _error(
