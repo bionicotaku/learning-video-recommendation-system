@@ -17,7 +17,7 @@ Catalog 的设计目标有五个。第一，数据库中的视频对象必须直
 
 旧式 `catalog.videos` 往往围绕“上传后处理流水线”组织，表内既保存原始文件信息，也保存媒体转码状态、AI 分析状态、产出状态和发布状态。这种模式适合“平台内自己接收原始视频并驱动流水线”的系统，但与当前场景不匹配。当前现实情况是：原始视频不进数据库，长视频在库外已完成切片，每个切片的视频 HLS 与 transcript JSON 也已经生成。因此，数据库应从“流水线状态机”收缩为“内容资产与索引层”。
 
-Catalog 只负责以下五类内容：切片视频内容资产主记录、transcript 元数据、sentence/span 时间定位与索引模型、从 semantic span 聚合而来的 Recall-ready 视频级 coarse unit 索引、单 clip 入库审计、用户对视频互动状态的聚合投影。Catalog 不负责 Learning state、Recommendation serving state、Recommendation audit、原始视频实体、媒体 / AI 流水线状态机，也不提前维护高层语义评分字段。Recommendation 自己的 serving state 与 recommendation audit 必须留在 `recommendation` schema，Learning engine 自己的学习事件与学习状态必须留在 `learning` schema。
+Catalog 只负责以下六类内容：切片视频内容资产主记录、transcript 元数据、sentence/span 时间定位与索引模型、从 semantic span 聚合而来的 Recall-ready 视频级 coarse unit 索引、单 clip 入库审计、用户对视频互动状态的聚合投影、视频级全局互动统计投影。Catalog 不负责 Learning state、Recommendation serving state、Recommendation audit、原始视频实体、媒体 / AI 流水线状态机，也不提前维护高层语义评分字段。Recommendation 自己的 serving state 与 recommendation audit 必须留在 `recommendation` schema，Learning engine 自己的学习事件与学习状态必须留在 `learning` schema。
 
 ## 3. 核心设计原则
 
@@ -37,7 +37,7 @@ Catalog 只负责以下五类内容：切片视频内容资产主记录、transc
 
 ## 4. 最终表清单与关系总览
 
-当前最终设计下，`catalog` schema 保留 7 张业务表：
+当前最终设计下，`catalog` schema 保留 8 张业务表：
 
 1. `catalog.videos`
 2. `catalog.video_transcripts`
@@ -46,6 +46,7 @@ Catalog 只负责以下五类内容：切片视频内容资产主记录、transc
 5. `catalog.video_unit_index`
 6. `catalog.video_ingestion_records`
 7. `catalog.video_user_states`
+8. `catalog.video_engagement_stats`
 
 表间关系如下：
 
@@ -55,10 +56,11 @@ catalog.videos
     ├── 1:N  -> catalog.video_transcript_sentences
     ├── 1:N  -> catalog.video_semantic_spans
     ├── 1:N  -> catalog.video_unit_index
-    └── 1:N  -> catalog.video_user_states
+    ├── 1:N  -> catalog.video_user_states
+    └── 1:1  -> catalog.video_engagement_stats
 ```
 
-未来最重要的读路径有三条：视频播放与字幕展示走 `videos -> video_transcripts.transcript_object_path -> 原始 JSON`；Recommendation / Recall 走 `coarse_unit_id -> video_unit_index -> candidate videos -> spans / sentences 时间定位`；用户视频消费状态读取走 `video_user_states`。
+未来最重要的读路径有四条：视频播放与字幕展示走 `videos -> video_transcripts.transcript_object_path -> 原始 JSON`；Recommendation / Recall 走 `coarse_unit_id -> video_unit_index -> candidate videos -> spans / sentences 时间定位`；用户视频消费状态读取走 `video_user_states`；feed/detail 的视频全局互动数字读取走 `video_engagement_stats`。
 
 ## 5. `catalog.videos`
 
@@ -208,35 +210,56 @@ sentence-level `translation`、`semantic_element.base_form`、`semantic_element.
 - `last_watched_at timestamptz null`
 - `watch_count integer not null default 0`
 - `completed_count integer not null default 0`
-- `last_watch_ratio numeric(6,5) null`
-- `max_watch_ratio numeric(6,5) null`
+- `last_position_ms integer not null default 0`
+- `max_position_ms integer not null default 0`
+- `total_watch_ms bigint not null default 0`
 - `updated_at timestamptz not null default now()`
 
-必要约束应包括：`primary key (user_id, video_id)`、`foreign key (user_id) references auth.users(id) on delete cascade`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (watch_count >= 0)`、`check (completed_count >= 0)`、`check (last_watch_ratio is null or (last_watch_ratio between 0 and 1))`、`check (max_watch_ratio is null or (max_watch_ratio between 0 and 1))`。推荐索引包括：`primary key (user_id, video_id)`、`(video_id)`、`(user_id, last_watched_at desc)`。这里明确不保留旧版 `occurred_at`，因为它无法清晰表示 like/bookmark/watch 三类行为中到底是哪一个事件时间。
+必要约束应包括：`primary key (user_id, video_id)`、`foreign key (user_id) references auth.users(id) on delete cascade`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (watch_count >= 0)`、`check (completed_count >= 0)`、`check (last_position_ms >= 0)`、`check (max_position_ms >= 0)`、`check (total_watch_ms >= 0)`。推荐索引包括：`primary key (user_id, video_id)`、`(video_id)`、`(user_id, last_watched_at desc)`。这里明确不保留旧版 `occurred_at`，因为它无法清晰表示 like/bookmark/watch 三类行为中到底是哪一个事件时间。
 
-## 12. 原始 transcript JSON 的保留策略
+`last_position_ms` 表示用户最近一次观看 session 最后停留的位置，用于恢复播放；`max_position_ms` 表示用户历史到达过的最远播放位置，用于派生观看比例；`total_watch_ms` 表示用户对该视频累计有效播放时长。`last_watch_ratio` 与 `max_watch_ratio` 不再持久化，观看比例统一通过 `position_ms / catalog.videos.duration_ms` 派生。
+
+## 12. `catalog.video_engagement_stats`
+
+`catalog.video_engagement_stats` 是视频级全局互动统计投影表。它是 feed、detail、排行和后台快速读取的读模型，不是原始事件真相表。原始观看 session 事实属于 `analytics.video_watch_events`，用户级状态属于 `catalog.video_user_states`；本表只保存可重建的全局聚合结果，避免热路径每次从事件表或用户状态表实时聚合。
+
+建议字段如下：
+
+- `video_id uuid not null`：主键，同时外键到 `catalog.videos(video_id)`
+- `view_count bigint not null default 0`：全局观看 session 数，语义等同于所有用户 `watch_count` 的聚合
+- `like_count bigint not null default 0`：当前点赞该视频的用户数
+- `favorite_count bigint not null default 0`：当前收藏该视频的用户数，对应 `catalog.video_user_states.has_bookmarked = true`
+- `completed_count bigint not null default 0`：全局完成观看 session 数
+- `total_watch_ms bigint not null default 0`：全局累计有效播放时长
+- `updated_at timestamptz not null default now()`
+
+必要约束应包括：`primary key (video_id)`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (view_count >= 0)`、`check (like_count >= 0)`、`check (favorite_count >= 0)`、`check (completed_count >= 0)`、`check (total_watch_ms >= 0)`。
+
+本表不保存 Recommendation 曝光次数，也不替代 Recommendation serving/audit。后续 watch-progress 写入逻辑应使用同一事务中的 delta 更新维护本表；后台重建任务可以从 `catalog.video_user_states` 与 `analytics.video_watch_events` 重算并校准。
+
+## 13. 原始 transcript JSON 的保留策略
 
 原始 transcript JSON 仍然保留在对象存储中，作为权威原始输入、字幕展示和审计来源。数据库不把整坨 JSON 存成主读模型，也不重复保存 subtitle 文本、翻译、词典、解释或映射理由；数据库只保存 `catalog.video_transcripts` 元数据、`catalog.video_transcript_sentences` 时间定位、`catalog.video_semantic_spans` 时间定位与 coarse unit 映射，以及 `catalog.video_unit_index` 聚合索引。HLS 路径放在 `catalog.videos`，transcript 原始 JSON 路径、checksum、format version 放在 `catalog.video_transcripts`。
 
-## 13. 入库流程设计
+## 14. 入库流程设计
 
 Catalog 的入库采用**单 clip 单事务 replace 写入，并为每次执行记录单条入库审计**。这意味着：每个 clip 的一次执行都由 `video_ingestion_records` 记录；每个 clip 在数据库中要么整体成功，要么整体不落地；transcript 展开和 `video_unit_index` 聚合都在同一事务内完成。
 
 单 clip 入库步骤应固定为：先读取 manifest、同名 transcript JSON 与同名 question JSON；再校验内容资产元数据，包括 `source_clip_key`、`parent_video_name`、`title`、`duration_ms`、`hls_master_playlist_path`、`transcript_object_path`、`transcript_checksum` 必须合法；再校验 transcript 结构，包括存在 `sentences`、sentence 的 `index/text/start/end` 合法、`end_ms > start_ms`、span 的 `index/text/start/end` 合法；若 span 时间超出所属 sentence 时间区间，则当前阶段记 warning 后继续入库，因为上游 AssemblyAI transcript 的原始输出偶尔会出现这类边界异常；若 `coarse_id` 非空则必须存在于 `semantic.coarse_unit`。question JSON 中的 `selected_coarse_unit_refs.refs` 必须与 transcript 中出现的 mapped coarse unit 一对一，且每个 ref 都能回查到同一 coarse unit 的 token；`questions[]` 只作为视频上下文题入库，写库时固定使用 `scope_type = 'video_unit'` 并绑定当前 clip 的 `video_id`。之后在应用层归一化生成 transcript 统计、sentence 时间行、semantic span 时间/映射行、`video_unit_index` 聚合结果和 `catalog.questions` 写入行；最后在同一事务中依次 upsert `catalog.videos`、replace `catalog.video_transcripts`、replace `catalog.video_transcript_sentences`、replace `catalog.video_semantic_spans`、replace `catalog.video_unit_index`、upsert `catalog.questions`，成功则写 `status = succeeded` 并关联 `video_id`，失败则回滚并写 `status = failed`、`error_code` 与 `error_message`。
 
-## 14. 轻量后处理逻辑
+## 15. 轻量后处理逻辑
 
 这里的后处理不是另一条重型异步流水线，而是单 clip 入库过程中的轻量派生计算。首先，根据 sentence 与 spans 生成 transcript 摘要：`sentence_count`、`semantic_span_count`、`mapped_span_count`、`unmapped_span_count`、`mapped_span_ratio`，写入 `catalog.video_transcripts`。其次，从 `catalog.video_semantic_spans` 中所有 `coarse_unit_id is not null` 的行，按 `(video_id, coarse_unit_id)` 聚合出 `mention_count`、`sentence_count`、`first_start_ms`、`last_end_ms`、`sentence_indexes`。再次，计算 `coverage_ms` 时，不能简单累加 span 时长，而应先取同一 `(video_id, coarse_unit_id)` 下所有 span 区间，按开始时间排序，合并重叠区间，再对合并后的区间求总时长，然后计算 `coverage_ratio = coverage_ms / videos.duration_ms`。最后，为每个 `(video_id, coarse_unit_id)` 生成一条 `best_evidence`。
 
 当前正式入库阶段，`best_evidence` 不再由 deterministic fallback 生成，而是直接来自同名 question JSON 的 `selected_coarse_unit_refs.refs`。每个 ref 必须与 transcript 中出现的 mapped coarse unit 严格一对一；`ref.token_index` 直接映射为 `catalog.video_semantic_spans.span_index`。如果 refs 与 transcript 中的 coarse unit 集合不一致、重复、缺失，或 ref 指向的 token 不存在 / token 的 `semantic_element.coarse_id` 不匹配，则该 clip 入库失败。`best_evidence_source` 写为 `selected_coarse_unit_refs`，`best_evidence_model/version/metadata` 记录 selection model、version、top_k、allowed question types、question 文件路径等审计信息。
 
-## 15. 幂等与更新策略
+## 16. 幂等与更新策略
 
 Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一次导入与数据库中的唯一 clip 实体对齐。
 
 跳过策略如下：如果 `source_clip_key` 已存在、transcript checksum 未变化、HLS 路径未变化、主要元数据未变化，则当前导入项可直接标记为 `skipped`。replace 策略如下：如果 transcript checksum 变化、HLS 路径变化、时长变化、transcript 结构化内容变化、或标题/描述变化，则执行完整 replace 写入，即重写 `video_transcripts`、`video_transcript_sentences`、`video_semantic_spans`、`video_unit_index`。这样既保证幂等，也保证当事实发生变化时，所有派生层保持一致。
 
-## 16. 与 Recommendation / Recall 的数据契约
+## 17. 与 Recommendation / Recall 的数据契约
 
 当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 jump-to / 精细证据定位时，再通过 `best_evidence_sentence_index` 与 `best_evidence_span_index` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 只保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`best_evidence_*`、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证高层语义标签，不返回字幕文本；Recommendation 只消费 Catalog 已选定的 unit-level best evidence，并把本轮使用结果保存在 `video_recommendation_items.learning_units` 中。
 
@@ -244,7 +267,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 其中 `recommendation.v_recommendable_video_units` 的 owner、字段 contract、过滤规则与刷新策略，以《推荐模块设计.md》中的权威定义为准。
 
-## 17. 明确不保留或不建立的结构
+## 18. 明确不保留或不建立的结构
 
 为了避免新旧架构混杂，当前最终设计明确不保留旧 `videos` 流水线字段，例如 `upload_user_id`、`raw_file_reference`、`media_status`、`analysis_status`、`media_job_id`、`analysis_job_id`、各种原始文件参数与中间态错误字段。这些都不属于当前内容资产层。
 
@@ -252,7 +275,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 同样，不在当前版本的 `video_unit_index` 中提前固化 `role`、`context_relevance`、`teachability_score`、`confidence_score` 等高层语义字段；也不把 Recommendation 投放状态塞进 `catalog.video_user_states`。这些都违反当前 Catalog 的边界定义。
 
-## 18. 当前实现约束
+## 19. 当前实现约束
 
 本文档定义的是 Catalog 的最终逻辑 schema 与最终读写契约，因此当前实现必须满足以下约束：
 
@@ -260,8 +283,8 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 - Recommendation 新读路径的正式启用前提，以《视频推荐系统总设计.md》与《推荐模块设计.md》中的系统级契约为准。
 - 若现网仍存在旧版结构、双写、回填或 reader 切换需求，应在单独的迁移/实施文档中描述，不纳入本最终设计文档。
 
-## 19. 最终结论
+## 20. 最终结论
 
 当前 Catalog 的最终设计可以压缩成一句话：
 
-> `catalog` 是一个只负责切片视频内容资产、transcript 结构化读模型、span 聚合索引、单 clip 入库审计和用户视频互动投影的内容事实与内容索引域；它以 `catalog.videos -> catalog.video_transcripts -> catalog.video_transcript_sentences -> catalog.video_semantic_spans -> catalog.video_unit_index` 为核心数据链，以 `video_unit_index.best_evidence_*` 作为单一、无歧义、可回查的 unit-level evidence 定位表达，并通过单 clip 单事务 replace 写入、幂等的 `source_clip_key`、以及确定性的轻量聚合逻辑，稳定为 Recommendation 与 Recall 提供输入。`catalog` 不拥有 Learning state，不拥有 Recommendation serving/audit，不维护媒体/AI 流水线状态机，也不固化 Recommendation ranking/selection 这类高层判断。
+> `catalog` 是一个只负责切片视频内容资产、transcript 结构化读模型、span 聚合索引、单 clip 入库审计、用户视频互动投影和视频级全局互动统计投影的内容事实与内容索引域；它以 `catalog.videos -> catalog.video_transcripts -> catalog.video_transcript_sentences -> catalog.video_semantic_spans -> catalog.video_unit_index` 为核心内容数据链，以 `video_unit_index.best_evidence_*` 作为单一、无歧义、可回查的 unit-level evidence 定位表达，并通过单 clip 单事务 replace 写入、幂等的 `source_clip_key`、以及确定性的轻量聚合逻辑，稳定为 Recommendation 与 Recall 提供输入。`catalog` 不拥有 Learning state，不拥有 Recommendation serving/audit，不维护媒体/AI 流水线状态机，也不固化 Recommendation ranking/selection 这类高层判断。

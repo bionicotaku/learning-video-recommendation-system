@@ -86,7 +86,7 @@ where video_id = sqlc.arg(video_id)
 order by sentence_index asc;
 
 -- name: ListVideoUserStatesByUserAndVideoIDs :many
-select user_id, video_id, last_watched_at, watch_count, completed_count, last_watch_ratio, max_watch_ratio
+select user_id, video_id, last_watched_at, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms
 from catalog.video_user_states
 where user_id = sqlc.arg(user_id)
   and video_id = any(sqlc.arg(video_ids)::uuid[])

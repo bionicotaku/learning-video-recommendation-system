@@ -10,8 +10,7 @@ create table if not exists analytics.video_watch_events (
 
   last_position_ms integer not null default 0,
   max_position_ms integer not null default 0,
-  duration_ms integer,
-  max_watch_ratio numeric(6,5) not null default 0,
+  active_watch_ms bigint not null default 0,
   is_completed boolean not null default false,
 
   progress_report_count integer not null default 0,
@@ -23,10 +22,10 @@ create table if not exists analytics.video_watch_events (
 
   check (last_position_ms >= 0),
   check (max_position_ms >= 0),
-  check (duration_ms is null or duration_ms > 0),
-  check (max_watch_ratio >= 0 and max_watch_ratio <= 1),
+  check (active_watch_ms >= 0),
   check (progress_report_count >= 0),
-  check (jsonb_typeof(client_context) = 'object')
+  check (jsonb_typeof(client_context) = 'object'),
+  check (jsonb_typeof(metadata) = 'object')
 );
 
 create index if not exists idx_video_watch_events_user_video_updated_at

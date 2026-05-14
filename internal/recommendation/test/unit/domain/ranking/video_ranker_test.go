@@ -24,7 +24,7 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 			{VideoID: "video-penalized", LastServedAt: &recentServedAt, ServedCount: 3},
 		},
 		VideoUserStates: []model.VideoUserState{
-			{VideoID: "video-penalized", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxWatchRatio: 0.95},
+			{VideoID: "video-penalized", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxPositionMs: 114_000},
 		},
 	}, []model.VideoCandidate{
 		videoCandidate("video-fresh", model.LearningRoleHardReview, 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, nil),
@@ -60,7 +60,7 @@ func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *t
 			PreferredDurationSec: [2]int{45, 180},
 		},
 		VideoUserStates: []model.VideoUserState{
-			{VideoID: "video-1", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxWatchRatio: 0.95},
+			{VideoID: "video-1", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxPositionMs: 114_000},
 		},
 	}, []model.VideoCandidate{
 		videoCandidate("video-1", model.LearningRoleHardReview, 0.8, 0.7, 0.5, 0.7, 0.2, 120_000, []int64{101}, int64Ptr(101)),
@@ -136,6 +136,7 @@ func videoCandidate(videoID string, dominantRole model.LearningRole, hardCover f
 	}
 	return model.VideoCandidate{
 		VideoID:               videoID,
+		DurationMs:            bestEndMs,
 		DominantRole:          dominantRole,
 		DominantUnitID:        dominantUnitID,
 		LearningUnits:         learningUnits,

@@ -420,22 +420,23 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	}
 }
 
-func (h *Harness) SeedVideoUserState(t *testing.T, userID, videoID string, lastWatchedAt *time.Time, watchCount, completedCount int32, lastWatchRatio, maxWatchRatio float64) {
+func (h *Harness) SeedVideoUserState(t *testing.T, userID, videoID string, lastWatchedAt *time.Time, watchCount, completedCount int32, lastPositionMs, maxPositionMs int32, totalWatchMs int64) {
 	if t != nil {
 		t.Helper()
 	}
 	if _, err := h.Pool.Exec(
 		context.Background(),
 		`insert into catalog.video_user_states (
-			user_id, video_id, last_watched_at, watch_count, completed_count, last_watch_ratio, max_watch_ratio
-		) values ($1, $2, $3, $4, $5, $6, $7)`,
+			user_id, video_id, last_watched_at, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms
+		) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		userID,
 		videoID,
 		lastWatchedAt,
 		watchCount,
 		completedCount,
-		lastWatchRatio,
-		maxWatchRatio,
+		lastPositionMs,
+		maxPositionMs,
+		totalWatchMs,
 	); err != nil {
 		failNow(t, "seed catalog.video_user_states: %v", err)
 	}

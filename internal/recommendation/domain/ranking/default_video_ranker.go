@@ -29,9 +29,9 @@ func (r *DefaultVideoRanker) Rank(recommendationContext model.RecommendationCont
 	ranked := append([]model.VideoCandidate(nil), candidates...)
 	for index := range ranked {
 		candidate := &ranked[index]
-		candidate.FreshnessScore = freshnessScore(videoServingByID[candidate.VideoID], videoUserByID[candidate.VideoID], recommendationContext.Now)
+		candidate.FreshnessScore = freshnessScore(videoServingByID[candidate.VideoID], videoUserByID[candidate.VideoID], candidate.DurationMs, recommendationContext.Now)
 		candidate.RecentServedPenalty = recentServedPenalty(videoServingByID[candidate.VideoID], recommendationContext.Now)
-		candidate.RecentWatchedPenalty = recentWatchedPenalty(videoUserByID[candidate.VideoID], recommendationContext.Now)
+		candidate.RecentWatchedPenalty = recentWatchedPenalty(videoUserByID[candidate.VideoID], candidate.DurationMs, recommendationContext.Now)
 		candidate.OverloadPenalty = overloadPenalty(*candidate, recommendationContext.Request.PreferredDurationSec)
 
 		demandCoverage := 0.50*candidate.HardReviewCover +
@@ -65,12 +65,12 @@ func (r *DefaultVideoRanker) Rank(recommendationContext model.RecommendationCont
 	return ranked, nil
 }
 
-func freshnessScore(serving model.UserVideoServingState, watched model.VideoUserState, now time.Time) float64 {
+func freshnessScore(serving model.UserVideoServingState, watched model.VideoUserState, durationMs int32, now time.Time) float64 {
 	freshness := 1.0
 	if penalty := recentServedPenalty(serving, now); penalty > 0 {
 		freshness -= penalty * 0.50
 	}
-	if penalty := recentWatchedPenalty(watched, now); penalty > 0 {
+	if penalty := recentWatchedPenalty(watched, durationMs, now); penalty > 0 {
 		freshness -= penalty * 0.35
 	}
 	return round4(math.Max(0, freshness))
@@ -85,14 +85,22 @@ func recentServedPenalty(state model.UserVideoServingState, now time.Time) float
 	return round4(math.Min(1.0, recency*0.70+countFactor*0.30))
 }
 
-func recentWatchedPenalty(state model.VideoUserState, now time.Time) float64 {
+func recentWatchedPenalty(state model.VideoUserState, durationMs int32, now time.Time) float64 {
 	recency := 0.0
 	if state.LastWatchedAt != nil {
 		recency = recencyPenalty(now.Sub(*state.LastWatchedAt), 96*time.Hour)
 	}
 	countFactor := math.Min(float64(state.WatchCount)/5.0, 1.0)
 	completionFactor := math.Min(float64(state.CompletedCount)/3.0, 1.0)
-	return round4(math.Min(1.0, recency*0.45+countFactor*0.25+completionFactor*0.10+state.MaxWatchRatio*0.20))
+	return round4(math.Min(1.0, recency*0.45+countFactor*0.25+completionFactor*0.10+watchedRatio(state.MaxPositionMs, durationMs)*0.20))
+}
+
+func watchedRatio(maxPositionMs int32, durationMs int32) float64 {
+	if maxPositionMs <= 0 || durationMs <= 0 {
+		return 0
+	}
+	ratio := float64(maxPositionMs) / float64(durationMs)
+	return math.Min(1.0, math.Max(0.0, ratio))
 }
 
 func overloadPenalty(candidate model.VideoCandidate, preferredDurationSec [2]int) float64 {

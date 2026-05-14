@@ -8,6 +8,7 @@ type VideoUserState struct {
 	LastWatchedAt  *time.Time
 	WatchCount     int32
 	CompletedCount int32
-	LastWatchRatio float64
-	MaxWatchRatio  float64
+	LastPositionMs int32
+	MaxPositionMs  int32
+	TotalWatchMs   int64
 }

@@ -1,27 +1,22 @@
 # 观看进度上报 MVP 设计
 
-本文档描述“用户观看视频进度”的 MVP 设计方案。它是待实施设计，不代表当前仓库已经落地。
-
-当前仓库已经存在 `catalog.video_user_states`，它是用户与视频互动状态的聚合投影表，不是观看流水表。当前没有专门的观看流水表。MVP 不建议新增高频 `play_started / progress / paused / resumed / seeked / completed` 全量事件流水，因为这会带来较高写入量，也会让 reduce 逻辑被 seek、重试、后台切换、重复 progress 上报等细节拖复杂。
-
-推荐方案是新增一张低频观看事件表，并继续维护现有 `catalog.video_user_states`：
+本文档描述“用户观看视频进度”的 MVP 设计方案。当前设计已经收敛为三层数据模型：
 
 ```text
-analytics.video_watch_events  -- 每次观看 session 的低频摘要事件
+analytics.video_watch_events  -- 一次观看 session 的低频摘要事实
 catalog.video_user_states     -- 用户 x 视频的聚合状态
+catalog.video_engagement_stats -- 视频级全局互动统计投影
 ```
 
-`analytics.video_watch_events` 用来保存原始观看事实，提供幂等、去重、完成次数依据和有限可追溯能力。`catalog.video_user_states` 继续作为 Recommendation 读取的轻量消费状态投影。
-
-因为本方案还没有执行，后续落地时应直接使用 `analytics.video_watch_events`，不需要保留旧的 `catalog.video_watch_sessions` 表名或兼容迁移。
+`analytics.video_watch_events` 保存 session 事实，提供幂等、去重、完成次数依据和有限可追溯能力。`catalog.video_user_states` 保存单个用户对单个视频的当前聚合状态。`catalog.video_engagement_stats` 保存视频级全局统计，供 feed/detail 快速读取，避免热路径实时聚合。
 
 ## 1. 设计目标
 
 本方案的目标是：
 
 1. 支持前端以低频方式上报观看进度。
-2. 避免高频事件流水带来的写入和归约复杂度。
-3. 让 `watch_count` 和 `completed_count` 有明确去重依据。
+2. 避免高频播放器事件流水带来的写入和归约复杂度。
+3. 让 `watch_count`、`completed_count` 和 `total_watch_ms` 有明确去重依据。
 4. 保持 Recommendation 只读 `catalog.video_user_states`，不直接依赖观看 session 表。
 5. 保持 Analytics / Catalog / Learning engine / Recommendation 边界清晰。
 
@@ -35,23 +30,17 @@ catalog.video_user_states     -- 用户 x 视频的聚合状态
 
 ## 2. 模块边界
 
-观看进度有两层语义：原始观看事实和聚合消费状态。
+原始观看事实属于 Analytics owner。`analytics.video_watch_events` 只记录用户观看某个视频的一次播放会话摘要。它不是逐秒播放器日志，也不记录推荐曝光。
 
-原始观看事实属于 Analytics owner。`analytics.video_watch_events` 只记录用户观看某个视频的一次播放会话摘要。它不是逐秒播放器日志，也不记录推荐曝光。推荐曝光和冷却仍属于 `recommendation.user_video_serving_states`。
+聚合消费状态属于 Catalog owner。`catalog.video_user_states` 是用户与视频的聚合投影，`catalog.video_engagement_stats` 是视频级全局统计投影。Recommendation 当前只允许读取 `catalog.video_user_states` 中的 `last_watched_at`、`watch_count`、`completed_count`、`last_position_ms`、`max_position_ms` 作为轻量 penalty 输入；观看比例不再持久化，而是用 `max_position_ms / catalog.videos.duration_ms` 派生。
 
-聚合消费状态属于 Catalog owner。`catalog.video_user_states` 继续作为用户与视频的聚合投影。Recommendation 当前只需要读取其中的 `last_watched_at`、`watch_count`、`completed_count`、`last_watch_ratio` 和 `max_watch_ratio` 作为轻量 penalty 输入。
-
-`learning.unit_learning_events` 只记录学习事件，例如正式学习、复习、测验、查词或 exposure。普通观看进度不应自动写入 Learning engine。只有当产品层明确把一次观看行为解释成学习行为时，才应由上层业务另行调用 Learning engine 的学习事件接口。
+`learning.unit_learning_events` 只记录学习事件。普通观看进度不应自动写入 Learning engine。只有当产品层明确把一次观看行为解释成学习行为时，才应由上层业务另行调用 Learning engine 的学习事件接口。
 
 ## 3. 数据库设计
 
 ### 3.1 `analytics.video_watch_events`
 
-建议新增表：
-
 ```sql
-create schema if not exists analytics;
-
 create table analytics.video_watch_events (
   watch_session_id uuid primary key,
 
@@ -64,8 +53,7 @@ create table analytics.video_watch_events (
 
   last_position_ms integer not null default 0,
   max_position_ms integer not null default 0,
-  duration_ms integer,
-  max_watch_ratio numeric(6,5) not null default 0,
+  active_watch_ms bigint not null default 0,
   is_completed boolean not null default false,
 
   progress_report_count integer not null default 0,
@@ -77,10 +65,10 @@ create table analytics.video_watch_events (
 
   check (last_position_ms >= 0),
   check (max_position_ms >= 0),
-  check (duration_ms is null or duration_ms > 0),
-  check (max_watch_ratio >= 0 and max_watch_ratio <= 1),
+  check (active_watch_ms >= 0),
   check (progress_report_count >= 0),
-  check (jsonb_typeof(client_context) = 'object')
+  check (jsonb_typeof(client_context) = 'object'),
+  check (jsonb_typeof(metadata) = 'object')
 );
 ```
 
@@ -88,22 +76,23 @@ create table analytics.video_watch_events (
 
 | 字段 | 含义 | 维护规则 |
 | --- | --- | --- |
-| `watch_session_id` | 一次播放会话 ID。由前端生成，并在一次播放器生命周期内复用。 | 主键；同一个 session 重复上报走 upsert。 |
+| `watch_session_id` | 一次播放会话 ID。 | 主键；同一个 session 重复上报走 upsert。 |
 | `user_id` | 当前登录用户。 | 从认证上下文获取，不接受前端传入。 |
 | `video_id` | 被观看的视频。 | 从 URL path 获取，必须存在于 `catalog.videos`。 |
 | `started_at` | 该 session 第一次上报时间。 | 首次 insert 时写入；后续不覆盖。 |
 | `last_seen_at` | 该 session 最近一次有效上报时间。 | 每次 progress 上报时更新。 |
 | `completed_at` | 该 session 首次完成时间。 | 第一次 `is_completed = true` 时写入；后续不覆盖。 |
-| `last_position_ms` | 最近一次上报的播放位置。 | 每次上报覆盖；允许小于 `max_position_ms`，因为用户可能 seek 回退。 |
-| `max_position_ms` | 该 session 到达过的最大播放位置。 | 只增不减，取历史值和本次 `position_ms` 的较大值。 |
-| `duration_ms` | 前端播放器看到的视频总时长。 | 可为空；有值时必须大于 0。后续上报可更新为最新可信值。 |
-| `max_watch_ratio` | 该 session 达到过的最大观看比例。 | 服务端用 `max_position_ms / duration_ms` 计算并裁剪到 `[0, 1]`。 |
+| `last_position_ms` | 最近一次上报的播放位置。 | 每次上报覆盖；允许小于 `max_position_ms`。 |
+| `max_position_ms` | 该 session 到达过的最大播放位置。 | 只增不减。 |
+| `active_watch_ms` | 该 session 累计有效播放时长。 | 前端上报 session 内累计值；服务端用新旧值差值维护投影。 |
 | `is_completed` | 该 session 是否已完成。 | 只允许从 `false` 变为 `true`。 |
 | `progress_report_count` | 该 session 累计收到的进度上报次数。 | 每次成功处理请求加 1。 |
-| `client_context` | 客户端环境上下文。 | 三张 analytics raw fact 表统一使用该字段，保存 `platform`、`app_version`、`os_version`、`device_model` 等低频排障信息。 |
+| `client_context` | 客户端环境上下文。 | 保存 `platform`、`app_version`、`os_version`、`device_model` 等低频排障信息。 |
 | `metadata` | 可选调试上下文。 | 只放 watch-progress 专属扩展信息，例如 `source_surface`、播放器版本。 |
 | `created_at` | 行创建时间。 | 数据库默认值。 |
 | `updated_at` | 行最近更新时间。 | 每次 upsert 更新。 |
+
+`duration_ms` 和 `max_watch_ratio` 不再保存在本表。视频时长只来自 `catalog.videos.duration_ms`；观看比例由 `max_position_ms / duration_ms` 派生。
 
 推荐索引：
 
@@ -118,19 +107,9 @@ create index idx_video_watch_events_video_updated_at
 on analytics.video_watch_events (video_id, updated_at desc);
 ```
 
-索引用途：
-
-| 索引 | 用途 |
-| --- | --- |
-| `(user_id, video_id, updated_at desc)` | 查询某用户对某视频最近的观看 session。 |
-| `(user_id, updated_at desc)` | 查询某用户最近观看历史。 |
-| `(video_id, updated_at desc)` | 查询某视频最近消费情况，用于排查或后台统计。 |
-
 ### 3.2 `catalog.video_user_states`
 
-现有 `catalog.video_user_states` 继续保留为聚合投影。观看进度 API 只维护观看相关字段，不处理点赞和收藏字段。
-
-字段语义建议固定如下：
+`catalog.video_user_states` 是用户与视频的聚合投影。观看进度 API 只维护观看相关字段，不处理点赞和收藏字段。
 
 | 字段 | 含义 | 观看进度 API 维护规则 |
 | --- | --- | --- |
@@ -145,9 +124,46 @@ on analytics.video_watch_events (video_id, updated_at desc);
 | `last_watched_at` | 用户最近观看该视频的时间。 | 每次成功上报后更新为最新 `last_seen_at`。 |
 | `watch_count` | 观看 session 数。 | 每个新 `watch_session_id` 只加 1。 |
 | `completed_count` | 完成 session 数。 | 每个 session 首次完成只加 1。 |
-| `last_watch_ratio` | 最近一次 session 当前达到的最大观看比例。 | 更新为当前 session 的 `max_watch_ratio`。 |
-| `max_watch_ratio` | 用户历史看该视频达到过的最大观看比例。 | 只增不减，取历史值和当前 session `max_watch_ratio` 的较大值。 |
+| `last_position_ms` | 最近一次 session 最后停留位置。 | 更新为当前 session 的 `last_position_ms`。 |
+| `max_position_ms` | 用户历史到达过的最远播放位置。 | 只增不减。 |
+| `total_watch_ms` | 用户对该视频累计有效播放时长。 | 按 `active_watch_ms` 的 session delta 累加。 |
 | `updated_at` | 聚合状态最近更新时间。 | 每次成功处理请求更新。 |
+
+`last_watch_ratio` 和 `max_watch_ratio` 不再持久化。需要展示或推荐 penalty 时，用 `position_ms / catalog.videos.duration_ms` 派生。
+
+### 3.3 `catalog.video_engagement_stats`
+
+`catalog.video_engagement_stats` 是视频级全局统计投影。
+
+```sql
+create table catalog.video_engagement_stats (
+  video_id uuid primary key references catalog.videos(video_id) on delete cascade,
+  view_count bigint not null default 0,
+  like_count bigint not null default 0,
+  favorite_count bigint not null default 0,
+  completed_count bigint not null default 0,
+  total_watch_ms bigint not null default 0,
+  updated_at timestamptz not null default now(),
+
+  check (view_count >= 0),
+  check (like_count >= 0),
+  check (favorite_count >= 0),
+  check (completed_count >= 0),
+  check (total_watch_ms >= 0)
+);
+```
+
+字段说明：
+
+| 字段 | 含义 |
+| --- | --- |
+| `video_id` | 视频 ID。 |
+| `view_count` | 全局观看 session 数，语义等同于所有用户 `watch_count` 的聚合。 |
+| `like_count` | 当前点赞该视频的用户数。 |
+| `favorite_count` | 当前收藏该视频的用户数，对应 `has_bookmarked = true`。 |
+| `completed_count` | 全局完成观看 session 数。 |
+| `total_watch_ms` | 全局累计有效播放时长。 |
+| `updated_at` | 统计投影最近更新时间。 |
 
 ## 4. API 设计
 
@@ -157,19 +173,13 @@ on analytics.video_watch_events (video_id, updated_at desc);
 POST /api/catalog/videos/{video_id}/watch-progress
 ```
 
-路径参数：
-
-| 参数 | 含义 |
-| --- | --- |
-| `video_id` | 被观看的视频 ID。服务端必须校验该视频存在。 |
-
 请求体：
 
 ```json
 {
   "watch_session_id": "9c68402b-2c53-4478-94ec-e4cb7e682458",
   "position_ms": 83420,
-  "duration_ms": 312000,
+  "active_watch_ms": 62000,
   "is_completed": false,
   "occurred_at": "2026-05-08T20:12:34.200Z",
   "source_surface": "fullscreen",
@@ -188,14 +198,14 @@ POST /api/catalog/videos/{video_id}/watch-progress
 | --- | --- | --- | --- |
 | `watch_session_id` | 是 | 一次播放会话 ID。 | 必须是 UUID；同一 session 后续上报必须指向同一 `user_id + video_id`。 |
 | `position_ms` | 是 | 当前播放位置，毫秒。 | 必须大于等于 0；可小于历史最大位置。 |
-| `duration_ms` | 建议必填 | 视频总时长，毫秒。 | 有值时必须大于 0；用于计算 `max_watch_ratio`。 |
+| `active_watch_ms` | 是 | 本 session 累计有效播放时长。 | 必须大于等于 0；重复上报用 delta 去重。 |
 | `is_completed` | 否 | 本次上报是否表示完成播放。 | 默认 `false`；session 只允许首次完成贡献一次 `completed_count`。 |
 | `occurred_at` | 否 | 客户端事件发生时间。 | 可用于 `started_at / last_seen_at`，但服务端应限制不能离当前时间过远。 |
-| `source_surface` | 建议必填 | 观看进度发生的产品入口，例如 `fullscreen`、`feed`、`detail`。 | 服务端可写入 `metadata.source_surface`，不参与观看进度核心规则。 |
-| `client_context` | 否 | 客户端环境上下文。 | 必须是 JSON object；服务端默认 `{}`。不放 `source` 或 `build_number`。 |
+| `source_surface` | 建议必填 | 观看进度发生的产品入口，例如 `fullscreen`、`feed`、`detail`。 | 服务端可写入 `metadata.source_surface`。 |
+| `client_context` | 否 | 客户端环境上下文。 | 必须是 JSON object；服务端默认 `{}`。 |
 | `metadata` | 否 | watch-progress 专属扩展调试上下文。 | 必须是 JSON object；不参与核心业务规则。 |
 
-不建议前端传 `watch_ratio`。服务端应根据 `position_ms` 和 `duration_ms` 计算，避免客户端传入不可信 ratio。
+不建议前端传 `watch_ratio` 或 `duration_ms`。服务端应从 `catalog.videos.duration_ms` 获取视频时长，并在需要时派生观看比例。
 
 成功响应：
 
@@ -209,28 +219,19 @@ POST /api/catalog/videos/{video_id}/watch-progress
     "has_watched": true,
     "watch_count": 1,
     "completed_count": 0,
-    "last_watch_ratio": 0.26737,
-    "max_watch_ratio": 0.26737,
+    "last_position_ms": 83420,
+    "max_position_ms": 83420,
+    "total_watch_ms": 62000,
     "last_watched_at": "2026-05-08T20:12:34.200Z"
   }
 }
 ```
 
-响应字段说明：
-
-| 字段 | 含义 |
-| --- | --- |
-| `accepted` | 服务端已接受并处理本次上报。 |
-| `watch_session_id` | 被处理的观看 session ID。 |
-| `created_session` | 本次是否新建 session；为 `true` 时 `watch_count` 会增加。 |
-| `completed_session` | 本次是否首次把该 session 标记为完成；为 `true` 时 `completed_count` 会增加。 |
-| `video_user_state` | 更新后的用户-视频观看聚合状态，方便前端立即刷新 UI。 |
-
 错误响应建议：
 
 | HTTP 状态 | 场景 |
 | --- | --- |
-| `400 Bad Request` | 请求 JSON 格式错误、字段类型错误、`position_ms < 0`、`duration_ms <= 0`。 |
+| `400 Bad Request` | 请求 JSON 格式错误、字段类型错误、`position_ms < 0`、`active_watch_ms < 0`。 |
 | `401 Unauthorized` | 未登录或认证失效。 |
 | `404 Not Found` | `video_id` 不存在。 |
 | `409 Conflict` | `watch_session_id` 已存在，但绑定的 `user_id` 或 `video_id` 与本次请求不一致。 |
@@ -238,13 +239,7 @@ POST /api/catalog/videos/{video_id}/watch-progress
 
 ### 4.2 给前端的接口说明
 
-前端只需要调用一个接口来上报视频观看进度：
-
-```http
-POST /api/catalog/videos/{video_id}/watch-progress
-```
-
-`video_id` 放在 URL path 里，表示“正在观看哪个视频”。请求 body 里不需要再重复传 `video_id`。用户身份也不需要传，后端会从登录态或 token 中解析当前用户。
+前端只需要调用一个接口来上报视频观看进度。`video_id` 放在 URL path 里，用户身份由后端从登录态解析。
 
 接口调用时机：
 
@@ -263,7 +258,7 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
   body: JSON.stringify({
     watch_session_id: watchSessionId,
     position_ms: Math.round(video.currentTime * 1000),
-    duration_ms: Math.round(video.duration * 1000),
+    active_watch_ms: activeWatchMs,
     is_completed: video.ended,
     occurred_at: new Date().toISOString(),
     source_surface: "fullscreen",
@@ -281,67 +276,21 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
 
 | 字段 | 前端怎么取 | 说明 |
 | --- | --- | --- |
-| `watch_session_id` | 打开一次视频播放页或创建一次播放器会话时生成 `crypto.randomUUID()`。 | 同一次观看过程中保持不变。不要每次 progress 都生成新 ID，否则后端会认为是多次观看。 |
-| `position_ms` | `Math.round(video.currentTime * 1000)`。 | 当前播放器位置，单位毫秒。它表示这次上报发生时播到哪里，不表示新增观看时长。seek 回退后它可以变小。 |
-| `duration_ms` | `Math.round(video.duration * 1000)`。 | 视频总时长，单位毫秒。前端拿不到时先不要上报，等 metadata loaded 后再报。 |
-| `is_completed` | `video.ended` 或 `position_ms / duration_ms >= 0.9`。 | 是否认为这次 session 已完成。后端会保证同一个 session 只计一次完成。 |
+| `watch_session_id` | 打开一次视频播放页或创建一次播放器会话时生成 `crypto.randomUUID()`。 | 同一次观看过程中保持不变。 |
+| `position_ms` | `Math.round(video.currentTime * 1000)`。 | 当前播放器位置，不表示新增观看时长。 |
+| `active_watch_ms` | 播放器处于真实播放状态时累计 elapsed time。 | 不用 `Date.now() - startedAt` 直接推导，暂停、后台、seek 不应累计。 |
+| `is_completed` | `video.ended` 或服务端根据 `position_ms / catalog.videos.duration_ms` 判断。 | 同一个 session 只计一次完成。 |
 | `occurred_at` | `new Date().toISOString()`。 | 客户端本次上报发生时间。 |
 | `source_surface` | 当前页面或播放场景，例如 `feed`、`fullscreen`、`detail`。 | 表示业务入口，不表示平台。 |
-| `client_context.platform` | 从全局 telemetry client context 读取。 | 例如 `ios`。不再额外传 `source: "ios"`。 |
-| `client_context.app_version` | 从全局 telemetry client context 读取。 | App 展示版本，例如 `1.3.0`。MVP 不传 `build_number`。 |
-| `client_context.os_version` | 从全局 telemetry client context 读取。 | 系统版本，例如 `18.5`。 |
-| `client_context.device_model` | 从全局 telemetry client context 读取。 | 设备型号，例如 `iPhone16,2`。 |
-
-前端应在 telemetry 基础层维护一个全局只读的客户端环境上下文，所有 analytics raw fact 上报都从这里读取并填入 `client_context`，不要在各个 feature 里分别拼装：
-
-```ts
-const telemetryClientContext = {
-  platform: "ios",
-  app_version: "1.3.0",
-  os_version: "18.5",
-  device_model: "iPhone16,2"
-};
-```
-
-`client_context` 只描述客户端运行环境，不描述业务入口；业务入口继续使用 `source_surface`、`trigger_type` 等业务字段。
-
-响应示例：
-
-```json
-{
-  "accepted": true,
-  "watch_session_id": "9c68402b-2c53-4478-94ec-e4cb7e682458",
-  "created_session": false,
-  "completed_session": false,
-  "video_user_state": {
-    "has_watched": true,
-    "watch_count": 1,
-    "completed_count": 0,
-    "last_watch_ratio": 0.26737,
-    "max_watch_ratio": 0.26737,
-    "last_watched_at": "2026-05-08T20:12:34.200Z"
-  }
-}
-```
-
-前端通常只需要关心：
-
-| 字段 | 用途 |
-| --- | --- |
-| `accepted` | 为 `true` 表示后端已处理。 |
-| `created_session` | 调试用；为 `true` 表示这是这个 `watch_session_id` 的第一次上报。 |
-| `completed_session` | 调试用；为 `true` 表示这次首次把 session 标记为完成。 |
-| `video_user_state.max_watch_ratio` | 可用于本地 UI 立即显示“看过多少”。 |
-| `video_user_state.completed_count` | 可用于判断是否至少完成过一次。 |
-| `video_user_state.last_watched_at` | 可用于本地展示最近观看时间。 |
+| `client_context.*` | 从全局 telemetry client context 读取。 | 所有 analytics raw fact 上报统一使用。 |
 
 前端注意事项：
 
 1. 同一个视频播放会话必须复用同一个 `watch_session_id`。
 2. 切换到另一个视频时必须生成新的 `watch_session_id`。
 3. 不要在 body 里传 `user_id`，也不要在 body 里重复传 `video_id`。
-4. 不要传 `watch_ratio`，后端会用 `position_ms / duration_ms` 计算。
-5. `position_ms` 是当前播放位置，不是新增观看时长。
+4. 不要传 `watch_ratio` 或 `duration_ms`。
+5. `position_ms` 是当前播放位置，`active_watch_ms` 是累计有效播放时长。
 6. 请求失败时可以重试；同一个 `watch_session_id` 重试不会重复增加观看次数。
 7. 进度上报不需要每秒发送，10 到 15 秒一次足够。
 
@@ -356,7 +305,7 @@ type PendingWatchProgress = {
   videoId: string;
   watchSessionId: string;
   positionMs: number;
-  durationMs: number;
+  activeWatchMs: number;
   isCompleted: boolean;
   occurredAt: string;
   sourceSurface: string;
@@ -371,57 +320,39 @@ type PendingWatchProgress = {
 
 更新规则：
 
-1. 普通 progress sample 到达时，覆盖 `positionMs`、`durationMs`、`occurredAt`、`sourceSurface`、`clientContext`。
+1. 普通 progress sample 到达时，覆盖 `positionMs`、`activeWatchMs`、`occurredAt`、`sourceSurface`、`clientContext`。
 2. `isCompleted` 使用 sticky 规则：`next.isCompleted = previous.isCompleted || incoming.isCompleted`。
 3. 同一个 `videoId + watchSessionId` 同一时刻只保留一个 pending state。
 4. 切换视频或生成新 `watchSessionId` 前，先 flush 当前 pending state。
 5. completed sample 到达后立即 flush，并保留 `isCompleted = true`，直到服务端接受或本次 pending 被明确清理。
-
-推荐运行时策略：
-
-1. 只接收 active video 的 progress sample。
-2. 普通 sample 最多 1 秒接收一次，避免播放器高频回调造成无意义写入压力。
-3. 每 15 秒定时 flush 当前 pending state。
-4. active video switch 时 flush。
-5. 播放达到完成阈值时立即 flush。
-6. fullscreen unmount 或页面退出时 best-effort flush。
-7. pause / resume 不必单独触发 flush，除非产品后续需要更精确的有效观看时长。
-
-这里的“pending state”可以复用 telemetry 基础设施的调度能力，例如 timer、best-effort flush、失败重试和幂等发送；但它不应该套用 append-only event queue 的合并规则。普通 progress 变化被覆盖是正确行为，因为后端只需要当前 session 的最新进度、最大进度和完成标记，不需要逐秒播放器流水。
-
-与 learning interactions 的区别：
-
-| 类型 | 前端缓存语义 | 合并规则 | HTTP API |
-| --- | --- | --- | --- |
-| watch progress | 可替换 pending state | 同一 `videoId + watchSessionId` 保留最新状态，`isCompleted` sticky | `POST /api/catalog/videos/{video_id}/watch-progress` |
-| learning interactions | append-only event queue | lookup / 已学会不能覆盖；exposure 可先聚合再入队 | `POST /api/analytics/learning-interactions` |
-
-因此，watch progress 不需要 batch HTTP API。即使前端内部有“待发送项”，也应该理解成一个可替换状态槽，而不是一组必须逐条保留的事件。
 
 ## 5. 后端处理流程
 
 服务端处理 `POST /api/catalog/videos/{video_id}/watch-progress` 时应按以下顺序执行：
 
 1. 从认证上下文获取 `user_id`。
-2. 校验 `video_id` 存在。
+2. 校验 `video_id` 存在，并读取 `catalog.videos.duration_ms`。
 3. 校验请求体字段。
 4. 在短事务内 upsert `analytics.video_watch_events`。
 5. 判断本次是否创建了新 session。
 6. 判断本次是否首次完成该 session。
-7. 在同一事务内 upsert `catalog.video_user_states`。
-8. 返回更新后的聚合状态。
+7. 计算 `delta_active_watch_ms = max(request.active_watch_ms - existing.active_watch_ms, 0)`。
+8. 在同一事务内 upsert `catalog.video_user_states`。
+9. 在同一事务内 upsert `catalog.video_engagement_stats`。
+10. 返回更新后的聚合状态。
 
 session upsert 规则：
 
 ```text
+new_last_position_ms = request.position_ms
 new_max_position_ms = greatest(existing.max_position_ms, request.position_ms)
-new_duration_ms = request.duration_ms if present else existing.duration_ms
-new_max_watch_ratio = clamp(new_max_position_ms / new_duration_ms, 0, 1)
+new_active_watch_ms = greatest(existing.active_watch_ms, request.active_watch_ms)
+delta_active_watch_ms = new_active_watch_ms - existing.active_watch_ms
 new_is_completed = existing.is_completed or request.is_completed
 new_completed_at = existing.completed_at or occurred_at when request.is_completed
 ```
 
-聚合投影更新规则：
+用户聚合投影更新规则：
 
 ```text
 has_watched = true
@@ -429,126 +360,48 @@ first_watched_at = coalesce(existing.first_watched_at, session.started_at)
 last_watched_at = greatest(existing.last_watched_at, session.last_seen_at)
 watch_count += 1 only when created_session = true
 completed_count += 1 only when completed_session = true
-last_watch_ratio = session.max_watch_ratio
-max_watch_ratio = greatest(existing.max_watch_ratio, session.max_watch_ratio)
+last_position_ms = session.last_position_ms
+max_position_ms = greatest(existing.max_position_ms, session.max_position_ms)
+total_watch_ms += delta_active_watch_ms
 updated_at = now()
 ```
+
+视频全局统计投影更新规则：
+
+```text
+view_count += 1 only when created_session = true
+completed_count += 1 only when completed_session = true
+total_watch_ms += delta_active_watch_ms
+updated_at = now()
+```
+
+点赞和收藏接口后续应维护 `like_count` 与 `favorite_count`，观看进度 API 不修改这两个字段。
 
 注意事项：
 
 1. 同一个 `watch_session_id` 不允许跨用户或跨视频复用。
 2. 同一个 session 多次传 `is_completed = true`，只能让 `completed_count` 增加一次。
-3. seek 回退只影响 `last_position_ms`，不降低 `max_position_ms` 和 `max_watch_ratio`。
-4. 前端重复上报同一 session 不会重复增加 `watch_count`。
+3. seek 回退只影响 `last_position_ms`，不降低 `max_position_ms`。
+4. 前端重复上报同一 session 不会重复增加 `watch_count` 或 `view_count`。
 5. 该接口不写 `learning.unit_learning_events`，也不写 `recommendation.user_video_serving_states`。
 
-## 6. 前端调用示例
-
-基础调用函数：
-
-```ts
-export async function reportWatchProgress(input: {
-  videoId: string;
-  watchSessionId: string;
-  positionMs: number;
-  durationMs: number;
-  isCompleted?: boolean;
-}) {
-  const response = await fetch(
-    `/api/catalog/videos/${input.videoId}/watch-progress`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        watch_session_id: input.watchSessionId,
-        position_ms: input.positionMs,
-        duration_ms: input.durationMs,
-        is_completed: input.isCompleted ?? false,
-        occurred_at: new Date().toISOString(),
-        source_surface: "fullscreen",
-        client_context: {
-          platform: "ios",
-          app_version: "1.3.0",
-          os_version: "18.5",
-          device_model: "iPhone16,2"
-        }
-      })
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`watch progress failed: ${response.status}`);
-  }
-
-  return response.json() as Promise<{
-    accepted: boolean;
-    watch_session_id: string;
-    created_session: boolean;
-    completed_session: boolean;
-    video_user_state: {
-      has_watched: boolean;
-      watch_count: number;
-      completed_count: number;
-      last_watch_ratio: number;
-      max_watch_ratio: number;
-      last_watched_at: string;
-    };
-  }>;
-}
-```
-
-播放器使用方式：
-
-```ts
-const watchSessionId = crypto.randomUUID();
-
-await reportWatchProgress({
-  videoId,
-  watchSessionId,
-  positionMs: 0,
-  durationMs
-});
-
-await reportWatchProgress({
-  videoId,
-  watchSessionId,
-  positionMs,
-  durationMs
-});
-
-await reportWatchProgress({
-  videoId,
-  watchSessionId,
-  positionMs,
-  durationMs,
-  isCompleted: positionMs / durationMs >= 0.9
-});
-```
-
-推荐上报策略：
-
-1. 播放开始时上报一次。
-2. 播放中每 10 到 15 秒上报一次。
-3. 暂停、退出页面、切换视频、播放结束时补一次。
-4. 页面卸载时可以用 `navigator.sendBeacon` 做 best-effort flush，但不能把它作为唯一可靠路径。
-
-## 7. 测试与验收标准
+## 6. 测试与验收标准
 
 数据库层应验证：
 
 1. `video_watch_events` 可以创建、重复 upsert，并保持 `watch_session_id` 唯一。
-2. `position_ms` 回退不会降低 `max_position_ms` 和 `max_watch_ratio`。
-3. 同一个 session 首次完成会设置 `completed_at`，后续完成上报不重复计数。
-4. 同一个 `watch_session_id` 绑定不同用户或不同视频时返回冲突。
+2. `position_ms` 回退不会降低 `max_position_ms`。
+3. `active_watch_ms` 重复上报不会重复累计。
+4. 同一个 session 首次完成会设置 `completed_at`，后续完成上报不重复计数。
+5. 同一个 `watch_session_id` 绑定不同用户或不同视频时返回冲突。
 
 API / usecase 层应验证：
 
-1. 第一次上报创建 session，并让 `video_user_states.watch_count = 1`。
-2. 同一个 session 重复上报不重复增加 `watch_count`。
-3. 首次完成让 `completed_count += 1`。
+1. 第一次上报创建 session，并让 `video_user_states.watch_count = 1`、`video_engagement_stats.view_count = 1`。
+2. 同一个 session 重复上报不重复增加 `watch_count` 和 `view_count`。
+3. 首次完成让用户级和视频级 `completed_count += 1`。
 4. 重复完成不重复增加 `completed_count`。
-5. `max_watch_ratio` 只增不减。
+5. `max_position_ms` 只增不减。
 6. 未登录、视频不存在、非法字段都返回明确错误。
 
 集成验收：
@@ -557,13 +410,12 @@ API / usecase 层应验证：
 2. Recommendation 继续只读 `catalog.video_user_states`，无需感知 `analytics.video_watch_events`。
 3. 普通观看进度不会自动写入 `learning.unit_learning_events`。
 
-## 8. 后续扩展
+## 7. 后续扩展
 
 如果未来需要更细粒度分析，可以在不破坏当前 API 的前提下新增：
 
 1. `analytics.video_player_events`：高频播放器事件流水，仅用于分析，不进入 MVP。
 2. `analytics.video_reaction_events`：点赞、收藏、分享等低频互动审计。
-3. session 级有效观看时长估算：基于服务端规则限制 progress 上报间隔与单次增量。
-4. 后台重建任务：从 `analytics.video_watch_events` 重算 `catalog.video_user_states`。
+3. 后台重建任务：从 `analytics.video_watch_events` 重算 `catalog.video_user_states` 和 `catalog.video_engagement_stats`。
 
 这些扩展都不应改变当前边界：Analytics 负责原始行为事实，Catalog 负责视频消费状态投影，Learning engine 负责学习证据与学习状态，Recommendation 负责推荐曝光、冷却与审计。

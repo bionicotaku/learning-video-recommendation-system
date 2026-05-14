@@ -31,7 +31,7 @@ func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
 	videoID := "00000000-0000-0000-0000-000000000201"
 	seedBaseRefs(t, ctx, db, tx, userID, videoID, 301)
 
-	if _, err := tx.Exec(ctx, `insert into catalog.video_user_states (user_id, video_id, watch_count, completed_count, last_watch_ratio, max_watch_ratio) values ($1, $2, 3, 1, 0.65000, 0.90000)`, userID, videoID); err != nil {
+	if _, err := tx.Exec(ctx, `insert into catalog.video_user_states (user_id, video_id, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms) values ($1, $2, 3, 1, 65000, 90000, 120000)`, userID, videoID); err != nil {
 		t.Fatalf("seed video_user_states: %v", err)
 	}
 
@@ -45,6 +45,9 @@ func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
 	}
 	if states[0].WatchCount != 3 || states[0].CompletedCount != 1 {
 		t.Fatalf("unexpected counters: %+v", states[0])
+	}
+	if states[0].LastPositionMs != 65000 || states[0].MaxPositionMs != 90000 || states[0].TotalWatchMs != 120000 {
+		t.Fatalf("unexpected watch state: %+v", states[0])
 	}
 }
 

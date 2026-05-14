@@ -36,6 +36,7 @@ type ResolvedEvidenceWindow struct {
 
 type VideoCandidate struct {
 	VideoID               string
+	DurationMs            int32
 	LaneSources           []string
 	DominantRole          LearningRole
 	DominantUnitID        *int64

@@ -2,7 +2,7 @@
 
 状态：LIVE DB SNAPSHOT
 更新时间：2026-05-14
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 Learning Engine normalized event 重构 migration 后记录。
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行视频观看状态与全局统计 live DB 临时 SQL 后记录。
 
 ## 1. Schema 概览
 
@@ -12,16 +12,16 @@
 | --- | --- |
 | `auth` | 存在，Supabase Auth 系统表存在 |
 | `semantic` | 存在，包含 `coarse_unit`、`fine_unit` |
-| `catalog` | 存在，包含当前 Catalog 内容表与 `catalog.questions` |
+| `catalog` | 存在，包含当前 Catalog 内容表、`catalog.questions` 与 `catalog.video_engagement_stats` |
 | `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events`、`analytics.learning_interaction_events` |
 | `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
 | `learning` | 存在，包含 `learning.unit_learning_events`、`learning.user_unit_states` |
 
-当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation 自有表、索引和物化视图。Learning Engine migration 已折叠为干净 baseline，tracking 状态为 `module=learningengine current=4 applied=4 pending=0`。
+当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation 自有表、索引和物化视图。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
 
 ## 2. Catalog Migration 状态
 
-`catalog_schema_migrations` 当前有 10 条记录，对应仓库内 10 个 Catalog migration：
+`catalog_schema_migrations` 当前有 11 条记录，对应仓库内 11 个 Catalog migration：
 
 - `000001_create_catalog_schema`
 - `000002_create_videos`
@@ -33,6 +33,7 @@
 - `000008_create_video_user_states`
 - `000009_create_catalog_indexes`
 - `000010_create_questions`
+- `000011_create_video_engagement_stats`
 
 当前新增的 `catalog.questions` 已存在。只读核对显示该表有 14 个字段，并包含以下索引：
 
@@ -40,6 +41,10 @@
 - `idx_questions_video_unit_active`
 - `idx_questions_unit_active`
 - `idx_questions_status_created_at`
+
+当前新增的 `catalog.video_engagement_stats` 已存在。只读核对显示该表字段为：`video_id`、`view_count`、`like_count`、`favorite_count`、`completed_count`、`total_watch_ms`、`updated_at`。
+
+当前 `catalog.video_user_states` 已删除 `last_watch_ratio`、`max_watch_ratio`，并新增 `last_position_ms`、`max_position_ms`、`total_watch_ms`。
 
 ## 3. Analytics Migration 状态
 
@@ -61,14 +66,14 @@
 
 `analytics.quiz_events` 已包含 `client_context jsonb not null default '{}'::jsonb`，并包含 `quiz_events_client_context_is_object` 约束。
 
-当前新增的 `analytics.video_watch_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
+当前新增的 `analytics.video_watch_events` 已存在。只读核对显示该表有 15 个字段，并包含以下索引：
 
 - `video_watch_events_pkey`
 - `idx_video_watch_events_user_video_updated_at`
 - `idx_video_watch_events_user_updated_at`
 - `idx_video_watch_events_video_updated_at`
 
-`analytics.video_watch_events` 已删除旧 `source` 字段，并包含 `client_context jsonb not null default '{}'::jsonb` 与 `video_watch_events_client_context_is_object` 约束。
+`analytics.video_watch_events` 已删除旧 `source` 字段，不再保存 `duration_ms` 与 `max_watch_ratio`，并包含 `active_watch_ms bigint not null default 0`、`client_context jsonb not null default '{}'::jsonb` 与 JSON object 约束。
 
 当前新增的 `analytics.learning_interaction_events` 已存在。只读核对显示该表有 24 个字段，并包含以下索引：
 

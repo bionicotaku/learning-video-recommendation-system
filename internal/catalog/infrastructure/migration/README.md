@@ -7,6 +7,7 @@
 - Catalog 自己的 schema
 - Catalog 自己的表
 - Catalog 自己的索引
+- 视频级全局互动统计投影 `catalog.video_engagement_stats`
 
 它不定义：
 

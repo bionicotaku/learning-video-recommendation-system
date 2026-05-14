@@ -329,7 +329,7 @@ func (q *Queries) ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg 
 }
 
 const listVideoUserStatesByUserAndVideoIDs = `-- name: ListVideoUserStatesByUserAndVideoIDs :many
-select user_id, video_id, last_watched_at, watch_count, completed_count, last_watch_ratio, max_watch_ratio
+select user_id, video_id, last_watched_at, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms
 from catalog.video_user_states
 where user_id = $1
   and video_id = any($2::uuid[])
@@ -356,8 +356,9 @@ func (q *Queries) ListVideoUserStatesByUserAndVideoIDs(ctx context.Context, arg 
 			&i.LastWatchedAt,
 			&i.WatchCount,
 			&i.CompletedCount,
-			&i.LastWatchRatio,
-			&i.MaxWatchRatio,
+			&i.LastPositionMs,
+			&i.MaxPositionMs,
+			&i.TotalWatchMs,
 		); err != nil {
 			return nil, err
 		}

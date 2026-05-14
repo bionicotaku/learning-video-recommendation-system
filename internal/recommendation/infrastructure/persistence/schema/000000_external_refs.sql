@@ -83,8 +83,9 @@ create table if not exists catalog.video_user_states (
   last_watched_at timestamptz,
   watch_count integer not null default 0,
   completed_count integer not null default 0,
-  last_watch_ratio numeric(6,5),
-  max_watch_ratio numeric(6,5)
+  last_position_ms integer not null default 0,
+  max_position_ms integer not null default 0,
+  total_watch_ms bigint not null default 0
 );
 
 create table if not exists learning.user_unit_states (

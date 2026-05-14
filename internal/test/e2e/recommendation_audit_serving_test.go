@@ -121,7 +121,7 @@ func TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty(t *testing.T
 	}
 
 	lastWatchedAt := time.Now().UTC()
-	h.SeedVideoUserState(t, userID, first.Videos[0].VideoID, &lastWatchedAt, 5, 2, 0.90, 0.95)
+	h.SeedVideoUserState(t, userID, first.Videos[0].VideoID, &lastWatchedAt, 5, 2, 81_000, 85_500, 180_000)
 
 	second := testutil.MustRecommend(t, recommendation, userID, 1)
 	if len(second.Videos) != 1 {

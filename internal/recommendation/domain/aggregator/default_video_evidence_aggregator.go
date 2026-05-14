@@ -108,6 +108,7 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 
 		videos = append(videos, model.VideoCandidate{
 			VideoID:               videoID,
+			DurationMs:            videoWindows[0].Candidate.DurationMs,
 			LaneSources:           sortedKeys(laneSources),
 			DominantRole:          dominantRole,
 			DominantUnitID:        dominantUnitID,

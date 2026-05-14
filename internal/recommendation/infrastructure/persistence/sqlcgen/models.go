@@ -65,8 +65,9 @@ type CatalogVideoUserState struct {
 	LastWatchedAt  pgtype.Timestamptz `json:"last_watched_at"`
 	WatchCount     int32              `json:"watch_count"`
 	CompletedCount int32              `json:"completed_count"`
-	LastWatchRatio pgtype.Numeric     `json:"last_watch_ratio"`
-	MaxWatchRatio  pgtype.Numeric     `json:"max_watch_ratio"`
+	LastPositionMs int32              `json:"last_position_ms"`
+	MaxPositionMs  int32              `json:"max_position_ms"`
+	TotalWatchMs   int64              `json:"total_watch_ms"`
 }
 
 type LearningUserUnitState struct {

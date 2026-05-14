@@ -818,7 +818,7 @@ base_score =
 - 日期：2026-04-16
 - 实际完成内容：
   - 新增 `DefaultVideoRanker`，按 `demand_coverage / coverage_strength_score / bundle_value_score / educational_fit_score / future_value_score / freshness_score` 做第一版评分，并计算 `recent_served_penalty / recent_watched_penalty / overload_penalty`。
-  - `catalog.video_user_states` 的轻量 penalty 已纳入 Ranker，仅消费 `last_watched_at / watch_count / completed_count / max_watch_ratio`。
+  - `catalog.video_user_states` 的轻量 penalty 已纳入 Ranker，仅消费 `last_watched_at / watch_count / completed_count / max_position_ms`，观看比例由 `VideoCandidate.duration_ms` 派生。
   - 新增 `DefaultVideoSelector`，实现 `normal / low_supply / extreme_sparse` 三种模式；先保 core dominant，再用边际收益贪心填充，并约束 `future_dominant_max / future_like_max / fallback_max / same_dominant_unit_max`。
   - 新增 `DefaultExplanationBuilder`，生成模板化 `reason_codes + explanation`，并输出 final ordering golden。
   - 新增 ranker、selector、explain 单测与 final ordering golden 测试。

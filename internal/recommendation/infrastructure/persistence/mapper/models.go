@@ -161,23 +161,15 @@ func ToTranscriptSentence(row recommendationsqlc.CatalogVideoTranscriptSentence)
 }
 
 func ToVideoUserState(row recommendationsqlc.CatalogVideoUserState) (model.VideoUserState, error) {
-	lastWatchRatio, err := NumericToFloat64(row.LastWatchRatio)
-	if err != nil {
-		return model.VideoUserState{}, err
-	}
-	maxWatchRatio, err := NumericToFloat64(row.MaxWatchRatio)
-	if err != nil {
-		return model.VideoUserState{}, err
-	}
-
 	return model.VideoUserState{
 		UserID:         UUIDToString(row.UserID),
 		VideoID:        UUIDToString(row.VideoID),
 		LastWatchedAt:  TimePointerFromPG(row.LastWatchedAt),
 		WatchCount:     row.WatchCount,
 		CompletedCount: row.CompletedCount,
-		LastWatchRatio: lastWatchRatio,
-		MaxWatchRatio:  maxWatchRatio,
+		LastPositionMs: row.LastPositionMs,
+		MaxPositionMs:  row.MaxPositionMs,
+		TotalWatchMs:   row.TotalWatchMs,
 	}, nil
 }
 
