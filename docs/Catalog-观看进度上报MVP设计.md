@@ -69,7 +69,7 @@ create table analytics.video_watch_events (
   is_completed boolean not null default false,
 
   progress_report_count integer not null default 0,
-  source text not null default 'app',
+  client_context jsonb not null default '{}'::jsonb,
   metadata jsonb not null default '{}'::jsonb,
 
   created_at timestamptz not null default now(),
@@ -79,7 +79,8 @@ create table analytics.video_watch_events (
   check (max_position_ms >= 0),
   check (duration_ms is null or duration_ms > 0),
   check (max_watch_ratio >= 0 and max_watch_ratio <= 1),
-  check (progress_report_count >= 0)
+  check (progress_report_count >= 0),
+  check (jsonb_typeof(client_context) = 'object')
 );
 ```
 
@@ -99,8 +100,8 @@ create table analytics.video_watch_events (
 | `max_watch_ratio` | 该 session 达到过的最大观看比例。 | 服务端用 `max_position_ms / duration_ms` 计算并裁剪到 `[0, 1]`。 |
 | `is_completed` | 该 session 是否已完成。 | 只允许从 `false` 变为 `true`。 |
 | `progress_report_count` | 该 session 累计收到的进度上报次数。 | 每次成功处理请求加 1。 |
-| `source` | 客户端来源。 | 例如 `web`、`ios`、`android`；默认 `app`。 |
-| `metadata` | 可选调试上下文。 | 只放非核心上下文，例如页面 surface、播放器版本。 |
+| `client_context` | 客户端环境上下文。 | 三张 analytics raw fact 表统一使用该字段，保存 `platform`、`app_version`、`os_version`、`device_model` 等低频排障信息。 |
+| `metadata` | 可选调试上下文。 | 只放 watch-progress 专属扩展信息，例如 `source_surface`、播放器版本。 |
 | `created_at` | 行创建时间。 | 数据库默认值。 |
 | `updated_at` | 行最近更新时间。 | 每次 upsert 更新。 |
 
@@ -171,9 +172,12 @@ POST /api/catalog/videos/{video_id}/watch-progress
   "duration_ms": 312000,
   "is_completed": false,
   "occurred_at": "2026-05-08T20:12:34.200Z",
-  "source": "web",
-  "metadata": {
-    "surface": "fullscreen"
+  "source_surface": "fullscreen",
+  "client_context": {
+    "platform": "ios",
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
   }
 }
 ```
@@ -187,8 +191,9 @@ POST /api/catalog/videos/{video_id}/watch-progress
 | `duration_ms` | 建议必填 | 视频总时长，毫秒。 | 有值时必须大于 0；用于计算 `max_watch_ratio`。 |
 | `is_completed` | 否 | 本次上报是否表示完成播放。 | 默认 `false`；session 只允许首次完成贡献一次 `completed_count`。 |
 | `occurred_at` | 否 | 客户端事件发生时间。 | 可用于 `started_at / last_seen_at`，但服务端应限制不能离当前时间过远。 |
-| `source` | 否 | 客户端来源。 | 例如 `web`、`ios`、`android`；默认 `app`。 |
-| `metadata` | 否 | 非核心调试上下文。 | 必须是 JSON object；不参与核心业务规则。 |
+| `source_surface` | 建议必填 | 观看进度发生的产品入口，例如 `fullscreen`、`feed`、`detail`。 | 服务端可写入 `metadata.source_surface`，不参与观看进度核心规则。 |
+| `client_context` | 否 | 客户端环境上下文。 | 必须是 JSON object；服务端默认 `{}`。不放 `source` 或 `build_number`。 |
+| `metadata` | 否 | watch-progress 专属扩展调试上下文。 | 必须是 JSON object；不参与核心业务规则。 |
 
 不建议前端传 `watch_ratio`。服务端应根据 `position_ms` 和 `duration_ms` 计算，避免客户端传入不可信 ratio。
 
@@ -261,9 +266,12 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
     duration_ms: Math.round(video.duration * 1000),
     is_completed: video.ended,
     occurred_at: new Date().toISOString(),
-    source: "web",
-    metadata: {
-      surface: "fullscreen"
+    source_surface: "fullscreen",
+    client_context: {
+      platform: "ios",
+      app_version: "1.3.0",
+      os_version: "18.5",
+      device_model: "iPhone16,2"
     }
   })
 });
@@ -278,8 +286,24 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
 | `duration_ms` | `Math.round(video.duration * 1000)`。 | 视频总时长，单位毫秒。前端拿不到时先不要上报，等 metadata loaded 后再报。 |
 | `is_completed` | `video.ended` 或 `position_ms / duration_ms >= 0.9`。 | 是否认为这次 session 已完成。后端会保证同一个 session 只计一次完成。 |
 | `occurred_at` | `new Date().toISOString()`。 | 客户端本次上报发生时间。 |
-| `source` | 固定传当前客户端，例如 `web`。 | 用于后端排查来源。 |
-| `metadata.surface` | 当前页面或播放场景，例如 `feed`、`fullscreen`、`detail`。 | 非核心字段，只用于调试和分析。 |
+| `source_surface` | 当前页面或播放场景，例如 `feed`、`fullscreen`、`detail`。 | 表示业务入口，不表示平台。 |
+| `client_context.platform` | 从全局 telemetry client context 读取。 | 例如 `ios`。不再额外传 `source: "ios"`。 |
+| `client_context.app_version` | 从全局 telemetry client context 读取。 | App 展示版本，例如 `1.3.0`。MVP 不传 `build_number`。 |
+| `client_context.os_version` | 从全局 telemetry client context 读取。 | 系统版本，例如 `18.5`。 |
+| `client_context.device_model` | 从全局 telemetry client context 读取。 | 设备型号，例如 `iPhone16,2`。 |
+
+前端应在 telemetry 基础层维护一个全局只读的客户端环境上下文，所有 analytics raw fact 上报都从这里读取并填入 `client_context`，不要在各个 feature 里分别拼装：
+
+```ts
+const telemetryClientContext = {
+  platform: "ios",
+  app_version: "1.3.0",
+  os_version: "18.5",
+  device_model: "iPhone16,2"
+};
+```
+
+`client_context` 只描述客户端运行环境，不描述业务入口；业务入口继续使用 `source_surface`、`trigger_type` 等业务字段。
 
 响应示例：
 
@@ -320,6 +344,59 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
 5. `position_ms` 是当前播放位置，不是新增观看时长。
 6. 请求失败时可以重试；同一个 `watch_session_id` 重试不会重复增加观看次数。
 7. 进度上报不需要每秒发送，10 到 15 秒一次足够。
+
+### 4.3 前端 pending state 设计
+
+观看进度上报不需要使用通用 event queue。它的语义不是“保留每次 progress 变化”，而是“把当前 watch session 的最新观看状态同步给后端”。
+
+前端可以维护一个可替换的 pending state：
+
+```ts
+type PendingWatchProgress = {
+  videoId: string;
+  watchSessionId: string;
+  positionMs: number;
+  durationMs: number;
+  isCompleted: boolean;
+  occurredAt: string;
+  sourceSurface: string;
+  clientContext: {
+    platform: string;
+    app_version: string;
+    os_version: string;
+    device_model: string;
+  };
+};
+```
+
+更新规则：
+
+1. 普通 progress sample 到达时，覆盖 `positionMs`、`durationMs`、`occurredAt`、`sourceSurface`、`clientContext`。
+2. `isCompleted` 使用 sticky 规则：`next.isCompleted = previous.isCompleted || incoming.isCompleted`。
+3. 同一个 `videoId + watchSessionId` 同一时刻只保留一个 pending state。
+4. 切换视频或生成新 `watchSessionId` 前，先 flush 当前 pending state。
+5. completed sample 到达后立即 flush，并保留 `isCompleted = true`，直到服务端接受或本次 pending 被明确清理。
+
+推荐运行时策略：
+
+1. 只接收 active video 的 progress sample。
+2. 普通 sample 最多 1 秒接收一次，避免播放器高频回调造成无意义写入压力。
+3. 每 15 秒定时 flush 当前 pending state。
+4. active video switch 时 flush。
+5. 播放达到完成阈值时立即 flush。
+6. fullscreen unmount 或页面退出时 best-effort flush。
+7. pause / resume 不必单独触发 flush，除非产品后续需要更精确的有效观看时长。
+
+这里的“pending state”可以复用 telemetry 基础设施的调度能力，例如 timer、best-effort flush、失败重试和幂等发送；但它不应该套用 append-only event queue 的合并规则。普通 progress 变化被覆盖是正确行为，因为后端只需要当前 session 的最新进度、最大进度和完成标记，不需要逐秒播放器流水。
+
+与 learning interactions 的区别：
+
+| 类型 | 前端缓存语义 | 合并规则 | HTTP API |
+| --- | --- | --- | --- |
+| watch progress | 可替换 pending state | 同一 `videoId + watchSessionId` 保留最新状态，`isCompleted` sticky | `POST /api/catalog/videos/{video_id}/watch-progress` |
+| learning interactions | append-only event queue | lookup / 已学会不能覆盖；exposure 可先聚合再入队 | `POST /api/analytics/learning-interactions` |
+
+因此，watch progress 不需要 batch HTTP API。即使前端内部有“待发送项”，也应该理解成一个可替换状态槽，而不是一组必须逐条保留的事件。
 
 ## 5. 后端处理流程
 
@@ -389,8 +466,13 @@ export async function reportWatchProgress(input: {
         duration_ms: input.durationMs,
         is_completed: input.isCompleted ?? false,
         occurred_at: new Date().toISOString(),
-        source: "web",
-        metadata: { surface: "fullscreen" }
+        source_surface: "fullscreen",
+        client_context: {
+          platform: "ios",
+          app_version: "1.3.0",
+          os_version: "18.5",
+          device_model: "iPhone16,2"
+        }
       })
     }
   );

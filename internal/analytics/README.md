@@ -6,6 +6,8 @@
 
 - 习题 / 练习答题原始事实
 - 观看 session 的低频摘要事实
+- exposure、lookup、已学会等非答题学习互动原始事实
+- raw fact 表统一的客户端环境上下文 `client_context`
 
 当前已落地结构：
 

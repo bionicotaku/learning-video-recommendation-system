@@ -6,6 +6,8 @@ create table if not exists analytics.quiz_events (
   user_id uuid not null
     references auth.users(id) on delete cascade,
 
+  client_context jsonb not null default '{}'::jsonb,
+
   question_id uuid not null
     references catalog.questions(question_id) on delete restrict,
 
@@ -42,7 +44,8 @@ create table if not exists analytics.quiz_events (
   check (selected_option_ids[cardinality(selected_option_ids)] = 'correct'),
   check (is_first_try_correct = (selected_option_ids[1] = 'correct')),
   check (total_elapsed_ms >= 0),
-  check (completed_at >= shown_at)
+  check (completed_at >= shown_at),
+  check (jsonb_typeof(client_context) = 'object')
 );
 
 create unique index if not exists uq_quiz_events_user_client_event

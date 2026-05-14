@@ -7,6 +7,8 @@
 - `analytics` schema
 - `analytics.quiz_events`
 - `analytics.video_watch_events`
+- `analytics.learning_interaction_events`
+- raw event 表统一的 `client_context` JSONB 上下文字段
 - Analytics 自己的索引
 
 它不定义：

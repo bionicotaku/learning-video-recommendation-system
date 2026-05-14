@@ -13,7 +13,7 @@
 | `auth` | 存在，Supabase Auth 系统表存在 |
 | `semantic` | 存在，包含 `coarse_unit`、`fine_unit` |
 | `catalog` | 存在，包含当前 Catalog 内容表与 `catalog.questions` |
-| `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events` |
+| `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events`、`analytics.learning_interaction_events` |
 | `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
 | `learning` | 不存在 |
 
@@ -43,13 +43,14 @@
 
 ## 3. Analytics Migration 状态
 
-`analytics_schema_migrations` 当前有 3 条记录，对应仓库内 3 个 Analytics migration：
+`analytics_schema_migrations` 当前有 4 条记录，对应仓库内 4 个 Analytics migration：
 
 - `000001_create_analytics_schema`
 - `000002_create_quiz_events`
 - `000003_create_video_watch_events`
+- `000004_create_learning_interaction_events`
 
-当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 15 个字段，并包含以下索引：
+当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
 
 - `quiz_events_pkey`
 - `uq_quiz_events_user_client_event`
@@ -58,12 +59,28 @@
 - `idx_quiz_events_unit_completed_at`
 - `idx_quiz_events_video_completed_at`
 
+`analytics.quiz_events` 已包含 `client_context jsonb not null default '{}'::jsonb`，并包含 `quiz_events_client_context_is_object` 约束。
+
 当前新增的 `analytics.video_watch_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
 
 - `video_watch_events_pkey`
 - `idx_video_watch_events_user_video_updated_at`
 - `idx_video_watch_events_user_updated_at`
 - `idx_video_watch_events_video_updated_at`
+
+`analytics.video_watch_events` 已删除旧 `source` 字段，并包含 `client_context jsonb not null default '{}'::jsonb` 与 `video_watch_events_client_context_is_object` 约束。
+
+当前新增的 `analytics.learning_interaction_events` 已存在。只读核对显示该表有 24 个字段，并包含以下索引：
+
+- `learning_interaction_events_pkey`
+- `uq_learning_interaction_events_user_client_event`
+- `idx_learning_interaction_events_user_occurred_at`
+- `idx_learning_interaction_events_user_unit_occurred_at`
+- `idx_learning_interaction_events_video_occurred_at`
+- `idx_learning_interaction_events_watch_session`
+- `idx_learning_interaction_events_related_quiz`
+
+`analytics.learning_interaction_events` 已包含 `client_context jsonb not null default '{}'::jsonb` 与 `event_payload jsonb not null default '{}'::jsonb`，并对两者都有 JSON object 约束。
 
 ## 4. Recommendation Migration 状态
 
