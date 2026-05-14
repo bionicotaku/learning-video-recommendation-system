@@ -30,13 +30,15 @@ func TestManagerRollsBackTransactionOnError(t *testing.T) {
 	err := manager.WithinTx(context.Background(), func(ctx context.Context, repos service.TransactionalRepositories) error {
 		return repos.UnitLearningEvents().Append(ctx, []model.LearningEvent{
 			{
-				UserID:       userID,
-				CoarseUnitID: 101,
-				EventType:    "new_learn",
-				SourceType:   "quiz_session",
-				Quality:      &q4,
-				Metadata:     []byte("{}"),
-				OccurredAt:   time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+				UserID:          userID,
+				CoarseUnitID:    101,
+				EventType:       "quiz",
+				ReducerEffect:   "affects_progress",
+				SourceType:      "quiz_event",
+				SourceRefID:     "tx-1",
+				ProgressQuality: &q4,
+				Metadata:        []byte("{}"),
+				OccurredAt:      time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
 			},
 		})
 	})
@@ -47,13 +49,15 @@ func TestManagerRollsBackTransactionOnError(t *testing.T) {
 	err = manager.WithinTx(context.Background(), func(ctx context.Context, repos service.TransactionalRepositories) error {
 		if err := repos.UnitLearningEvents().Append(ctx, []model.LearningEvent{
 			{
-				UserID:       userID,
-				CoarseUnitID: 101,
-				EventType:    "review",
-				SourceType:   "quiz_session",
-				Quality:      &q4,
-				Metadata:     []byte("{}"),
-				OccurredAt:   time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
+				UserID:          userID,
+				CoarseUnitID:    101,
+				EventType:       "quiz",
+				ReducerEffect:   "affects_progress",
+				SourceType:      "quiz_event",
+				SourceRefID:     "tx-2",
+				ProgressQuality: &q4,
+				Metadata:        []byte("{}"),
+				OccurredAt:      time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
 			},
 		}); err != nil {
 			return err

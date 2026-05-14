@@ -89,10 +89,9 @@
   - `status`
   - `is_target`
   - `target_priority`
-  - `last_quality`
+  - `last_progress_quality`
   - `next_review_at`
-  - `strong_event_count`
-  - `review_count`
+  - `progress_event_count`
 - Recommendation 输出：
   - `selector_mode`
   - `underfilled`

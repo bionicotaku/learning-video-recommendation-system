@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -103,6 +104,16 @@ func mustRecordEvents(t interface {
 	Fatalf(string, ...any)
 }, suite *testutil.LearningSuite, userID string, events ...learningdto.LearningEventInput) {
 	t.Helper()
+	for idx := range events {
+		if events[idx].SourceRefID == "" {
+			events[idx].SourceRefID = fmt.Sprintf(
+				"e2e:%d:%s:%d",
+				events[idx].CoarseUnitID,
+				events[idx].OccurredAt.UTC().Format(time.RFC3339Nano),
+				idx,
+			)
+		}
+	}
 	if _, err := suite.RecordEvents.Execute(ctx(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: events,

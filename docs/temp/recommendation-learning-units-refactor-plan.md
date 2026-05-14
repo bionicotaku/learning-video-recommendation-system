@@ -871,7 +871,7 @@ Recommendation 本轮只负责输出 `learning_units`。前端学习反馈仍建
 | 点击字幕 token 查义 | `lookup` | 弱信号，但价值高于纯 exposure |
 | 弹窗选择认识 | `review` 或 `quiz` + quality | 强信号，取决于是否有题目 |
 | 弹窗选择模糊 | `review` + 中低 quality | 强信号 |
-| 弹窗选择不认识 | `review` + 低 quality，或 `new_learn` | 强信号 |
+| 弹窗选择不认识 | `review` + 低 quality，或 `legacy-new-learn` | 强信号 |
 | 结尾小测答题 | `quiz` | 强信号 |
 | 学习模式即时练习 | `quiz` 或 `review` | 强信号 |
 

@@ -2,7 +2,7 @@
 
 状态：LIVE DB SNAPSHOT
 更新时间：2026-05-14
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做只读探查，并在本轮执行 `make catalog-migrate-up` 与 `make analytics-migrate-up` 后记录。
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 Learning Engine normalized event 重构 migration 后记录。
 
 ## 1. Schema 概览
 
@@ -15,9 +15,9 @@
 | `catalog` | 存在，包含当前 Catalog 内容表与 `catalog.questions` |
 | `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events`、`analytics.learning_interaction_events` |
 | `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
-| `learning` | 不存在 |
+| `learning` | 存在，包含 `learning.unit_learning_events`、`learning.user_unit_states` |
 
-这意味着当前 live DB 已有 Catalog、Analytics、Recommendation 自有表、索引和物化视图，但还没有 Learning engine 的 `learning.*` 表。需要完整线上闭环时，仍必须另行应用 Learning engine migration。
+当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation 自有表、索引和物化视图。Learning Engine migration 已折叠为干净 baseline，tracking 状态为 `module=learningengine current=4 applied=4 pending=0`。
 
 ## 2. Catalog Migration 状态
 
@@ -93,6 +93,34 @@
 - `000005_create_recommendation_indexes`
 
 Recommendation 本轮没有重新执行 migrate 或 refresh。
+
+## 4.1 Learning Engine Migration 状态
+
+`learningengine_schema_migrations` 当前有 4 条记录，对应仓库内 4 个 Learning Engine migration：
+
+- `000001_create_learning_schema`
+- `000002_create_user_unit_states`
+- `000003_create_unit_learning_events`
+- `000004_create_learning_indexes`
+
+当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。只读核对显示该表有 13 个字段，并包含以下关键约束与索引：
+
+- `unit_learning_events_pkey`
+- `uq_unit_learning_events_source_unit`
+- `idx_learning_events_user_time`
+- `idx_learning_events_user_unit_time`
+- `event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mastered')`
+- `reducer_effect in ('observe_only', 'affects_progress')`
+- `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`
+- `metadata` 必须为 JSON object
+
+当前 `learning.user_unit_states` 已是 progress / schedule 语义的状态投影表。只读核对显示该表有 28 个字段，并包含以下索引：
+
+- `user_unit_states_pkey`
+- `idx_learning_states_user_target_status_due`
+- `idx_learning_states_user_updated_at`
+
+该表当前已使用 `first_observed_at`、`observation_count`、`progress_event_count`、`last_progress_quality`、`recent_progress_qualities`、`recent_progress_passes`、`schedule_repetition`、`schedule_interval_days`、`schedule_ease_factor` 等新字段，不再包含旧 `strong_event_count`、`review_count`、`last_quality`。
 
 ## 5. Recommendation 表与视图
 

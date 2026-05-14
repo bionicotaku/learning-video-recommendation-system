@@ -28,7 +28,7 @@ func TestE2E_RecommendationSelectorMarksExtremeSparseWhenDemandUnderfills(t *tes
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: unitID, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: unitID, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 3)
@@ -74,8 +74,8 @@ func TestE2E_RecommendationSelectorRespectsSameUnitMax(t *testing.T) {
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: heavyUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: otherHardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: heavyUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: otherHardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 4)
@@ -117,8 +117,8 @@ func TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin(t *test
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 5)
@@ -164,11 +164,11 @@ func TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply(t *testing.T
 	q4 := int16(4)
 	q1 := int16(1)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "review", SourceType: "quiz_session", Quality: &q1, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softA, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softB, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softC, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q1, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softA, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softB, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softC, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 4)

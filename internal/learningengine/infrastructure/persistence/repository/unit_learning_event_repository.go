@@ -38,17 +38,17 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 		}
 
 		if _, err := r.queries.AppendLearningEvent(ctx, learningenginesqlc.AppendLearningEventParams{
-			UserID:         userID,
-			CoarseUnitID:   event.CoarseUnitID,
-			VideoID:        videoID,
-			EventType:      event.EventType,
-			SourceType:     event.SourceType,
-			SourceRefID:    mapper.StringToText(event.SourceRefID),
-			IsCorrect:      mapper.BoolPointerToPG(event.IsCorrect),
-			Quality:        mapper.Int16PointerToPG(event.Quality),
-			ResponseTimeMs: mapper.Int32PointerToPG(event.ResponseTimeMs),
-			Metadata:       metadata,
-			OccurredAt:     mapper.TimePointerToPG(&event.OccurredAt),
+			UserID:          userID,
+			CoarseUnitID:    event.CoarseUnitID,
+			VideoID:         videoID,
+			EventType:       event.EventType,
+			ReducerEffect:   event.ReducerEffect,
+			ProgressQuality: mapper.Int16PointerToPG(event.ProgressQuality),
+			SourceType:      event.SourceType,
+			SourceRefID:     event.SourceRefID,
+			IsCorrect:       mapper.BoolPointerToPG(event.IsCorrect),
+			Metadata:        metadata,
+			OccurredAt:      mapper.TimePointerToPG(&event.OccurredAt),
 		}); err != nil {
 			return err
 		}

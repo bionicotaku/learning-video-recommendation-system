@@ -39,17 +39,17 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 		}
 
 		event := model.LearningEvent{
-			UserID:         request.UserID,
-			CoarseUnitID:   input.CoarseUnitID,
-			VideoID:        input.VideoID,
-			EventType:      input.EventType,
-			SourceType:     input.SourceType,
-			SourceRefID:    input.SourceRefID,
-			IsCorrect:      input.IsCorrect,
-			Quality:        input.Quality,
-			ResponseTimeMs: input.ResponseTimeMs,
-			Metadata:       metadata,
-			OccurredAt:     input.OccurredAt,
+			UserID:          request.UserID,
+			CoarseUnitID:    input.CoarseUnitID,
+			VideoID:         input.VideoID,
+			EventType:       input.EventType,
+			ReducerEffect:   input.ReducerEffect,
+			SourceType:      input.SourceType,
+			SourceRefID:     input.SourceRefID,
+			IsCorrect:       input.IsCorrect,
+			ProgressQuality: input.ProgressQuality,
+			Metadata:        metadata,
+			OccurredAt:      input.OccurredAt,
 		}
 		if err := policy.ValidateEvent(event); err != nil {
 			return dto.RecordLearningEventsResponse{}, err
@@ -76,8 +76,8 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 			for _, event := range unitEvents {
 				nextState, err := aggregate.Reduce(currentState, event)
 				if err != nil {
-					if errors.Is(err, aggregate.ErrLateStrongEvent) {
-						return ErrLateStrongEvent
+					if errors.Is(err, aggregate.ErrLateProgressEvent) {
+						return ErrLateProgressEvent
 					}
 					return err
 				}

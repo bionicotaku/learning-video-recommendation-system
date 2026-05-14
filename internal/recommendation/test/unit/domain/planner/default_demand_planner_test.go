@@ -26,10 +26,10 @@ func TestDefaultDemandPlannerRespectsBucketPrecedence(t *testing.T) {
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{
-				CoarseUnitID:   101,
-				Status:         "new",
-				TargetPriority: 0.9,
-				LastQuality:    &lastQuality,
+				CoarseUnitID:        101,
+				Status:              "new",
+				TargetPriority:      0.9,
+				LastProgressQuality: &lastQuality,
 			},
 		},
 		UnitInventory: []model.UnitVideoInventory{

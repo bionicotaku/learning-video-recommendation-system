@@ -72,11 +72,11 @@ func TestSetTargetInactiveExecute(t *testing.T) {
 func TestSuspendTargetUnitExecute(t *testing.T) {
 	stateRepo := &fakeUserUnitStateRepository{
 		state: &model.UserUnitState{
-			UserID:       "11111111-1111-1111-1111-111111111111",
-			CoarseUnitID: 101,
-			IsTarget:     true,
-			Status:       enum.StatusReviewing,
-			EaseFactor:   2.5,
+			UserID:             "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:       101,
+			IsTarget:           true,
+			Status:             enum.StatusReviewing,
+			ScheduleEaseFactor: 2.5,
 		},
 	}
 	txManager := &fakeTxManager{
@@ -110,7 +110,7 @@ func TestSuspendTargetUnitExecute(t *testing.T) {
 }
 
 func TestResumeTargetUnitExecuteRecomputesStatus(t *testing.T) {
-	lastReviewedAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	lastQuality := int16(4)
 	stateRepo := &fakeUserUnitStateRepository{
 		state: &model.UserUnitState{
@@ -119,17 +119,16 @@ func TestResumeTargetUnitExecuteRecomputesStatus(t *testing.T) {
 			IsTarget:                true,
 			Status:                  enum.StatusSuspended,
 			SuspendedReason:         "manual_pause",
-			StrongEventCount:        2,
-			ReviewCount:             1,
-			CorrectCount:            2,
-			ConsecutiveCorrect:      2,
-			LastQuality:             &lastQuality,
-			RecentQualityWindow:     []int16{4, 4},
-			RecentCorrectnessWindow: []bool{true, true},
-			Repetition:              2,
-			IntervalDays:            3,
-			EaseFactor:              2.5,
-			LastReviewedAt:          &lastReviewedAt,
+			ProgressEventCount:      2,
+			ProgressSuccessCount:    2,
+			ConsecutiveSuccessCount: 2,
+			LastProgressQuality:     &lastQuality,
+			RecentProgressQualities: []int16{4, 4},
+			RecentProgressPasses:    []bool{true, true},
+			ScheduleRepetition:      2,
+			ScheduleIntervalDays:    3,
+			ScheduleEaseFactor:      2.5,
+			LastProgressAt:          &lastProgressAt,
 		},
 	}
 	txManager := &fakeTxManager{
@@ -216,8 +215,8 @@ func TestRecordLearningEventsExecuteReducesSortedEvents(t *testing.T) {
 	response, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: "11111111-1111-1111-1111-111111111111",
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: t2},
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_2", ProgressQuality: &q4, OccurredAt: t2},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_1", ProgressQuality: &q4, OccurredAt: t1},
 		},
 	})
 	if err != nil {
@@ -238,19 +237,19 @@ func TestRecordLearningEventsExecuteReducesSortedEvents(t *testing.T) {
 	}
 }
 
-func TestRecordLearningEventsExecuteRejectsLateStrongEvent(t *testing.T) {
-	lastReviewedAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+func TestRecordLearningEventsExecuteRejectsLateProgressEvent(t *testing.T) {
+	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	q4 := int16(4)
 
 	stateRepo := &fakeUserUnitStateRepository{
 		statesByUnit: map[int64]*model.UserUnitState{
 			101: {
-				UserID:         "11111111-1111-1111-1111-111111111111",
-				CoarseUnitID:   101,
-				IsTarget:       true,
-				Status:         enum.StatusReviewing,
-				LastReviewedAt: &lastReviewedAt,
-				EaseFactor:     2.5,
+				UserID:             "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:       101,
+				IsTarget:           true,
+				Status:             enum.StatusReviewing,
+				LastProgressAt:     &lastProgressAt,
+				ScheduleEaseFactor: 2.5,
 			},
 		},
 	}
@@ -265,11 +264,11 @@ func TestRecordLearningEventsExecuteRejectsLateStrongEvent(t *testing.T) {
 	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: "11111111-1111-1111-1111-111111111111",
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: lastReviewedAt.Add(-time.Hour)},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_1", ProgressQuality: &q4, OccurredAt: lastProgressAt.Add(-time.Hour)},
 		},
 	})
-	if !errors.Is(err, service.ErrLateStrongEvent) {
-		t.Fatalf("Execute() error = %v, want ErrLateStrongEvent", err)
+	if !errors.Is(err, service.ErrLateProgressEvent) {
+		t.Fatalf("Execute() error = %v, want ErrLateProgressEvent", err)
 	}
 }
 
@@ -289,8 +288,8 @@ func TestRecordLearningEventsExecuteHandlesMultipleUnits(t *testing.T) {
 	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: "11111111-1111-1111-1111-111111111111",
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
-			{CoarseUnitID: 102, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_1", ProgressQuality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 102, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_2", ProgressQuality: &q4, OccurredAt: t1},
 		},
 	})
 	if err != nil {
@@ -303,26 +302,30 @@ func TestRecordLearningEventsExecuteHandlesMultipleUnits(t *testing.T) {
 }
 
 func TestReplayUserStatesExecutePreservesControlSliceAndTargetOnlyRows(t *testing.T) {
-	lastReviewedAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	eventsRepo := &fakeUnitLearningEventRepository{
 		listByUserOrdered: []model.LearningEvent{
 			{
-				UserID:       "11111111-1111-1111-1111-111111111111",
-				CoarseUnitID: 101,
-				EventType:    "new_learn",
-				SourceType:   "quiz_session",
-				Quality:      int16Pointer(4),
-				Metadata:     []byte("{}"),
-				OccurredAt:   lastReviewedAt.Add(-24 * time.Hour),
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventQuiz,
+				ReducerEffect:   enum.ReducerEffectAffectsProgress,
+				SourceType:      "quiz_event",
+				SourceRefID:     "event_1",
+				ProgressQuality: int16Pointer(4),
+				Metadata:        []byte("{}"),
+				OccurredAt:      lastProgressAt.Add(-24 * time.Hour),
 			},
 			{
-				UserID:       "11111111-1111-1111-1111-111111111111",
-				CoarseUnitID: 101,
-				EventType:    "review",
-				SourceType:   "quiz_session",
-				Quality:      int16Pointer(4),
-				Metadata:     []byte("{}"),
-				OccurredAt:   lastReviewedAt,
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventQuiz,
+				ReducerEffect:   enum.ReducerEffectAffectsProgress,
+				SourceType:      "quiz_event",
+				SourceRefID:     "event_2",
+				ProgressQuality: int16Pointer(4),
+				Metadata:        []byte("{}"),
+				OccurredAt:      lastProgressAt,
 			},
 		},
 	}
@@ -390,8 +393,8 @@ func TestReplayUserStatesExecutePreservesControlSliceAndTargetOnlyRows(t *testin
 	if rebuiltByUnit[102].Status != enum.StatusSuspended {
 		t.Fatalf("unit 102 status = %q, want %q", rebuiltByUnit[102].Status, enum.StatusSuspended)
 	}
-	if rebuiltByUnit[102].StrongEventCount != 0 {
-		t.Fatalf("unit 102 strong_event_count = %d, want 0", rebuiltByUnit[102].StrongEventCount)
+	if rebuiltByUnit[102].ProgressEventCount != 0 {
+		t.Fatalf("unit 102 progress_event_count = %d, want 0", rebuiltByUnit[102].ProgressEventCount)
 	}
 }
 

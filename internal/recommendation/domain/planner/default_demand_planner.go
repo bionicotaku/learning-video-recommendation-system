@@ -89,7 +89,7 @@ func classifyDemandUnit(state model.LearningStateSnapshot, inventory model.UnitV
 }
 
 func isHardReview(state model.LearningStateSnapshot, now time.Time) bool {
-	if state.LastQuality != nil && *state.LastQuality < 3 {
+	if state.LastProgressQuality != nil && *state.LastProgressQuality < 3 {
 		return true
 	}
 	return state.NextReviewAt != nil && !state.NextReviewAt.After(now)
@@ -102,7 +102,7 @@ func isSoftReview(state model.LearningStateSnapshot, now time.Time) bool {
 	if state.MasteryScore < 0.6 {
 		return true
 	}
-	return state.LastQuality != nil && *state.LastQuality < 4
+	return state.LastProgressQuality != nil && *state.LastProgressQuality < 4
 }
 
 func plannerFlags(bundle model.DemandBundle) model.PlannerFlags {

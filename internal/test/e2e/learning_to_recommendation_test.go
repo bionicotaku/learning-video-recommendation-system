@@ -159,12 +159,12 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 	if _, err := learning.RecordEvents.Execute(context.Background(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []learningdto.LearningEventInput{
-			{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-			{CoarseUnitID: hardUnit, EventType: "review", SourceType: "quiz_session", Quality: &q2, OccurredAt: mustTimeAdd(now, -24*time.Hour)},
-			{CoarseUnitID: softUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -1*time.Hour)},
-			{CoarseUnitID: futureUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -72*time.Hour)},
-			{CoarseUnitID: futureUnit, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-			{CoarseUnitID: futureUnit, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-1", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-2", ProgressQuality: &q2, OccurredAt: mustTimeAdd(now, -24*time.Hour)},
+			{CoarseUnitID: softUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-3", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -1*time.Hour)},
+			{CoarseUnitID: futureUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-4", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -72*time.Hour)},
+			{CoarseUnitID: futureUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-5", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+			{CoarseUnitID: futureUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "learning-rec-6", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute(): %v", err)
@@ -217,7 +217,13 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 	for i := range beforeStates.States {
 		before := beforeStates.States[i]
 		after := afterStates.States[i]
-		if before.CoarseUnitID != after.CoarseUnitID || before.Status != after.Status || before.IsTarget != after.IsTarget || before.TargetPriority != after.TargetPriority || before.ReviewCount != after.ReviewCount || before.StrongEventCount != after.StrongEventCount {
+		if before.CoarseUnitID != after.CoarseUnitID ||
+			before.Status != after.Status ||
+			before.IsTarget != after.IsTarget ||
+			before.TargetPriority != after.TargetPriority ||
+			before.ProgressEventCount != after.ProgressEventCount ||
+			before.ScheduleRepetition != after.ScheduleRepetition ||
+			before.ScheduleIntervalDays != after.ScheduleIntervalDays {
 			t.Fatalf("observable state drift after replay: before=%+v after=%+v", before, after)
 		}
 	}

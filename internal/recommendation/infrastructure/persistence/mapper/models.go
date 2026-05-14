@@ -19,30 +19,21 @@ func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (mode
 	if err != nil {
 		return model.LearningStateSnapshot{}, err
 	}
-	progressPercent, err := NumericToFloat64(row.ProgressPercent)
-	if err != nil {
-		return model.LearningStateSnapshot{}, err
-	}
 	masteryScore, err := NumericToFloat64(row.MasteryScore)
 	if err != nil {
 		return model.LearningStateSnapshot{}, err
 	}
 
 	return model.LearningStateSnapshot{
-		UserID:                  UUIDToString(row.UserID),
-		CoarseUnitID:            row.CoarseUnitID,
-		IsTarget:                row.IsTarget,
-		TargetPriority:          targetPriority,
-		Status:                  row.Status,
-		ProgressPercent:         progressPercent,
-		MasteryScore:            masteryScore,
-		LastQuality:             Int16PointerFromPG(row.LastQuality),
-		NextReviewAt:            TimePointerFromPG(row.NextReviewAt),
-		RecentQualityWindow:     row.RecentQualityWindow,
-		RecentCorrectnessWindow: row.RecentCorrectnessWindow,
-		StrongEventCount:        row.StrongEventCount,
-		ReviewCount:             row.ReviewCount,
-		UpdatedAt:               row.UpdatedAt.Time,
+		UserID:              UUIDToString(row.UserID),
+		CoarseUnitID:        row.CoarseUnitID,
+		IsTarget:            row.IsTarget,
+		TargetPriority:      targetPriority,
+		Status:              row.Status,
+		MasteryScore:        masteryScore,
+		LastProgressQuality: Int16PointerFromPG(row.LastProgressQuality),
+		NextReviewAt:        TimePointerFromPG(row.NextReviewAt),
+		UpdatedAt:           row.UpdatedAt.Time,
 	}, nil
 }
 

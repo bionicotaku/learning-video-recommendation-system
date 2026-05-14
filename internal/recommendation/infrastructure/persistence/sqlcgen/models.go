@@ -70,20 +70,15 @@ type CatalogVideoUserState struct {
 }
 
 type LearningUserUnitState struct {
-	UserID                  pgtype.UUID        `json:"user_id"`
-	CoarseUnitID            int64              `json:"coarse_unit_id"`
-	IsTarget                bool               `json:"is_target"`
-	TargetPriority          pgtype.Numeric     `json:"target_priority"`
-	Status                  string             `json:"status"`
-	ProgressPercent         pgtype.Numeric     `json:"progress_percent"`
-	MasteryScore            pgtype.Numeric     `json:"mastery_score"`
-	LastQuality             pgtype.Int2        `json:"last_quality"`
-	NextReviewAt            pgtype.Timestamptz `json:"next_review_at"`
-	RecentQualityWindow     []int16            `json:"recent_quality_window"`
-	RecentCorrectnessWindow []bool             `json:"recent_correctness_window"`
-	StrongEventCount        int32              `json:"strong_event_count"`
-	ReviewCount             int32              `json:"review_count"`
-	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	CoarseUnitID        int64              `json:"coarse_unit_id"`
+	IsTarget            bool               `json:"is_target"`
+	TargetPriority      pgtype.Numeric     `json:"target_priority"`
+	Status              string             `json:"status"`
+	MasteryScore        pgtype.Numeric     `json:"mastery_score"`
+	LastProgressQuality pgtype.Int2        `json:"last_progress_quality"`
+	NextReviewAt        pgtype.Timestamptz `json:"next_review_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RecommendationUserUnitServingState struct {

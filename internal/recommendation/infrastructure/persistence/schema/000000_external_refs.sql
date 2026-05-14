@@ -90,17 +90,12 @@ create table if not exists catalog.video_user_states (
 create table if not exists learning.user_unit_states (
   user_id uuid not null,
   coarse_unit_id bigint not null,
-  is_target boolean not null default true,
-  target_priority numeric(5,4) not null default 0.5,
+  is_target boolean not null default false,
+  target_priority numeric(8,4) not null default 0,
   status text not null default 'new',
-  progress_percent numeric(5,2) not null default 0,
   mastery_score numeric(5,4) not null default 0,
-  last_quality smallint,
+  last_progress_quality smallint,
   next_review_at timestamptz,
-  recent_quality_window smallint[] not null default '{}',
-  recent_correctness_window boolean[] not null default '{}',
-  strong_event_count integer not null default 0,
-  review_count integer not null default 0,
   updated_at timestamptz not null default now()
 );
 

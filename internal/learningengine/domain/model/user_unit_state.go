@@ -12,22 +12,21 @@ type UserUnitState struct {
 	Status                  string
 	ProgressPercent         float64
 	MasteryScore            float64
-	FirstSeenAt             *time.Time
-	LastSeenAt              *time.Time
-	LastReviewedAt          *time.Time
-	SeenCount               int32
-	StrongEventCount        int32
-	ReviewCount             int32
-	CorrectCount            int32
-	WrongCount              int32
-	ConsecutiveCorrect      int32
-	ConsecutiveWrong        int32
-	LastQuality             *int16
-	RecentQualityWindow     []int16
-	RecentCorrectnessWindow []bool
-	Repetition              int32
-	IntervalDays            float64
-	EaseFactor              float64
+	FirstObservedAt         *time.Time
+	LastObservedAt          *time.Time
+	ObservationCount        int32
+	ProgressEventCount      int32
+	LastProgressAt          *time.Time
+	LastProgressQuality     *int16
+	RecentProgressQualities []int16
+	RecentProgressPasses    []bool
+	ProgressSuccessCount    int32
+	ProgressFailureCount    int32
+	ConsecutiveSuccessCount int32
+	ConsecutiveFailureCount int32
+	ScheduleRepetition      int32
+	ScheduleIntervalDays    float64
+	ScheduleEaseFactor      float64
 	NextReviewAt            *time.Time
 	SuspendedReason         string
 	CreatedAt               time.Time

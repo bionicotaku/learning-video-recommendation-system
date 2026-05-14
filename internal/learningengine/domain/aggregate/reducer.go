@@ -9,7 +9,7 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/domain/policy"
 )
 
-var ErrLateStrongEvent = errors.New("late strong event")
+var ErrLateProgressEvent = errors.New("late progress event")
 
 func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*model.UserUnitState, error) {
 	if err := policy.ValidateEvent(event); err != nil {
@@ -18,44 +18,39 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 
 	state := initState(currentState, event)
 
-	if policy.IsStrongEventType(event.EventType) && state.LastReviewedAt != nil && event.OccurredAt.Before(*state.LastReviewedAt) {
-		return nil, ErrLateStrongEvent
+	if policy.IsAffectsProgressEffect(event.ReducerEffect) && state.LastProgressAt != nil && event.OccurredAt.Before(*state.LastProgressAt) {
+		return nil, ErrLateProgressEvent
 	}
 
-	updateSeenFields(state, event.OccurredAt)
+	updateObservationFields(state, event.OccurredAt)
 
-	if policy.IsWeakEventType(event.EventType) {
+	if policy.IsObserveOnlyEffect(event.ReducerEffect) {
 		finalizeState(state)
 		return state, nil
 	}
 
-	quality := *event.Quality
+	quality := *event.ProgressQuality
 	pass := policy.IsPassingQuality(quality)
 
-	state.StrongEventCount++
-	state.LastReviewedAt = timePointer(event.OccurredAt)
-	state.LastQuality = int16Pointer(quality)
-
-	if event.EventType == enum.EventReview || event.EventType == enum.EventQuiz {
-		state.ReviewCount++
-	}
-
-	state.RecentQualityWindow = policy.AppendRecentQuality(state.RecentQualityWindow, quality)
-	state.RecentCorrectnessWindow = policy.AppendRecentCorrectness(state.RecentCorrectnessWindow, pass)
+	state.ProgressEventCount++
+	state.LastProgressAt = timePointer(event.OccurredAt)
+	state.LastProgressQuality = int16Pointer(quality)
+	state.RecentProgressQualities = policy.AppendRecentProgressQuality(state.RecentProgressQualities, quality)
+	state.RecentProgressPasses = policy.AppendRecentProgressPass(state.RecentProgressPasses, pass)
 
 	if pass {
-		state.CorrectCount++
-		state.ConsecutiveCorrect++
-		state.ConsecutiveWrong = 0
-		policy.ApplySm2Success(state, quality)
+		state.ProgressSuccessCount++
+		state.ConsecutiveSuccessCount++
+		state.ConsecutiveFailureCount = 0
+		policy.ApplyProgressSuccessSchedule(state, quality)
 	} else {
-		state.WrongCount++
-		state.ConsecutiveWrong++
-		state.ConsecutiveCorrect = 0
-		policy.ApplySm2Failure(state)
+		state.ProgressFailureCount++
+		state.ConsecutiveFailureCount++
+		state.ConsecutiveSuccessCount = 0
+		policy.ApplyProgressFailureSchedule(state)
 	}
 
-	state.NextReviewAt = timePointer(event.OccurredAt.Add(time.Duration(state.IntervalDays*24) * time.Hour))
+	state.NextReviewAt = timePointer(event.OccurredAt.Add(time.Duration(state.ScheduleIntervalDays*24) * time.Hour))
 
 	finalizeState(state)
 	return state, nil
@@ -69,30 +64,33 @@ func initState(currentState *model.UserUnitState, event model.LearningEvent) *mo
 	if currentState == nil {
 		now := event.OccurredAt
 		return &model.UserUnitState{
-			UserID:         event.UserID,
-			CoarseUnitID:   event.CoarseUnitID,
-			IsTarget:       false,
-			TargetPriority: 0,
-			Status:         enum.StatusNew,
-			EaseFactor:     2.5,
-			CreatedAt:      now,
-			UpdatedAt:      now,
+			UserID:             event.UserID,
+			CoarseUnitID:       event.CoarseUnitID,
+			IsTarget:           false,
+			TargetPriority:     0,
+			Status:             enum.StatusNew,
+			ScheduleEaseFactor: 2.5,
+			CreatedAt:          now,
+			UpdatedAt:          now,
 		}
 	}
 
 	cloned := *currentState
-	cloned.RecentQualityWindow = append([]int16(nil), currentState.RecentQualityWindow...)
-	cloned.RecentCorrectnessWindow = append([]bool(nil), currentState.RecentCorrectnessWindow...)
+	cloned.RecentProgressQualities = append([]int16(nil), currentState.RecentProgressQualities...)
+	cloned.RecentProgressPasses = append([]bool(nil), currentState.RecentProgressPasses...)
+	if cloned.ScheduleEaseFactor == 0 {
+		cloned.ScheduleEaseFactor = 2.5
+	}
 	return &cloned
 }
 
-func updateSeenFields(state *model.UserUnitState, occurredAt time.Time) {
-	state.SeenCount++
-	if state.FirstSeenAt == nil || occurredAt.Before(*state.FirstSeenAt) {
-		state.FirstSeenAt = timePointer(occurredAt)
+func updateObservationFields(state *model.UserUnitState, occurredAt time.Time) {
+	state.ObservationCount++
+	if state.FirstObservedAt == nil || occurredAt.Before(*state.FirstObservedAt) {
+		state.FirstObservedAt = timePointer(occurredAt)
 	}
-	if state.LastSeenAt == nil || occurredAt.After(*state.LastSeenAt) {
-		state.LastSeenAt = timePointer(occurredAt)
+	if state.LastObservedAt == nil || occurredAt.After(*state.LastObservedAt) {
+		state.LastObservedAt = timePointer(occurredAt)
 	}
 }
 

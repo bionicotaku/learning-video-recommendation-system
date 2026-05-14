@@ -70,7 +70,7 @@ func TestE2E_MultiUserReplayDoesNotAffectOtherUsersRecommendation(t *testing.T) 
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userA, learningdto.LearningEventInput{
-		CoarseUnitID: unitA, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour),
+		CoarseUnitID: unitA, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour),
 	})
 
 	beforeReplayB := mustRecommendN(t, recommendation, userB, 1)

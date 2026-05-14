@@ -48,8 +48,8 @@ func TestE2E_RecommendationWriteSideRunMetadataAndRanksStayConsistent(t *testing
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 3)

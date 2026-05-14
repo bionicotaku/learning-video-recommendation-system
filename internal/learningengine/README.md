@@ -27,8 +27,8 @@
 - SQL/query/sqlc 基础层
 - domain 规则：
   - 事件校验
-  - 强弱事件分类
-  - 简化 SM-2
+  - `reducer_effect` 分发
+  - progress / schedule 语义的简化 SM-2 path
   - `progress_percent`
   - `mastery_score`
   - 状态迁移
@@ -85,6 +85,8 @@ internal/learningengine/
 - 同一 `user_id` 的所有状态写入 usecase 通过数据库 advisory xact lock 串行化，避免 `ReplayUserStates` 与在线写入并发破坏最终一致性
 - 仅由学习事件创建的新状态默认 `is_target = false`；target 只能来自显式 control 命令，不能由学习事件隐式产生
 - `recommendation` 只能读取 `learning.user_unit_states`，不能回写 Learning engine 业务表
+- `learning.unit_learning_events` 是 normalized Learning Engine event ledger，不是 `analytics.*` raw log
+- reducer 只按 `reducer_effect = observe_only / affects_progress` 分发；`event_type` 不再隐含 strong / weak 或 new / review 语义
 
 ## 主要调用链
 
@@ -94,6 +96,7 @@ internal/learningengine/
 request
   -> request validation
   -> map dto -> domain events
+  -> validate reducer_effect / progress_quality
   -> group by coarse_unit_id
   -> sort by occurred_at
   -> tx begin

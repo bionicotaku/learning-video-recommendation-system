@@ -7,19 +7,19 @@ import (
 
 func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.LearningEvent {
 	return model.LearningEvent{
-		EventID:        row.EventID,
-		UserID:         UUIDToString(row.UserID),
-		CoarseUnitID:   row.CoarseUnitID,
-		VideoID:        UUIDToString(row.VideoID),
-		EventType:      row.EventType,
-		SourceType:     row.SourceType,
-		SourceRefID:    TextToString(row.SourceRefID),
-		IsCorrect:      BoolPointerFromPG(row.IsCorrect),
-		Quality:        Int16PointerFromPG(row.Quality),
-		ResponseTimeMs: Int32PointerFromPG(row.ResponseTimeMs),
-		Metadata:       row.Metadata,
-		OccurredAt:     row.OccurredAt.Time,
-		CreatedAt:      row.CreatedAt.Time,
+		EventID:         UUIDToString(row.EventID),
+		UserID:          UUIDToString(row.UserID),
+		CoarseUnitID:    row.CoarseUnitID,
+		VideoID:         UUIDToString(row.VideoID),
+		EventType:       row.EventType,
+		ReducerEffect:   row.ReducerEffect,
+		SourceType:      row.SourceType,
+		SourceRefID:     row.SourceRefID,
+		IsCorrect:       BoolPointerFromPG(row.IsCorrect),
+		ProgressQuality: Int16PointerFromPG(row.ProgressQuality),
+		Metadata:        row.Metadata,
+		OccurredAt:      row.OccurredAt.Time,
+		CreatedAt:       row.CreatedAt.Time,
 	}
 }
 
@@ -36,11 +36,11 @@ func ToUserUnitState(row learningenginesqlc.LearningUserUnitState) (model.UserUn
 	if err != nil {
 		return model.UserUnitState{}, err
 	}
-	intervalDays, err := NumericToFloat64(row.IntervalDays)
+	scheduleIntervalDays, err := NumericToFloat64(row.ScheduleIntervalDays)
 	if err != nil {
 		return model.UserUnitState{}, err
 	}
-	easeFactor, err := NumericToFloat64(row.EaseFactor)
+	scheduleEaseFactor, err := NumericToFloat64(row.ScheduleEaseFactor)
 	if err != nil {
 		return model.UserUnitState{}, err
 	}
@@ -55,22 +55,21 @@ func ToUserUnitState(row learningenginesqlc.LearningUserUnitState) (model.UserUn
 		Status:                  row.Status,
 		ProgressPercent:         progressPercent,
 		MasteryScore:            masteryScore,
-		FirstSeenAt:             TimePointerFromPG(row.FirstSeenAt),
-		LastSeenAt:              TimePointerFromPG(row.LastSeenAt),
-		LastReviewedAt:          TimePointerFromPG(row.LastReviewedAt),
-		SeenCount:               row.SeenCount,
-		StrongEventCount:        row.StrongEventCount,
-		ReviewCount:             row.ReviewCount,
-		CorrectCount:            row.CorrectCount,
-		WrongCount:              row.WrongCount,
-		ConsecutiveCorrect:      row.ConsecutiveCorrect,
-		ConsecutiveWrong:        row.ConsecutiveWrong,
-		LastQuality:             Int16PointerFromPG(row.LastQuality),
-		RecentQualityWindow:     row.RecentQualityWindow,
-		RecentCorrectnessWindow: row.RecentCorrectnessWindow,
-		Repetition:              row.Repetition,
-		IntervalDays:            intervalDays,
-		EaseFactor:              easeFactor,
+		FirstObservedAt:         TimePointerFromPG(row.FirstObservedAt),
+		LastObservedAt:          TimePointerFromPG(row.LastObservedAt),
+		ObservationCount:        row.ObservationCount,
+		ProgressEventCount:      row.ProgressEventCount,
+		LastProgressAt:          TimePointerFromPG(row.LastProgressAt),
+		LastProgressQuality:     Int16PointerFromPG(row.LastProgressQuality),
+		RecentProgressQualities: row.RecentProgressQualities,
+		RecentProgressPasses:    row.RecentProgressPasses,
+		ProgressSuccessCount:    row.ProgressSuccessCount,
+		ProgressFailureCount:    row.ProgressFailureCount,
+		ConsecutiveSuccessCount: row.ConsecutiveSuccessCount,
+		ConsecutiveFailureCount: row.ConsecutiveFailureCount,
+		ScheduleRepetition:      row.ScheduleRepetition,
+		ScheduleIntervalDays:    scheduleIntervalDays,
+		ScheduleEaseFactor:      scheduleEaseFactor,
 		NextReviewAt:            TimePointerFromPG(row.NextReviewAt),
 		SuspendedReason:         TextToString(row.SuspendedReason),
 		CreatedAt:               row.CreatedAt.Time,

@@ -17,19 +17,19 @@ type CatalogVideo struct {
 }
 
 type LearningUnitLearningEvent struct {
-	EventID        int64              `json:"event_id"`
-	UserID         pgtype.UUID        `json:"user_id"`
-	CoarseUnitID   int64              `json:"coarse_unit_id"`
-	VideoID        pgtype.UUID        `json:"video_id"`
-	EventType      string             `json:"event_type"`
-	SourceType     string             `json:"source_type"`
-	SourceRefID    pgtype.Text        `json:"source_ref_id"`
-	IsCorrect      pgtype.Bool        `json:"is_correct"`
-	Quality        pgtype.Int2        `json:"quality"`
-	ResponseTimeMs pgtype.Int4        `json:"response_time_ms"`
-	Metadata       []byte             `json:"metadata"`
-	OccurredAt     pgtype.Timestamptz `json:"occurred_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	EventID         pgtype.UUID        `json:"event_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	CoarseUnitID    int64              `json:"coarse_unit_id"`
+	VideoID         pgtype.UUID        `json:"video_id"`
+	EventType       string             `json:"event_type"`
+	ReducerEffect   string             `json:"reducer_effect"`
+	ProgressQuality pgtype.Int2        `json:"progress_quality"`
+	SourceType      string             `json:"source_type"`
+	SourceRefID     string             `json:"source_ref_id"`
+	IsCorrect       pgtype.Bool        `json:"is_correct"`
+	Metadata        []byte             `json:"metadata"`
+	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type LearningUserUnitState struct {
@@ -42,22 +42,21 @@ type LearningUserUnitState struct {
 	Status                  string             `json:"status"`
 	ProgressPercent         pgtype.Numeric     `json:"progress_percent"`
 	MasteryScore            pgtype.Numeric     `json:"mastery_score"`
-	FirstSeenAt             pgtype.Timestamptz `json:"first_seen_at"`
-	LastSeenAt              pgtype.Timestamptz `json:"last_seen_at"`
-	LastReviewedAt          pgtype.Timestamptz `json:"last_reviewed_at"`
-	SeenCount               int32              `json:"seen_count"`
-	StrongEventCount        int32              `json:"strong_event_count"`
-	ReviewCount             int32              `json:"review_count"`
-	CorrectCount            int32              `json:"correct_count"`
-	WrongCount              int32              `json:"wrong_count"`
-	ConsecutiveCorrect      int32              `json:"consecutive_correct"`
-	ConsecutiveWrong        int32              `json:"consecutive_wrong"`
-	LastQuality             pgtype.Int2        `json:"last_quality"`
-	RecentQualityWindow     []int16            `json:"recent_quality_window"`
-	RecentCorrectnessWindow []bool             `json:"recent_correctness_window"`
-	Repetition              int32              `json:"repetition"`
-	IntervalDays            pgtype.Numeric     `json:"interval_days"`
-	EaseFactor              pgtype.Numeric     `json:"ease_factor"`
+	FirstObservedAt         pgtype.Timestamptz `json:"first_observed_at"`
+	LastObservedAt          pgtype.Timestamptz `json:"last_observed_at"`
+	ObservationCount        int32              `json:"observation_count"`
+	ProgressEventCount      int32              `json:"progress_event_count"`
+	LastProgressAt          pgtype.Timestamptz `json:"last_progress_at"`
+	LastProgressQuality     pgtype.Int2        `json:"last_progress_quality"`
+	RecentProgressQualities []int16            `json:"recent_progress_qualities"`
+	RecentProgressPasses    []bool             `json:"recent_progress_passes"`
+	ProgressSuccessCount    int32              `json:"progress_success_count"`
+	ProgressFailureCount    int32              `json:"progress_failure_count"`
+	ConsecutiveSuccessCount int32              `json:"consecutive_success_count"`
+	ConsecutiveFailureCount int32              `json:"consecutive_failure_count"`
+	ScheduleRepetition      int32              `json:"schedule_repetition"`
+	ScheduleIntervalDays    pgtype.Numeric     `json:"schedule_interval_days"`
+	ScheduleEaseFactor      pgtype.Numeric     `json:"schedule_ease_factor"`
 	NextReviewAt            pgtype.Timestamptz `json:"next_review_at"`
 	SuspendedReason         pgtype.Text        `json:"suspended_reason"`
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`

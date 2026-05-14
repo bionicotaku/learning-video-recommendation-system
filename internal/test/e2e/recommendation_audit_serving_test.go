@@ -32,8 +32,8 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	if _, err := learning.RecordEvents.Execute(context.Background(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []learningdto.LearningEventInput{
-			{CoarseUnitID: unitID, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
-			{CoarseUnitID: unitID, EventType: "review", SourceType: "quiz_session", Quality: &q2, OccurredAt: now.Add(-12 * time.Hour)},
+			{CoarseUnitID: unitID, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "audit-serving-1", ProgressQuality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
+			{CoarseUnitID: unitID, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "audit-serving-2", ProgressQuality: &q2, OccurredAt: now.Add(-12 * time.Hour)},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute(): %v", err)
@@ -108,8 +108,8 @@ func TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty(t *testing.T
 	if _, err := learning.RecordEvents.Execute(context.Background(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []learningdto.LearningEventInput{
-			{CoarseUnitID: unitID, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
-			{CoarseUnitID: unitID, EventType: "review", SourceType: "quiz_session", Quality: &q2, OccurredAt: now.Add(-6 * time.Hour)},
+			{CoarseUnitID: unitID, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "audit-replay-1", ProgressQuality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
+			{CoarseUnitID: unitID, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "audit-replay-2", ProgressQuality: &q2, OccurredAt: now.Add(-6 * time.Hour)},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute(): %v", err)

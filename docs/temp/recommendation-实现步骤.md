@@ -423,11 +423,11 @@ Planner 规则必须按设计文档直接实现：
 - `status`
 - `next_review_at`
 - `mastery_score`
-- `last_quality`
-- `recent_quality_window`
-- `recent_correctness_window`
-- `strong_event_count`
-- `review_count`
+- `last_progress_quality`
+- `recent_progress_qualities`
+- `recent_progress_passes`
+- `progress_event_count`
+- `progress_event_count`
 
 ### 涉及接口/类型
 

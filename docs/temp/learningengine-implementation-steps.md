@@ -1,12 +1,14 @@
 # Learningengine 实施步骤与进度记录
 
-状态：DRAFT  
+状态：HISTORICAL
 更新时间：2026-04-16  
 适用范围：`internal/learningengine`
 
 ## 文档目的
 
-本文档是 `learningengine` 模块的实施步骤与进度记录文档，不是设计文档，也不是当前实现说明文档。
+本文档是 `learningengine` 模块早期实施步骤与进度记录文档，不是设计文档，也不是当前实现说明文档。
+当前 Learning Engine 权威设计以 `docs/学习引擎设计.md` 为准，当前实现说明以
+`internal/learningengine/README.md` 为准。
 
 本文档的作用是：
 
@@ -14,7 +16,7 @@
 2. 为每一步提供明确的实施内容、测试方案和验收标准
 3. 作为实现过程中的唯一进度真相
 
-后续执行 `learningengine` 实现时，必须以本文档为准推进。
+后续执行 `learningengine` 实现时，不再以本文档为准推进；本文只用于追溯历史实施过程。
 
 ## 实施范围
 
@@ -253,7 +255,7 @@ go test ./internal/learningengine/domain/...
 - 实际改动摘要：
   - 新增学习事件类型常量
   - 新增 event 校验、强弱事件分类、recent window 截断、简化 SM-2、progress/mastery 计算、状态迁移与挂起覆盖规则
-  - 新增统一 reducer，并暴露 late strong event 错误
+  - 新增统一 reducer，并暴露 late legacy progress-driving event 错误
   - 先写领域测试，再补实现，完成 reducer 行为收敛
 - 实际测试命令：
   - `go test ./internal/learningengine/domain/...`
@@ -450,7 +452,7 @@ go test ./internal/learningengine/...
 - 实际改动摘要：
   - 新增 `RecordLearningEventsUsecase`
   - 实现事件映射、请求校验、按 unit 分组排序、事务内 append + reduce + batch upsert
-  - 将 late strong event 提升为 application 错误
+  - 将 late legacy progress-driving event 提升为 application 错误
   - 为 `metadata` 补齐默认 `{}`，满足事实表 not-null 约束
   - 新增 `RecordLearningEvents` 的 unit 测试和 real Postgres 连库测试
   - 新增事务回滚测试，验证 state 写失败时 event append 不会落库

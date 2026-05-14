@@ -23,13 +23,15 @@ func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
 	q4 := int16(4)
 	events := []model.LearningEvent{
 		{
-			UserID:       userID,
-			CoarseUnitID: 101,
-			EventType:    "new_learn",
-			SourceType:   "quiz_session",
-			Quality:      &q4,
-			Metadata:     []byte("{}"),
-			OccurredAt:   time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+			UserID:          userID,
+			CoarseUnitID:    101,
+			EventType:       "quiz",
+			ReducerEffect:   "affects_progress",
+			SourceType:      "quiz_event",
+			SourceRefID:     "repo-1",
+			ProgressQuality: &q4,
+			Metadata:        []byte("{}"),
+			OccurredAt:      time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
 		},
 	}
 
@@ -44,8 +46,11 @@ func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
 	if len(recorded) != 1 {
 		t.Fatalf("recorded len = %d, want 1", len(recorded))
 	}
-	if recorded[0].EventType != "new_learn" {
-		t.Fatalf("event_type = %q, want new_learn", recorded[0].EventType)
+	if recorded[0].EventType != "quiz" {
+		t.Fatalf("event_type = %q, want quiz", recorded[0].EventType)
+	}
+	if recorded[0].ReducerEffect != "affects_progress" {
+		t.Fatalf("reducer_effect = %q, want affects_progress", recorded[0].ReducerEffect)
 	}
 }
 
@@ -59,14 +64,14 @@ func TestUserUnitStateRepositoryUpsertListAndDelete(t *testing.T) {
 
 	repo := persistrepo.NewUserUnitStateRepository(db.Pool)
 	state := &model.UserUnitState{
-		UserID:            userID,
-		CoarseUnitID:      101,
-		IsTarget:          true,
-		TargetSource:      "curriculum",
-		TargetSourceRefID: "lesson_1",
-		TargetPriority:    0.9,
-		Status:            "new",
-		EaseFactor:        2.5,
+		UserID:             userID,
+		CoarseUnitID:       101,
+		IsTarget:           true,
+		TargetSource:       "curriculum",
+		TargetSourceRefID:  "lesson_1",
+		TargetPriority:     0.9,
+		Status:             "new",
+		ScheduleEaseFactor: 2.5,
 	}
 
 	if _, err := repo.Upsert(context.Background(), state); err != nil {

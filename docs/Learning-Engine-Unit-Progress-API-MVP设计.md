@@ -16,7 +16,7 @@
 1. 已掌握词列表：读取所有已经 mastered 的目标词，并按 `label` 的字典序分页。
 2. 未掌握词列表：读取所有尚未 mastered 的目标词，先按 `progress_percent` 从大到小分页，相同进度下再按 `label` 的字典序分页。
 
-Learning Engine 当前已经维护 `learning.user_unit_states`。该表保存用户对每个 `semantic.coarse_unit` 的学习状态、进度百分比、掌握分和最近复习时间。
+Learning Engine 当前已经维护 `learning.user_unit_states`。该表保存用户对每个 `semantic.coarse_unit` 的学习状态、进度百分比、掌握分和最近 progress 时间。
 
 `semantic.coarse_unit` 保存学习单元本身的内容元数据，包括英文 label、词性、中文短标签和中文释义。前端展示学习进度时，需要把 Learning Engine 状态与 `semantic.coarse_unit` 展示字段合并返回。
 
@@ -59,7 +59,7 @@ learning.user_unit_states
 - `is_target`
 - `status`
 - `progress_percent`
-- `last_reviewed_at`
+- `last_progress_at`
 
 ### 3.2 展示元数据表
 
@@ -192,7 +192,7 @@ bucket = mastered | unmastered
       "chinese_label": "放弃；抛弃",
       "chinese_def": "表示放弃某事物、抛弃某人或中止某计划。",
       "progress_percent": 64.25,
-      "last_reviewed_at": "2026-05-08T09:20:00Z"
+      "last_progress_at": "2026-05-08T09:20:00Z"
     }
   ],
   "page": {
@@ -214,7 +214,7 @@ bucket = mastered | unmastered
 | `chinese_label` | string \| null | `semantic.coarse_unit.chinese_label` | 中文短标签，用于列表展示。 |
 | `chinese_def` | string \| null | `semantic.coarse_unit.chinese_def` | 中文释义，用于列表或详情展示。 |
 | `progress_percent` | number | `learning.user_unit_states.progress_percent` | `0..100`，保留两位小数。 |
-| `last_reviewed_at` | string \| null | `learning.user_unit_states.last_reviewed_at` | 最近一次强学习事件时间。新词可能为空。 |
+| `last_progress_at` | string \| null | `learning.user_unit_states.last_progress_at` | 最近一次推进 progress 的事件时间。新词可能为空。 |
 
 MVP 不返回 `display_text`。前端如需展示 fallback，可以自行按明确规则使用 `chinese_label ?? label`，但后端不伪造数据库不存在的显示字段。
 
@@ -365,7 +365,7 @@ select
   cu.chinese_label,
   cu.chinese_def,
   s.progress_percent,
-  s.last_reviewed_at
+  s.last_progress_at
 from learning.user_unit_states s
 join semantic.coarse_unit cu
   on cu.id = s.coarse_unit_id
@@ -390,7 +390,7 @@ select
   cu.chinese_label,
   cu.chinese_def,
   s.progress_percent,
-  s.last_reviewed_at
+  s.last_progress_at
 from learning.user_unit_states s
 join semantic.coarse_unit cu
   on cu.id = s.coarse_unit_id
@@ -490,7 +490,7 @@ MVP 完成后应满足：
 
 1. 前端可以分页读取 mastered target units，顺序稳定为 `label` 字典序。
 2. 前端可以分页读取 unmastered target units，顺序稳定为 `progress_percent desc + label asc`。
-3. 返回项包含 `coarse_unit_id`、`kind`、`label`、`pos`、`chinese_label`、`chinese_def`、`progress_percent`、`last_reviewed_at`。
+3. 返回项包含 `coarse_unit_id`、`kind`、`label`、`pos`、`chinese_label`、`chinese_def`、`progress_percent`、`last_progress_at`。
 4. mastered 判定只依赖 `status = 'mastered'`。
 5. unmastered 判定只包含 `new`、`learning`、`reviewing`。
 6. `suspended` 和 `is_target = false` 默认不出现在两个列表里。

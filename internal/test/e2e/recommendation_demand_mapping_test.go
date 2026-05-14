@@ -46,10 +46,10 @@ func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testi
 	q4 := int16(4)
 	q3 := int16(3)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softMasteryUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softQualityUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
-		learningdto.LearningEventInput{CoarseUnitID: softQualityUnit, EventType: "review", SourceType: "quiz_session", Quality: &q3, OccurredAt: mustTimeAdd(now, -1*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softMasteryUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softQualityUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -48*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: softQualityUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q3, OccurredAt: mustTimeAdd(now, -1*time.Hour)},
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 5)
@@ -119,7 +119,7 @@ func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreEx
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
-		learningdto.LearningEventInput{CoarseUnitID: nonTargetUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
+		learningdto.LearningEventInput{CoarseUnitID: nonTargetUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
 	if _, err := learning.SuspendTargetUnit.Execute(ctx(), learningdto.SuspendTargetUnitRequest{

@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"learning-video-recommendation-system/internal/learningengine/domain/enum"
@@ -17,17 +18,29 @@ func ValidateEvent(event model.LearningEvent) error {
 	if event.SourceType == "" {
 		return fmt.Errorf("source_type is required")
 	}
+	if event.SourceRefID == "" {
+		return fmt.Errorf("source_ref_id is required")
+	}
 	if event.OccurredAt.IsZero() {
 		return fmt.Errorf("occurred_at is required")
 	}
 	if !IsSupportedEventType(event.EventType) {
 		return fmt.Errorf("unsupported event_type: %s", event.EventType)
 	}
-	if IsStrongEventType(event.EventType) && event.Quality == nil {
-		return fmt.Errorf("quality is required for strong events")
+	if !IsSupportedReducerEffect(event.ReducerEffect) {
+		return fmt.Errorf("unsupported reducer_effect: %s", event.ReducerEffect)
 	}
-	if event.Quality != nil && (*event.Quality < 0 || *event.Quality > 5) {
-		return fmt.Errorf("quality must be between 0 and 5")
+	if IsAffectsProgressEffect(event.ReducerEffect) && event.ProgressQuality == nil {
+		return fmt.Errorf("progress_quality is required for affects_progress events")
+	}
+	if IsObserveOnlyEffect(event.ReducerEffect) && event.ProgressQuality != nil {
+		return fmt.Errorf("progress_quality must be empty for observe_only events")
+	}
+	if event.ProgressQuality != nil && (*event.ProgressQuality < 0 || *event.ProgressQuality > 5) {
+		return fmt.Errorf("progress_quality must be between 0 and 5")
+	}
+	if len(event.Metadata) > 0 && !isJSONObject(event.Metadata) {
+		return fmt.Errorf("metadata must be a json object")
 	}
 
 	return nil
@@ -35,21 +48,38 @@ func ValidateEvent(event model.LearningEvent) error {
 
 func IsSupportedEventType(eventType string) bool {
 	switch eventType {
-	case enum.EventExposure, enum.EventLookup, enum.EventNewLearn, enum.EventReview, enum.EventQuiz:
+	case enum.EventExposure, enum.EventLookup, enum.EventQuiz, enum.EventSelfMarkMastered:
 		return true
 	default:
 		return false
 	}
 }
 
-func IsWeakEventType(eventType string) bool {
-	return eventType == enum.EventExposure || eventType == enum.EventLookup
+func IsSupportedReducerEffect(reducerEffect string) bool {
+	switch reducerEffect {
+	case enum.ReducerEffectObserveOnly, enum.ReducerEffectAffectsProgress:
+		return true
+	default:
+		return false
+	}
 }
 
-func IsStrongEventType(eventType string) bool {
-	return eventType == enum.EventNewLearn || eventType == enum.EventReview || eventType == enum.EventQuiz
+func IsObserveOnlyEffect(reducerEffect string) bool {
+	return reducerEffect == enum.ReducerEffectObserveOnly
+}
+
+func IsAffectsProgressEffect(reducerEffect string) bool {
+	return reducerEffect == enum.ReducerEffectAffectsProgress
 }
 
 func IsPassingQuality(quality int16) bool {
 	return quality >= 3
+}
+
+func isJSONObject(raw []byte) bool {
+	var value map[string]any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return false
+	}
+	return value != nil
 }

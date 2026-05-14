@@ -116,8 +116,8 @@ func TestRecordLearningEventsWithDatabase(t *testing.T) {
 	response, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: t2},
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "record-2", ProgressQuality: &q4, OccurredAt: t2},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "record-1", ProgressQuality: &q4, OccurredAt: t1},
 		},
 	})
 	if err != nil {
@@ -154,7 +154,7 @@ func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
 	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "rollback-1", ProgressQuality: &q4, OccurredAt: t1},
 		},
 	})
 	if !errors.Is(err, errForcedBatchUpsertFailure) {
@@ -203,8 +203,8 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: t1},
-			{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &q4, OccurredAt: t2},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "replay-1", ProgressQuality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "replay-2", ProgressQuality: &q4, OccurredAt: t2},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
@@ -248,10 +248,10 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	if afterByUnit[102].Status != "suspended" {
 		t.Fatalf("unit 102 status = %q, want suspended", afterByUnit[102].Status)
 	}
-	if afterByUnit[102].StrongEventCount != 0 {
-		t.Fatalf("unit 102 strong_event_count = %d, want 0", afterByUnit[102].StrongEventCount)
+	if afterByUnit[102].ProgressEventCount != 0 {
+		t.Fatalf("unit 102 progress_event_count = %d, want 0", afterByUnit[102].ProgressEventCount)
 	}
-	if afterByUnit[101].Repetition != beforeByUnit[101].Repetition || afterByUnit[101].IntervalDays != beforeByUnit[101].IntervalDays {
+	if afterByUnit[101].ScheduleRepetition != beforeByUnit[101].ScheduleRepetition || afterByUnit[101].ScheduleIntervalDays != beforeByUnit[101].ScheduleIntervalDays {
 		t.Fatalf("unit 101 replay progression mismatch: before=%+v after=%+v", beforeByUnit[101], afterByUnit[101])
 	}
 }
@@ -275,7 +275,7 @@ func TestReplayAndRecordSerializeForSameUser(t *testing.T) {
 	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []dto.LearningEventInput{
-			{CoarseUnitID: 101, EventType: "new_learn", SourceType: "quiz_session", Quality: &firstQuality, OccurredAt: firstOccurredAt},
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "serialize-1", ProgressQuality: &firstQuality, OccurredAt: firstOccurredAt},
 		},
 	}); err != nil {
 		t.Fatalf("seed RecordLearningEvents.Execute() error = %v", err)
@@ -297,7 +297,7 @@ func TestReplayAndRecordSerializeForSameUser(t *testing.T) {
 		_, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 			UserID: userID,
 			Events: []dto.LearningEventInput{
-				{CoarseUnitID: 101, EventType: "review", SourceType: "quiz_session", Quality: &secondQuality, OccurredAt: firstOccurredAt.Add(24 * time.Hour)},
+				{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "serialize-2", ProgressQuality: &secondQuality, OccurredAt: firstOccurredAt.Add(24 * time.Hour)},
 			},
 		})
 		recordDone <- err
@@ -331,7 +331,7 @@ func TestReplayAndRecordSerializeForSameUser(t *testing.T) {
 	if len(states) != 1 {
 		t.Fatalf("states len = %d, want 1", len(states))
 	}
-	if states[0].Status != "reviewing" || states[0].StrongEventCount != 2 || states[0].ReviewCount != 1 {
+	if states[0].Status != "reviewing" || states[0].ProgressEventCount != 2 {
 		t.Fatalf("unexpected final state after replay+record serialization: %+v", states[0])
 	}
 

@@ -4,11 +4,11 @@ insert into learning.unit_learning_events (
   coarse_unit_id,
   video_id,
   event_type,
+  reducer_effect,
+  progress_quality,
   source_type,
   source_ref_id,
   is_correct,
-  quality,
-  response_time_ms,
   metadata,
   occurred_at
 ) values (
@@ -16,11 +16,11 @@ insert into learning.unit_learning_events (
   sqlc.arg(coarse_unit_id),
   sqlc.narg(video_id),
   sqlc.arg(event_type),
+  sqlc.arg(reducer_effect),
+  sqlc.narg(progress_quality),
   sqlc.arg(source_type),
-  sqlc.narg(source_ref_id),
+  sqlc.arg(source_ref_id),
   sqlc.narg(is_correct),
-  sqlc.narg(quality),
-  sqlc.narg(response_time_ms),
   sqlc.arg(metadata),
   sqlc.arg(occurred_at)
 )

@@ -16,41 +16,41 @@ func RecentWindowLimit() int {
 	return recentWindowLimit
 }
 
-func ApplySm2Success(state *model.UserUnitState, quality int16) {
-	state.Repetition++
+func ApplyProgressSuccessSchedule(state *model.UserUnitState, quality int16) {
+	state.ScheduleRepetition++
 
-	switch state.Repetition {
+	switch state.ScheduleRepetition {
 	case 1:
-		state.IntervalDays = 1
+		state.ScheduleIntervalDays = 1
 	case 2:
-		state.IntervalDays = 3
+		state.ScheduleIntervalDays = 3
 	case 3:
-		state.IntervalDays = 6
+		state.ScheduleIntervalDays = 6
 	default:
-		state.IntervalDays = math.Round(state.IntervalDays * state.EaseFactor)
+		state.ScheduleIntervalDays = math.Round(state.ScheduleIntervalDays * state.ScheduleEaseFactor)
 	}
 
 	delta := 0.1 - float64(5-quality)*(0.08+float64(5-quality)*0.02)
-	state.EaseFactor = math.Max(easeFactorFloor, state.EaseFactor+delta)
+	state.ScheduleEaseFactor = math.Max(easeFactorFloor, state.ScheduleEaseFactor+delta)
 }
 
-func ApplySm2Failure(state *model.UserUnitState) {
-	state.Repetition = 0
-	state.IntervalDays = 1
+func ApplyProgressFailureSchedule(state *model.UserUnitState) {
+	state.ScheduleRepetition = 0
+	state.ScheduleIntervalDays = 1
 }
 
 func ComputeProgressPercent(state model.UserUnitState) float64 {
-	if state.StrongEventCount == 0 {
+	if state.ProgressEventCount == 0 {
 		return 0
 	}
 	if ComputeActiveStatus(state) == enum.StatusMastered {
 		return 100
 	}
 
-	intervalComponent := minFloat(state.IntervalDays/21, 1)
-	accuracyComponent := averageBoolWindow(state.RecentCorrectnessWindow)
-	repetitionComponent := minFloat(float64(state.Repetition)/4, 1)
-	qualityComponent := averageInt16Window(state.RecentQualityWindow) / 5
+	intervalComponent := minFloat(state.ScheduleIntervalDays/21, 1)
+	accuracyComponent := averageBoolWindow(state.RecentProgressPasses)
+	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/4, 1)
+	qualityComponent := averageInt16Window(state.RecentProgressQualities) / 5
 
 	score := 100 * clamp01(
 		0.45*intervalComponent+
@@ -63,17 +63,17 @@ func ComputeProgressPercent(state model.UserUnitState) float64 {
 }
 
 func ComputeMasteryScore(state model.UserUnitState) float64 {
-	if state.StrongEventCount == 0 {
+	if state.ProgressEventCount == 0 {
 		return 0
 	}
 
-	intervalComponent := minFloat(state.IntervalDays/21, 1)
-	accuracyComponent := averageBoolWindow(state.RecentCorrectnessWindow)
-	stabilityComponent := minFloat(float64(state.ConsecutiveCorrect)/3, 1)
-	repetitionComponent := minFloat(float64(state.Repetition)/4, 1)
+	intervalComponent := minFloat(state.ScheduleIntervalDays/21, 1)
+	accuracyComponent := averageBoolWindow(state.RecentProgressPasses)
+	stabilityComponent := minFloat(float64(state.ConsecutiveSuccessCount)/3, 1)
+	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/4, 1)
 
 	failurePenalty := 0.0
-	if state.LastQuality != nil && *state.LastQuality < 3 {
+	if state.LastProgressQuality != nil && *state.LastProgressQuality < 3 {
 		failurePenalty = 0.20
 	}
 
@@ -89,19 +89,19 @@ func ComputeMasteryScore(state model.UserUnitState) float64 {
 }
 
 func ComputeActiveStatus(state model.UserUnitState) string {
-	if state.StrongEventCount == 0 {
+	if state.ProgressEventCount == 0 {
 		return enum.StatusNew
 	}
 
-	if state.LastQuality != nil && *state.LastQuality < 3 {
+	if state.LastProgressQuality != nil && *state.LastProgressQuality < 3 {
 		return enum.StatusReviewing
 	}
 
-	if !hasTwoRecentPassingQualities(state.RecentQualityWindow) || state.StrongEventCount < 2 || state.IntervalDays < 3 {
+	if !hasTwoRecentPassingQualities(state.RecentProgressQualities) || state.ProgressEventCount < 2 || state.ScheduleIntervalDays < 3 {
 		return enum.StatusLearning
 	}
 
-	if state.IntervalDays >= 21 && noRecentFailures(state.RecentCorrectnessWindow) && ComputeMasteryScore(state) >= 0.8 {
+	if state.ScheduleIntervalDays >= 21 && noRecentFailures(state.RecentProgressPasses) && ComputeMasteryScore(state) >= 0.8 {
 		return enum.StatusMastered
 	}
 
@@ -112,12 +112,12 @@ func IsSuspendedControl(state model.UserUnitState) bool {
 	return state.Status == enum.StatusSuspended || state.SuspendedReason != ""
 }
 
-func AppendRecentQuality(values []int16, quality int16) []int16 {
+func AppendRecentProgressQuality(values []int16, quality int16) []int16 {
 	return trimRecentWindow(append(values, quality), recentWindowLimit)
 }
 
-func AppendRecentCorrectness(values []bool, correct bool) []bool {
-	return trimRecentWindow(append(values, correct), recentWindowLimit)
+func AppendRecentProgressPass(values []bool, pass bool) []bool {
+	return trimRecentWindow(append(values, pass), recentWindowLimit)
 }
 
 func trimRecentWindow[T any](values []T, limit int) []T {

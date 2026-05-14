@@ -145,14 +145,14 @@ func applyControlSnapshot(state *model.UserUnitState, snapshot controlSnapshot) 
 
 func defaultStateFromSnapshot(userID string, snapshot controlSnapshot) *model.UserUnitState {
 	state := &model.UserUnitState{
-		UserID:            userID,
-		CoarseUnitID:      snapshot.CoarseUnitID,
-		IsTarget:          snapshot.IsTarget,
-		TargetSource:      snapshot.TargetSource,
-		TargetSourceRefID: snapshot.TargetSourceRefID,
-		TargetPriority:    snapshot.TargetPriority,
-		Status:            enum.StatusNew,
-		EaseFactor:        2.5,
+		UserID:             userID,
+		CoarseUnitID:       snapshot.CoarseUnitID,
+		IsTarget:           snapshot.IsTarget,
+		TargetSource:       snapshot.TargetSource,
+		TargetSourceRefID:  snapshot.TargetSourceRefID,
+		TargetPriority:     snapshot.TargetPriority,
+		Status:             enum.StatusNew,
+		ScheduleEaseFactor: 2.5,
 	}
 	if snapshot.Status == enum.StatusSuspended || snapshot.SuspendedReason != "" {
 		state.Status = enum.StatusSuspended

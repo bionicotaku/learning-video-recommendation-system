@@ -17,11 +17,11 @@ insert into learning.unit_learning_events (
   coarse_unit_id,
   video_id,
   event_type,
+  reducer_effect,
+  progress_quality,
   source_type,
   source_ref_id,
   is_correct,
-  quality,
-  response_time_ms,
   metadata,
   occurred_at
 ) values (
@@ -37,21 +37,21 @@ insert into learning.unit_learning_events (
   $10,
   $11
 )
-returning event_id, user_id, coarse_unit_id, video_id, event_type, source_type, source_ref_id, is_correct, quality, response_time_ms, metadata, occurred_at, created_at
+returning event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
 `
 
 type AppendLearningEventParams struct {
-	UserID         pgtype.UUID        `json:"user_id"`
-	CoarseUnitID   int64              `json:"coarse_unit_id"`
-	VideoID        pgtype.UUID        `json:"video_id"`
-	EventType      string             `json:"event_type"`
-	SourceType     string             `json:"source_type"`
-	SourceRefID    pgtype.Text        `json:"source_ref_id"`
-	IsCorrect      pgtype.Bool        `json:"is_correct"`
-	Quality        pgtype.Int2        `json:"quality"`
-	ResponseTimeMs pgtype.Int4        `json:"response_time_ms"`
-	Metadata       []byte             `json:"metadata"`
-	OccurredAt     pgtype.Timestamptz `json:"occurred_at"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	CoarseUnitID    int64              `json:"coarse_unit_id"`
+	VideoID         pgtype.UUID        `json:"video_id"`
+	EventType       string             `json:"event_type"`
+	ReducerEffect   string             `json:"reducer_effect"`
+	ProgressQuality pgtype.Int2        `json:"progress_quality"`
+	SourceType      string             `json:"source_type"`
+	SourceRefID     string             `json:"source_ref_id"`
+	IsCorrect       pgtype.Bool        `json:"is_correct"`
+	Metadata        []byte             `json:"metadata"`
+	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
 }
 
 func (q *Queries) AppendLearningEvent(ctx context.Context, arg AppendLearningEventParams) (LearningUnitLearningEvent, error) {
@@ -60,11 +60,11 @@ func (q *Queries) AppendLearningEvent(ctx context.Context, arg AppendLearningEve
 		arg.CoarseUnitID,
 		arg.VideoID,
 		arg.EventType,
+		arg.ReducerEffect,
+		arg.ProgressQuality,
 		arg.SourceType,
 		arg.SourceRefID,
 		arg.IsCorrect,
-		arg.Quality,
-		arg.ResponseTimeMs,
 		arg.Metadata,
 		arg.OccurredAt,
 	)
@@ -75,11 +75,11 @@ func (q *Queries) AppendLearningEvent(ctx context.Context, arg AppendLearningEve
 		&i.CoarseUnitID,
 		&i.VideoID,
 		&i.EventType,
+		&i.ReducerEffect,
+		&i.ProgressQuality,
 		&i.SourceType,
 		&i.SourceRefID,
 		&i.IsCorrect,
-		&i.Quality,
-		&i.ResponseTimeMs,
 		&i.Metadata,
 		&i.OccurredAt,
 		&i.CreatedAt,
@@ -88,7 +88,7 @@ func (q *Queries) AppendLearningEvent(ctx context.Context, arg AppendLearningEve
 }
 
 const listLearningEventsByUserOrdered = `-- name: ListLearningEventsByUserOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, source_type, source_ref_id, is_correct, quality, response_time_ms, metadata, occurred_at, created_at
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
 from learning.unit_learning_events
 where user_id = $1
 order by occurred_at asc, event_id asc
@@ -109,11 +109,11 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 			&i.CoarseUnitID,
 			&i.VideoID,
 			&i.EventType,
+			&i.ReducerEffect,
+			&i.ProgressQuality,
 			&i.SourceType,
 			&i.SourceRefID,
 			&i.IsCorrect,
-			&i.Quality,
-			&i.ResponseTimeMs,
 			&i.Metadata,
 			&i.OccurredAt,
 			&i.CreatedAt,
@@ -129,7 +129,7 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 }
 
 const listLearningEventsByUserUnitOrdered = `-- name: ListLearningEventsByUserUnitOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, source_type, source_ref_id, is_correct, quality, response_time_ms, metadata, occurred_at, created_at
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
 from learning.unit_learning_events
 where user_id = $1
   and coarse_unit_id = $2
@@ -156,11 +156,11 @@ func (q *Queries) ListLearningEventsByUserUnitOrdered(ctx context.Context, arg L
 			&i.CoarseUnitID,
 			&i.VideoID,
 			&i.EventType,
+			&i.ReducerEffect,
+			&i.ProgressQuality,
 			&i.SourceType,
 			&i.SourceRefID,
 			&i.IsCorrect,
-			&i.Quality,
-			&i.ResponseTimeMs,
 			&i.Metadata,
 			&i.OccurredAt,
 			&i.CreatedAt,

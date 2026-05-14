@@ -130,22 +130,22 @@ func toUpsertUserUnitStateParams(state *model.UserUnitState) (learningenginesqlc
 	if err != nil {
 		return learningenginesqlc.UpsertUserUnitStateParams{}, err
 	}
-	intervalDays, err := mapper.Float64ToNumeric(state.IntervalDays)
+	scheduleIntervalDays, err := mapper.Float64ToNumeric(state.ScheduleIntervalDays)
 	if err != nil {
 		return learningenginesqlc.UpsertUserUnitStateParams{}, err
 	}
-	easeFactor, err := mapper.Float64ToNumeric(state.EaseFactor)
+	scheduleEaseFactor, err := mapper.Float64ToNumeric(state.ScheduleEaseFactor)
 	if err != nil {
 		return learningenginesqlc.UpsertUserUnitStateParams{}, err
 	}
 
-	recentQualityWindow := state.RecentQualityWindow
-	if recentQualityWindow == nil {
-		recentQualityWindow = []int16{}
+	recentProgressQualities := state.RecentProgressQualities
+	if recentProgressQualities == nil {
+		recentProgressQualities = []int16{}
 	}
-	recentCorrectnessWindow := state.RecentCorrectnessWindow
-	if recentCorrectnessWindow == nil {
-		recentCorrectnessWindow = []bool{}
+	recentProgressPasses := state.RecentProgressPasses
+	if recentProgressPasses == nil {
+		recentProgressPasses = []bool{}
 	}
 
 	return learningenginesqlc.UpsertUserUnitStateParams{
@@ -158,22 +158,21 @@ func toUpsertUserUnitStateParams(state *model.UserUnitState) (learningenginesqlc
 		Status:                  state.Status,
 		ProgressPercent:         progressPercent,
 		MasteryScore:            masteryScore,
-		FirstSeenAt:             mapper.TimePointerToPG(state.FirstSeenAt),
-		LastSeenAt:              mapper.TimePointerToPG(state.LastSeenAt),
-		LastReviewedAt:          mapper.TimePointerToPG(state.LastReviewedAt),
-		SeenCount:               state.SeenCount,
-		StrongEventCount:        state.StrongEventCount,
-		ReviewCount:             state.ReviewCount,
-		CorrectCount:            state.CorrectCount,
-		WrongCount:              state.WrongCount,
-		ConsecutiveCorrect:      state.ConsecutiveCorrect,
-		ConsecutiveWrong:        state.ConsecutiveWrong,
-		LastQuality:             mapper.Int16PointerToPG(state.LastQuality),
-		RecentQualityWindow:     recentQualityWindow,
-		RecentCorrectnessWindow: recentCorrectnessWindow,
-		Repetition:              state.Repetition,
-		IntervalDays:            intervalDays,
-		EaseFactor:              easeFactor,
+		FirstObservedAt:         mapper.TimePointerToPG(state.FirstObservedAt),
+		LastObservedAt:          mapper.TimePointerToPG(state.LastObservedAt),
+		ObservationCount:        state.ObservationCount,
+		ProgressEventCount:      state.ProgressEventCount,
+		LastProgressAt:          mapper.TimePointerToPG(state.LastProgressAt),
+		LastProgressQuality:     mapper.Int16PointerToPG(state.LastProgressQuality),
+		RecentProgressQualities: recentProgressQualities,
+		RecentProgressPasses:    recentProgressPasses,
+		ProgressSuccessCount:    state.ProgressSuccessCount,
+		ProgressFailureCount:    state.ProgressFailureCount,
+		ConsecutiveSuccessCount: state.ConsecutiveSuccessCount,
+		ConsecutiveFailureCount: state.ConsecutiveFailureCount,
+		ScheduleRepetition:      state.ScheduleRepetition,
+		ScheduleIntervalDays:    scheduleIntervalDays,
+		ScheduleEaseFactor:      scheduleEaseFactor,
 		NextReviewAt:            mapper.TimePointerToPG(state.NextReviewAt),
 		SuspendedReason:         mapper.StringToText(state.SuspendedReason),
 	}, nil

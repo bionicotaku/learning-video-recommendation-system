@@ -66,7 +66,7 @@ func (q *Queries) EnsureTargetUnit(ctx context.Context, arg EnsureTargetUnitPara
 }
 
 const getUserUnitStateForUpdate = `-- name: GetUserUnitStateForUpdate :one
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, recent_quality_window, recent_correctness_window, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and coarse_unit_id = $2
@@ -91,22 +91,21 @@ func (q *Queries) GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnit
 		&i.Status,
 		&i.ProgressPercent,
 		&i.MasteryScore,
-		&i.FirstSeenAt,
-		&i.LastSeenAt,
-		&i.LastReviewedAt,
-		&i.SeenCount,
-		&i.StrongEventCount,
-		&i.ReviewCount,
-		&i.CorrectCount,
-		&i.WrongCount,
-		&i.ConsecutiveCorrect,
-		&i.ConsecutiveWrong,
-		&i.LastQuality,
-		&i.RecentQualityWindow,
-		&i.RecentCorrectnessWindow,
-		&i.Repetition,
-		&i.IntervalDays,
-		&i.EaseFactor,
+		&i.FirstObservedAt,
+		&i.LastObservedAt,
+		&i.ObservationCount,
+		&i.ProgressEventCount,
+		&i.LastProgressAt,
+		&i.LastProgressQuality,
+		&i.RecentProgressQualities,
+		&i.RecentProgressPasses,
+		&i.ProgressSuccessCount,
+		&i.ProgressFailureCount,
+		&i.ConsecutiveSuccessCount,
+		&i.ConsecutiveFailureCount,
+		&i.ScheduleRepetition,
+		&i.ScheduleIntervalDays,
+		&i.ScheduleEaseFactor,
 		&i.NextReviewAt,
 		&i.SuspendedReason,
 		&i.CreatedAt,
@@ -116,7 +115,7 @@ func (q *Queries) GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnit
 }
 
 const listUserUnitStates = `-- name: ListUserUnitStates :many
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, recent_quality_window, recent_correctness_window, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and (not $2::boolean or is_target = true)
@@ -149,22 +148,21 @@ func (q *Queries) ListUserUnitStates(ctx context.Context, arg ListUserUnitStates
 			&i.Status,
 			&i.ProgressPercent,
 			&i.MasteryScore,
-			&i.FirstSeenAt,
-			&i.LastSeenAt,
-			&i.LastReviewedAt,
-			&i.SeenCount,
-			&i.StrongEventCount,
-			&i.ReviewCount,
-			&i.CorrectCount,
-			&i.WrongCount,
-			&i.ConsecutiveCorrect,
-			&i.ConsecutiveWrong,
-			&i.LastQuality,
-			&i.RecentQualityWindow,
-			&i.RecentCorrectnessWindow,
-			&i.Repetition,
-			&i.IntervalDays,
-			&i.EaseFactor,
+			&i.FirstObservedAt,
+			&i.LastObservedAt,
+			&i.ObservationCount,
+			&i.ProgressEventCount,
+			&i.LastProgressAt,
+			&i.LastProgressQuality,
+			&i.RecentProgressQualities,
+			&i.RecentProgressPasses,
+			&i.ProgressSuccessCount,
+			&i.ProgressFailureCount,
+			&i.ConsecutiveSuccessCount,
+			&i.ConsecutiveFailureCount,
+			&i.ScheduleRepetition,
+			&i.ScheduleIntervalDays,
+			&i.ScheduleEaseFactor,
 			&i.NextReviewAt,
 			&i.SuspendedReason,
 			&i.CreatedAt,
@@ -210,22 +208,21 @@ insert into learning.user_unit_states (
   status,
   progress_percent,
   mastery_score,
-  first_seen_at,
-  last_seen_at,
-  last_reviewed_at,
-  seen_count,
-  strong_event_count,
-  review_count,
-  correct_count,
-  wrong_count,
-  consecutive_correct,
-  consecutive_wrong,
-  last_quality,
-  recent_quality_window,
-  recent_correctness_window,
-  repetition,
-  interval_days,
-  ease_factor,
+  first_observed_at,
+  last_observed_at,
+  observation_count,
+  progress_event_count,
+  last_progress_at,
+  last_progress_quality,
+  recent_progress_qualities,
+  recent_progress_passes,
+  progress_success_count,
+  progress_failure_count,
+  consecutive_success_count,
+  consecutive_failure_count,
+  schedule_repetition,
+  schedule_interval_days,
+  schedule_ease_factor,
   next_review_at,
   suspended_reason,
   updated_at
@@ -256,7 +253,6 @@ insert into learning.user_unit_states (
   $24,
   $25,
   $26,
-  $27,
   now()
 )
 on conflict (user_id, coarse_unit_id) do update
@@ -268,26 +264,25 @@ set
   status = excluded.status,
   progress_percent = excluded.progress_percent,
   mastery_score = excluded.mastery_score,
-  first_seen_at = excluded.first_seen_at,
-  last_seen_at = excluded.last_seen_at,
-  last_reviewed_at = excluded.last_reviewed_at,
-  seen_count = excluded.seen_count,
-  strong_event_count = excluded.strong_event_count,
-  review_count = excluded.review_count,
-  correct_count = excluded.correct_count,
-  wrong_count = excluded.wrong_count,
-  consecutive_correct = excluded.consecutive_correct,
-  consecutive_wrong = excluded.consecutive_wrong,
-  last_quality = excluded.last_quality,
-  recent_quality_window = excluded.recent_quality_window,
-  recent_correctness_window = excluded.recent_correctness_window,
-  repetition = excluded.repetition,
-  interval_days = excluded.interval_days,
-  ease_factor = excluded.ease_factor,
+  first_observed_at = excluded.first_observed_at,
+  last_observed_at = excluded.last_observed_at,
+  observation_count = excluded.observation_count,
+  progress_event_count = excluded.progress_event_count,
+  last_progress_at = excluded.last_progress_at,
+  last_progress_quality = excluded.last_progress_quality,
+  recent_progress_qualities = excluded.recent_progress_qualities,
+  recent_progress_passes = excluded.recent_progress_passes,
+  progress_success_count = excluded.progress_success_count,
+  progress_failure_count = excluded.progress_failure_count,
+  consecutive_success_count = excluded.consecutive_success_count,
+  consecutive_failure_count = excluded.consecutive_failure_count,
+  schedule_repetition = excluded.schedule_repetition,
+  schedule_interval_days = excluded.schedule_interval_days,
+  schedule_ease_factor = excluded.schedule_ease_factor,
   next_review_at = excluded.next_review_at,
   suspended_reason = excluded.suspended_reason,
   updated_at = now()
-returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_seen_at, last_seen_at, last_reviewed_at, seen_count, strong_event_count, review_count, correct_count, wrong_count, consecutive_correct, consecutive_wrong, last_quality, recent_quality_window, recent_correctness_window, repetition, interval_days, ease_factor, next_review_at, suspended_reason, created_at, updated_at
+returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
 `
 
 type UpsertUserUnitStateParams struct {
@@ -300,22 +295,21 @@ type UpsertUserUnitStateParams struct {
 	Status                  string             `json:"status"`
 	ProgressPercent         pgtype.Numeric     `json:"progress_percent"`
 	MasteryScore            pgtype.Numeric     `json:"mastery_score"`
-	FirstSeenAt             pgtype.Timestamptz `json:"first_seen_at"`
-	LastSeenAt              pgtype.Timestamptz `json:"last_seen_at"`
-	LastReviewedAt          pgtype.Timestamptz `json:"last_reviewed_at"`
-	SeenCount               int32              `json:"seen_count"`
-	StrongEventCount        int32              `json:"strong_event_count"`
-	ReviewCount             int32              `json:"review_count"`
-	CorrectCount            int32              `json:"correct_count"`
-	WrongCount              int32              `json:"wrong_count"`
-	ConsecutiveCorrect      int32              `json:"consecutive_correct"`
-	ConsecutiveWrong        int32              `json:"consecutive_wrong"`
-	LastQuality             pgtype.Int2        `json:"last_quality"`
-	RecentQualityWindow     []int16            `json:"recent_quality_window"`
-	RecentCorrectnessWindow []bool             `json:"recent_correctness_window"`
-	Repetition              int32              `json:"repetition"`
-	IntervalDays            pgtype.Numeric     `json:"interval_days"`
-	EaseFactor              pgtype.Numeric     `json:"ease_factor"`
+	FirstObservedAt         pgtype.Timestamptz `json:"first_observed_at"`
+	LastObservedAt          pgtype.Timestamptz `json:"last_observed_at"`
+	ObservationCount        int32              `json:"observation_count"`
+	ProgressEventCount      int32              `json:"progress_event_count"`
+	LastProgressAt          pgtype.Timestamptz `json:"last_progress_at"`
+	LastProgressQuality     pgtype.Int2        `json:"last_progress_quality"`
+	RecentProgressQualities []int16            `json:"recent_progress_qualities"`
+	RecentProgressPasses    []bool             `json:"recent_progress_passes"`
+	ProgressSuccessCount    int32              `json:"progress_success_count"`
+	ProgressFailureCount    int32              `json:"progress_failure_count"`
+	ConsecutiveSuccessCount int32              `json:"consecutive_success_count"`
+	ConsecutiveFailureCount int32              `json:"consecutive_failure_count"`
+	ScheduleRepetition      int32              `json:"schedule_repetition"`
+	ScheduleIntervalDays    pgtype.Numeric     `json:"schedule_interval_days"`
+	ScheduleEaseFactor      pgtype.Numeric     `json:"schedule_ease_factor"`
 	NextReviewAt            pgtype.Timestamptz `json:"next_review_at"`
 	SuspendedReason         pgtype.Text        `json:"suspended_reason"`
 }
@@ -331,22 +325,21 @@ func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitSta
 		arg.Status,
 		arg.ProgressPercent,
 		arg.MasteryScore,
-		arg.FirstSeenAt,
-		arg.LastSeenAt,
-		arg.LastReviewedAt,
-		arg.SeenCount,
-		arg.StrongEventCount,
-		arg.ReviewCount,
-		arg.CorrectCount,
-		arg.WrongCount,
-		arg.ConsecutiveCorrect,
-		arg.ConsecutiveWrong,
-		arg.LastQuality,
-		arg.RecentQualityWindow,
-		arg.RecentCorrectnessWindow,
-		arg.Repetition,
-		arg.IntervalDays,
-		arg.EaseFactor,
+		arg.FirstObservedAt,
+		arg.LastObservedAt,
+		arg.ObservationCount,
+		arg.ProgressEventCount,
+		arg.LastProgressAt,
+		arg.LastProgressQuality,
+		arg.RecentProgressQualities,
+		arg.RecentProgressPasses,
+		arg.ProgressSuccessCount,
+		arg.ProgressFailureCount,
+		arg.ConsecutiveSuccessCount,
+		arg.ConsecutiveFailureCount,
+		arg.ScheduleRepetition,
+		arg.ScheduleIntervalDays,
+		arg.ScheduleEaseFactor,
 		arg.NextReviewAt,
 		arg.SuspendedReason,
 	)
@@ -361,22 +354,21 @@ func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitSta
 		&i.Status,
 		&i.ProgressPercent,
 		&i.MasteryScore,
-		&i.FirstSeenAt,
-		&i.LastSeenAt,
-		&i.LastReviewedAt,
-		&i.SeenCount,
-		&i.StrongEventCount,
-		&i.ReviewCount,
-		&i.CorrectCount,
-		&i.WrongCount,
-		&i.ConsecutiveCorrect,
-		&i.ConsecutiveWrong,
-		&i.LastQuality,
-		&i.RecentQualityWindow,
-		&i.RecentCorrectnessWindow,
-		&i.Repetition,
-		&i.IntervalDays,
-		&i.EaseFactor,
+		&i.FirstObservedAt,
+		&i.LastObservedAt,
+		&i.ObservationCount,
+		&i.ProgressEventCount,
+		&i.LastProgressAt,
+		&i.LastProgressQuality,
+		&i.RecentProgressQualities,
+		&i.RecentProgressPasses,
+		&i.ProgressSuccessCount,
+		&i.ProgressFailureCount,
+		&i.ConsecutiveSuccessCount,
+		&i.ConsecutiveFailureCount,
+		&i.ScheduleRepetition,
+		&i.ScheduleIntervalDays,
+		&i.ScheduleEaseFactor,
 		&i.NextReviewAt,
 		&i.SuspendedReason,
 		&i.CreatedAt,

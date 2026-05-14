@@ -53,14 +53,9 @@ select
   is_target,
   target_priority,
   status,
-  progress_percent,
   mastery_score,
-  last_quality,
+  last_progress_quality,
   next_review_at,
-  recent_quality_window,
-  recent_correctness_window,
-  strong_event_count,
-  review_count,
   updated_at
 from learning.user_unit_states
 where user_id = $1
@@ -84,14 +79,9 @@ func (q *Queries) ListLearningStatesForRecommendation(ctx context.Context, userI
 			&i.IsTarget,
 			&i.TargetPriority,
 			&i.Status,
-			&i.ProgressPercent,
 			&i.MasteryScore,
-			&i.LastQuality,
+			&i.LastProgressQuality,
 			&i.NextReviewAt,
-			&i.RecentQualityWindow,
-			&i.RecentCorrectnessWindow,
-			&i.StrongEventCount,
-			&i.ReviewCount,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err

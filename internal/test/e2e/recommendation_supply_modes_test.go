@@ -86,9 +86,9 @@ func TestE2E_RecommendationNormalModeWithBundleCoverage(t *testing.T) {
 	if _, err := learning.RecordEvents.Execute(context.Background(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []learningdto.LearningEventInput{
-			{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
-			{CoarseUnitID: hardUnit, EventType: "review", SourceType: "quiz_session", Quality: &q2, OccurredAt: now.Add(-24 * time.Hour)},
-			{CoarseUnitID: softUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-2 * time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-1", ProgressQuality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-2", ProgressQuality: &q2, OccurredAt: now.Add(-24 * time.Hour)},
+			{CoarseUnitID: softUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-3", ProgressQuality: &q4, OccurredAt: now.Add(-2 * time.Hour)},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute(): %v", err)
@@ -182,10 +182,10 @@ func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 	if _, err := learning.RecordEvents.Execute(context.Background(), learningdto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []learningdto.LearningEventInput{
-			{CoarseUnitID: hardUnit, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
-			{CoarseUnitID: hardUnit, EventType: "review", SourceType: "quiz_session", Quality: &q1, OccurredAt: now.Add(-12 * time.Hour)},
-			{CoarseUnitID: softUnitA, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-3 * time.Hour)},
-			{CoarseUnitID: softUnitB, EventType: "new_learn", SourceType: "quiz_session", Quality: &q4, OccurredAt: now.Add(-4 * time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-mode-1", ProgressQuality: &q4, OccurredAt: now.Add(-48 * time.Hour)},
+			{CoarseUnitID: hardUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-mode-2", ProgressQuality: &q1, OccurredAt: now.Add(-12 * time.Hour)},
+			{CoarseUnitID: softUnitA, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-mode-3", ProgressQuality: &q4, OccurredAt: now.Add(-3 * time.Hour)},
+			{CoarseUnitID: softUnitB, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "supply-mode-4", ProgressQuality: &q4, OccurredAt: now.Add(-4 * time.Hour)},
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute(): %v", err)
