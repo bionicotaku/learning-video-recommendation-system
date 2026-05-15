@@ -1,0 +1,17 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries:
+      - "query/*.sql"
+    schema:
+      - "schema/*.sql"
+      - "../../../../analytics/infrastructure/migration/*.up.sql"
+      - "../../../infrastructure/migration/*.up.sql"
+    gen:
+      go:
+        package: "normalizersqlc"
+        out: "sqlcgen"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_json_tags: true
+        emit_empty_slices: true

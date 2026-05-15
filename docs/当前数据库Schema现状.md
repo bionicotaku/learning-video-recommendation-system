@@ -101,13 +101,14 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 
 ## 4.1 Learning Engine Migration 状态
 
-`learningengine_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Learning Engine migration：
+仓库内 Learning Engine migration 当前已清理为 4 个 clean baseline migration：
 
 - `000001_create_learning_schema`
 - `000002_create_user_unit_states`
 - `000003_create_unit_learning_events`
 - `000004_create_learning_indexes`
-- `000005_add_set_mastered_reducer_effect`
+
+`set_mastered`、`progress_quality` 和 self mark 相关约束已经直接折叠进 `000003_create_unit_learning_events`，不再保留历史 patch migration。
 
 当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。只读核对显示该表有 13 个字段，并包含以下关键约束与索引：
 

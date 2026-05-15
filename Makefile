@@ -1,4 +1,4 @@
-.PHONY: fmt lint test quick-check check sqlc-generate learningengine-test-integration integration-test recommendation-test-integration e2e-test \
+.PHONY: fmt lint test quick-check check sqlc-generate learningengine-test-integration normalizer-test-integration integration-test recommendation-test-integration e2e-test \
 	analytics-migrate-up analytics-migrate-down analytics-migrate-version analytics-migrate-status \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
 	learningengine-migrate-up learningengine-migrate-down learningengine-migrate-version learningengine-migrate-status \
@@ -21,16 +21,20 @@ quick-check:
 
 sqlc-generate:
 	sqlc generate -f internal/learningengine/infrastructure/persistence/sqlc.yaml
+	sqlc generate -f internal/learningengine/normalizer/infrastructure/persistence/sqlc.yaml
 	sqlc generate -f internal/recommendation/infrastructure/persistence/sqlc.yaml
 
 learningengine-test-integration:
 	go test -tags=integration ./internal/learningengine/test/integration/...
 
+normalizer-test-integration:
+	go test -tags=integration ./internal/learningengine/normalizer/test/integration/...
+
 recommendation-test-integration:
 	go test -tags=integration ./internal/recommendation/test/integration/...
 
 integration-test:
-	go test -tags=integration ./internal/learningengine/test/integration/... ./internal/recommendation/test/integration/...
+	go test -tags=integration ./internal/learningengine/test/integration/... ./internal/learningengine/normalizer/test/integration/... ./internal/recommendation/test/integration/...
 
 e2e-test:
 	go test -tags=e2e ./internal/test/e2e/...

@@ -8,6 +8,7 @@
 
 - `learning.unit_learning_events`
 - `learning.user_unit_states`
+- `internal/learningengine/normalizer` raw fact 解释规则
 - target/control 字段
 - replay 相关边界
 
@@ -42,10 +43,16 @@
   - `ListUserUnitStates`
   - `RecordLearningEvents`
   - `ReplayUserStates`
+- normalizer 子模块：
+  - read-only 读取 `analytics.quiz_events`
+  - read-only 读取 `analytics.learning_interaction_events`
+  - 把 raw fact 映射为 `RecordLearningEvents` 输入
+  - 不维护 checkpoint / rollup 表
 - 模块内数据库测试：
   - usecase real Postgres 测试
   - repository real Postgres 测试
   - 事务回滚测试
+  - normalizer real Postgres 测试
 
 ## 目录结构
 
@@ -70,6 +77,27 @@ internal/learningengine/
       schema/
       sqlcgen/
       tx/
+  normalizer/
+    application/
+      dto/
+      repository/
+      service/
+      usecase/
+    domain/
+      model/
+      policy/
+      rule/
+    infrastructure/
+      persistence/
+        mapper/
+        query/
+        repository/
+        schema/
+        sqlcgen/
+    test/
+      fixture/
+      unit/
+      integration/
   test/
     fixture/
     unit/
@@ -87,11 +115,26 @@ internal/learningengine/
 - 仅由学习事件创建的新状态默认 `is_target = false`；target 只能来自显式 control 命令，不能由学习事件隐式产生
 - `recommendation` 只能读取 `learning.user_unit_states`，不能回写 Learning engine 业务表
 - `learning.unit_learning_events` 是 normalized Learning Engine event ledger，不是 `analytics.*` raw log
+- normalizer 是 raw fact 到 normalized ledger 的唯一 Learning Engine 内部解释入口；它不直接写 `learning.*`，所有写入都调用 `RecordLearningEvents`
 - reducer 只按 `reducer_effect = observe_only / affects_progress / set_mastered` 分发；`event_type` 不再隐含 strong / weak 或 new / review 语义
 - `event_type = self_mark_mastered` 必须使用 `reducer_effect = set_mastered`，直接进入 completed mastered 状态并移出 target
 - `status = mastered && is_target = false` 是 terminal mastered；后续普通 observation / progress event 不再改变状态，除非先通过显式 control 命令重新加入 target
 
 ## 主要调用链
+
+### NormalizePendingEvents
+
+```text
+request
+  -> normalize source_kind / limit
+  -> read pending analytics.quiz_events / analytics.learning_interaction_events
+  -> anti-join learning.unit_learning_events by source_type/source_ref_id/coarse_unit_id
+  -> map raw fact -> normalized event
+  -> group by user_id
+  -> call RecordLearningEvents
+```
+
+当前 normalizer 不维护 checkpoint。幂等依赖 pending anti-join 和 `learning.unit_learning_events` 的唯一约束。
 
 ### RecordLearningEvents
 
@@ -182,14 +225,18 @@ first learning event for unseen unit
   - 不包含带 `integration` tag 的真实数据库慢测试
 - `make learningengine-test-integration`
   - 单独执行 Learning engine 模块内真实数据库测试
+- `make normalizer-test-integration`
+  - 单独执行 Learning Engine normalizer 子模块真实数据库测试
 - `make check`
   - 作为完整仓库级验收
   - 先执行 `quick-check`
-  - 再通过一次 `go test -tags=integration ...` 调用并行调度 Learning engine 与 Recommendation 的模块内 integration 测试
+  - 再通过一次 `go test -tags=integration ...` 调用并行调度 Learning engine、Learning Engine normalizer 与 Recommendation 的模块内 integration 测试
 
 ## 当前约束
 
 - 当前没有 HTTP/API 层
+- 当前没有 normalizer public API / CLI / job 封装，只有 application usecase
+- 当前 normalizer 没有 checkpoint、rollup 或 normalized_at 状态字段
 - 当前没有用户级 partial replay
 - 当前没有复杂乱序历史修复工具
 - 当前不持有 Recommendation 派生概念或投放字段
