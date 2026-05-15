@@ -237,6 +237,69 @@ func TestRecordLearningEventsExecuteReducesSortedEvents(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsExecuteSetMasteredTerminalState(t *testing.T) {
+	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(24 * time.Hour)
+	q1 := int16(1)
+
+	stateRepo := &fakeUserUnitStateRepository{
+		statesByUnit: map[int64]*model.UserUnitState{
+			101: {
+				UserID:             "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:       101,
+				IsTarget:           true,
+				Status:             enum.StatusReviewing,
+				ScheduleEaseFactor: 2.5,
+			},
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewRecordLearningEventsUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: enum.EventSelfMarkMastered, ReducerEffect: enum.ReducerEffectSetMastered, SourceType: "learning_interaction_event", SourceRefID: "self-mark-1", OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "quiz-after-mastered", ProgressQuality: &q1, OccurredAt: t2},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if response.RecordedCount != 2 {
+		t.Fatalf("RecordedCount = %d, want 2", response.RecordedCount)
+	}
+	if len(eventRepo.appended) != 2 {
+		t.Fatalf("appended events = %d, want 2", len(eventRepo.appended))
+	}
+	if len(stateRepo.batchUpserted) != 1 {
+		t.Fatalf("upserted states = %d, want 1", len(stateRepo.batchUpserted))
+	}
+	state := stateRepo.batchUpserted[0]
+	if state.Status != enum.StatusMastered {
+		t.Fatalf("status = %q, want %q", state.Status, enum.StatusMastered)
+	}
+	if state.IsTarget {
+		t.Fatalf("is_target = true, want false")
+	}
+	if state.ProgressPercent != 100 {
+		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
+	}
+	if state.MasteryScore != 1 {
+		t.Fatalf("mastery_score = %v, want 1", state.MasteryScore)
+	}
+	if state.ProgressEventCount != 0 {
+		t.Fatalf("progress_event_count = %d, want 0", state.ProgressEventCount)
+	}
+}
+
 func TestRecordLearningEventsExecuteRejectsLateProgressEvent(t *testing.T) {
 	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	q4 := int16(4)
@@ -298,6 +361,73 @@ func TestRecordLearningEventsExecuteHandlesMultipleUnits(t *testing.T) {
 
 	if len(stateRepo.batchUpserted) != 2 {
 		t.Fatalf("upserted states = %d, want 2", len(stateRepo.batchUpserted))
+	}
+}
+
+func TestReplayUserStatesExecutePreservesSetMasteredInactiveTarget(t *testing.T) {
+	eventTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	eventsRepo := &fakeUnitLearningEventRepository{
+		listByUserOrdered: []model.LearningEvent{
+			{
+				UserID:        "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:  101,
+				EventType:     enum.EventSelfMarkMastered,
+				ReducerEffect: enum.ReducerEffectSetMastered,
+				SourceType:    "learning_interaction_event",
+				SourceRefID:   "self-mark-1",
+				Metadata:      []byte("{}"),
+				OccurredAt:    eventTime,
+			},
+		},
+	}
+	stateRepo := &fakeUserUnitStateRepository{
+		listStates: []model.UserUnitState{
+			{
+				UserID:            "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:      101,
+				IsTarget:          true,
+				TargetSource:      "curriculum",
+				TargetSourceRefID: "lesson_1",
+				TargetPriority:    0.9,
+			},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventsRepo,
+		},
+	}
+	usecase := service.NewReplayUserStatesUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.ReplayUserStatesRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if response.ProcessedEventCount != 1 {
+		t.Fatalf("ProcessedEventCount = %d, want 1", response.ProcessedEventCount)
+	}
+	if len(stateRepo.batchUpserted) != 1 {
+		t.Fatalf("upserted states = %d, want 1", len(stateRepo.batchUpserted))
+	}
+	state := stateRepo.batchUpserted[0]
+	if state.Status != enum.StatusMastered {
+		t.Fatalf("status = %q, want %q", state.Status, enum.StatusMastered)
+	}
+	if state.IsTarget {
+		t.Fatalf("is_target = true, want false")
+	}
+	if state.TargetSource != "curriculum" {
+		t.Fatalf("target_source = %q, want curriculum", state.TargetSource)
+	}
+	if state.ProgressPercent != 100 {
+		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
+	}
+	if state.MasteryScore != 1 {
+		t.Fatalf("mastery_score = %v, want 1", state.MasteryScore)
 	}
 }
 

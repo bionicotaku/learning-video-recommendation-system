@@ -26,9 +26,10 @@
 - Learning engine owner 的 migration
 - SQL/query/sqlc 基础层
 - domain 规则：
-  - 事件校验
-  - `reducer_effect` 分发
-  - progress / schedule 语义的简化 SM-2 path
+	  - 事件校验
+	  - `reducer_effect` 分发
+	  - `set_mastered` 终态掌握分支
+	  - progress / schedule 语义的简化 SM-2 path
   - `progress_percent`
   - `mastery_score`
   - 状态迁移
@@ -86,7 +87,9 @@ internal/learningengine/
 - 仅由学习事件创建的新状态默认 `is_target = false`；target 只能来自显式 control 命令，不能由学习事件隐式产生
 - `recommendation` 只能读取 `learning.user_unit_states`，不能回写 Learning engine 业务表
 - `learning.unit_learning_events` 是 normalized Learning Engine event ledger，不是 `analytics.*` raw log
-- reducer 只按 `reducer_effect = observe_only / affects_progress` 分发；`event_type` 不再隐含 strong / weak 或 new / review 语义
+- reducer 只按 `reducer_effect = observe_only / affects_progress / set_mastered` 分发；`event_type` 不再隐含 strong / weak 或 new / review 语义
+- `event_type = self_mark_mastered` 必须使用 `reducer_effect = set_mastered`，直接进入 completed mastered 状态并移出 target
+- `status = mastered && is_target = false` 是 terminal mastered；后续普通 observation / progress event 不再改变状态，除非先通过显式 control 命令重新加入 target
 
 ## 主要调用链
 

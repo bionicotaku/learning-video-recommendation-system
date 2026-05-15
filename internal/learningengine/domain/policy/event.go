@@ -36,6 +36,14 @@ func ValidateEvent(event model.LearningEvent) error {
 	if IsObserveOnlyEffect(event.ReducerEffect) && event.ProgressQuality != nil {
 		return fmt.Errorf("progress_quality must be empty for observe_only events")
 	}
+	if IsSetMasteredEffect(event.ReducerEffect) {
+		if event.EventType != enum.EventSelfMarkMastered {
+			return fmt.Errorf("set_mastered reducer_effect requires self_mark_mastered event_type")
+		}
+		if event.ProgressQuality != nil {
+			return fmt.Errorf("progress_quality must be empty for set_mastered events")
+		}
+	}
 	if event.ProgressQuality != nil && (*event.ProgressQuality < 0 || *event.ProgressQuality > 5) {
 		return fmt.Errorf("progress_quality must be between 0 and 5")
 	}
@@ -57,7 +65,7 @@ func IsSupportedEventType(eventType string) bool {
 
 func IsSupportedReducerEffect(reducerEffect string) bool {
 	switch reducerEffect {
-	case enum.ReducerEffectObserveOnly, enum.ReducerEffectAffectsProgress:
+	case enum.ReducerEffectObserveOnly, enum.ReducerEffectAffectsProgress, enum.ReducerEffectSetMastered:
 		return true
 	default:
 		return false
@@ -70,6 +78,10 @@ func IsObserveOnlyEffect(reducerEffect string) bool {
 
 func IsAffectsProgressEffect(reducerEffect string) bool {
 	return reducerEffect == enum.ReducerEffectAffectsProgress
+}
+
+func IsSetMasteredEffect(reducerEffect string) bool {
+	return reducerEffect == enum.ReducerEffectSetMastered
 }
 
 func IsPassingQuality(quality int16) bool {

@@ -18,11 +18,21 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 
 	state := initState(currentState, event)
 
+	if isTerminalMastered(state) && !policy.IsSetMasteredEffect(event.ReducerEffect) {
+		return state, nil
+	}
+
 	if policy.IsAffectsProgressEffect(event.ReducerEffect) && state.LastProgressAt != nil && event.OccurredAt.Before(*state.LastProgressAt) {
 		return nil, ErrLateProgressEvent
 	}
 
 	updateObservationFields(state, event.OccurredAt)
+
+	if policy.IsSetMasteredEffect(event.ReducerEffect) {
+		applyCompletedMasteredState(state)
+		state.UpdatedAt = time.Now().UTC()
+		return state, nil
+	}
 
 	if policy.IsObserveOnlyEffect(event.ReducerEffect) {
 		finalizeState(state)
@@ -99,10 +109,28 @@ func finalizeState(state *model.UserUnitState) {
 	state.ProgressPercent = policy.ComputeProgressPercent(*state)
 	state.MasteryScore = policy.ComputeMasteryScore(*state)
 	state.Status = activeStatus
+	if activeStatus == enum.StatusMastered {
+		applyCompletedMasteredState(state)
+		state.UpdatedAt = time.Now().UTC()
+		return
+	}
 	if policy.IsSuspendedControl(*state) {
 		state.Status = enum.StatusSuspended
 	}
 	state.UpdatedAt = time.Now().UTC()
+}
+
+func isTerminalMastered(state *model.UserUnitState) bool {
+	return state.Status == enum.StatusMastered && !state.IsTarget
+}
+
+func applyCompletedMasteredState(state *model.UserUnitState) {
+	state.Status = enum.StatusMastered
+	state.ProgressPercent = 100
+	state.MasteryScore = 1
+	state.NextReviewAt = nil
+	state.IsTarget = false
+	state.SuspendedReason = ""
 }
 
 func timePointer(value time.Time) *time.Time {

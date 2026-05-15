@@ -50,6 +50,10 @@ Catalog 的权威最终设计文档。定义 `catalog` schema 的最终边界、
 
 学习互动信号链路的 MVP 架构图草案。它用简化图和详细设计图说明前端互动收集、后端接入、`analytics.learning_interaction_events`、`analytics.quiz_events`、标准化分流、Practice attempt、learning evidence 与 Learning engine 之间的组件关系。
 
+### [学习引擎Normalizer设计.md](学习引擎Normalizer设计.md)
+
+Learning Engine normalizer 的 MVP 设计草案。它定义 `internal/learningengine/normalizer` 子模块如何 read-only 读取 `analytics.*` raw fact，把 quiz、lookup、exposure 和 self mark 解释成 Learning Engine normalized event，并在暂不增加 checkpoint 的前提下依赖 source 幂等约束与 anti-join 查询完成可重试归一化。
+
 ## 运行时现状参考
 
 ### [当前数据库Schema现状.md](当前数据库Schema现状.md)

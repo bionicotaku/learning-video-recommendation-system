@@ -54,6 +54,103 @@ func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
 	}
 }
 
+func TestUnitLearningEventRepositoryAppendSetMastered(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+	events := []model.LearningEvent{
+		{
+			UserID:        userID,
+			CoarseUnitID:  101,
+			EventType:     "self_mark_mastered",
+			ReducerEffect: "set_mastered",
+			SourceType:    "learning_interaction_event",
+			SourceRefID:   "repo-self-mark-1",
+			Metadata:      []byte("{}"),
+			OccurredAt:    time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	if err := repo.Append(context.Background(), events); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	recorded, err := repo.ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(recorded) != 1 {
+		t.Fatalf("recorded len = %d, want 1", len(recorded))
+	}
+	if recorded[0].ReducerEffect != "set_mastered" {
+		t.Fatalf("reducer_effect = %q, want set_mastered", recorded[0].ReducerEffect)
+	}
+	if recorded[0].ProgressQuality != nil {
+		t.Fatalf("progress_quality = %v, want nil", recorded[0].ProgressQuality)
+	}
+}
+
+func TestUnitLearningEventRepositoryRejectsInvalidSetMasteredQuality(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+	quality := int16(5)
+	events := []model.LearningEvent{
+		{
+			UserID:          userID,
+			CoarseUnitID:    101,
+			EventType:       "self_mark_mastered",
+			ReducerEffect:   "set_mastered",
+			SourceType:      "learning_interaction_event",
+			SourceRefID:     "repo-self-mark-invalid-quality",
+			ProgressQuality: &quality,
+			Metadata:        []byte("{}"),
+			OccurredAt:      time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	if err := repo.Append(context.Background(), events); err == nil {
+		t.Fatal("Append() error = nil, want database constraint error")
+	}
+}
+
+func TestUnitLearningEventRepositoryRejectsInvalidSetMasteredEventType(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+	events := []model.LearningEvent{
+		{
+			UserID:        userID,
+			CoarseUnitID:  101,
+			EventType:     "quiz",
+			ReducerEffect: "set_mastered",
+			SourceType:    "quiz_event",
+			SourceRefID:   "repo-set-mastered-invalid-type",
+			Metadata:      []byte("{}"),
+			OccurredAt:    time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	if err := repo.Append(context.Background(), events); err == nil {
+		t.Fatal("Append() error = nil, want database constraint error")
+	}
+}
+
 func TestUserUnitStateRepositoryUpsertListAndDelete(t *testing.T) {
 	t.Parallel()
 

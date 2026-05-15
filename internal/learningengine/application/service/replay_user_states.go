@@ -130,6 +130,16 @@ func mergeSnapshots(userID string, rebuilt map[int64]*model.UserUnitState, snaps
 }
 
 func applyControlSnapshot(state *model.UserUnitState, snapshot controlSnapshot) {
+	if state.Status == enum.StatusMastered && !state.IsTarget {
+		state.TargetSource = snapshot.TargetSource
+		state.TargetSourceRefID = snapshot.TargetSourceRefID
+		state.TargetPriority = snapshot.TargetPriority
+		if snapshot.CreatedAt != nil {
+			state.CreatedAt = snapshot.CreatedAt.CreatedAt
+		}
+		return
+	}
+
 	state.IsTarget = snapshot.IsTarget
 	state.TargetSource = snapshot.TargetSource
 	state.TargetSourceRefID = snapshot.TargetSourceRefID

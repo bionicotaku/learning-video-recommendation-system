@@ -139,6 +139,84 @@ func TestRecordLearningEventsWithDatabase(t *testing.T) {
 	}
 }
 
+func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	txManager := persisttx.NewManager(db.Pool)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
+	replayUsecase := service.NewReplayUserStatesUsecase(txManager)
+	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
+
+	if _, err := ensureUsecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
+		UserID: userID,
+		Targets: []dto.TargetUnitSpec{
+			{CoarseUnitID: 101, TargetSource: "curriculum", TargetSourceRefID: "lesson_1", TargetPriority: 0.9},
+		},
+	}); err != nil {
+		t.Fatalf("EnsureTargetUnits.Execute() error = %v", err)
+	}
+
+	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{
+				CoarseUnitID:  101,
+				EventType:     "self_mark_mastered",
+				ReducerEffect: "set_mastered",
+				SourceType:    "learning_interaction_event",
+				SourceRefID:   "self-mark-1",
+				OccurredAt:    time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
+	}
+
+	activeTargets, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
+		UserID:           userID,
+		OnlyTarget:       true,
+		ExcludeSuspended: true,
+	})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(active targets) error = %v", err)
+	}
+	if len(activeTargets.States) != 0 {
+		t.Fatalf("active target states len = %d, want 0", len(activeTargets.States))
+	}
+
+	allStates, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
+		UserID: userID,
+	})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(all) error = %v", err)
+	}
+	if len(allStates.States) != 1 {
+		t.Fatalf("all states len = %d, want 1", len(allStates.States))
+	}
+	assertCompletedMasteredState(t, allStates.States[0])
+
+	if _, err := replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID}); err != nil {
+		t.Fatalf("ReplayUserStates.Execute() error = %v", err)
+	}
+
+	afterReplay, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
+		UserID: userID,
+	})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(after replay) error = %v", err)
+	}
+	if len(afterReplay.States) != 1 {
+		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
+	}
+	assertCompletedMasteredState(t, afterReplay.States[0])
+}
+
 func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
 	t.Parallel()
 
@@ -423,6 +501,29 @@ func indexStatesByUnit(states []model.UserUnitState) map[int64]model.UserUnitSta
 		indexed[state.CoarseUnitID] = state
 	}
 	return indexed
+}
+
+func assertCompletedMasteredState(t *testing.T, state model.UserUnitState) {
+	t.Helper()
+
+	if state.Status != "mastered" {
+		t.Fatalf("status = %q, want mastered", state.Status)
+	}
+	if state.IsTarget {
+		t.Fatalf("is_target = true, want false")
+	}
+	if state.ProgressPercent != 100 {
+		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
+	}
+	if state.MasteryScore != 1 {
+		t.Fatalf("mastery_score = %v, want 1", state.MasteryScore)
+	}
+	if state.NextReviewAt != nil {
+		t.Fatalf("next_review_at = %v, want nil", state.NextReviewAt)
+	}
+	if state.SuspendedReason != "" {
+		t.Fatalf("suspended_reason = %q, want empty", state.SuspendedReason)
+	}
 }
 
 type blockingUserTxManager struct {

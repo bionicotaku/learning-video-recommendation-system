@@ -101,12 +101,13 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 
 ## 4.1 Learning Engine Migration 状态
 
-`learningengine_schema_migrations` 当前有 4 条记录，对应仓库内 4 个 Learning Engine migration：
+`learningengine_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Learning Engine migration：
 
 - `000001_create_learning_schema`
 - `000002_create_user_unit_states`
 - `000003_create_unit_learning_events`
 - `000004_create_learning_indexes`
+- `000005_add_set_mastered_reducer_effect`
 
 当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。只读核对显示该表有 13 个字段，并包含以下关键约束与索引：
 
@@ -115,8 +116,9 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `idx_learning_events_user_time`
 - `idx_learning_events_user_unit_time`
 - `event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mastered')`
-- `reducer_effect in ('observe_only', 'affects_progress')`
-- `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`
+- `reducer_effect in ('observe_only', 'affects_progress', 'set_mastered')`
+- `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`；`observe_only` 和 `set_mastered` 必须为空
+- `set_mastered` 只能与 `event_type = 'self_mark_mastered'` 一起使用
 - `metadata` 必须为 JSON object
 
 当前 `learning.user_unit_states` 已是 progress / schedule 语义的状态投影表。只读核对显示该表有 28 个字段，并包含以下索引：

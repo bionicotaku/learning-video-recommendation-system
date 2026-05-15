@@ -145,18 +145,106 @@ func TestReduce_MasteredWhenStableAndIntervalLargeEnough(t *testing.T) {
 	if state.Status != enum.StatusMastered {
 		t.Fatalf("status = %q, want %q", state.Status, enum.StatusMastered)
 	}
-	if state.ScheduleIntervalDays < 21 {
-		t.Fatalf("schedule_interval_days = %v, want >= 21", state.ScheduleIntervalDays)
+	if state.IsTarget {
+		t.Fatalf("is_target = true, want false")
 	}
 	if state.ProgressPercent != 100 {
 		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
 	}
-	if state.MasteryScore < 0.8 {
-		t.Fatalf("mastery_score = %v, want >= 0.8", state.MasteryScore)
+	if state.MasteryScore != 1 {
+		t.Fatalf("mastery_score = %v, want 1", state.MasteryScore)
+	}
+	if state.NextReviewAt != nil {
+		t.Fatalf("next_review_at = %v, want nil", state.NextReviewAt)
 	}
 }
 
-func TestReduce_FailureAfterMasteredFallsBackToReviewing(t *testing.T) {
+func TestReduce_SetMasteredMarksCompletedAndInactive(t *testing.T) {
+	state := emptyState()
+	state.Status = enum.StatusSuspended
+	state.SuspendedReason = "manual_pause"
+	nextReviewAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	state.NextReviewAt = &nextReviewAt
+	eventTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+
+	next, err := aggregate.Reduce(&state, learningEvent(enum.EventSelfMarkMastered, enum.ReducerEffectSetMastered, nil, eventTime))
+	if err != nil {
+		t.Fatalf("Reduce() error = %v", err)
+	}
+
+	if next.Status != enum.StatusMastered {
+		t.Fatalf("status = %q, want %q", next.Status, enum.StatusMastered)
+	}
+	if next.IsTarget {
+		t.Fatalf("is_target = true, want false")
+	}
+	if next.ProgressPercent != 100 {
+		t.Fatalf("progress_percent = %v, want 100", next.ProgressPercent)
+	}
+	if next.MasteryScore != 1 {
+		t.Fatalf("mastery_score = %v, want 1", next.MasteryScore)
+	}
+	if next.NextReviewAt != nil {
+		t.Fatalf("next_review_at = %v, want nil", next.NextReviewAt)
+	}
+	if next.SuspendedReason != "" {
+		t.Fatalf("suspended_reason = %q, want empty", next.SuspendedReason)
+	}
+	if next.ProgressEventCount != 0 {
+		t.Fatalf("progress_event_count = %d, want 0", next.ProgressEventCount)
+	}
+	if next.ObservationCount != state.ObservationCount+1 {
+		t.Fatalf("observation_count = %d, want %d", next.ObservationCount, state.ObservationCount+1)
+	}
+}
+
+func TestReduce_SetMasteredRejectsProgressQuality(t *testing.T) {
+	eventTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	quality := int16(5)
+
+	_, err := aggregate.Reduce(nil, learningEvent(enum.EventSelfMarkMastered, enum.ReducerEffectSetMastered, &quality, eventTime))
+	if err == nil {
+		t.Fatal("Reduce() error = nil, want validation error")
+	}
+}
+
+func TestReduce_SetMasteredRequiresSelfMarkEvent(t *testing.T) {
+	eventTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+
+	_, err := aggregate.Reduce(nil, learningEvent(enum.EventQuiz, enum.ReducerEffectSetMastered, nil, eventTime))
+	if err == nil {
+		t.Fatal("Reduce() error = nil, want validation error")
+	}
+}
+
+func TestReduce_TerminalMasteredIgnoresLaterProgressEvent(t *testing.T) {
+	state := masteredState()
+	state.IsTarget = false
+	state.NextReviewAt = nil
+	state.MasteryScore = 1
+	eventTime := state.LastProgressAt.Add(24 * time.Hour)
+	q := int16(1)
+
+	next, err := aggregate.Reduce(&state, learningEvent(enum.EventQuiz, enum.ReducerEffectAffectsProgress, &q, eventTime))
+	if err != nil {
+		t.Fatalf("Reduce() error = %v", err)
+	}
+
+	if next.Status != enum.StatusMastered {
+		t.Fatalf("status = %q, want %q", next.Status, enum.StatusMastered)
+	}
+	if next.ProgressEventCount != state.ProgressEventCount {
+		t.Fatalf("progress_event_count = %d, want %d", next.ProgressEventCount, state.ProgressEventCount)
+	}
+	if next.ObservationCount != state.ObservationCount {
+		t.Fatalf("observation_count = %d, want %d", next.ObservationCount, state.ObservationCount)
+	}
+	if next.ScheduleRepetition != state.ScheduleRepetition {
+		t.Fatalf("schedule_repetition = %d, want %d", next.ScheduleRepetition, state.ScheduleRepetition)
+	}
+}
+
+func TestReduce_FailureAfterRetargetedMasteredFallsBackToReviewing(t *testing.T) {
 	state := masteredState()
 	eventTime := state.LastProgressAt.Add(24 * time.Hour)
 	q := int16(1)
@@ -183,7 +271,7 @@ func TestReduce_FailureAfterMasteredFallsBackToReviewing(t *testing.T) {
 func TestReduce_TruncatesRecentProgressWindowsToFive(t *testing.T) {
 	state := emptyState()
 	t0 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
-	qualities := []int16{5, 4, 3, 5, 4, 2}
+	qualities := []int16{4, 3, 2, 4, 2, 4}
 
 	var err error
 	current := &state
@@ -194,7 +282,7 @@ func TestReduce_TruncatesRecentProgressWindowsToFive(t *testing.T) {
 		}
 	}
 
-	wantQualities := []int16{4, 3, 5, 4, 2}
+	wantQualities := []int16{3, 2, 4, 2, 4}
 	if len(current.RecentProgressQualities) != len(wantQualities) {
 		t.Fatalf("recent_progress_qualities len = %d, want %d", len(current.RecentProgressQualities), len(wantQualities))
 	}
