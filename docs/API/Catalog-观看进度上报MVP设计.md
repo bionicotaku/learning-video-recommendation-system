@@ -87,7 +87,7 @@ create table analytics.video_watch_events (
 | `active_watch_ms` | 该 session 累计有效播放时长。 | 前端上报 session 内累计值；服务端用新旧值差值维护投影。 |
 | `is_completed` | 该 session 是否已完成。 | 只允许从 `false` 变为 `true`。 |
 | `progress_report_count` | 该 session 累计收到的进度上报次数。 | 每次成功处理请求加 1。 |
-| `client_context` | 客户端环境上下文。 | 保存 `platform`、`app_version`、`os_version`、`device_model` 等低频排障信息。 |
+| `client_context` | 客户端环境上下文。 | 保存客户端环境 JSON object；当前前端样例使用 `platform`、`app_version`、`os_version`、`device_model`。 |
 | `metadata` | 可选调试上下文。 | 只放 watch-progress 专属扩展信息，例如 `source_surface`、播放器版本。 |
 | `created_at` | 行创建时间。 | 数据库默认值。 |
 | `updated_at` | 行最近更新时间。 | 每次 upsert 更新。 |
@@ -200,9 +200,9 @@ POST /api/catalog/videos/{video_id}/watch-progress
 | `position_ms` | 是 | 当前播放位置，毫秒。 | 必须大于等于 0；可小于历史最大位置。 |
 | `active_watch_ms` | 是 | 本 session 累计有效播放时长。 | 必须大于等于 0；重复上报用 delta 去重。 |
 | `is_completed` | 否 | 本次上报是否表示完成播放。 | 默认 `false`；session 只允许首次完成贡献一次 `completed_count`。 |
-| `occurred_at` | 否 | 客户端事件发生时间。 | 可用于 `started_at / last_seen_at`，但服务端应限制不能离当前时间过远。 |
+| `occurred_at` | 否 | 客户端事件发生时间。 | RFC3339 datetime with explicit offset。可用于 `started_at / last_seen_at`，但服务端应限制不能离当前时间过远。 |
 | `source_surface` | 建议必填 | 观看进度发生的产品入口，例如 `fullscreen`、`feed`、`detail`。 | 服务端可写入 `metadata.source_surface`。 |
-| `client_context` | 否 | 客户端环境上下文。 | 必须是 JSON object；服务端默认 `{}`。 |
+| `client_context` | 否 | 客户端环境上下文。 | 必须是 JSON object；建议使用当前四个基础字段，服务端缺省 `{}`。 |
 | `metadata` | 否 | watch-progress 专属扩展调试上下文。 | 必须是 JSON object；不参与核心业务规则。 |
 
 不建议前端传 `watch_ratio` 或 `duration_ms`。服务端应从 `catalog.videos.duration_ms` 获取视频时长，并在需要时派生观看比例。
@@ -280,9 +280,9 @@ await fetch(`/api/catalog/videos/${videoId}/watch-progress`, {
 | `position_ms` | `Math.round(video.currentTime * 1000)`。 | 当前播放器位置，不表示新增观看时长。 |
 | `active_watch_ms` | 播放器处于真实播放状态时累计 elapsed time。 | 不用 `Date.now() - startedAt` 直接推导，暂停、后台、seek 不应累计。 |
 | `is_completed` | `video.ended` 或服务端根据 `position_ms / catalog.videos.duration_ms` 判断。 | 同一个 session 只计一次完成。 |
-| `occurred_at` | `new Date().toISOString()`。 | 客户端本次上报发生时间。 |
+| `occurred_at` | `new Date().toISOString()`。 | 客户端本次上报发生时间，必须带 `Z` 或 offset。 |
 | `source_surface` | 当前页面或播放场景，例如 `feed`、`fullscreen`、`detail`。 | 表示业务入口，不表示平台。 |
-| `client_context.*` | 从全局 telemetry client context 读取。 | 所有 analytics raw fact 上报统一使用。 |
+| `client_context.*` | 从全局 telemetry client context 读取。 | 当前建议上传 `platform`、`app_version`、`os_version`、`device_model`；后续可随客户端遥测扩展。 |
 
 前端注意事项：
 

@@ -114,6 +114,56 @@ func TestRawReadersByIDsFilterByUserAndSelectedIDs(t *testing.T) {
 	}
 }
 
+func TestRawReadersReturnTimesInUTC(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	questionID := "22222222-2222-2222-2222-222222222222"
+	quizEventID := "33333333-3333-3333-3333-333333333333"
+	interactionEventID := "44444444-4444-4444-4444-444444444444"
+	completedAt := time.Date(2026, 5, 15, 10, 0, 0, 0, time.FixedZone("PDT", -7*60*60))
+	occurredAt := completedAt.Add(2 * time.Second)
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedQuestion(t, questionID)
+	seedQuizEvent(t, db, quizEventID, userID, questionID, 101, completedAt)
+	seedLearningInteraction(t, db, interactionEventID, userID, 101, "lookup", occurredAt)
+
+	quizReader := normalizerrepo.NewRawQuizEventReader(db.Pool)
+	quizRows, err := quizReader.ListQuizEventsByIDs(context.Background(), userID, []string{quizEventID})
+	if err != nil {
+		t.Fatalf("ListQuizEventsByIDs() error = %v", err)
+	}
+	if len(quizRows) != 1 {
+		t.Fatalf("quiz rows = %d, want 1", len(quizRows))
+	}
+	if quizRows[0].CompletedAt.Location() != time.UTC {
+		t.Fatalf("CompletedAt location = %v, want UTC", quizRows[0].CompletedAt.Location())
+	}
+	if !quizRows[0].CompletedAt.Equal(completedAt) {
+		t.Fatalf("CompletedAt = %v, want same instant as %v", quizRows[0].CompletedAt, completedAt)
+	}
+	if quizRows[0].ShownAt.Location() != time.UTC {
+		t.Fatalf("ShownAt location = %v, want UTC", quizRows[0].ShownAt.Location())
+	}
+
+	interactionReader := normalizerrepo.NewRawLearningInteractionReader(db.Pool)
+	interactionRows, err := interactionReader.ListLearningInteractionsByIDs(context.Background(), userID, []string{interactionEventID})
+	if err != nil {
+		t.Fatalf("ListLearningInteractionsByIDs() error = %v", err)
+	}
+	if len(interactionRows) != 1 {
+		t.Fatalf("interaction rows = %d, want 1", len(interactionRows))
+	}
+	if interactionRows[0].OccurredAt.Location() != time.UTC {
+		t.Fatalf("OccurredAt location = %v, want UTC", interactionRows[0].OccurredAt.Location())
+	}
+	if !interactionRows[0].OccurredAt.Equal(occurredAt) {
+		t.Fatalf("OccurredAt = %v, want same instant as %v", interactionRows[0].OccurredAt, occurredAt)
+	}
+}
+
 func seedQuizEvent(t *testing.T, db *fixture.TestDatabase, eventID, userID, questionID string, unitID int64, completedAt time.Time) {
 	t.Helper()
 	if _, err := db.Pool.Exec(context.Background(), `

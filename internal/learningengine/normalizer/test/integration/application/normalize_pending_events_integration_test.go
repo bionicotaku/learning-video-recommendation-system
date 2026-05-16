@@ -13,6 +13,7 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/normalizer/test/fixture"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
+	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 )
 
@@ -172,6 +173,47 @@ func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	}
 	if otherUserStateCount != 0 {
 		t.Fatalf("other user states = %d, want 0", otherUserStateCount)
+	}
+}
+
+func TestNormalizeByIDWritesLearningEventOccurredAtAsUTCInstant(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	questionID := "22222222-2222-2222-2222-222222222222"
+	quizEventID := "33333333-3333-3333-3333-333333333333"
+	completedAt := time.Date(2026, 5, 15, 10, 0, 0, 0, time.FixedZone("PDT", -7*60*60))
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedQuestion(t, questionID)
+	seedQuizEvent(t, db, quizEventID, userID, questionID, 101, true, 5000, completedAt)
+
+	usecase := newNormalizeQuizAttemptByIDUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeQuizAttemptByIDRequest{
+		UserID:      userID,
+		QuizEventID: quizEventID,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.RecordedEventCount != 1 {
+		t.Fatalf("RecordedEventCount = %d, want 1", response.RecordedEventCount)
+	}
+
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	occurredAt := events[0].OccurredAt
+	if occurredAt.Location() != time.UTC {
+		t.Fatalf("occurred_at location = %v, want UTC", occurredAt.Location())
+	}
+	if !occurredAt.Equal(completedAt) {
+		t.Fatalf("occurred_at = %v, want same instant as %v", occurredAt, completedAt)
 	}
 }
 

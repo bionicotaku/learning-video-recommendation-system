@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"learning-video-recommendation-system/internal/learningengine/normalizer/test/fixture"
+	"learning-video-recommendation-system/internal/analytics/test/fixture"
 )
 
 var suite *fixture.Suite

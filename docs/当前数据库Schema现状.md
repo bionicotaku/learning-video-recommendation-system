@@ -19,6 +19,20 @@
 
 当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation 自有表、索引和物化视图。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
 
+时间字段统一口径：
+
+- 当前业务时间点字段统一使用 `timestamptz`，例如 `created_at`、`updated_at`、`occurred_at`、`shown_at`、`completed_at`、`started_at`、`last_seen_at`、`publish_at` 等。
+- 相对位置、播放进度、曝光区间、耗时与间隔统一使用整数毫秒字段或整数数组，例如 `*_ms`、`selection_interval_ms`。
+- 当前 schema 不使用 `timestamp without time zone` 保存业务时间点，也不使用独立 `timezone` / `time_zone` 字段解释事件时间。
+- Postgres `timestamptz` 保存 absolute instant，不保存原始时区名称；应用层读写会统一归一化为 UTC `time.Time`。
+- 本轮时间统一没有新增 migration，也没有改变任何 DB 字段类型。
+
+`client_context` 统一口径：
+
+- Analytics raw fact 表当前使用 `client_context jsonb not null default '{}'::jsonb`。
+- DB 只通过 `jsonb_typeof(client_context) = 'object'` 约束其为 JSON object，不固定字段集合。
+- 当前 API 样例推荐客户端携带 `platform`、`app_version`、`os_version`、`device_model` 四个基础字段，但 DB 不拒绝未来扩展字段。
+
 ## 2. Catalog Migration 状态
 
 `catalog_schema_migrations` 当前有 11 条记录，对应仓库内 11 个 Catalog migration：

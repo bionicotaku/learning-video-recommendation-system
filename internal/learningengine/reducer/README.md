@@ -84,3 +84,11 @@ Replay never re-reads analytics raw facts. It only uses the reducer-owned normal
 - `set_mastered`: updates observation and moves the unit to terminal mastered state.
 
 `event_type` describes the normalized business event. `reducer_effect` is the reducer dispatch field.
+
+## Time Handling
+
+- `RecordLearningEvents` normalizes `OccurredAt` to UTC before validation and append.
+- Persistence mappers use `internal/platform/postgres/pgtime` to write UTC `time.Time` into `timestamptz`.
+- Persistence mappers use `internal/platform/postgres/pgtime` to read UTC `time.Time` back into reducer models.
+- UUID、nullable text、numeric 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；reducer 仍保留本地 mapper 函数作为模块边界。
+- Integration fixture uses `internal/platform/postgres/pgtest` for embedded Postgres and template database cloning; reducer `test/fixture` owns the reducer schema plan and seed helpers.

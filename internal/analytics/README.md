@@ -43,6 +43,10 @@ internal/analytics/
 - `(user_id, client_event_id)` 重复时返回已有 `event_id`，不把重复当错误。
 - 真实 repository 分别写入 quiz 与 learning interaction raw facts；两类事件由未来不同 API 调用，不再混入同一事务。
 - `user_id` 来自 usecase request；未来 HTTP 层必须从认证上下文传入，不能信任事件 payload。
+- `client_context` 只要求是 JSON object，不固定字段集合；当前 API 样例推荐四个基础字段，但后端不拒绝扩展字段。
+- `shown_at`、`completed_at`、`occurred_at` 在 application/service 边界会归一化为 UTC instant；persistence mapper 通过 `internal/platform/postgres/pgtime` 统一写入 `timestamptz`。
+- UUID、nullable text 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；Analytics 仍保留本地 mapper 函数作为模块边界。
+- Integration fixture 使用 `internal/platform/postgres/pgtest` 管理 embedded Postgres 和 template database；Analytics 自己的 `test/fixture` 只声明 Analytics schema plan 与 seed helper。
 
 Analytics 不负责：
 

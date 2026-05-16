@@ -70,6 +70,7 @@
   - integration 测试使用外部依赖 stub + 真实 Recommendation migration / 物化视图 / refresh 路径
   - `test/fixture` 是模块内 integration 的唯一共享测试基座入口
   - 当前 integration 基座已对齐 `learningengine`：每个 integration 测试包共享一个 embedded Postgres server，template database 只初始化一次，每个测试 case clone 独立数据库
+  - embedded Postgres 生命周期和 template clone 通过 `internal/platform/postgres/pgtest` 复用；Recommendation `test/fixture` 只保留 schema plan、seed helper 和 tx helper
   - 当前测试结构已经对齐模块级集中测试规范，不在业务实现目录旁散落 `*_test.go`
   - 日常编码可先运行 `make quick-check`
   - 默认 `make check` 已通过一次 `go test -tags=integration ...` 调用并行调度 Learning engine + Recommendation integration；E2E 仍通过 `make e2e-test` 单独运行
@@ -87,6 +88,8 @@
 - 只读计算不包长事务；只在最终写 audit 和 serving state 时开启短事务。
 - `catalog.video_user_states` 只作为轻量 penalty 输入，不承载 Recommendation own 的投放状态。
 - Candidate Generator 和 Evidence Resolver 必须沿调用方 `ctx` 传播取消、超时和 trace 上下文。
+- Recommendation persistence mappers 通过 `internal/platform/postgres/pgtime` 读写 UTC `time.Time`；serving state 写入前注入的 `now` 也归一化为 UTC。
+- UUID、nullable text、numeric 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；Recommendation 仍保留本地 mapper 函数作为模块边界。
 - `selector_mode=extreme_sparse` 由 selection 结果 underfill 后置判定，而不是 planner 预判。
 - `GenerateVideoRecommendations` 对外响应是 video learning plan：每个 video 通过 `learning_units` 暴露本轮预期学习 unit、role、primary 标记和 unit-level evidence；不再暴露 `Covered*` 或 video-level `best_evidence`。
 - `video_recommendation_items` 审计表以 `dominant_role`、`dominant_unit_id` 和 `learning_units jsonb` 保存 item 快照；不再保存 covered count 或 video-level best evidence 字段。

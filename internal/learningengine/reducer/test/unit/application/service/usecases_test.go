@@ -237,6 +237,41 @@ func TestRecordLearningEventsExecuteReducesSortedEvents(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsExecuteNormalizesOccurredAtToUTC(t *testing.T) {
+	q4 := int16(4)
+	localTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.FixedZone("PDT", -7*60*60))
+
+	stateRepo := &fakeUserUnitStateRepository{}
+	eventRepo := &fakeUnitLearningEventRepository{}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewRecordLearningEventsUsecase(txManager)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "event_utc", ProgressQuality: &q4, OccurredAt: localTime},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if len(eventRepo.appended) != 1 {
+		t.Fatalf("appended events = %d, want 1", len(eventRepo.appended))
+	}
+	got := eventRepo.appended[0].OccurredAt
+	if got.Location() != time.UTC {
+		t.Fatalf("OccurredAt location = %v, want UTC", got.Location())
+	}
+	if !got.Equal(localTime) {
+		t.Fatalf("OccurredAt = %v, want same instant as %v", got, localTime)
+	}
+}
+
 func TestRecordLearningEventsExecuteSetMasteredTerminalState(t *testing.T) {
 	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	t2 := t1.Add(24 * time.Hour)

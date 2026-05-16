@@ -63,6 +63,129 @@ func TestRecordLearningInteractionsBatchWritesInteractions(t *testing.T) {
 	}
 }
 
+func TestRecordLearningInteractionsBatchNormalizesOccurredAtToUTC(t *testing.T) {
+	localTime := time.Date(2026, 5, 15, 10, 0, 0, 0, time.FixedZone("PDT", -7*60*60))
+	unitID := int64(101)
+	writer := &fakeRawEventWriter{}
+	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		ClientContext: []byte(`{"platform":"ios","app_version":"1.3.0","os_version":"18.5","device_model":"iPhone16,2"}`),
+		Events: []dto.LearningInteractionEventInput{
+			{
+				ClientEventID: "interaction-utc",
+				EventType:     "lookup",
+				SourceSurface: "video_subtitle",
+				CoarseUnitID:  &unitID,
+				TokenText:     "test",
+				OccurredAt:    localTime,
+				EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if len(writer.interactions) != 1 {
+		t.Fatalf("writer interactions = %d, want 1", len(writer.interactions))
+	}
+	got := writer.interactions[0].OccurredAt
+	if got.Location() != time.UTC {
+		t.Fatalf("OccurredAt location = %v, want UTC", got.Location())
+	}
+	if !got.Equal(localTime) {
+		t.Fatalf("OccurredAt = %v, want same instant as %v", got, localTime)
+	}
+}
+
+func TestRecordLearningInteractionsBatchAcceptsLooseClientContextObject(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	cases := []struct {
+		name          string
+		idSuffix      string
+		clientContext []byte
+	}{
+		{name: "empty", idSuffix: "empty", clientContext: []byte(`{}`)},
+		{name: "single field", idSuffix: "single-field", clientContext: []byte(`{"platform":"ios"}`)},
+		{name: "recommended fields", idSuffix: "recommended-fields", clientContext: []byte(`{"platform":"ios","app_version":"1.3.0","os_version":"18.5","device_model":"iPhone16,2"}`)},
+		{name: "extra fields", idSuffix: "extra-fields", clientContext: []byte(`{"platform":"ios","app_version":"1.3.0","locale":"en-US","timezone":"America/Los_Angeles"}`)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+				UserID:        "11111111-1111-1111-1111-111111111111",
+				ClientContext: tc.clientContext,
+				Events: []dto.LearningInteractionEventInput{
+					{
+						ClientEventID: "interaction-" + tc.idSuffix,
+						EventType:     "lookup",
+						SourceSurface: "video_subtitle",
+						CoarseUnitID:  &unitID,
+						TokenText:     "test",
+						OccurredAt:    now,
+						EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
+					},
+				},
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if len(writer.interactions) != 1 {
+				t.Fatalf("writer interactions = %d, want 1", len(writer.interactions))
+			}
+		})
+	}
+}
+
+func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	cases := []struct {
+		name          string
+		clientContext []byte
+	}{
+		{name: "array", clientContext: []byte(`[]`)},
+		{name: "string", clientContext: []byte(`"ios"`)},
+		{name: "number", clientContext: []byte(`123`)},
+		{name: "null", clientContext: []byte(`null`)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+				UserID:        "11111111-1111-1111-1111-111111111111",
+				ClientContext: tc.clientContext,
+				Events: []dto.LearningInteractionEventInput{
+					{
+						ClientEventID: "interaction-" + tc.name,
+						EventType:     "lookup",
+						SourceSurface: "video_subtitle",
+						CoarseUnitID:  &unitID,
+						TokenText:     "test",
+						OccurredAt:    now,
+						EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
+					},
+				},
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want validation error")
+			}
+			if len(writer.interactions) != 0 {
+				t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
+			}
+		})
+	}
+}
+
 func TestRecordLearningInteractionsBatchRejectsInvalidBatchBeforeWrite(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	writer := &fakeRawEventWriter{}

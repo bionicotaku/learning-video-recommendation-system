@@ -4,14 +4,15 @@
 
 文档状态：MVP 设计，HTTP handler 尚未实现
 目标读者：前端、后端、数据、后续接手维护的人
-当前范围：定义未来学习事件上报 API 的前端上传契约、字段语义、raw fact 落库语义、幂等语义、错误语义、后端内部归一化链路。
+当前范围：定义未来学习事件上报 API 的前端上传契约、字段语义、raw fact 落库语义、幂等响应、业务成功边界和后端内部归一化链路。
 当前明确不做：本轮不实现 HTTP handler，不创建真实路由，不引入 queue / checkpoint / dead-letter / `normalized_at`。
 
 关联文档：
 
-- [学习互动信号语义设计.md](学习互动信号语义设计.md)：定义 exposure / lookup / self mark / quiz 的学习语义。
-- [学习引擎Normalizer设计.md](学习引擎Normalizer设计.md)：定义 raw fact 如何转成 Learning Engine normalized event。
-- [题目入库文档.md](题目入库文档.md)：定义题目内容与 quiz attempt 的存储边界。
+- [API模块总体设计规范.md](API模块总体设计规范.md)：定义 `internal/api` 的统一入口规范、错误响应、认证、validation 和跨模块编排规则。
+- [学习互动信号语义设计.md](../学习互动信号语义设计.md)：定义 exposure / lookup / self mark / quiz 的学习语义。
+- [学习引擎Normalizer设计.md](../学习引擎Normalizer设计.md)：定义 raw fact 如何转成 Learning Engine normalized event。
+- [题目入库文档.md](../题目入库文档.md)：定义题目内容与 quiz attempt 的存储边界。
 
 ## 1. 一句话结论
 
@@ -40,11 +41,11 @@ API 成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, cli
 
 ## 2. API 定位
 
-### 2.1 认证与用户来源
+### 2.1 Principal 与用户来源
 
-`user_id` 不允许从请求体读取。未来 `internal/api` handler 必须从认证上下文取得当前用户 ID，然后传给 `internal/analytics`。
+本 API 遵守 [API模块总体设计规范.md](API模块总体设计规范.md) 的 principal 规则。生产认证默认由网关 / Auth provider 完成；`internal/api` 只从可信 principal 中解析 `user_id`。
 
-前端事件 payload 里即使带了 `user_id`，后端也应忽略或拒绝，避免跨用户伪造。
+请求体不接收可信 `user_id`。未来 handler 必须把 principal 中的 `user_id` 传给 `internal/analytics`，不能从前端 payload 选择写入用户。
 
 ### 2.2 成功语义
 
@@ -64,16 +65,16 @@ raw fact accepted = 已新插入 analytics raw row 或已幂等存在
 
 后端会同步尝试归一化本次 raw IDs。若内部归一化失败，repair/backfill 会通过 `NormalizePendingEvents` 补偿。
 
-### 2.3 模块归属
+### 2.3 学习事件专属链路
 
-| 层 | 未来/当前模块 | 职责 |
-| --- | --- | --- |
-| HTTP handler | future `internal/api` | 认证、解析请求、调用 Analytics、调用 normalizer、返回 raw accepted 响应。 |
-| raw fact write | `internal/analytics` | 校验并幂等写入 `analytics.learning_interaction_events` 或 `analytics.quiz_events`。 |
-| raw -> normalized | `internal/learningengine/normalizer` | 按 raw IDs 读取 Analytics facts，生成 normalized events。 |
-| normalized write + reducer | `internal/learningengine/reducer` | 幂等 append `learning.unit_learning_events`，只 reduce 本次新插入 events。 |
+```text
+internal/api
+  -> internal/analytics raw fact write
+  -> internal/learningengine/normalizer by-ID normalize
+  -> internal/learningengine/reducer RecordLearningEvents
+```
 
-Analytics 不生成 `reducer_effect`，不计算 `progress_quality`，不写 `learning.*`。
+Analytics 只保存 raw fact，不生成 `reducer_effect`，不计算 `progress_quality`，不写 `learning.*`。
 
 Learning Engine normalizer 不写 Analytics，不直接写 `learning.*`，只调用 reducer 的 `RecordLearningEvents`。
 
@@ -99,18 +100,29 @@ Learning Engine normalizer 不写 Analytics，不直接写 `learning.*`，只调
 
 `client_context` 描述客户端运行环境，不描述业务入口。业务入口使用每条 interaction 的 `source_surface` 或 quiz 的 `trigger_type`。
 
-推荐字段：
+learning interaction batch 和 quiz attempt 的前端上传样例统一携带以下基础字段：
+
+```json
+{
+  "client_context": {
+    "platform": "ios",
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
+  }
+}
+```
 
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
-| `platform` | string | 否 | `ios` / `android` / `web` 等。 |
-| `app_version` | string | 否 | App 版本。 |
-| `os_version` | string | 否 | 系统版本。 |
-| `device_model` | string | 否 | 设备型号。 |
-| `locale` | string | 否 | 客户端 locale。 |
-| `timezone` | string | 否 | IANA 时区，例如 `America/Los_Angeles`。 |
+| `platform` | string | 建议 | `ios` / `android` / `web` 等。 |
+| `app_version` | string | 建议 | App 版本。 |
+| `os_version` | string | 建议 | 系统版本。 |
+| `device_model` | string | 建议 | 设备型号。 |
 
-缺省按 `{}` 处理。必须是 JSON object，不能是 array / string / number。
+后端只要求 `client_context` 是 JSON object，不能是 array / string / number；字段集合不在 application / DB 层固定，后续可以随客户端遥测演进扩展。
+
+所有 `*_at` 时间字段必须自己携带 `Z` 或 offset；后端不会用客户端时区补解释事件时间。
 
 ### 4.2 `client_event_id`
 
@@ -130,7 +142,6 @@ Learning Engine normalizer 不写 Analytics，不直接写 `learning.*`，只调
 ```http
 POST /api/learning-interactions:batch
 Content-Type: application/json
-Authorization: Bearer <access_token>
 ```
 
 ### 5.2 请求结构
@@ -140,7 +151,8 @@ Authorization: Bearer <access_token>
   "client_context": {
     "platform": "ios",
     "app_version": "1.3.0",
-    "timezone": "America/Los_Angeles"
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
   },
   "events": []
 }
@@ -150,7 +162,7 @@ Authorization: Bearer <access_token>
 
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
-| `client_context` | object | 否 | 请求级客户端环境上下文。缺省按 `{}` 处理。 |
+| `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
 | `events` | array | 是 | interaction 事件数组。整批先 validation，任意一条非法则整批拒绝。 |
 
 `events[]` 通用字段：
@@ -168,7 +180,7 @@ Authorization: Bearer <access_token>
 | `token_text` | string | `lookup` 必需 | 用户 lookup 的原始 token 文本。 |
 | `sentence_index` | integer | 否 | 字幕句子 index。 |
 | `span_index` | integer | 否 | token/span index。 |
-| `occurred_at` | ISO datetime | 是 | 事件实际发生时间。 |
+| `occurred_at` | RFC3339 datetime with explicit offset | 是 | 事件实际发生时间。必须带 `Z` 或 offset，后端按 UTC 时间点存储。 |
 | `event_payload` | object | 否 | 附加原始上下文。缺省 `{}`。 |
 
 `exposure` 额外字段：
@@ -195,7 +207,8 @@ Authorization: Bearer <access_token>
   "client_context": {
     "platform": "ios",
     "app_version": "1.3.0",
-    "timezone": "America/Los_Angeles"
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
   },
   "events": [
     {
@@ -291,14 +304,18 @@ Authorization: Bearer <access_token>
 ```http
 POST /api/quiz-attempts
 Content-Type: application/json
-Authorization: Bearer <access_token>
 ```
 
 ### 6.2 请求结构
 
 ```json
 {
-  "client_context": {},
+  "client_context": {
+    "platform": "ios",
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
+  },
   "client_event_id": "01JY_QUIZ_0001",
   "question_id": "44444444-4444-4444-4444-444444444444",
   "coarse_unit_id": 101,
@@ -318,7 +335,7 @@ Authorization: Bearer <access_token>
 
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
-| `client_context` | object | 否 | 请求级客户端环境上下文。缺省 `{}`。 |
+| `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
 | `question_id` | string UUID | 是 | `catalog.questions.question_id`。 |
 | `coarse_unit_id` | integer | 是 | 本题对应学习单元。 |
@@ -329,8 +346,8 @@ Authorization: Bearer <access_token>
 | `selection_interval_ms` | integer[] | 是 | 每次选择前的耗时，长度必须等于 `selected_option_ids`。每项非负。 |
 | `is_first_try_correct` | boolean | 是 | 第一项选择是否正确。必须和 `selected_option_ids[0]` 一致。 |
 | `total_elapsed_ms` | integer | 是 | 从展示题目到完成的总耗时，非负。 |
-| `shown_at` | ISO datetime | 是 | 题目展示时间。 |
-| `completed_at` | ISO datetime | 是 | 题目完成时间，必须 `>= shown_at`。 |
+| `shown_at` | RFC3339 datetime with explicit offset | 是 | 题目展示时间。必须带 `Z` 或 offset，后端按 UTC 时间点存储。 |
+| `completed_at` | RFC3339 datetime with explicit offset | 是 | 题目完成时间，必须 `>= shown_at`。必须带 `Z` 或 offset，后端按 UTC 时间点存储。 |
 
 MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 completed attempt”，不是 clickstream。错误一次和错误多次对 Learning Engine quality 没区别；normalizer 只看 `is_first_try_correct` 和 `total_elapsed_ms`。
 
@@ -342,7 +359,9 @@ MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 comple
 {
   "client_context": {
     "platform": "ios",
-    "app_version": "1.3.0"
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
   },
   "client_event_id": "01JY_QUIZ_FAST_CORRECT",
   "question_id": "44444444-4444-4444-4444-444444444444",
@@ -365,7 +384,9 @@ MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 comple
 {
   "client_context": {
     "platform": "ios",
-    "app_version": "1.3.0"
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
   },
   "client_event_id": "01JY_QUIZ_WRONG_THEN_CORRECT",
   "question_id": "55555555-5555-5555-5555-555555555555",
@@ -435,7 +456,7 @@ source_type = quiz_event
 source_ref_id = analytics.quiz_events.event_id
 ```
 
-## 8. 错误语义
+## 8. 错误与补偿语义
 
 ### 8.1 Validation error
 
@@ -443,20 +464,27 @@ source_ref_id = analytics.quiz_events.event_id
 
 interaction batch 是整批拒绝，不 partial success。quiz attempt 是单条拒绝。
 
-示例：
+错误 envelope、状态码、`request_id` 遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。示例：
 
 ```json
 {
   "error": {
-    "code": "validation_failed",
-    "message": "events[1].occurred_at is required"
+    "code": "invalid_request",
+    "message": "events[1].occurred_at is required",
+    "details": [
+      {
+        "field": "events[1].occurred_at",
+        "reason": "required"
+      }
+    ],
+    "request_id": "req_01HY..."
   }
 }
 ```
 
 ### 8.2 Duplicate
 
-重复不是错误。后端返回已有 raw event ID，并标记 `inserted=false`。
+本 API 的幂等命中不是错误。后端返回已有 raw event ID，并标记 `inserted=false`。
 
 ### 8.3 Internal normalize failure
 
@@ -490,8 +518,7 @@ export type ClientContext = {
   app_version?: string;
   os_version?: string;
   device_model?: string;
-  locale?: string;
-  timezone?: string;
+  [key: string]: unknown;
 };
 
 export type LearningInteractionEvent =
@@ -587,11 +614,11 @@ export type RecordQuizAttemptResponse = {
 
 当前本轮只落应用层和 normalizer 前置结构，不落 HTTP handler。
 
-未来 `internal/api` 应只做薄适配：
+未来 `internal/api` 的学习事件 handler 应只做该 API 的薄适配：
 
-- 从 auth context 取 `user_id`。
+- 从可信 principal 取 `user_id`。
 - 把 JSON request 映射到 `internal/analytics` DTO。
 - raw write 成功后，把 raw event IDs 传给 `internal/learningengine/normalizer`。
 - 返回 raw accepted response。
 
-不要在 HTTP 层生成 `progress_quality`、`reducer_effect` 或直接写 `learning.*`。
+通用认证、错误 envelope、状态码、request id、body size、CORS、日志和 handler 目录规则不在本文重复定义，统一遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。不要在 HTTP 层生成 `progress_quality`、`reducer_effect` 或直接写 `learning.*`。

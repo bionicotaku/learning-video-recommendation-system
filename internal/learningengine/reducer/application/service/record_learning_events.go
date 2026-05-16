@@ -49,7 +49,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 			IsCorrect:       input.IsCorrect,
 			ProgressQuality: input.ProgressQuality,
 			Metadata:        metadata,
-			OccurredAt:      input.OccurredAt,
+			OccurredAt:      input.OccurredAt.UTC(),
 		}
 		if err := policy.ValidateEvent(event); err != nil {
 			return dto.RecordLearningEventsResponse{}, err

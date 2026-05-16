@@ -97,8 +97,16 @@ The SQL layer is read-only for Analytics and joins against reducer-owned `learni
 
 Pending queries exclude rows already present in `learning.unit_learning_events` by `user_id + source_type + source_ref_id + coarse_unit_id`. The by-IDs path relies on reducer `RecordLearningEvents` idempotent append, so duplicates are counted and not reduced again.
 
+## Time Handling
+
+- Raw `shown_at`、`completed_at`、`occurred_at` values read from Analytics are mapped to UTC `time.Time`.
+- Pending filters written as `timestamptz` use `internal/platform/postgres/pgtime`.
+- Normalized events keep the same instant and pass UTC `OccurredAt` into reducer `RecordLearningEvents`.
+- UUID、nullable text 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；normalizer 仍保留本地 mapper 函数作为模块边界。
+
 ## Tests
 
 - Unit tests live under `test/unit`.
 - Real Postgres tests live under `test/integration`.
-- The integration fixture applies minimal external refs, Analytics migrations, and Learning Engine migrations.
+- The integration fixture uses `internal/platform/postgres/pgtest` for embedded Postgres and template database cloning.
+- Normalizer `test/fixture` owns the schema plan: minimal external refs, Analytics migrations, and Learning Engine reducer migrations.

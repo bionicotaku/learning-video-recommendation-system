@@ -33,7 +33,7 @@ func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (mode
 		MasteryScore:        masteryScore,
 		LastProgressQuality: Int16PointerFromPG(row.LastProgressQuality),
 		NextReviewAt:        TimePointerFromPG(row.NextReviewAt),
-		UpdatedAt:           row.UpdatedAt.Time,
+		UpdatedAt:           TimeFromPG(row.UpdatedAt),
 	}, nil
 }
 
@@ -136,7 +136,7 @@ func ToUnitVideoInventory(row recommendationsqlc.RecommendationVUnitVideoInvento
 		AvgCoverageRatio:   avgCoverageRatio,
 		StrongVideoCount:   strongVideoCount,
 		SupplyGrade:        TextToString(row.SupplyGrade),
-		UpdatedAt:          row.UpdatedAt.Time,
+		UpdatedAt:          TimeFromPG(row.UpdatedAt),
 	}, nil
 }
 

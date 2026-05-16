@@ -71,7 +71,9 @@ func mapQuizAttemptRequest(request dto.RecordQuizAttemptRequest) (model.RawQuizE
 	if request.CompletedAt.IsZero() {
 		return model.RawQuizEvent{}, fmt.Errorf("completed_at is required")
 	}
-	if request.CompletedAt.Before(request.ShownAt) {
+	shownAt := request.ShownAt.UTC()
+	completedAt := request.CompletedAt.UTC()
+	if completedAt.Before(shownAt) {
 		return model.RawQuizEvent{}, fmt.Errorf("completed_at must be >= shown_at")
 	}
 	lastOption := request.SelectedOptionIDs[len(request.SelectedOptionIDs)-1]
@@ -104,7 +106,7 @@ func mapQuizAttemptRequest(request dto.RecordQuizAttemptRequest) (model.RawQuizE
 		SelectionIntervalMS: request.SelectionIntervalMS,
 		IsFirstTryCorrect:   request.IsFirstTryCorrect,
 		TotalElapsedMS:      request.TotalElapsedMS,
-		ShownAt:             request.ShownAt,
-		CompletedAt:         request.CompletedAt,
+		ShownAt:             shownAt,
+		CompletedAt:         completedAt,
 	}, nil
 }

@@ -4,7 +4,7 @@
 
 当前这里已经不是空目录，而是一套 **Learning engine × Recommendation** 的真实迁移驱动 E2E：
 
-- 使用一个共享 embedded Postgres
+- 使用一个共享 embedded Postgres，底层生命周期复用 `internal/platform/postgres/pgtest`
 - 直接执行 `learningengine` 与 `recommendation` 的真实 migration `*.up.sql`
 - 不通过 `dbtool`
 - 不依赖 live DB
@@ -12,9 +12,8 @@
 
 ## 当前测试基座
 
-共享基座在 [testutil/harness.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e/testutil/harness.go)，固定负责：
+共享基座在 [testutil/harness.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e/testutil/harness.go)，底层 DB 生命周期和 schema plan 执行委托 `pgtest`，自身固定负责：
 
-- 启动和关闭 embedded Postgres
 - 顺序执行：
   - `internal/learningengine/reducer/infrastructure/persistence/schema/000000_external_refs.sql`
   - `internal/learningengine/reducer/infrastructure/migration/*.up.sql`

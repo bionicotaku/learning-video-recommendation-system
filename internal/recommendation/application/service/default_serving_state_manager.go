@@ -41,7 +41,7 @@ func (m *DefaultServingStateManager) ApplySelection(ctx context.Context, runID s
 		unitIDs = appendUniqueInt64(unitIDs, model.LearningUnitIDs(video.LearningUnits)...)
 	}
 
-	now := m.now()
+	now := m.now().UTC()
 	if queries, ok := queriesFromContext(ctx); ok {
 		return m.applyWithinQueries(ctx, queries, runID, userID, now, videoIDs, unitIDs)
 	}

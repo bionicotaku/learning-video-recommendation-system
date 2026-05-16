@@ -133,7 +133,7 @@ func mapLearningInteractionInput(userID string, clientContext []byte, input dto.
 		TokenText:                      input.TokenText,
 		SentenceIndex:                  input.SentenceIndex,
 		SpanIndex:                      input.SpanIndex,
-		OccurredAt:                     input.OccurredAt,
+		OccurredAt:                     input.OccurredAt.UTC(),
 		ExposureStartMS:                input.ExposureStartMS,
 		ExposureEndMS:                  input.ExposureEndMS,
 		ExposureCount:                  input.ExposureCount,

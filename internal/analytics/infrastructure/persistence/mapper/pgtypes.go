@@ -3,32 +3,23 @@ package mapper
 import (
 	"time"
 
+	"learning-video-recommendation-system/internal/platform/postgres/pgtext"
+	"learning-video-recommendation-system/internal/platform/postgres/pgtime"
+	"learning-video-recommendation-system/internal/platform/postgres/pguuid"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func StringToUUID(value string) (pgtype.UUID, error) {
-	if value == "" {
-		return pgtype.UUID{}, nil
-	}
-	var uuid pgtype.UUID
-	if err := uuid.Scan(value); err != nil {
-		return pgtype.UUID{}, err
-	}
-	return uuid, nil
+	return pguuid.FromString(value)
 }
 
 func UUIDToString(value pgtype.UUID) string {
-	if !value.Valid {
-		return ""
-	}
-	return value.String()
+	return pguuid.ToString(value)
 }
 
 func StringToText(value string) pgtype.Text {
-	if value == "" {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: value, Valid: true}
+	return pgtext.FromString(value)
 }
 
 func Int64PointerToPG(value *int64) pgtype.Int8 {
@@ -46,8 +37,5 @@ func Int32PointerToPG(value *int32) pgtype.Int4 {
 }
 
 func TimePointerToPG(value *time.Time) pgtype.Timestamptz {
-	if value == nil || value.IsZero() {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *value, Valid: true}
+	return pgtime.ToTimestamptz(value)
 }

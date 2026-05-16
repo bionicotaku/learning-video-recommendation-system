@@ -18,8 +18,8 @@ func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.Lea
 		IsCorrect:       BoolPointerFromPG(row.IsCorrect),
 		ProgressQuality: Int16PointerFromPG(row.ProgressQuality),
 		Metadata:        row.Metadata,
-		OccurredAt:      row.OccurredAt.Time,
-		CreatedAt:       row.CreatedAt.Time,
+		OccurredAt:      TimeFromPG(row.OccurredAt),
+		CreatedAt:       TimeFromPG(row.CreatedAt),
 	}
 }
 
@@ -72,7 +72,7 @@ func ToUserUnitState(row learningenginesqlc.LearningUserUnitState) (model.UserUn
 		ScheduleEaseFactor:      scheduleEaseFactor,
 		NextReviewAt:            TimePointerFromPG(row.NextReviewAt),
 		SuspendedReason:         TextToString(row.SuspendedReason),
-		CreatedAt:               row.CreatedAt.Time,
-		UpdatedAt:               row.UpdatedAt.Time,
+		CreatedAt:               TimeFromPG(row.CreatedAt),
+		UpdatedAt:               TimeFromPG(row.UpdatedAt),
 	}, nil
 }

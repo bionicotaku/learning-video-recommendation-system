@@ -4,17 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
@@ -22,6 +15,7 @@ import (
 	learningusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
 	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
+	"learning-video-recommendation-system/internal/platform/postgres/pgtest"
 	recommendationdto "learning-video-recommendation-system/internal/recommendation/application/dto"
 	recommendationservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
@@ -35,8 +29,9 @@ import (
 )
 
 type Harness struct {
-	postgres *embeddedpostgres.EmbeddedPostgres
-	Pool     *pgxpool.Pool
+	suite *pgtest.Suite
+	db    *pgtest.Database
+	Pool  *pgxpool.Pool
 
 	mu          sync.Mutex
 	nextUUIDSeq int64
@@ -125,34 +120,27 @@ func StartHarness(t *testing.T) *Harness {
 }
 
 func OpenHarness(baseDir string) (*Harness, error) {
-	port := freePort(nil)
-	config := embeddedpostgres.DefaultConfig().
-		Port(uint32(port)).
-		Database("cross_module_e2e").
-		Username("postgres").
-		Password("postgres").
-		RuntimePath(filepath.Join(baseDir, "runtime")).
-		DataPath(filepath.Join(baseDir, "data")).
-		BinariesPath(filepath.Join(baseDir, "bin"))
-
-	postgres := embeddedpostgres.NewDatabase(config)
-	if err := postgres.Start(); err != nil {
-		return nil, fmt.Errorf("start embedded postgres: %w", err)
+	suite, err := pgtest.OpenSuite(pgtest.Options{
+		BaseDir:              baseDir,
+		TempDirPrefix:        "learning-recommendation-e2e-*",
+		TemplateDatabaseName: "cross_module_e2e_template",
+		DatabaseNamePrefix:   "cross_module_e2e",
+		SchemaPlan:           e2eSchemaPlan(),
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	dsn := fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/cross_module_e2e?sslmode=disable", port)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pool, err := pgxpool.New(ctx, dsn)
+	db, err := suite.OpenDatabase(context.Background(), "cross_module_e2e")
 	if err != nil {
-		_ = postgres.Stop()
-		return nil, fmt.Errorf("connect pgx pool: %w", err)
+		_ = suite.Close()
+		return nil, err
 	}
 
 	harness := &Harness{
-		postgres:    postgres,
-		Pool:        pool,
+		suite:       suite,
+		db:          db,
+		Pool:        db.Pool,
 		nextUUIDSeq: 1000,
 		nextUnitID:  100,
 	}
@@ -161,16 +149,6 @@ func OpenHarness(baseDir string) (*Harness, error) {
 
 func (h *Harness) applySchema(t *testing.T) {
 	t.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	if err := applySchemaSequence(ctx, func(ctx context.Context, sql string) error {
-		_, err := h.Pool.Exec(ctx, sql)
-		return err
-	}, repoRoot(t), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "learningengine", "reducer", "infrastructure", "migration")), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "recommendation", "infrastructure", "migration"))); err != nil {
-		t.Fatalf("apply schema sequence: %v", err)
-	}
 }
 
 func (h *Harness) ApplySchema(t *testing.T) {
@@ -179,28 +157,17 @@ func (h *Harness) ApplySchema(t *testing.T) {
 }
 
 func (h *Harness) ApplySchemaForMain() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	root := repoRootFromRuntime()
-	return applySchemaSequence(
-		ctx,
-		func(ctx context.Context, sql string) error {
-			_, err := h.Pool.Exec(ctx, sql)
-			return err
-		},
-		root,
-		migrationFilesForMain(filepath.Join(root, "internal", "learningengine", "reducer", "infrastructure", "migration")),
-		migrationFilesForMain(filepath.Join(root, "internal", "recommendation", "infrastructure", "migration")),
-	)
+	return nil
 }
 
 func (h *Harness) Close() error {
-	if h.Pool != nil {
-		h.Pool.Close()
+	if h.db != nil {
+		if err := h.db.Close(context.Background()); err != nil {
+			return err
+		}
 	}
-	if h.postgres != nil {
-		return h.postgres.Stop()
+	if h.suite != nil {
+		return h.suite.Close()
 	}
 	return nil
 }
@@ -641,95 +608,41 @@ func happyPathVideo(videoID string, unitID int64, startMs, endMs int32, sentence
 	}
 }
 
-func migrationFiles(t *testing.T, dir string) []string {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read migration dir %s: %v", dir, err)
-	}
-
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".up.sql") {
-			files = append(files, filepath.Join(dir, name))
-		}
-	}
-	sort.Strings(files)
-	return files
-}
-
-func repoRoot(t *testing.T) string {
-	t.Helper()
-	return repoRootFromRuntime()
-}
-
-func repoRootFromRuntime() string {
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("resolve caller path")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
-}
-
-func freePort(_ any) int {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		panic(fmt.Sprintf("allocate free port: %v", err))
-	}
-	defer listener.Close()
-	return listener.Addr().(*net.TCPAddr).Port
-}
-
-func migrationFilesForMain(dir string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		panic(fmt.Sprintf("read migration dir %s: %v", dir, err))
-	}
-
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".up.sql") {
-			files = append(files, filepath.Join(dir, name))
-		}
-	}
-	sort.Strings(files)
-	return files
-}
-
-func applySchemaSequence(ctx context.Context, execSQL func(context.Context, string) error, root string, learningMigrations []string, recommendationMigrations []string) error {
-	sequence := []string{filepath.Join(root, "internal", "learningengine", "reducer", "infrastructure", "persistence", "schema", "000000_external_refs.sql")}
-	sequence = append(sequence, learningMigrations...)
-	sequence = append(sequence, supplementalExternalCatalogSQL())
-	sequence = append(sequence, filepath.Join(root, "internal", "recommendation", "infrastructure", "persistence", "schema", "000000_external_refs.sql"))
-	sequence = append(sequence, supplementalDropPlaceholderRecommendationViewsSQL())
-	sequence = append(sequence, recommendationMigrations...)
-
-	for _, item := range sequence {
-		if strings.HasPrefix(item, "-- supplemental-sql --\n") {
-			if err := execSQL(ctx, item); err != nil {
-				return fmt.Errorf("exec supplemental sql: %w", err)
-			}
-			continue
-		}
-
-		content, err := os.ReadFile(item)
-		if err != nil {
-			return fmt.Errorf("read sql file %s: %w", item, err)
-		}
-		if err := execSQL(ctx, string(content)); err != nil {
-			return fmt.Errorf("exec sql file %s: %w", item, err)
-		}
-	}
-
-	return nil
+func e2eSchemaPlan() pgtest.SchemaPlan {
+	return pgtest.NewSchemaPlan(
+		pgtest.SQLFile(pgtest.RepoPath(
+			"internal",
+			"learningengine",
+			"reducer",
+			"infrastructure",
+			"persistence",
+			"schema",
+			"000000_external_refs.sql",
+		)),
+		pgtest.MigrationDir(pgtest.RepoPath(
+			"internal",
+			"learningengine",
+			"reducer",
+			"infrastructure",
+			"migration",
+		)),
+		pgtest.SQLText("e2e supplemental external catalog columns", supplementalExternalCatalogSQL()),
+		pgtest.SQLFile(pgtest.RepoPath(
+			"internal",
+			"recommendation",
+			"infrastructure",
+			"persistence",
+			"schema",
+			"000000_external_refs.sql",
+		)),
+		pgtest.SQLText("drop placeholder recommendation materialized views", supplementalDropPlaceholderRecommendationViewsSQL()),
+		pgtest.MigrationDir(pgtest.RepoPath(
+			"internal",
+			"recommendation",
+			"infrastructure",
+			"migration",
+		)),
+	)
 }
 
 func supplementalExternalCatalogSQL() string {
