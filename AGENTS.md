@@ -16,28 +16,29 @@ Rules:
 
 ## 工作原则
 
-1. 先读文档，再读代码，再动手实现。
-2. 先搜索已有实现，不重复造轮子。
-3. 不做向后兼容；以当前结构最优为准。
-4. 不保留兼容壳、旧路径、旧表 owner、旧脚本。
-5. 每次只基于当前有效文档和当前代码结构行动。
+1. 先读文档，再读代码，再动手实现
+2. 先搜索已有实现，不重复造轮子
+3. 不做向后兼容；以当前结构最优为准
+4. 不保留兼容壳、旧路径、旧表 owner、旧脚本
+5. 每次只基于当前有效文档和当前代码结构行动
+6. 没有我的允许不要新建分支
 
 ## 执行要求
 
-1. 涉及任务列表时，每完成一条，先更新任务文档，再继续下一条。
-2. 日常编码过程中的快速回归，默认先执行 `make quick-check`。
-3. 如果改动涉及相关模块的 integration 测试范围，补跑对应的 integration test。
-4. 标准最终验收必须执行 `make check`, 只变更了文档等非代码部分则不用。
-5. 任务若有额外验收要求，在 `make check` 之外补跑。
-6. 改动前先确认模块边界，不跨模块偷放职责。
+1. 涉及任务列表时，每完成一条，先更新任务文档，再继续下一条
+2. 日常编码过程中的快速回归，默认先执行 `make quick-check`
+3. 如果改动涉及相关模块的 integration 测试范围，补跑对应的 integration test
+4. 标准最终验收必须执行 `make check`, 只变更了文档等非代码部分则不用
+5. 任务若有额外验收要求，在 `make check` 之外补跑
+6. 改动前先确认模块边界，不跨模块偷放职责
 7. 能删除的旧实现就直接删除，不留“后面再清理”
 8. migration 修改: 要先创建临时 migration 应用到 live DB, 然后清理中间过程, 保持 migration 干净
 
 ## 文档规则
 
-1. 设计文档放在 `docs/`，代码说明文档放在各目录的 `README.md`。
-2. API 设计文档统一放在 `docs/API/`，不要散落在 `docs/` 根目录。
-3. 文档映射保持一致：`docs/` 定义设计，代码实现落到 `internal/`，目录级 `README.md` 解释当前实现。
+1. 设计文档放在 `docs/`，代码说明文档放在各目录的 `README.md`
+2. API 设计文档统一放在 `docs/API/`，不要散落在 `docs/` 根目录
+3. 文档映射保持一致：`docs/` 定义设计，代码实现落到 `internal/`，目录级 `README.md` 解释当前实现
 4. 新模块或新的文件结构，默认必须遵循 [编码和结构规范.md](docs/编码和结构规范.md)。
 5. 如确有必要偏离统一结构，可以自定义，但必须在对应目录的 `README.md` 中明确写出：
    - 为什么要偏离
@@ -50,14 +51,14 @@ Rules:
    - 边界
    - 依赖关系
    - 主要调用链
-8. 临时文档放到 `docs/temp/`；不要把过程性文档长期留在主目录。
+8. 临时文档放到 `docs/temp/`；不要把过程性文档长期留在主目录
 
 ## 当前结构约束
 
-1. `internal/learningengine` 和 `internal/recommendation` 是两个平级模块。
-2. `learningengine` 维护 `learning.*` 学习域表。
-3. `recommendation` 只读 `learning.*`，只写 `recommendation.*`。
-4. 不要重新引入混合 owner 的 `scheduler` 模块。
+1. `internal/learningengine` 和 `internal/recommendation` 是两个平级模块
+2. `learningengine` 维护 `learning.*` 学习域表
+3. `recommendation` 只读 `learning.*`，只写 `recommendation.*`
+4. 不要重新引入混合 owner 的 `scheduler` 模块
 
 ## 额外信息
 

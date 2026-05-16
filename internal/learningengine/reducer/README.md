@@ -57,11 +57,14 @@ internal/learningengine/reducer/
 request
   -> validate normalized events
   -> group and sort by coarse_unit_id / occurred_at
-  -> append learning.unit_learning_events
+  -> batch append learning.unit_learning_events
   -> skip duplicate source events
+  -> lock affected user_unit_states in one query
   -> reduce only newly inserted events
-  -> upsert learning.user_unit_states
+  -> batch upsert learning.user_unit_states
 ```
+
+The reducer keeps business state-machine logic in Go. SQL is only responsible for idempotent ledger append, row locking and batch persistence. Duplicate normalized events are ignored at append time and are never reduced.
 
 ### ReplayUserStates
 
@@ -72,7 +75,7 @@ request
   -> delete current user states
   -> replay reducer from empty state
   -> merge control snapshot
-  -> upsert rebuilt states
+  -> batch upsert rebuilt states
 ```
 
 Replay never re-reads analytics raw facts. It only uses the reducer-owned normalized ledger.

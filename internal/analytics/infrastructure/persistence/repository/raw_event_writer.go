@@ -2,9 +2,6 @@ package repository
 
 import (
 	"context"
-	"errors"
-
-	"github.com/jackc/pgx/v5"
 
 	apprepo "learning-video-recommendation-system/internal/analytics/application/repository"
 	"learning-video-recommendation-system/internal/analytics/domain/model"
@@ -58,7 +55,7 @@ func upsertLearningInteractions(ctx context.Context, queries *analyticssqlc.Quer
 			return nil, err
 		}
 
-		eventID, err := queries.InsertLearningInteractionEvent(ctx, analyticssqlc.InsertLearningInteractionEventParams{
+		row, err := queries.InsertLearningInteractionEvent(ctx, analyticssqlc.InsertLearningInteractionEventParams{
 			ClientEventID:                  event.ClientEventID,
 			UserID:                         userID,
 			ClientContext:                  defaultJSONObject(event.ClientContext),
@@ -82,22 +79,10 @@ func upsertLearningInteractions(ctx context.Context, queries *analyticssqlc.Quer
 			LookupPracticeNowClicked:       event.LookupPracticeNowClicked,
 			EventPayload:                   defaultJSONObject(event.EventPayload),
 		})
-		if err == nil {
-			results = append(results, model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(eventID), Inserted: true})
-			continue
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
-		}
-
-		existingEventID, err := queries.GetLearningInteractionEventByClientID(ctx, analyticssqlc.GetLearningInteractionEventByClientIDParams{
-			UserID:        userID,
-			ClientEventID: event.ClientEventID,
-		})
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(existingEventID), Inserted: false})
+		results = append(results, model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(row.EventID), Inserted: row.Inserted})
 	}
 	return results, nil
 }
@@ -120,7 +105,7 @@ func upsertQuizEvent(ctx context.Context, queries *analyticssqlc.Queries, event 
 		return model.RawEventWriteResult{}, err
 	}
 
-	eventID, err := queries.InsertQuizEvent(ctx, analyticssqlc.InsertQuizEventParams{
+	row, err := queries.InsertQuizEvent(ctx, analyticssqlc.InsertQuizEventParams{
 		ClientEventID:       event.ClientEventID,
 		UserID:              userID,
 		ClientContext:       defaultJSONObject(event.ClientContext),
@@ -136,21 +121,10 @@ func upsertQuizEvent(ctx context.Context, queries *analyticssqlc.Queries, event 
 		ShownAt:             mapper.TimePointerToPG(&event.ShownAt),
 		CompletedAt:         mapper.TimePointerToPG(&event.CompletedAt),
 	})
-	if err == nil {
-		return model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(eventID), Inserted: true}, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return model.RawEventWriteResult{}, err
-	}
-
-	existingEventID, err := queries.GetQuizEventByClientID(ctx, analyticssqlc.GetQuizEventByClientIDParams{
-		UserID:        userID,
-		ClientEventID: event.ClientEventID,
-	})
 	if err != nil {
 		return model.RawEventWriteResult{}, err
 	}
-	return model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(existingEventID), Inserted: false}, nil
+	return model.RawEventWriteResult{ClientEventID: event.ClientEventID, EventID: mapper.UUIDToString(row.EventID), Inserted: row.Inserted}, nil
 }
 
 func defaultJSONObject(value []byte) []byte {

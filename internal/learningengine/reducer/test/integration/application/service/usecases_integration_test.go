@@ -530,6 +530,10 @@ func (r *failingBatchUpsertUserUnitStateRepository) GetByUserAndUnitForUpdate(ct
 	return r.inner.GetByUserAndUnitForUpdate(ctx, userID, coarseUnitID)
 }
 
+func (r *failingBatchUpsertUserUnitStateRepository) ListByUserAndUnitIDsForUpdate(ctx context.Context, userID string, coarseUnitIDs []int64) (map[int64]*model.UserUnitState, error) {
+	return r.inner.ListByUserAndUnitIDsForUpdate(ctx, userID, coarseUnitIDs)
+}
+
 func (r *failingBatchUpsertUserUnitStateRepository) Upsert(ctx context.Context, state *model.UserUnitState) (*model.UserUnitState, error) {
 	return r.inner.Upsert(ctx, state)
 }

@@ -12,6 +12,8 @@ import (
 
 type Querier interface {
 	GetSemanticSpanByVideoUnitAndRef(ctx context.Context, arg GetSemanticSpanByVideoUnitAndRefParams) (CatalogVideoSemanticSpan, error)
+	IncrementUserUnitServingStates(ctx context.Context, arg IncrementUserUnitServingStatesParams) error
+	IncrementUserVideoServingStates(ctx context.Context, arg IncrementUserVideoServingStatesParams) error
 	InsertVideoRecommendationItem(ctx context.Context, arg InsertVideoRecommendationItemParams) error
 	InsertVideoRecommendationRun(ctx context.Context, arg InsertVideoRecommendationRunParams) error
 	ListLearningStatesForRecommendation(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
@@ -23,8 +25,6 @@ type Querier interface {
 	ListVideoUserStatesByUserAndVideoIDs(ctx context.Context, arg ListVideoUserStatesByUserAndVideoIDsParams) ([]CatalogVideoUserState, error)
 	RefreshRecommendableVideoUnits(ctx context.Context) error
 	RefreshUnitVideoInventory(ctx context.Context) error
-	UpsertUserUnitServingState(ctx context.Context, arg UpsertUserUnitServingStateParams) error
-	UpsertUserVideoServingState(ctx context.Context, arg UpsertUserVideoServingStateParams) error
 }
 
 var _ Querier = (*Queries)(nil)

@@ -11,6 +11,96 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const incrementUserUnitServingStates = `-- name: IncrementUserUnitServingStates :exec
+insert into recommendation.user_unit_serving_states (
+  user_id,
+  coarse_unit_id,
+  last_served_at,
+  last_run_id,
+  served_count,
+  updated_at
+) 
+select
+  $1,
+  input.coarse_unit_id,
+  $2,
+  $3,
+  1,
+  now()
+from (
+  select distinct unnest($4::bigint[]) as coarse_unit_id
+) input
+where input.coarse_unit_id is not null
+on conflict (user_id, coarse_unit_id) do update
+set
+  last_served_at = excluded.last_served_at,
+  last_run_id = excluded.last_run_id,
+  served_count = recommendation.user_unit_serving_states.served_count + 1,
+  updated_at = now()
+`
+
+type IncrementUserUnitServingStatesParams struct {
+	UserID        pgtype.UUID        `json:"user_id"`
+	LastServedAt  pgtype.Timestamptz `json:"last_served_at"`
+	LastRunID     pgtype.UUID        `json:"last_run_id"`
+	CoarseUnitIds []int64            `json:"coarse_unit_ids"`
+}
+
+func (q *Queries) IncrementUserUnitServingStates(ctx context.Context, arg IncrementUserUnitServingStatesParams) error {
+	_, err := q.db.Exec(ctx, incrementUserUnitServingStates,
+		arg.UserID,
+		arg.LastServedAt,
+		arg.LastRunID,
+		arg.CoarseUnitIds,
+	)
+	return err
+}
+
+const incrementUserVideoServingStates = `-- name: IncrementUserVideoServingStates :exec
+insert into recommendation.user_video_serving_states (
+  user_id,
+  video_id,
+  last_served_at,
+  last_run_id,
+  served_count,
+  updated_at
+)
+select
+  $1,
+  input.video_id,
+  $2,
+  $3,
+  1,
+  now()
+from (
+  select distinct unnest($4::uuid[]) as video_id
+) input
+where input.video_id is not null
+on conflict (user_id, video_id) do update
+set
+  last_served_at = excluded.last_served_at,
+  last_run_id = excluded.last_run_id,
+  served_count = recommendation.user_video_serving_states.served_count + 1,
+  updated_at = now()
+`
+
+type IncrementUserVideoServingStatesParams struct {
+	UserID       pgtype.UUID        `json:"user_id"`
+	LastServedAt pgtype.Timestamptz `json:"last_served_at"`
+	LastRunID    pgtype.UUID        `json:"last_run_id"`
+	VideoIds     []pgtype.UUID      `json:"video_ids"`
+}
+
+func (q *Queries) IncrementUserVideoServingStates(ctx context.Context, arg IncrementUserVideoServingStatesParams) error {
+	_, err := q.db.Exec(ctx, incrementUserVideoServingStates,
+		arg.UserID,
+		arg.LastServedAt,
+		arg.LastRunID,
+		arg.VideoIds,
+	)
+	return err
+}
+
 const insertVideoRecommendationItem = `-- name: InsertVideoRecommendationItem :exec
 insert into recommendation.video_recommendation_items (
   run_id,
@@ -132,91 +222,5 @@ refresh materialized view recommendation.v_unit_video_inventory
 
 func (q *Queries) RefreshUnitVideoInventory(ctx context.Context) error {
 	_, err := q.db.Exec(ctx, refreshUnitVideoInventory)
-	return err
-}
-
-const upsertUserUnitServingState = `-- name: UpsertUserUnitServingState :exec
-insert into recommendation.user_unit_serving_states (
-  user_id,
-  coarse_unit_id,
-  last_served_at,
-  last_run_id,
-  served_count,
-  updated_at
-) values (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  now()
-)
-on conflict (user_id, coarse_unit_id) do update
-set
-  last_served_at = excluded.last_served_at,
-  last_run_id = excluded.last_run_id,
-  served_count = excluded.served_count,
-  updated_at = now()
-`
-
-type UpsertUserUnitServingStateParams struct {
-	UserID       pgtype.UUID        `json:"user_id"`
-	CoarseUnitID int64              `json:"coarse_unit_id"`
-	LastServedAt pgtype.Timestamptz `json:"last_served_at"`
-	LastRunID    pgtype.UUID        `json:"last_run_id"`
-	ServedCount  int32              `json:"served_count"`
-}
-
-func (q *Queries) UpsertUserUnitServingState(ctx context.Context, arg UpsertUserUnitServingStateParams) error {
-	_, err := q.db.Exec(ctx, upsertUserUnitServingState,
-		arg.UserID,
-		arg.CoarseUnitID,
-		arg.LastServedAt,
-		arg.LastRunID,
-		arg.ServedCount,
-	)
-	return err
-}
-
-const upsertUserVideoServingState = `-- name: UpsertUserVideoServingState :exec
-insert into recommendation.user_video_serving_states (
-  user_id,
-  video_id,
-  last_served_at,
-  last_run_id,
-  served_count,
-  updated_at
-) values (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  now()
-)
-on conflict (user_id, video_id) do update
-set
-  last_served_at = excluded.last_served_at,
-  last_run_id = excluded.last_run_id,
-  served_count = excluded.served_count,
-  updated_at = now()
-`
-
-type UpsertUserVideoServingStateParams struct {
-	UserID       pgtype.UUID        `json:"user_id"`
-	VideoID      pgtype.UUID        `json:"video_id"`
-	LastServedAt pgtype.Timestamptz `json:"last_served_at"`
-	LastRunID    pgtype.UUID        `json:"last_run_id"`
-	ServedCount  int32              `json:"served_count"`
-}
-
-func (q *Queries) UpsertUserVideoServingState(ctx context.Context, arg UpsertUserVideoServingStateParams) error {
-	_, err := q.db.Exec(ctx, upsertUserVideoServingState,
-		arg.UserID,
-		arg.VideoID,
-		arg.LastServedAt,
-		arg.LastRunID,
-		arg.ServedCount,
-	)
 	return err
 }

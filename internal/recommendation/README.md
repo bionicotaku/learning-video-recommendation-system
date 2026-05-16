@@ -17,7 +17,7 @@
 - Recommendation owner migration
 - 物化读视图与 SQL/query/sqlc 基础层
 - `video_recommendation_runs` / `video_recommendation_items` 审计写入
-- `user_unit_serving_states` / `user_video_serving_states` 短事务写入
+- `user_unit_serving_states` / `user_video_serving_states` 短事务原子递增写入
 - 单测、scenario/golden 测试、Recommendation integration 测试
 - 基于真实 Learning engine + Catalog fixture + Recommendation 主链路的跨模块 E2E
 
@@ -86,6 +86,7 @@
 
 - Recommendation 的审计中心始终是 video recommendation run/item。
 - 只读计算不包长事务；只在最终写 audit 和 serving state 时开启短事务。
+- Serving state 计数由数据库侧 `served_count = served_count + 1` 原子递增维护，应用层不读取旧计数再覆盖写回。
 - `catalog.video_user_states` 只作为轻量 penalty 输入，不承载 Recommendation own 的投放状态。
 - Candidate Generator 和 Evidence Resolver 必须沿调用方 `ctx` 传播取消、超时和 trace 上下文。
 - Recommendation persistence mappers 通过 `internal/platform/postgres/pgtime` 读写 UTC `time.Time`；serving state 写入前注入的 `now` 也归一化为 UTC。

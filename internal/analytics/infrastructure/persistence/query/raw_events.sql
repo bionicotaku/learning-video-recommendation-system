@@ -46,14 +46,9 @@ insert into analytics.learning_interaction_events (
   sqlc.arg(lookup_practice_now_clicked),
   sqlc.arg(event_payload)
 )
-on conflict (user_id, client_event_id) do nothing
-returning event_id;
-
--- name: GetLearningInteractionEventByClientID :one
-select event_id
-from analytics.learning_interaction_events
-where user_id = sqlc.arg(user_id)
-  and client_event_id = sqlc.arg(client_event_id);
+on conflict (user_id, client_event_id) do update
+set client_event_id = excluded.client_event_id
+returning event_id, (xmax = 0) as inserted;
 
 -- name: InsertQuizEvent :one
 insert into analytics.quiz_events (
@@ -87,11 +82,6 @@ insert into analytics.quiz_events (
   sqlc.arg(shown_at),
   sqlc.arg(completed_at)
 )
-on conflict (user_id, client_event_id) do nothing
-returning event_id;
-
--- name: GetQuizEventByClientID :one
-select event_id
-from analytics.quiz_events
-where user_id = sqlc.arg(user_id)
-  and client_event_id = sqlc.arg(client_event_id);
+on conflict (user_id, client_event_id) do update
+set client_event_id = excluded.client_event_id
+returning event_id, (xmax = 0) as inserted;

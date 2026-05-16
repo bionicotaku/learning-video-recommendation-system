@@ -399,6 +399,43 @@ func TestRecordLearningEventsExecuteHandlesMultipleUnits(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsExecuteLoadsAffectedStatesInOneBatch(t *testing.T) {
+	q4 := int16(4)
+	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+
+	stateRepo := &fakeUserUnitStateRepository{
+		statesByUnit: map[int64]*model.UserUnitState{
+			101: {UserID: "11111111-1111-1111-1111-111111111111", CoarseUnitID: 101, IsTarget: true, Status: "new", ScheduleEaseFactor: 2.5},
+			202: {UserID: "11111111-1111-1111-1111-111111111111", CoarseUnitID: 202, IsTarget: true, Status: "new", ScheduleEaseFactor: 2.5},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     &fakeUnitLearningEventRepository{},
+		},
+	}
+	usecase := service.NewRecordLearningEventsUsecase(txManager)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "batch-state-1", ProgressQuality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 202, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "batch-state-2", ProgressQuality: &q4, OccurredAt: t1.Add(time.Second)},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if stateRepo.getForUpdateCalls != 0 {
+		t.Fatalf("GetByUserAndUnitForUpdate calls = %d, want 0; states should be loaded in one batch", stateRepo.getForUpdateCalls)
+	}
+	if len(stateRepo.batchUpserted) != 2 {
+		t.Fatalf("BatchUpsert states = %d, want 2", len(stateRepo.batchUpserted))
+	}
+}
+
 func TestRecordLearningEventsExecuteSkipsDuplicateAppendRows(t *testing.T) {
 	q4 := int16(4)
 	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
@@ -668,20 +705,38 @@ func (f *fakeTargetStateCommandRepository) SetTargetInactive(_ context.Context, 
 }
 
 type fakeUserUnitStateRepository struct {
-	state         *model.UserUnitState
-	statesByUnit  map[int64]*model.UserUnitState
-	upserted      *model.UserUnitState
-	batchUpserted []*model.UserUnitState
-	listStates    []model.UserUnitState
-	lastFilter    model.UserUnitStateFilter
-	deleteCalled  bool
+	state             *model.UserUnitState
+	statesByUnit      map[int64]*model.UserUnitState
+	upserted          *model.UserUnitState
+	batchUpserted     []*model.UserUnitState
+	listStates        []model.UserUnitState
+	lastFilter        model.UserUnitStateFilter
+	deleteCalled      bool
+	getForUpdateCalls int
 }
 
 func (f *fakeUserUnitStateRepository) GetByUserAndUnitForUpdate(_ context.Context, _ string, coarseUnitID int64) (*model.UserUnitState, error) {
+	f.getForUpdateCalls++
 	if f.statesByUnit != nil {
 		return f.statesByUnit[coarseUnitID], nil
 	}
 	return f.state, nil
+}
+
+func (f *fakeUserUnitStateRepository) ListByUserAndUnitIDsForUpdate(_ context.Context, _ string, coarseUnitIDs []int64) (map[int64]*model.UserUnitState, error) {
+	result := make(map[int64]*model.UserUnitState, len(coarseUnitIDs))
+	for _, coarseUnitID := range coarseUnitIDs {
+		if f.statesByUnit != nil {
+			if state := f.statesByUnit[coarseUnitID]; state != nil {
+				result[coarseUnitID] = state
+			}
+			continue
+		}
+		if f.state != nil && f.state.CoarseUnitID == coarseUnitID {
+			result[coarseUnitID] = f.state
+		}
+	}
+	return result, nil
 }
 
 func (f *fakeUserUnitStateRepository) Upsert(_ context.Context, state *model.UserUnitState) (*model.UserUnitState, error) {

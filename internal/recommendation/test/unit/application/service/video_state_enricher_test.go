@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
@@ -98,7 +99,7 @@ func (s *spyVideoServingRepository) ListByUserAndVideoIDs(ctx context.Context, u
 	return append([]model.UserVideoServingState(nil), s.states...), nil
 }
 
-func (s *spyVideoServingRepository) Upsert(context.Context, model.UserVideoServingState) error {
+func (s *spyVideoServingRepository) IncrementServedCounts(context.Context, string, string, time.Time, []string) error {
 	return nil
 }
 

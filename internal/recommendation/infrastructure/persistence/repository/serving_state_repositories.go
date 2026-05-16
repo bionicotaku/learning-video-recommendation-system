@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -51,22 +52,25 @@ func (r *UnitServingStateRepository) ListByUserAndUnitIDs(ctx context.Context, u
 	return result, nil
 }
 
-func (r *UnitServingStateRepository) Upsert(ctx context.Context, state model.UserUnitServingState) error {
-	pgUserID, err := mapper.StringToUUID(state.UserID)
+func (r *UnitServingStateRepository) IncrementServedCounts(ctx context.Context, userID string, runID string, servedAt time.Time, coarseUnitIDs []int64) error {
+	if len(coarseUnitIDs) == 0 {
+		return nil
+	}
+
+	pgUserID, err := mapper.StringToUUID(userID)
 	if err != nil {
 		return err
 	}
-	pgRunID, err := mapper.StringToUUID(state.LastRunID)
+	pgRunID, err := mapper.StringToUUID(runID)
 	if err != nil {
 		return err
 	}
 
-	return r.queries.UpsertUserUnitServingState(ctx, recommendationsqlc.UpsertUserUnitServingStateParams{
-		UserID:       pgUserID,
-		CoarseUnitID: state.CoarseUnitID,
-		LastServedAt: mapper.TimePointerToPG(state.LastServedAt),
-		LastRunID:    pgRunID,
-		ServedCount:  state.ServedCount,
+	return r.queries.IncrementUserUnitServingStates(ctx, recommendationsqlc.IncrementUserUnitServingStatesParams{
+		UserID:        pgUserID,
+		LastServedAt:  mapper.TimePointerToPG(&servedAt),
+		LastRunID:     pgRunID,
+		CoarseUnitIds: uniqueInt64s(coarseUnitIDs),
 	})
 }
 
@@ -100,25 +104,59 @@ func (r *VideoServingStateRepository) ListByUserAndVideoIDs(ctx context.Context,
 	return result, nil
 }
 
-func (r *VideoServingStateRepository) Upsert(ctx context.Context, state model.UserVideoServingState) error {
-	pgUserID, err := mapper.StringToUUID(state.UserID)
+func (r *VideoServingStateRepository) IncrementServedCounts(ctx context.Context, userID string, runID string, servedAt time.Time, videoIDs []string) error {
+	if len(videoIDs) == 0 {
+		return nil
+	}
+
+	pgUserID, err := mapper.StringToUUID(userID)
 	if err != nil {
 		return err
 	}
-	pgVideoID, err := mapper.StringToUUID(state.VideoID)
-	if err != nil {
-		return err
-	}
-	pgRunID, err := mapper.StringToUUID(state.LastRunID)
+	pgRunID, err := mapper.StringToUUID(runID)
 	if err != nil {
 		return err
 	}
 
-	return r.queries.UpsertUserVideoServingState(ctx, recommendationsqlc.UpsertUserVideoServingStateParams{
+	pgVideoIDs := make([]pgtype.UUID, 0, len(videoIDs))
+	for _, videoID := range uniqueStrings(videoIDs) {
+		pgVideoID, err := mapper.StringToUUID(videoID)
+		if err != nil {
+			return err
+		}
+		pgVideoIDs = append(pgVideoIDs, pgVideoID)
+	}
+
+	return r.queries.IncrementUserVideoServingStates(ctx, recommendationsqlc.IncrementUserVideoServingStatesParams{
 		UserID:       pgUserID,
-		VideoID:      pgVideoID,
-		LastServedAt: mapper.TimePointerToPG(state.LastServedAt),
+		LastServedAt: mapper.TimePointerToPG(&servedAt),
 		LastRunID:    pgRunID,
-		ServedCount:  state.ServedCount,
+		VideoIds:     pgVideoIDs,
 	})
+}
+
+func uniqueInt64s(values []int64) []int64 {
+	seen := make(map[int64]struct{}, len(values))
+	result := make([]int64, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }

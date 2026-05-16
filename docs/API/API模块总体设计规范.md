@@ -291,7 +291,8 @@ API 不应复制业务模块 validation。业务模块返回的 validation error
 - 上报类 API 包括 learning interaction batch、quiz attempt、watch progress。
 - `client_context` 只要求是 JSON object；后端不在 application / DB 层固定字段集合。
 - `client_context` 可以随客户端遥测演进增加字段；新增字段不应改变业务行为。
-- `client_context` 只描述客户端环境，不描述业务入口。业务入口应使用 `source_surface`、`trigger_type` 或具体 endpoint path。
+- `client_context` 只描述客户端环境，不描述业务入口。业务入口应使用 `source_surface`、`trigger_type` 或具体业务字段表达。
+- 上报类 command API 优先让请求 body 自包含业务事实字段，例如 `video_id`、`watch_session_id`、`coarse_unit_id`；path 参数只用于真正的资源读取或资源子命令。
 - `timezone` 不参与任何 `*_at` 时间字段解析；前端不需要上传 `timezone`。
 
 ### 7.5 时间字段规范

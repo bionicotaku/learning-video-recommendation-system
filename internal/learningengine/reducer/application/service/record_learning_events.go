@@ -74,14 +74,16 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 		}
 
 		groupedInsertedEvents := groupAndSortEvents(appendResult.InsertedEvents)
-		nextStates := make([]*model.UserUnitState, 0, len(groupedEvents))
-		for coarseUnitID, unitEvents := range groupedInsertedEvents {
-			state, err := repos.UserUnitStates().GetByUserAndUnitForUpdate(ctx, request.UserID, coarseUnitID)
-			if err != nil {
-				return err
-			}
+		coarseUnitIDs := sortedCoarseUnitIDs(groupedInsertedEvents)
+		currentStates, err := repos.UserUnitStates().ListByUserAndUnitIDsForUpdate(ctx, request.UserID, coarseUnitIDs)
+		if err != nil {
+			return err
+		}
 
-			currentState := state
+		nextStates := make([]*model.UserUnitState, 0, len(groupedInsertedEvents))
+		for _, coarseUnitID := range coarseUnitIDs {
+			currentState := currentStates[coarseUnitID]
+			unitEvents := groupedInsertedEvents[coarseUnitID]
 			for _, event := range unitEvents {
 				nextState, err := aggregate.Reduce(currentState, event)
 				if err != nil {
@@ -127,6 +129,16 @@ func groupAndSortEvents(events []model.LearningEvent) map[int64][]model.Learning
 }
 
 func flattenGroupedEvents(grouped map[int64][]model.LearningEvent) []model.LearningEvent {
+	coarseUnitIDs := sortedCoarseUnitIDs(grouped)
+	orderedEvents := make([]model.LearningEvent, 0)
+	for _, coarseUnitID := range coarseUnitIDs {
+		orderedEvents = append(orderedEvents, grouped[coarseUnitID]...)
+	}
+
+	return orderedEvents
+}
+
+func sortedCoarseUnitIDs(grouped map[int64][]model.LearningEvent) []int64 {
 	coarseUnitIDs := make([]int64, 0, len(grouped))
 	for coarseUnitID := range grouped {
 		coarseUnitIDs = append(coarseUnitIDs, coarseUnitID)
@@ -134,11 +146,5 @@ func flattenGroupedEvents(grouped map[int64][]model.LearningEvent) []model.Learn
 	sort.Slice(coarseUnitIDs, func(i, j int) bool {
 		return coarseUnitIDs[i] < coarseUnitIDs[j]
 	})
-
-	orderedEvents := make([]model.LearningEvent, 0)
-	for _, coarseUnitID := range coarseUnitIDs {
-		orderedEvents = append(orderedEvents, grouped[coarseUnitID]...)
-	}
-
-	return orderedEvents
+	return coarseUnitIDs
 }

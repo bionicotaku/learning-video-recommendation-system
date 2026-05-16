@@ -11,13 +11,15 @@ import (
 )
 
 type Querier interface {
-	AppendLearningEvent(ctx context.Context, arg AppendLearningEventParams) (LearningUnitLearningEvent, error)
+	AppendLearningEvents(ctx context.Context, events []byte) ([]AppendLearningEventsRow, error)
+	BatchUpsertUserUnitStates(ctx context.Context, states []byte) ([]LearningUserUnitState, error)
 	DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error
 	EnsureTargetUnit(ctx context.Context, arg EnsureTargetUnitParams) error
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)
 	ListUserUnitStates(ctx context.Context, arg ListUserUnitStatesParams) ([]LearningUserUnitState, error)
+	ListUserUnitStatesForUpdateByUnitIDs(ctx context.Context, arg ListUserUnitStatesForUpdateByUnitIDsParams) ([]LearningUserUnitState, error)
 	SetTargetInactive(ctx context.Context, arg SetTargetInactiveParams) error
 	UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitStateParams) (LearningUserUnitState, error)
 }

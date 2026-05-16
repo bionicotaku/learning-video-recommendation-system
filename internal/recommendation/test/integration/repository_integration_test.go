@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
 	}
 }
 
-func TestServingStateRepositoriesListAndUpsert(t *testing.T) {
+func TestServingStateRepositoriesListAndIncrement(t *testing.T) {
 	db := testDB(t)
 	tx := fixture.BeginTestTx(t, db.Pool)
 	ctx := context.Background()
@@ -66,24 +67,18 @@ func TestServingStateRepositoriesListAndUpsert(t *testing.T) {
 	unitRepo := repository.NewUnitServingStateRepository(tx)
 	videoRepo := repository.NewVideoServingStateRepository(tx)
 
-	if err := unitRepo.Upsert(ctx, model.UserUnitServingState{
-		UserID:       userID,
-		CoarseUnitID: unitID,
-		LastServedAt: &now,
-		LastRunID:    runID,
-		ServedCount:  2,
-	}); err != nil {
-		t.Fatalf("upsert unit serving state: %v", err)
+	if err := unitRepo.IncrementServedCounts(ctx, userID, runID, now, []int64{unitID}); err != nil {
+		t.Fatalf("increment unit serving state: %v", err)
+	}
+	if err := unitRepo.IncrementServedCounts(ctx, userID, runID, now, []int64{unitID}); err != nil {
+		t.Fatalf("increment unit serving state again: %v", err)
 	}
 
-	if err := videoRepo.Upsert(ctx, model.UserVideoServingState{
-		UserID:       userID,
-		VideoID:      videoID,
-		LastServedAt: &now,
-		LastRunID:    runID,
-		ServedCount:  4,
-	}); err != nil {
-		t.Fatalf("upsert video serving state: %v", err)
+	if err := videoRepo.IncrementServedCounts(ctx, userID, runID, now, []string{videoID}); err != nil {
+		t.Fatalf("increment video serving state: %v", err)
+	}
+	if err := videoRepo.IncrementServedCounts(ctx, userID, runID, now, []string{videoID}); err != nil {
+		t.Fatalf("increment video serving state again: %v", err)
 	}
 
 	unitStates, err := unitRepo.ListByUserAndUnitIDs(ctx, userID, []int64{unitID})
@@ -98,8 +93,60 @@ func TestServingStateRepositoriesListAndUpsert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list video serving states: %v", err)
 	}
-	if len(videoStates) != 1 || videoStates[0].ServedCount != 4 {
+	if len(videoStates) != 1 || videoStates[0].ServedCount != 2 {
 		t.Fatalf("unexpected video states: %+v", videoStates)
+	}
+}
+
+func TestServingStateRepositoriesIncrementConcurrently(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000112"
+	videoID := "00000000-0000-0000-0000-000000000212"
+	unitID := int64(312)
+	runID := "00000000-0000-0000-0000-000000000412"
+	now := time.Now().UTC()
+	seedBaseRefs(t, ctx, db, db.Pool, userID, videoID, unitID)
+
+	unitRepo := repository.NewUnitServingStateRepository(db.Pool)
+	videoRepo := repository.NewVideoServingStateRepository(db.Pool)
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 4)
+	for i := 0; i < 2; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			errs <- unitRepo.IncrementServedCounts(ctx, userID, runID, now, []int64{unitID})
+		}()
+		go func() {
+			defer wg.Done()
+			errs <- videoRepo.IncrementServedCounts(ctx, userID, runID, now, []string{videoID})
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("increment serving state concurrently: %v", err)
+		}
+	}
+
+	unitStates, err := unitRepo.ListByUserAndUnitIDs(ctx, userID, []int64{unitID})
+	if err != nil {
+		t.Fatalf("list unit serving states: %v", err)
+	}
+	if len(unitStates) != 1 || unitStates[0].ServedCount != 2 {
+		t.Fatalf("unexpected unit states after concurrent increments: %+v", unitStates)
+	}
+
+	videoStates, err := videoRepo.ListByUserAndVideoIDs(ctx, userID, []string{videoID})
+	if err != nil {
+		t.Fatalf("list video serving states: %v", err)
+	}
+	if len(videoStates) != 1 || videoStates[0].ServedCount != 2 {
+		t.Fatalf("unexpected video states after concurrent increments: %+v", videoStates)
 	}
 }
 

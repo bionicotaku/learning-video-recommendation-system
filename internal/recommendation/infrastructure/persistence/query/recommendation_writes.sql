@@ -1,4 +1,4 @@
--- name: UpsertUserUnitServingState :exec
+-- name: IncrementUserUnitServingStates :exec
 insert into recommendation.user_unit_serving_states (
   user_id,
   coarse_unit_id,
@@ -6,22 +6,26 @@ insert into recommendation.user_unit_serving_states (
   last_run_id,
   served_count,
   updated_at
-) values (
+) 
+select
   sqlc.arg(user_id),
-  sqlc.arg(coarse_unit_id),
+  input.coarse_unit_id,
   sqlc.narg(last_served_at),
   sqlc.narg(last_run_id),
-  sqlc.arg(served_count),
+  1,
   now()
-)
+from (
+  select distinct unnest(sqlc.arg(coarse_unit_ids)::bigint[]) as coarse_unit_id
+) input
+where input.coarse_unit_id is not null
 on conflict (user_id, coarse_unit_id) do update
 set
   last_served_at = excluded.last_served_at,
   last_run_id = excluded.last_run_id,
-  served_count = excluded.served_count,
+  served_count = recommendation.user_unit_serving_states.served_count + 1,
   updated_at = now();
 
--- name: UpsertUserVideoServingState :exec
+-- name: IncrementUserVideoServingStates :exec
 insert into recommendation.user_video_serving_states (
   user_id,
   video_id,
@@ -29,19 +33,23 @@ insert into recommendation.user_video_serving_states (
   last_run_id,
   served_count,
   updated_at
-) values (
+)
+select
   sqlc.arg(user_id),
-  sqlc.arg(video_id),
+  input.video_id,
   sqlc.narg(last_served_at),
   sqlc.narg(last_run_id),
-  sqlc.arg(served_count),
+  1,
   now()
-)
+from (
+  select distinct unnest(sqlc.arg(video_ids)::uuid[]) as video_id
+) input
+where input.video_id is not null
 on conflict (user_id, video_id) do update
 set
   last_served_at = excluded.last_served_at,
   last_run_id = excluded.last_run_id,
-  served_count = excluded.served_count,
+  served_count = recommendation.user_video_serving_states.served_count + 1,
   updated_at = now();
 
 -- name: InsertVideoRecommendationRun :exec

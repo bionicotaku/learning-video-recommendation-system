@@ -11,44 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getLearningInteractionEventByClientID = `-- name: GetLearningInteractionEventByClientID :one
-select event_id
-from analytics.learning_interaction_events
-where user_id = $1
-  and client_event_id = $2
-`
-
-type GetLearningInteractionEventByClientIDParams struct {
-	UserID        pgtype.UUID `json:"user_id"`
-	ClientEventID string      `json:"client_event_id"`
-}
-
-func (q *Queries) GetLearningInteractionEventByClientID(ctx context.Context, arg GetLearningInteractionEventByClientIDParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, getLearningInteractionEventByClientID, arg.UserID, arg.ClientEventID)
-	var event_id pgtype.UUID
-	err := row.Scan(&event_id)
-	return event_id, err
-}
-
-const getQuizEventByClientID = `-- name: GetQuizEventByClientID :one
-select event_id
-from analytics.quiz_events
-where user_id = $1
-  and client_event_id = $2
-`
-
-type GetQuizEventByClientIDParams struct {
-	UserID        pgtype.UUID `json:"user_id"`
-	ClientEventID string      `json:"client_event_id"`
-}
-
-func (q *Queries) GetQuizEventByClientID(ctx context.Context, arg GetQuizEventByClientIDParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, getQuizEventByClientID, arg.UserID, arg.ClientEventID)
-	var event_id pgtype.UUID
-	err := row.Scan(&event_id)
-	return event_id, err
-}
-
 const insertLearningInteractionEvent = `-- name: InsertLearningInteractionEvent :one
 insert into analytics.learning_interaction_events (
   client_event_id,
@@ -97,8 +59,9 @@ insert into analytics.learning_interaction_events (
   $21,
   $22
 )
-on conflict (user_id, client_event_id) do nothing
-returning event_id
+on conflict (user_id, client_event_id) do update
+set client_event_id = excluded.client_event_id
+returning event_id, (xmax = 0) as inserted
 `
 
 type InsertLearningInteractionEventParams struct {
@@ -126,7 +89,12 @@ type InsertLearningInteractionEventParams struct {
 	EventPayload                   []byte             `json:"event_payload"`
 }
 
-func (q *Queries) InsertLearningInteractionEvent(ctx context.Context, arg InsertLearningInteractionEventParams) (pgtype.UUID, error) {
+type InsertLearningInteractionEventRow struct {
+	EventID  pgtype.UUID `json:"event_id"`
+	Inserted bool        `json:"inserted"`
+}
+
+func (q *Queries) InsertLearningInteractionEvent(ctx context.Context, arg InsertLearningInteractionEventParams) (InsertLearningInteractionEventRow, error) {
 	row := q.db.QueryRow(ctx, insertLearningInteractionEvent,
 		arg.ClientEventID,
 		arg.UserID,
@@ -151,9 +119,9 @@ func (q *Queries) InsertLearningInteractionEvent(ctx context.Context, arg Insert
 		arg.LookupPracticeNowClicked,
 		arg.EventPayload,
 	)
-	var event_id pgtype.UUID
-	err := row.Scan(&event_id)
-	return event_id, err
+	var i InsertLearningInteractionEventRow
+	err := row.Scan(&i.EventID, &i.Inserted)
+	return i, err
 }
 
 const insertQuizEvent = `-- name: InsertQuizEvent :one
@@ -188,8 +156,9 @@ insert into analytics.quiz_events (
   $13,
   $14
 )
-on conflict (user_id, client_event_id) do nothing
-returning event_id
+on conflict (user_id, client_event_id) do update
+set client_event_id = excluded.client_event_id
+returning event_id, (xmax = 0) as inserted
 `
 
 type InsertQuizEventParams struct {
@@ -209,7 +178,12 @@ type InsertQuizEventParams struct {
 	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
 }
 
-func (q *Queries) InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams) (pgtype.UUID, error) {
+type InsertQuizEventRow struct {
+	EventID  pgtype.UUID `json:"event_id"`
+	Inserted bool        `json:"inserted"`
+}
+
+func (q *Queries) InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams) (InsertQuizEventRow, error) {
 	row := q.db.QueryRow(ctx, insertQuizEvent,
 		arg.ClientEventID,
 		arg.UserID,
@@ -226,7 +200,7 @@ func (q *Queries) InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams
 		arg.ShownAt,
 		arg.CompletedAt,
 	)
-	var event_id pgtype.UUID
-	err := row.Scan(&event_id)
-	return event_id, err
+	var i InsertQuizEventRow
+	err := row.Scan(&i.EventID, &i.Inserted)
+	return i, err
 }

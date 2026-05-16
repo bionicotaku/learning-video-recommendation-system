@@ -23,6 +23,24 @@ func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.Lea
 	}
 }
 
+func ToLearningEventFromAppendRow(row learningenginesqlc.AppendLearningEventsRow) model.LearningEvent {
+	return model.LearningEvent{
+		EventID:         UUIDToString(row.EventID),
+		UserID:          UUIDToString(row.UserID),
+		CoarseUnitID:    row.CoarseUnitID,
+		VideoID:         UUIDToString(row.VideoID),
+		EventType:       row.EventType,
+		ReducerEffect:   row.ReducerEffect,
+		SourceType:      row.SourceType,
+		SourceRefID:     row.SourceRefID,
+		IsCorrect:       BoolPointerFromPG(row.IsCorrect),
+		ProgressQuality: Int16PointerFromPG(row.ProgressQuality),
+		Metadata:        row.Metadata,
+		OccurredAt:      TimeFromPG(row.OccurredAt),
+		CreatedAt:       TimeFromPG(row.CreatedAt),
+	}
+}
+
 func ToUserUnitState(row learningenginesqlc.LearningUserUnitState) (model.UserUnitState, error) {
 	targetPriority, err := NumericToFloat64(row.TargetPriority)
 	if err != nil {

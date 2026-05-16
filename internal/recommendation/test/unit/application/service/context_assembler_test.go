@@ -107,7 +107,7 @@ func (s *stubUnitServingStateRepository) ListByUserAndUnitIDs(_ context.Context,
 	return s.states, s.err
 }
 
-func (s *stubUnitServingStateRepository) Upsert(context.Context, model.UserUnitServingState) error {
+func (s *stubUnitServingStateRepository) IncrementServedCounts(context.Context, string, string, time.Time, []int64) error {
 	return nil
 }
 

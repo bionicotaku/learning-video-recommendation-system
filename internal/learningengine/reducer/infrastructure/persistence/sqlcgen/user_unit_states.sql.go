@@ -11,6 +11,174 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const batchUpsertUserUnitStates = `-- name: BatchUpsertUserUnitStates :many
+with input as (
+  select
+    (item.value->>'user_id')::uuid as user_id,
+    (item.value->>'coarse_unit_id')::bigint as coarse_unit_id,
+    (item.value->>'is_target')::boolean as is_target,
+    nullif(item.value->>'target_source', '') as target_source,
+    nullif(item.value->>'target_source_ref_id', '') as target_source_ref_id,
+    (item.value->>'target_priority')::numeric as target_priority,
+    item.value->>'status' as status,
+    (item.value->>'progress_percent')::numeric as progress_percent,
+    (item.value->>'mastery_score')::numeric as mastery_score,
+    nullif(item.value->>'first_observed_at', '')::timestamptz as first_observed_at,
+    nullif(item.value->>'last_observed_at', '')::timestamptz as last_observed_at,
+    (item.value->>'observation_count')::integer as observation_count,
+    (item.value->>'progress_event_count')::integer as progress_event_count,
+    nullif(item.value->>'last_progress_at', '')::timestamptz as last_progress_at,
+    nullif(item.value->>'last_progress_quality', '')::smallint as last_progress_quality,
+    coalesce((select array_agg(value::smallint) from jsonb_array_elements_text(coalesce(item.value->'recent_progress_qualities', '[]'::jsonb)) as q(value)), '{}'::smallint[]) as recent_progress_qualities,
+    coalesce((select array_agg(value::boolean) from jsonb_array_elements_text(coalesce(item.value->'recent_progress_passes', '[]'::jsonb)) as p(value)), '{}'::boolean[]) as recent_progress_passes,
+    (item.value->>'progress_success_count')::integer as progress_success_count,
+    (item.value->>'progress_failure_count')::integer as progress_failure_count,
+    (item.value->>'consecutive_success_count')::integer as consecutive_success_count,
+    (item.value->>'consecutive_failure_count')::integer as consecutive_failure_count,
+    (item.value->>'schedule_repetition')::integer as schedule_repetition,
+    (item.value->>'schedule_interval_days')::numeric as schedule_interval_days,
+    (item.value->>'schedule_ease_factor')::numeric as schedule_ease_factor,
+    nullif(item.value->>'next_review_at', '')::timestamptz as next_review_at,
+    nullif(item.value->>'suspended_reason', '') as suspended_reason
+  from jsonb_array_elements($1::jsonb) as item(value)
+)
+insert into learning.user_unit_states (
+  user_id,
+  coarse_unit_id,
+  is_target,
+  target_source,
+  target_source_ref_id,
+  target_priority,
+  status,
+  progress_percent,
+  mastery_score,
+  first_observed_at,
+  last_observed_at,
+  observation_count,
+  progress_event_count,
+  last_progress_at,
+  last_progress_quality,
+  recent_progress_qualities,
+  recent_progress_passes,
+  progress_success_count,
+  progress_failure_count,
+  consecutive_success_count,
+  consecutive_failure_count,
+  schedule_repetition,
+  schedule_interval_days,
+  schedule_ease_factor,
+  next_review_at,
+  suspended_reason,
+  updated_at
+)
+select
+  user_id,
+  coarse_unit_id,
+  is_target,
+  target_source,
+  target_source_ref_id,
+  target_priority,
+  status,
+  progress_percent,
+  mastery_score,
+  first_observed_at,
+  last_observed_at,
+  observation_count,
+  progress_event_count,
+  last_progress_at,
+  last_progress_quality,
+  coalesce(recent_progress_qualities, '{}'::smallint[]),
+  coalesce(recent_progress_passes, '{}'::boolean[]),
+  progress_success_count,
+  progress_failure_count,
+  consecutive_success_count,
+  consecutive_failure_count,
+  schedule_repetition,
+  schedule_interval_days,
+  schedule_ease_factor,
+  next_review_at,
+  suspended_reason,
+  now()
+from input
+on conflict (user_id, coarse_unit_id) do update
+set
+  is_target = excluded.is_target,
+  target_source = excluded.target_source,
+  target_source_ref_id = excluded.target_source_ref_id,
+  target_priority = excluded.target_priority,
+  status = excluded.status,
+  progress_percent = excluded.progress_percent,
+  mastery_score = excluded.mastery_score,
+  first_observed_at = excluded.first_observed_at,
+  last_observed_at = excluded.last_observed_at,
+  observation_count = excluded.observation_count,
+  progress_event_count = excluded.progress_event_count,
+  last_progress_at = excluded.last_progress_at,
+  last_progress_quality = excluded.last_progress_quality,
+  recent_progress_qualities = excluded.recent_progress_qualities,
+  recent_progress_passes = excluded.recent_progress_passes,
+  progress_success_count = excluded.progress_success_count,
+  progress_failure_count = excluded.progress_failure_count,
+  consecutive_success_count = excluded.consecutive_success_count,
+  consecutive_failure_count = excluded.consecutive_failure_count,
+  schedule_repetition = excluded.schedule_repetition,
+  schedule_interval_days = excluded.schedule_interval_days,
+  schedule_ease_factor = excluded.schedule_ease_factor,
+  next_review_at = excluded.next_review_at,
+  suspended_reason = excluded.suspended_reason,
+  updated_at = now()
+returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
+`
+
+func (q *Queries) BatchUpsertUserUnitStates(ctx context.Context, states []byte) ([]LearningUserUnitState, error) {
+	rows, err := q.db.Query(ctx, batchUpsertUserUnitStates, states)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LearningUserUnitState{}
+	for rows.Next() {
+		var i LearningUserUnitState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.IsTarget,
+			&i.TargetSource,
+			&i.TargetSourceRefID,
+			&i.TargetPriority,
+			&i.Status,
+			&i.ProgressPercent,
+			&i.MasteryScore,
+			&i.FirstObservedAt,
+			&i.LastObservedAt,
+			&i.ObservationCount,
+			&i.ProgressEventCount,
+			&i.LastProgressAt,
+			&i.LastProgressQuality,
+			&i.RecentProgressQualities,
+			&i.RecentProgressPasses,
+			&i.ProgressSuccessCount,
+			&i.ProgressFailureCount,
+			&i.ConsecutiveSuccessCount,
+			&i.ConsecutiveFailureCount,
+			&i.ScheduleRepetition,
+			&i.ScheduleIntervalDays,
+			&i.ScheduleEaseFactor,
+			&i.NextReviewAt,
+			&i.SuspendedReason,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteUserUnitStatesByUser = `-- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
 where user_id = $1
@@ -131,6 +299,69 @@ type ListUserUnitStatesParams struct {
 
 func (q *Queries) ListUserUnitStates(ctx context.Context, arg ListUserUnitStatesParams) ([]LearningUserUnitState, error) {
 	rows, err := q.db.Query(ctx, listUserUnitStates, arg.UserID, arg.OnlyTarget, arg.ExcludeSuspended)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LearningUserUnitState{}
+	for rows.Next() {
+		var i LearningUserUnitState
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.IsTarget,
+			&i.TargetSource,
+			&i.TargetSourceRefID,
+			&i.TargetPriority,
+			&i.Status,
+			&i.ProgressPercent,
+			&i.MasteryScore,
+			&i.FirstObservedAt,
+			&i.LastObservedAt,
+			&i.ObservationCount,
+			&i.ProgressEventCount,
+			&i.LastProgressAt,
+			&i.LastProgressQuality,
+			&i.RecentProgressQualities,
+			&i.RecentProgressPasses,
+			&i.ProgressSuccessCount,
+			&i.ProgressFailureCount,
+			&i.ConsecutiveSuccessCount,
+			&i.ConsecutiveFailureCount,
+			&i.ScheduleRepetition,
+			&i.ScheduleIntervalDays,
+			&i.ScheduleEaseFactor,
+			&i.NextReviewAt,
+			&i.SuspendedReason,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserUnitStatesForUpdateByUnitIDs = `-- name: ListUserUnitStatesForUpdateByUnitIDs :many
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
+from learning.user_unit_states
+where user_id = $1
+  and coarse_unit_id = any($2::bigint[])
+order by coarse_unit_id asc
+for update
+`
+
+type ListUserUnitStatesForUpdateByUnitIDsParams struct {
+	UserID        pgtype.UUID `json:"user_id"`
+	CoarseUnitIds []int64     `json:"coarse_unit_ids"`
+}
+
+func (q *Queries) ListUserUnitStatesForUpdateByUnitIDs(ctx context.Context, arg ListUserUnitStatesForUpdateByUnitIDsParams) ([]LearningUserUnitState, error) {
+	rows, err := q.db.Query(ctx, listUserUnitStatesForUpdateByUnitIDs, arg.UserID, arg.CoarseUnitIds)
 	if err != nil {
 		return nil, err
 	}

@@ -6,15 +6,11 @@ package analyticssqlc
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
-	GetLearningInteractionEventByClientID(ctx context.Context, arg GetLearningInteractionEventByClientIDParams) (pgtype.UUID, error)
-	GetQuizEventByClientID(ctx context.Context, arg GetQuizEventByClientIDParams) (pgtype.UUID, error)
-	InsertLearningInteractionEvent(ctx context.Context, arg InsertLearningInteractionEventParams) (pgtype.UUID, error)
-	InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams) (pgtype.UUID, error)
+	InsertLearningInteractionEvent(ctx context.Context, arg InsertLearningInteractionEventParams) (InsertLearningInteractionEventRow, error)
+	InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams) (InsertQuizEventRow, error)
 }
 
 var _ Querier = (*Queries)(nil)
