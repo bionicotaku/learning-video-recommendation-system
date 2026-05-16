@@ -7,6 +7,8 @@ func TestLoadConfigFromEnvRequiresTrustedUserIDHeader(t *testing.T) {
 		switch key {
 		case "DATABASE_URL":
 			return "postgres://example"
+		case "PUBLIC_ASSET_BASE_URL":
+			return "https://cdn.example.com"
 		default:
 			return ""
 		}
@@ -24,6 +26,8 @@ func TestLoadConfigFromEnvReadsTrustedUserIDHeader(t *testing.T) {
 			return "postgres://example"
 		case "API_TRUSTED_USER_ID_HEADER":
 			return "X-Trusted-User-ID"
+		case "PUBLIC_ASSET_BASE_URL":
+			return "https://cdn.example.com/assets/"
 		default:
 			return ""
 		}
@@ -37,6 +41,9 @@ func TestLoadConfigFromEnvReadsTrustedUserIDHeader(t *testing.T) {
 	}
 	if config.TrustedUserIDHeader != "X-Trusted-User-ID" {
 		t.Fatalf("unexpected trusted header: %s", config.TrustedUserIDHeader)
+	}
+	if config.PublicAssetBaseURL != "https://cdn.example.com/assets" {
+		t.Fatalf("unexpected public asset base url: %s", config.PublicAssetBaseURL)
 	}
 }
 

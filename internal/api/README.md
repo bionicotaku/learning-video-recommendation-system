@@ -22,15 +22,27 @@ domain rules. Business rules remain in `catalog`, `analytics`,
 Current implemented endpoint group:
 
 ```text
+POST /api/feed
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
 POST /api/video-watch-progress
 ```
 
-These endpoints return only raw Analytics acceptance results. Learning Engine
-normalization is attempted synchronously as best effort and is not exposed as
-the HTTP success boundary.
+`POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
+feed plan and audit/serving state, then batch-fills Catalog video display
+fields, engagement stats, and `semantic.coarse_unit.label` text before returning
+the frontend `FeedResponse`. It does not expose recommendation rank, score,
+reason codes, selector mode, or underfilled status.
+
+Feed materialization is all-or-error: the facade does not silently drop plan
+items or learning units after Recommendation has written audit/serving state.
+Missing display data, incomplete evidence, missing unit labels, or invalid media
+URLs are treated as backend consistency failures.
+
+The learning-event endpoints return only raw Analytics acceptance results.
+Learning Engine normalization is attempted synchronously as best effort and is
+not exposed as the HTTP success boundary.
 
 `POST /api/learning-interactions:batch` accepts only exposure and lookup raw
 interactions. Self-mark mastered is intentionally a separate endpoint so it can
@@ -45,6 +57,10 @@ and Catalog projections have been updated in one backend transaction.
 by a trusted upstream gateway or runtime that strips client-supplied identity
 headers before forwarding the request. This module does not implement JWT
 verification and never trusts `user_id` from the body or query string.
+
+`cmd/server` also requires `PUBLIC_ASSET_BASE_URL` for feed media URL assembly.
+Catalog paths that are already absolute `http://` or `https://` URLs pass
+through unchanged; relative HLS and cover paths are joined against this base URL.
 
 Transport errors use the shared JSON error envelope. Decode, field validation,
 and known business validation failures map to `400 invalid_request`; missing

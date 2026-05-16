@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -12,6 +13,7 @@ type config struct {
 	Addr                string
 	DatabaseURL         string
 	TrustedUserIDHeader string
+	PublicAssetBaseURL  string
 }
 
 func loadConfig() (config, error) {
@@ -30,6 +32,15 @@ func loadConfigFromEnv(getenv func(string) string) (config, error) {
 		return config{}, fmt.Errorf("API_TRUSTED_USER_ID_HEADER is not set")
 	}
 
+	publicAssetBaseURL := strings.TrimRight(strings.TrimSpace(getenv("PUBLIC_ASSET_BASE_URL")), "/")
+	if publicAssetBaseURL == "" {
+		return config{}, fmt.Errorf("PUBLIC_ASSET_BASE_URL is not set")
+	}
+	parsedPublicAssetBaseURL, err := url.Parse(publicAssetBaseURL)
+	if err != nil || !parsedPublicAssetBaseURL.IsAbs() || (parsedPublicAssetBaseURL.Scheme != "http" && parsedPublicAssetBaseURL.Scheme != "https") {
+		return config{}, fmt.Errorf("PUBLIC_ASSET_BASE_URL must be an absolute http(s) URL")
+	}
+
 	addr := strings.TrimSpace(getenv("API_ADDR"))
 	if addr == "" {
 		addr = ":8080"
@@ -39,5 +50,6 @@ func loadConfigFromEnv(getenv func(string) string) (config, error) {
 		Addr:                addr,
 		DatabaseURL:         databaseURL,
 		TrustedUserIDHeader: trustedUserIDHeader,
+		PublicAssetBaseURL:  publicAssetBaseURL,
 	}, nil
 }

@@ -11,6 +11,7 @@ import (
 	analyticsrepo "learning-video-recommendation-system/internal/analytics/infrastructure/persistence/repository"
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
@@ -21,6 +22,15 @@ import (
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/infrastructure/persistence/repository"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
+	recommendationservice "learning-video-recommendation-system/internal/recommendation/application/service"
+	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
+	recommendationaggregator "learning-video-recommendation-system/internal/recommendation/domain/aggregator"
+	recommendationexplain "learning-video-recommendation-system/internal/recommendation/domain/explain"
+	recommendationplanner "learning-video-recommendation-system/internal/recommendation/domain/planner"
+	recommendationranking "learning-video-recommendation-system/internal/recommendation/domain/ranking"
+	recommendationselector "learning-video-recommendation-system/internal/recommendation/domain/selector"
+	recommendationrepo "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/repository"
+	recommendationtx "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/tx"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -34,9 +44,14 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	if err != nil {
 		return nil, err
 	}
+	feedHandler, err := buildFeedHandler(pool, logger, config)
+	if err != nil {
+		return nil, err
+	}
 	watchProgress := buildWatchProgressHandler(pool)
 
 	handler := router.New(router.Options{
+		Feed:           feedHandler,
 		LearningEvents: learningEvents,
 		WatchProgress:  watchProgress,
 	})
@@ -72,4 +87,55 @@ func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
 	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
 	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
 	return watchprogress.NewHandler(recordWatchProgress)
+}
+
+func buildFeedHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (*feed.Handler, error) {
+	recommendations, err := buildRecommendationUsecase(pool)
+	if err != nil {
+		return nil, err
+	}
+
+	lookupReader := catalogrepo.NewFeedLookupReader(pool)
+	feedVideos := catalogservice.NewFeedVideoLookupUsecase(lookupReader)
+	unitLabels := catalogservice.NewUnitLabelLookupUsecase(lookupReader)
+	feedService := apiservice.NewFeedService(
+		recommendations,
+		feedVideos,
+		unitLabels,
+		apiservice.NewPublicAssetURLBuilder(config.PublicAssetBaseURL),
+		logger,
+	)
+	return feed.NewHandler(feedService), nil
+}
+
+func buildRecommendationUsecase(pool *pgxpool.Pool) (*recommendationusecase.GenerateVideoRecommendationsService, error) {
+	unitServing := recommendationrepo.NewUnitServingStateRepository(pool)
+	videoServing := recommendationrepo.NewVideoServingStateRepository(pool)
+
+	return recommendationusecase.NewGenerateVideoRecommendationsPipeline(
+		recommendationservice.NewDefaultContextAssembler(
+			recommendationrepo.NewLearningStateReader(pool),
+			recommendationrepo.NewUnitInventoryReader(pool),
+			unitServing,
+		),
+		recommendationplanner.NewDefaultDemandPlanner(),
+		recommendationservice.NewDefaultCandidateGenerator(recommendationrepo.NewRecommendableVideoUnitReader(pool)),
+		recommendationservice.NewDefaultEvidenceResolver(
+			recommendationrepo.NewSemanticSpanReader(pool),
+			recommendationrepo.NewTranscriptSentenceReader(pool),
+		),
+		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
+		recommendationranking.NewDefaultVideoRanker(),
+		recommendationselector.NewDefaultVideoSelector(),
+		recommendationexplain.NewDefaultExplanationBuilder(),
+		recommendationservice.NewDefaultVideoStateEnricher(
+			videoServing,
+			recommendationrepo.NewVideoUserStateReader(pool),
+		),
+		recommendationservice.NewDefaultRecommendationResultWriter(
+			recommendationtx.NewManager(pool),
+			recommendationservice.NewDefaultAuditWriter(recommendationrepo.NewRecommendationAuditRepository(pool)),
+			recommendationservice.NewDefaultServingStateManager(unitServing, videoServing),
+		),
+	)
 }

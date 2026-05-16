@@ -10,6 +10,7 @@
 - 单视频入库审计
 - 用户对视频的互动状态投影
 - 观看进度上报命令 `RecordVideoWatchProgress`
+- Feed facade 使用的批量读取能力：视频展示字段、互动统计、unit label
 
 当前已落地结构：
 
@@ -53,3 +54,21 @@ POST /api/video-watch-progress
 `analytics.video_watch_events` 仍属于 Analytics schema，但在 watch-progress 命令中作为 session ledger 与 Catalog 投影同事务维护。Catalog repository 可以在这个命令内写入该表；这是为了保证 `watch_count`、`completed_count` 和 `total_watch_ms` 的去重依据与投影更新保持原子一致，不表示 Catalog 泛化拥有 Analytics raw fact 表。
 
 watch-progress 写入路径使用数据库内条件 upsert，不在 application 层 pre-read `analytics.video_watch_events`。同一 `watch_session_id` 首次并发上报时，repository 只做一次内部重试，让第二次 SQL 语句读取已存在 session 后继续由数据库侧计算 delta；同一 `watch_session_id` 绑定不同用户或视频时返回 conflict；不存在的视频返回 not found。普通观看进度不写 Learning Engine，也不写 Recommendation serving state。
+
+Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
+
+```text
+internal/api FeedService
+  -> catalog.FeedVideoLookupUsecase
+  -> catalog.FeedLookupReader.ListFeedVideosByIDs
+  -> catalog.videos + catalog.video_engagement_stats
+
+internal/api FeedService
+  -> catalog.UnitLabelLookupUsecase
+  -> catalog.FeedLookupReader.ListUnitLabelsByIDs
+  -> semantic.coarse_unit
+```
+
+`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`。
+
+`ListUnitLabelsByIDs` 只补 `semantic.coarse_unit.status = active` 的 `label`。Catalog 在这里提供 lightweight read capability，是为了让 API facade 批量补齐展示文本；Catalog 不理解 Recommendation 的 role、rank、score，也不参与 quiz 选择。

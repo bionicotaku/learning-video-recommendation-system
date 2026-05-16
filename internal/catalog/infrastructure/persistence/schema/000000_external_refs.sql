@@ -9,5 +9,7 @@ create table if not exists auth.users (
 create sequence if not exists semantic.coarse_unit_id_seq;
 
 create table if not exists semantic.coarse_unit (
-  id bigint primary key default nextval('semantic.coarse_unit_id_seq'::regclass)
+  id bigint primary key default nextval('semantic.coarse_unit_id_seq'::regclass),
+  label text not null default '',
+  status text not null default 'active'
 );

@@ -165,5 +165,7 @@ type CatalogVideoUserState struct {
 }
 
 type SemanticCoarseUnit struct {
-	ID int64 `json:"id"`
+	ID     int64  `json:"id"`
+	Label  string `json:"label"`
+	Status string `json:"status"`
 }
