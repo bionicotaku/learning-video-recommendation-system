@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	learningenum "learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/model"
+	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 )
 
 const SourceTypeLearningInteractionEvent = "learning_interaction_event"

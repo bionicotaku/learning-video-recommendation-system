@@ -25,7 +25,7 @@ func moduleSpecs() map[string]moduleSpec {
 		},
 		"learningengine": {
 			Name:          "learningengine",
-			MigrationDir:  filepath.FromSlash("internal/learningengine/infrastructure/migration"),
+			MigrationDir:  filepath.FromSlash("internal/learningengine/reducer/infrastructure/migration"),
 			TrackingTable: "learningengine_schema_migrations",
 		},
 		"recommendation": {

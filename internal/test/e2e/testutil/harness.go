@@ -17,11 +17,11 @@ import (
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	learningdto "learning-video-recommendation-system/internal/learningengine/application/dto"
-	learningservice "learning-video-recommendation-system/internal/learningengine/application/service"
-	learningusecase "learning-video-recommendation-system/internal/learningengine/application/usecase"
-	learningrepo "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/repository"
-	learningtx "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/tx"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
+	learningusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
+	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
+	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 	recommendationdto "learning-video-recommendation-system/internal/recommendation/application/dto"
 	recommendationservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
@@ -168,7 +168,7 @@ func (h *Harness) applySchema(t *testing.T) {
 	if err := applySchemaSequence(ctx, func(ctx context.Context, sql string) error {
 		_, err := h.Pool.Exec(ctx, sql)
 		return err
-	}, repoRoot(t), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "learningengine", "infrastructure", "migration")), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "recommendation", "infrastructure", "migration"))); err != nil {
+	}, repoRoot(t), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "learningengine", "reducer", "infrastructure", "migration")), migrationFiles(t, filepath.Join(repoRoot(t), "internal", "recommendation", "infrastructure", "migration"))); err != nil {
 		t.Fatalf("apply schema sequence: %v", err)
 	}
 }
@@ -190,7 +190,7 @@ func (h *Harness) ApplySchemaForMain() error {
 			return err
 		},
 		root,
-		migrationFilesForMain(filepath.Join(root, "internal", "learningengine", "infrastructure", "migration")),
+		migrationFilesForMain(filepath.Join(root, "internal", "learningengine", "reducer", "infrastructure", "migration")),
 		migrationFilesForMain(filepath.Join(root, "internal", "recommendation", "infrastructure", "migration")),
 	)
 }
@@ -705,7 +705,7 @@ func migrationFilesForMain(dir string) []string {
 }
 
 func applySchemaSequence(ctx context.Context, execSQL func(context.Context, string) error, root string, learningMigrations []string, recommendationMigrations []string) error {
-	sequence := []string{filepath.Join(root, "internal", "learningengine", "infrastructure", "persistence", "schema", "000000_external_refs.sql")}
+	sequence := []string{filepath.Join(root, "internal", "learningengine", "reducer", "infrastructure", "persistence", "schema", "000000_external_refs.sql")}
 	sequence = append(sequence, learningMigrations...)
 	sequence = append(sequence, supplementalExternalCatalogSQL())
 	sequence = append(sequence, filepath.Join(root, "internal", "recommendation", "infrastructure", "persistence", "schema", "000000_external_refs.sql"))

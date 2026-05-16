@@ -16,8 +16,8 @@
 
 - 启动和关闭 embedded Postgres
 - 顺序执行：
-  - `internal/learningengine/infrastructure/persistence/schema/000000_external_refs.sql`
-  - `internal/learningengine/infrastructure/migration/*.up.sql`
+  - `internal/learningengine/reducer/infrastructure/persistence/schema/000000_external_refs.sql`
+  - `internal/learningengine/reducer/infrastructure/migration/*.up.sql`
   - 补齐 Recommendation 需要的外部 `catalog.videos` 字段
   - `internal/recommendation/infrastructure/persistence/schema/000000_external_refs.sql`
   - 删除 external refs 里占位的 Recommendation 物化视图

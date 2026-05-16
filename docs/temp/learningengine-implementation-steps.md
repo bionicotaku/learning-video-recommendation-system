@@ -235,7 +235,7 @@ go test ./internal/learningengine/...
 建议测试命令：
 
 ```bash
-go test ./internal/learningengine/domain/...
+go test ./internal/learningengine/reducer/domain/...
 ```
 
 ### 验收标准
@@ -258,7 +258,7 @@ go test ./internal/learningengine/domain/...
   - 新增统一 reducer，并暴露 late legacy progress-driving event 错误
   - 先写领域测试，再补实现，完成 reducer 行为收敛
 - 实际测试命令：
-  - `go test ./internal/learningengine/domain/...`
+  - `go test ./internal/learningengine/reducer/domain/...`
   - `go test ./internal/learningengine/...`
 - 测试结果：
   - 领域测试通过
@@ -360,7 +360,7 @@ go test ./internal/learningengine/...
   - 新增 usecase 单测
   - 新增最小连库验证和测试数据库 helper
 - 实际测试命令：
-  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/reducer/application/service/...`
   - `go test ./internal/learningengine/...`
 - 测试结果：
   - application/service 单测与最小连库测试通过
@@ -457,7 +457,7 @@ go test ./internal/learningengine/...
   - 新增 `RecordLearningEvents` 的 unit 测试和 real Postgres 连库测试
   - 新增事务回滚测试，验证 state 写失败时 event append 不会落库
 - 实际测试命令：
-  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/reducer/application/service/...`
   - `go test ./internal/learningengine/...`
 - 测试结果：
   - `RecordLearningEvents` 单测通过
@@ -555,7 +555,7 @@ go test ./internal/learningengine/...
   - 新增 replay 单测和 real Postgres 连库测试
   - 修复无事件状态 upsert 时 `recent_*_window` 为空切片而非 `NULL`
 - 实际测试命令：
-  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/reducer/application/service/...`
   - `go test ./internal/learningengine/...`
 - 测试结果：
   - replay 单测通过
@@ -643,8 +643,8 @@ go test ./internal/learningengine/...
   - 新增事务管理器连库测试，验证 error 时回滚
   - 扩展 application/service 的 real Postgres 用例，覆盖 target/control、record、replay
 - 实际测试命令：
-  - `go test ./internal/learningengine/infrastructure/persistence/repository ./internal/learningengine/infrastructure/persistence/tx`
-  - `go test ./internal/learningengine/application/service/...`
+  - `go test ./internal/learningengine/reducer/infrastructure/persistence/repository ./internal/learningengine/reducer/infrastructure/persistence/tx`
+  - `go test ./internal/learningengine/reducer/application/service/...`
   - `go test ./internal/learningengine/...`
 - 测试结果：
   - repository 连库测试通过

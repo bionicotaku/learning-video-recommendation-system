@@ -36,3 +36,32 @@ where i.coarse_unit_id is not null
   )
 order by i.occurred_at asc, i.event_id asc
 limit sqlc.arg(limit_count)::int;
+
+-- name: ListLearningInteractionsByIDs :many
+select
+  i.event_id,
+  i.user_id,
+  i.event_type,
+  i.source_surface,
+  i.video_id,
+  i.watch_session_id,
+  i.recommendation_run_id,
+  i.related_quiz_event_id,
+  i.coarse_unit_id,
+  i.token_text,
+  i.sentence_index,
+  i.span_index,
+  i.occurred_at,
+  i.exposure_start_ms,
+  i.exposure_end_ms,
+  i.exposure_count,
+  i.lookup_visible_ms,
+  i.lookup_sentence_audio_replay_count,
+  i.lookup_word_audio_play_count,
+  i.lookup_practice_now_clicked,
+  i.event_payload
+from analytics.learning_interaction_events i
+where i.user_id = sqlc.arg(user_id)
+  and i.event_type in ('exposure', 'lookup', 'self_mark_mastered')
+  and i.event_id = any(sqlc.arg(event_ids)::uuid[])
+order by i.occurred_at asc, i.event_id asc;

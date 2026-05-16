@@ -18,6 +18,18 @@ func StringToUUID(value string) (pgtype.UUID, error) {
 	return result, nil
 }
 
+func StringsToUUIDs(values []string) ([]pgtype.UUID, error) {
+	uuids := make([]pgtype.UUID, 0, len(values))
+	for _, value := range values {
+		uuid, err := StringToUUID(value)
+		if err != nil {
+			return nil, err
+		}
+		uuids = append(uuids, uuid)
+	}
+	return uuids, nil
+}
+
 func UUIDToString(value pgtype.UUID) string {
 	if !value.Valid {
 		return ""

@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	learningenum "learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/rule"
+	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 )
 
 func TestMapQuizEventQualityUsesFiveSecondBoundary(t *testing.T) {

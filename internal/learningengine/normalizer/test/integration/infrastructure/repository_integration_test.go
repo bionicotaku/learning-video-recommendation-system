@@ -74,6 +74,46 @@ func TestRawLearningInteractionReaderExcludesAlreadyRecordedEvents(t *testing.T)
 	}
 }
 
+func TestRawReadersByIDsFilterByUserAndSelectedIDs(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	otherUserID := "99999999-9999-9999-9999-999999999999"
+	questionID := "22222222-2222-2222-2222-222222222222"
+	quizEventID := "33333333-3333-3333-3333-333333333333"
+	otherQuizEventID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	interactionEventID := "44444444-4444-4444-4444-444444444444"
+	otherInteractionEventID := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	db.SeedUser(t, userID)
+	db.SeedUser(t, otherUserID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedQuestion(t, questionID)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	seedQuizEvent(t, db, quizEventID, userID, questionID, 101, now)
+	seedQuizEvent(t, db, otherQuizEventID, otherUserID, questionID, 101, now.Add(time.Second))
+	seedLearningInteraction(t, db, interactionEventID, userID, 101, "lookup", now)
+	seedLearningInteraction(t, db, otherInteractionEventID, otherUserID, 101, "lookup", now.Add(time.Second))
+
+	quizReader := normalizerrepo.NewRawQuizEventReader(db.Pool)
+	quizRows, err := quizReader.ListQuizEventsByIDs(context.Background(), userID, []string{quizEventID, otherQuizEventID})
+	if err != nil {
+		t.Fatalf("ListQuizEventsByIDs() error = %v", err)
+	}
+	if len(quizRows) != 1 || quizRows[0].EventID != quizEventID {
+		t.Fatalf("quiz rows = %+v, want only requested user row", quizRows)
+	}
+
+	interactionReader := normalizerrepo.NewRawLearningInteractionReader(db.Pool)
+	interactionRows, err := interactionReader.ListLearningInteractionsByIDs(context.Background(), userID, []string{interactionEventID, otherInteractionEventID})
+	if err != nil {
+		t.Fatalf("ListLearningInteractionsByIDs() error = %v", err)
+	}
+	if len(interactionRows) != 1 || interactionRows[0].EventID != interactionEventID {
+		t.Fatalf("interaction rows = %+v, want only requested user row", interactionRows)
+	}
+}
+
 func seedQuizEvent(t *testing.T, db *fixture.TestDatabase, eventID, userID, questionID string, unitID int64, completedAt time.Time) {
 	t.Helper()
 	if _, err := db.Pool.Exec(context.Background(), `

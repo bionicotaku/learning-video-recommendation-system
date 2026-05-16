@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	learningdto "learning-video-recommendation-system/internal/learningengine/application/dto"
-	learningenum "learning-video-recommendation-system/internal/learningengine/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/application/repository"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/model"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 )
 
 func TestNormalizePendingEventsDefaultsToAllAndGroupsByUser(t *testing.T) {
@@ -84,10 +84,103 @@ func TestNormalizePendingEventsFailFastOnRecorderError(t *testing.T) {
 	}
 }
 
+func TestNormalizeLearningInteractionsByIDsReadsSelectedRowsAndRecords(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventSelfMarkMastered, now.Add(time.Second)),
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !interactionReader.byIDsCalled {
+		t.Fatalf("interaction by IDs reader was not called")
+	}
+	if interactionReader.lastByIDsUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("reader user id = %q", interactionReader.lastByIDsUserID)
+	}
+	if response.ReadRawCount != 1 || response.NormalizedEventCount != 1 || response.RecordedEventCount != 1 {
+		t.Fatalf("response = %+v, want read=1 normalized=1 recorded=1", response)
+	}
+	if len(recorder.requests) != 1 {
+		t.Fatalf("recorder requests = %d, want 1", len(recorder.requests))
+	}
+	if len(recorder.requests[0].Events) != 1 {
+		t.Fatalf("recorded events = %d, want 1", len(recorder.requests[0].Events))
+	}
+}
+
+func TestNormalizeQuizAttemptByIDReadsSelectedRowAndRecords(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	quizReader := &fakeQuizReader{eventsByID: []model.RawQuizEvent{
+		validRawQuiz("11111111-1111-1111-1111-111111111111", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 101, now),
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeQuizAttemptByIDUsecase(quizReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeQuizAttemptByIDRequest{
+		UserID:      "11111111-1111-1111-1111-111111111111",
+		QuizEventID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !quizReader.byIDsCalled {
+		t.Fatalf("quiz by IDs reader was not called")
+	}
+	if quizReader.lastByIDsUserID != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("reader user id = %q", quizReader.lastByIDsUserID)
+	}
+	if response.ReadRawCount != 1 || response.NormalizedEventCount != 1 || response.RecordedEventCount != 1 {
+		t.Fatalf("response = %+v, want read=1 normalized=1 recorded=1", response)
+	}
+	if len(recorder.requests) != 1 || len(recorder.requests[0].Events) != 1 {
+		t.Fatalf("recorder requests = %+v, want one request with one event", recorder.requests)
+	}
+	if recorder.requests[0].Events[0].ProgressQuality == nil || *recorder.requests[0].Events[0].ProgressQuality != 5 {
+		t.Fatalf("quality = %v, want 5", recorder.requests[0].Events[0].ProgressQuality)
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDsSkipsUnmappedLookup(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		{EventID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", UserID: "11111111-1111-1111-1111-111111111111", EventType: learningenum.EventLookup, SourceSurface: "video_subtitle", OccurredAt: now, EventPayload: []byte(`{}`)},
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.ReadRawCount != 1 || response.SkippedCount != 1 || response.RecordedEventCount != 0 {
+		t.Fatalf("response = %+v, want read=1 skipped=1 recorded=0", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
+	}
+}
+
 type fakeQuizReader struct {
-	events     []model.RawQuizEvent
-	called     bool
-	lastFilter normalizerrepo.PendingRawEventFilter
+	events          []model.RawQuizEvent
+	eventsByID      []model.RawQuizEvent
+	called          bool
+	byIDsCalled     bool
+	lastFilter      normalizerrepo.PendingRawEventFilter
+	lastByIDsUserID string
+	lastByIDs       []string
 }
 
 func (r *fakeQuizReader) ListPendingQuizEvents(_ context.Context, filter normalizerrepo.PendingRawEventFilter) ([]model.RawQuizEvent, error) {
@@ -96,16 +189,34 @@ func (r *fakeQuizReader) ListPendingQuizEvents(_ context.Context, filter normali
 	return r.events, nil
 }
 
+func (r *fakeQuizReader) ListQuizEventsByIDs(_ context.Context, userID string, eventIDs []string) ([]model.RawQuizEvent, error) {
+	r.byIDsCalled = true
+	r.lastByIDsUserID = userID
+	r.lastByIDs = append([]string(nil), eventIDs...)
+	return r.eventsByID, nil
+}
+
 type fakeInteractionReader struct {
-	events     []model.RawLearningInteraction
-	called     bool
-	lastFilter normalizerrepo.PendingRawEventFilter
+	events          []model.RawLearningInteraction
+	eventsByID      []model.RawLearningInteraction
+	called          bool
+	byIDsCalled     bool
+	lastFilter      normalizerrepo.PendingRawEventFilter
+	lastByIDsUserID string
+	lastByIDs       []string
 }
 
 func (r *fakeInteractionReader) ListPendingLearningInteractions(_ context.Context, filter normalizerrepo.PendingRawEventFilter) ([]model.RawLearningInteraction, error) {
 	r.called = true
 	r.lastFilter = filter
 	return r.events, nil
+}
+
+func (r *fakeInteractionReader) ListLearningInteractionsByIDs(_ context.Context, userID string, eventIDs []string) ([]model.RawLearningInteraction, error) {
+	r.byIDsCalled = true
+	r.lastByIDsUserID = userID
+	r.lastByIDs = append([]string(nil), eventIDs...)
+	return r.eventsByID, nil
 }
 
 type fakeRecorder struct {

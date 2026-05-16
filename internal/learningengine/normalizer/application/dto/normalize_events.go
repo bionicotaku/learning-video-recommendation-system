@@ -22,6 +22,37 @@ type NormalizePendingEventsResponse struct {
 	NormalizedEventCount   int
 	SkippedCount           int
 	RecordedEventCount     int
+	DuplicateEventCount    int
+	ErrorCount             int
+	RecordedUserBatchCount int
+}
+
+type NormalizeLearningInteractionsByIDsRequest struct {
+	UserID                      string
+	LearningInteractionEventIDs []string
+}
+
+type NormalizeLearningInteractionsByIDsResponse struct {
+	ReadRawCount           int
+	NormalizedEventCount   int
+	SkippedCount           int
+	RecordedEventCount     int
+	DuplicateEventCount    int
+	ErrorCount             int
+	RecordedUserBatchCount int
+}
+
+type NormalizeQuizAttemptByIDRequest struct {
+	UserID      string
+	QuizEventID string
+}
+
+type NormalizeQuizAttemptByIDResponse struct {
+	ReadRawCount           int
+	NormalizedEventCount   int
+	SkippedCount           int
+	RecordedEventCount     int
+	DuplicateEventCount    int
 	ErrorCount             int
 	RecordedUserBatchCount int
 }

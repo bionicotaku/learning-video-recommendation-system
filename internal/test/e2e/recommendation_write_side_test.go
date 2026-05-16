@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	learningdto "learning-video-recommendation-system/internal/learningengine/application/dto"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	recommendationservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
 	recommendationaggregator "learning-video-recommendation-system/internal/recommendation/domain/aggregator"

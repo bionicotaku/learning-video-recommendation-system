@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	learningservice "learning-video-recommendation-system/internal/learningengine/application/service"
-	learningenum "learning-video-recommendation-system/internal/learningengine/domain/enum"
-	learningtx "learning-video-recommendation-system/internal/learningengine/infrastructure/persistence/tx"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/test/fixture"
+	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
+	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
+	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 )
 
 func TestNormalizePendingEventsQuizUpdatesLearningState(t *testing.T) {
@@ -112,11 +112,90 @@ func TestNormalizePendingEventsLookupAndExposureOnlyUpdateObservation(t *testing
 	}
 }
 
+func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	otherUserID := "99999999-9999-9999-9999-999999999999"
+	questionID := "22222222-2222-2222-2222-222222222222"
+	db.SeedUser(t, userID)
+	db.SeedUser(t, otherUserID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
+	db.SeedQuestion(t, questionID)
+
+	quizEventID := "33333333-3333-3333-3333-333333333333"
+	selfMarkEventID := "44444444-4444-4444-4444-444444444444"
+	otherUserEventID := "55555555-5555-5555-5555-555555555555"
+	occurredAt := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	seedQuizEvent(t, db, quizEventID, userID, questionID, 101, true, 5000, occurredAt)
+	seedLearningInteraction(t, db, selfMarkEventID, userID, 102, learningenum.EventSelfMarkMastered, occurredAt.Add(time.Second))
+	seedLearningInteraction(t, db, otherUserEventID, otherUserID, 102, learningenum.EventLookup, occurredAt.Add(2*time.Second))
+
+	quizUsecase := newNormalizeQuizAttemptByIDUsecase(db)
+	quizResponse, err := quizUsecase.Execute(context.Background(), dto.NormalizeQuizAttemptByIDRequest{
+		UserID:      userID,
+		QuizEventID: quizEventID,
+	})
+	if err != nil {
+		t.Fatalf("quiz Execute() error = %v", err)
+	}
+	if quizResponse.ReadRawCount != 1 || quizResponse.RecordedEventCount != 1 {
+		t.Fatalf("quiz response = %+v, want read=1 recorded=1", quizResponse)
+	}
+
+	interactionUsecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	interactionResponse, err := interactionUsecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{selfMarkEventID, otherUserEventID},
+	})
+	if err != nil {
+		t.Fatalf("interaction Execute() error = %v", err)
+	}
+	if interactionResponse.ReadRawCount != 1 || interactionResponse.RecordedEventCount != 1 {
+		t.Fatalf("interaction response = %+v, want read=1 recorded=1", interactionResponse)
+	}
+
+	quizState := readState(t, db, userID, 101)
+	if quizState.progressEventCount != 1 || quizState.lastProgressQuality == nil || *quizState.lastProgressQuality != 5 {
+		t.Fatalf("quiz state = %+v, want one quality=5 progress event", quizState)
+	}
+	selfMarkState := readState(t, db, userID, 102)
+	if selfMarkState.status != "mastered" || selfMarkState.isTarget {
+		t.Fatalf("self mark state = %+v, want terminal mastered", selfMarkState)
+	}
+
+	var otherUserStateCount int
+	if err := db.Pool.QueryRow(context.Background(), `select count(*) from learning.user_unit_states where user_id = $1`, otherUserID).Scan(&otherUserStateCount); err != nil {
+		t.Fatalf("count other user states: %v", err)
+	}
+	if otherUserStateCount != 0 {
+		t.Fatalf("other user states = %d, want 0", otherUserStateCount)
+	}
+}
+
 func newNormalizerUsecase(db *fixture.TestDatabase) *normalizerservice.NormalizePendingEventsUsecase {
 	recordUsecase := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(db.Pool))
 	return normalizerservice.NewNormalizePendingEventsUsecase(
 		normalizerrepo.NewRawQuizEventReader(db.Pool),
 		normalizerrepo.NewRawLearningInteractionReader(db.Pool),
+		recordUsecase,
+	)
+}
+
+func newNormalizeLearningInteractionsByIDsUsecase(db *fixture.TestDatabase) *normalizerservice.NormalizeLearningInteractionsByIDsUsecase {
+	recordUsecase := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(db.Pool))
+	return normalizerservice.NewNormalizeLearningInteractionsByIDsUsecase(
+		normalizerrepo.NewRawLearningInteractionReader(db.Pool),
+		recordUsecase,
+	)
+}
+
+func newNormalizeQuizAttemptByIDUsecase(db *fixture.TestDatabase) *normalizerservice.NormalizeQuizAttemptByIDUsecase {
+	recordUsecase := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(db.Pool))
+	return normalizerservice.NewNormalizeQuizAttemptByIDUsecase(
+		normalizerrepo.NewRawQuizEventReader(db.Pool),
 		recordUsecase,
 	)
 }

@@ -273,7 +273,7 @@ func applyNormalizerSchema(ctx context.Context, db execer) error {
 	}
 	sqlFiles = append(sqlFiles, analyticsMigrations...)
 
-	learningEngineMigrations, err := migrationFiles(filepath.Join(repoRoot(), "internal", "learningengine", "infrastructure", "migration"))
+	learningEngineMigrations, err := migrationFiles(filepath.Join(repoRoot(), "internal", "learningengine", "reducer", "infrastructure", "migration"))
 	if err != nil {
 		return err
 	}

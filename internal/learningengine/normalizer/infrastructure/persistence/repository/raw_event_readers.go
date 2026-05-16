@@ -41,6 +41,31 @@ func (r *RawQuizEventReader) ListPendingQuizEvents(ctx context.Context, filter a
 	return result, nil
 }
 
+func (r *RawQuizEventReader) ListQuizEventsByIDs(ctx context.Context, userID string, eventIDs []string) ([]model.RawQuizEvent, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	pgEventIDs, err := mapper.StringsToUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListQuizEventsByIDs(ctx, normalizersqlc.ListQuizEventsByIDsParams{
+		UserID:   pgUserID,
+		EventIds: pgEventIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.RawQuizEvent, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapper.ToRawQuizEventByID(row))
+	}
+	return result, nil
+}
+
 type RawLearningInteractionReader struct {
 	queries *normalizersqlc.Queries
 }
@@ -69,6 +94,31 @@ func (r *RawLearningInteractionReader) ListPendingLearningInteractions(ctx conte
 	result := make([]model.RawLearningInteraction, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, mapper.ToRawLearningInteraction(row))
+	}
+	return result, nil
+}
+
+func (r *RawLearningInteractionReader) ListLearningInteractionsByIDs(ctx context.Context, userID string, eventIDs []string) ([]model.RawLearningInteraction, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	pgEventIDs, err := mapper.StringsToUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListLearningInteractionsByIDs(ctx, normalizersqlc.ListLearningInteractionsByIDsParams{
+		UserID:   pgUserID,
+		EventIds: pgEventIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.RawLearningInteraction, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapper.ToRawLearningInteractionByID(row))
 	}
 	return result, nil
 }

@@ -11,6 +11,107 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const listLearningInteractionsByIDs = `-- name: ListLearningInteractionsByIDs :many
+select
+  i.event_id,
+  i.user_id,
+  i.event_type,
+  i.source_surface,
+  i.video_id,
+  i.watch_session_id,
+  i.recommendation_run_id,
+  i.related_quiz_event_id,
+  i.coarse_unit_id,
+  i.token_text,
+  i.sentence_index,
+  i.span_index,
+  i.occurred_at,
+  i.exposure_start_ms,
+  i.exposure_end_ms,
+  i.exposure_count,
+  i.lookup_visible_ms,
+  i.lookup_sentence_audio_replay_count,
+  i.lookup_word_audio_play_count,
+  i.lookup_practice_now_clicked,
+  i.event_payload
+from analytics.learning_interaction_events i
+where i.user_id = $1
+  and i.event_type in ('exposure', 'lookup', 'self_mark_mastered')
+  and i.event_id = any($2::uuid[])
+order by i.occurred_at asc, i.event_id asc
+`
+
+type ListLearningInteractionsByIDsParams struct {
+	UserID   pgtype.UUID   `json:"user_id"`
+	EventIds []pgtype.UUID `json:"event_ids"`
+}
+
+type ListLearningInteractionsByIDsRow struct {
+	EventID                        pgtype.UUID        `json:"event_id"`
+	UserID                         pgtype.UUID        `json:"user_id"`
+	EventType                      string             `json:"event_type"`
+	SourceSurface                  string             `json:"source_surface"`
+	VideoID                        pgtype.UUID        `json:"video_id"`
+	WatchSessionID                 pgtype.UUID        `json:"watch_session_id"`
+	RecommendationRunID            pgtype.UUID        `json:"recommendation_run_id"`
+	RelatedQuizEventID             pgtype.UUID        `json:"related_quiz_event_id"`
+	CoarseUnitID                   pgtype.Int8        `json:"coarse_unit_id"`
+	TokenText                      pgtype.Text        `json:"token_text"`
+	SentenceIndex                  pgtype.Int4        `json:"sentence_index"`
+	SpanIndex                      pgtype.Int4        `json:"span_index"`
+	OccurredAt                     pgtype.Timestamptz `json:"occurred_at"`
+	ExposureStartMs                pgtype.Int4        `json:"exposure_start_ms"`
+	ExposureEndMs                  pgtype.Int4        `json:"exposure_end_ms"`
+	ExposureCount                  pgtype.Int4        `json:"exposure_count"`
+	LookupVisibleMs                pgtype.Int4        `json:"lookup_visible_ms"`
+	LookupSentenceAudioReplayCount int32              `json:"lookup_sentence_audio_replay_count"`
+	LookupWordAudioPlayCount       int32              `json:"lookup_word_audio_play_count"`
+	LookupPracticeNowClicked       bool               `json:"lookup_practice_now_clicked"`
+	EventPayload                   []byte             `json:"event_payload"`
+}
+
+func (q *Queries) ListLearningInteractionsByIDs(ctx context.Context, arg ListLearningInteractionsByIDsParams) ([]ListLearningInteractionsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listLearningInteractionsByIDs, arg.UserID, arg.EventIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLearningInteractionsByIDsRow{}
+	for rows.Next() {
+		var i ListLearningInteractionsByIDsRow
+		if err := rows.Scan(
+			&i.EventID,
+			&i.UserID,
+			&i.EventType,
+			&i.SourceSurface,
+			&i.VideoID,
+			&i.WatchSessionID,
+			&i.RecommendationRunID,
+			&i.RelatedQuizEventID,
+			&i.CoarseUnitID,
+			&i.TokenText,
+			&i.SentenceIndex,
+			&i.SpanIndex,
+			&i.OccurredAt,
+			&i.ExposureStartMs,
+			&i.ExposureEndMs,
+			&i.ExposureCount,
+			&i.LookupVisibleMs,
+			&i.LookupSentenceAudioReplayCount,
+			&i.LookupWordAudioPlayCount,
+			&i.LookupPracticeNowClicked,
+			&i.EventPayload,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingLearningInteractions = `-- name: ListPendingLearningInteractions :many
 select
   i.event_id,

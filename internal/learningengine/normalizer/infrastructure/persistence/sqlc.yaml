@@ -6,7 +6,7 @@ sql:
     schema:
       - "schema/*.sql"
       - "../../../../analytics/infrastructure/migration/*.up.sql"
-      - "../../../infrastructure/migration/*.up.sql"
+      - "../../../reducer/infrastructure/migration/*.up.sql"
     gen:
       go:
         package: "normalizersqlc"

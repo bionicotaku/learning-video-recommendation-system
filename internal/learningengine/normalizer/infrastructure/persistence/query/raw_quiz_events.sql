@@ -26,3 +26,23 @@ where (sqlc.narg(user_id)::uuid is null or q.user_id = sqlc.narg(user_id)::uuid)
   )
 order by q.completed_at asc, q.event_id asc
 limit sqlc.arg(limit_count)::int;
+
+-- name: ListQuizEventsByIDs :many
+select
+  q.event_id,
+  q.user_id,
+  q.question_id,
+  q.coarse_unit_id,
+  q.video_id,
+  q.recommendation_run_id,
+  q.trigger_type,
+  q.selected_option_ids,
+  q.selection_interval_ms,
+  q.is_first_try_correct,
+  q.total_elapsed_ms,
+  q.shown_at,
+  q.completed_at
+from analytics.quiz_events q
+where q.user_id = sqlc.arg(user_id)
+  and q.event_id = any(sqlc.arg(event_ids)::uuid[])
+order by q.completed_at asc, q.event_id asc;

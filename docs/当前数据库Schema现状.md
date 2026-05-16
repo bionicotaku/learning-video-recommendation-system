@@ -101,7 +101,8 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 
 ## 4.1 Learning Engine Migration 状态
 
-仓库内 Learning Engine migration 当前已清理为 4 个 clean baseline migration：
+仓库内 Learning Engine migration 当前已清理为 4 个 clean baseline migration，代码路径为
+`internal/learningengine/reducer/infrastructure/migration`：
 
 - `000001_create_learning_schema`
 - `000002_create_user_unit_states`

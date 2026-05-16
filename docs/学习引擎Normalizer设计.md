@@ -2,9 +2,9 @@
 
 ## 0. 文档信息
 
-文档状态：MVP 设计草案  
-目标读者：后端、数据、前端、后续接手维护的人  
-当前范围：定义 Learning Engine normalizer 的模块边界、输入输出、映射规则、质量分语义和 MVP 实现结构。  
+文档状态：MVP 当前实现说明
+目标读者：后端、数据、前端、后续接手维护的人
+当前范围：定义 Learning Engine normalizer 的模块边界、输入输出、映射规则、质量分语义、split by-ID API 主路径和 repair/backfill 路径。
 当前明确不做：不新增 checkpoint 表，不新增跨视频 exposure rollup 表，不让弱互动直接推进 progress。
 
 本文承接：
@@ -16,14 +16,42 @@
 
 ## 1. 一句话结论
 
-Normalizer 是 Learning Engine 的 raw fact 解释子模块。
+Normalizer 是 Learning Engine 的 raw fact 解释子模块，和 reducer 是 `internal/learningengine` 下的两个平级子模块。
 
-它 read-only 读取 `analytics.*` 原始互动事实，把可解释、可绑定 `coarse_unit_id` 的事实转换成 Learning Engine normalized event，然后调用现有 `RecordLearningEvents` 链路写入：
+它 read-only 读取 `analytics.*` 原始互动事实，把可解释、可绑定 `coarse_unit_id` 的事实转换成 Learning Engine normalized event，然后调用 reducer 的 `RecordLearningEvents` 链路写入。
+
+未来 API 的请求内主路径是按 raw source 拆开的 by-ID 用例：
+
+```text
+POST /api/learning-interactions:batch
+        ↓
+analytics learning interaction raw fact batch write
+        ↓
+NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
+        ↓
+reducer.RecordLearningEvents
+
+POST /api/quiz-attempts
+        ↓
+analytics quiz raw fact write
+        ↓
+NormalizeQuizAttemptByID(user_id, quiz_event_id)
+        ↓
+reducer.RecordLearningEvents
+        ↓
+learning.unit_learning_events
+        ↓
+reducer
+        ↓
+learning.user_unit_states
+```
+
+后台补偿路径是 pending scan：
 
 ```text
 analytics raw fact
         ↓
-internal/learningengine/normalizer
+NormalizePendingEvents
         ↓
 RecordLearningEvents
         ↓
@@ -34,7 +62,7 @@ reducer
 learning.user_unit_states
 ```
 
-Normalizer 不直接写 `learning.unit_learning_events`，不直接更新 `learning.user_unit_states`，不绕过 reducer。
+Normalizer 不直接写 `learning.unit_learning_events`，不直接更新 `learning.user_unit_states`，不绕过 reducer。`NormalizePendingEvents` 只作为 repair/backfill，不是未来 API 的主入口。
 
 ## 2. Owner 与模块边界
 
@@ -59,11 +87,11 @@ Normalizer 的职责是解释这些事实对学习状态意味着什么：
 - 如果推进，`progress_quality` 是多少；
 - 如果是 self mark，是否直接 `set_mastered`。
 
-这些解释规则属于 Learning Engine 的学习语义，因此 normalizer 放在 `internal/learningengine/normalizer`，而不是放在 `internal/analytics`。
+这些解释规则属于 Learning Engine 的学习语义，因此 normalizer 放在 `internal/learningengine/normalizer`，和 `internal/learningengine/reducer` 平级，而不是放在 `internal/analytics`。
 
 ### 2.2 和 Learning Engine reducer 的关系
 
-Normalizer 不是 reducer 的一部分。
+Normalizer 不是 reducer 的一部分。二者的依赖方向固定为 normalizer 调用 reducer 的公开 application usecase；reducer 禁止 import normalizer 或 analytics。
 
 Reducer 只消费已经归一化的 event：
 
@@ -121,7 +149,7 @@ Recommendation 返回给前端的 `learning_units` 会影响前端产生哪些 e
 4. 让 quiz 成为 MVP 主要 progress 信号。
 5. 让 lookup / exposure 保守地只更新 observation。
 6. 让 self mark 使用 `set_mastered`，不伪装成 quality 5。
-7. MVP 不引入 checkpoint 表，先依赖 source 幂等约束和可重扫查询。
+7. MVP 不引入 checkpoint 表，API 主路径使用 raw IDs，repair/backfill 依赖 source 幂等约束和可重扫查询。
 
 ## 4. 非目标
 
@@ -537,7 +565,31 @@ learning interaction:
 
 同一 raw fact 重试不会产生重复 normalized event。
 
-### 13.2 如何查询 pending raw facts
+`RecordLearningEvents` 已按这个约束做幂等 append：
+
+- 插入成功的 event 才进入 reducer；
+- duplicate event 计入 `duplicate_count`；
+- duplicate 不重复推进 progress，不重复更新 schedule，也不重复更新 observation。
+
+### 13.2 API 主路径如何读取 raw facts
+
+未来 API 写入 raw fact 后，会直接把本次 raw IDs 交给 normalizer：
+
+```text
+NormalizeLearningInteractionsByIDs
+  user_id
+  learning_interaction_event_ids
+
+NormalizeQuizAttemptByID
+  user_id
+  quiz_event_id
+```
+
+by-ID reader 必须同时按 `user_id` 和 `event_id` 过滤。即使调用方传入了其他用户的 raw `event_id`，也不能被读取或归约。
+
+这条路径不 anti-join pending，因为 API handler 已经知道本次 raw IDs；幂等交给 `RecordLearningEvents` 的 normalized ledger 唯一约束处理。
+
+### 13.3 repair/backfill 如何查询 pending raw facts
 
 由于没有 checkpoint，pending 查询应优先使用 anti-join：
 
@@ -575,7 +627,7 @@ order by i.occurred_at asc, i.event_id asc
 limit $1;
 ```
 
-### 13.3 skipped raw facts 怎么处理
+### 13.4 skipped raw facts 怎么处理
 
 没有 checkpoint 时，skipped fact 分两类：
 
@@ -589,23 +641,96 @@ MVP 查询应尽量在 SQL 层排除这些事实，避免每轮重复读：
 
 如果未来出现“有 coarse_unit_id 但策略上 skipped”的大量事实，再补 checkpoint 或 skip ledger。
 
-### 13.4 失败重试
+### 13.5 失败重试
 
 如果调用 `RecordLearningEvents` 失败：
 
 - 不写 checkpoint；
 - 不标记 raw fact；
-- 下次 normalizer 扫描仍会读到它；
+- 请求内 by-IDs 路径可重试同一批 IDs；
+- repair/backfill 的 pending scan 仍会读到未进入 `learning.unit_learning_events` 的 raw fact；
 - 幂等约束保证已成功写入的 event 不重复。
 
 这意味着 MVP 的失败语义是 at-least-once normalize attempt + idempotent write。
 
 ## 14. 应用层用例
 
-推荐 usecase：
+### 14.1 API 主路径：`NormalizeLearningInteractionsByIDs`
+
+未来 `POST /api/learning-interactions:batch` 写 raw 成功后同步调用：
 
 ```text
-NormalizePendingLearningEvents
+NormalizeLearningInteractionsByIDs
+```
+
+输入 DTO：
+
+```text
+user_id required
+learning_interaction_event_ids required non-empty
+```
+
+要求：
+
+- `user_id` 必填；
+- `learning_interaction_event_ids` 必须非空；
+- reader 只返回该用户自己的 raw rows；
+- unmapped lookup 可以被读取，但 mapper 会 skipped，不进入 Learning Engine；
+- recorder 失败时 fail-fast，返回已累计 response 和 `error_count = 1`。
+
+输出 DTO：
+
+```text
+read_raw_count
+normalized_event_count
+skipped_count
+recorded_event_count
+duplicate_event_count
+error_count
+recorded_user_batch_count
+```
+
+### 14.2 API 主路径：`NormalizeQuizAttemptByID`
+
+未来 `POST /api/quiz-attempts` 写 raw 成功后同步调用：
+
+```text
+NormalizeQuizAttemptByID
+```
+
+输入 DTO：
+
+```text
+user_id required
+quiz_event_id required
+```
+
+要求：
+
+- `user_id` 必填；
+- `quiz_event_id` 必填；
+- reader 只返回该用户自己的 raw row；
+- quiz raw fact validation 失败时 skipped，不进入 Learning Engine；
+- recorder 失败时 fail-fast，返回已累计 response 和 `error_count = 1`。
+
+输出 DTO：
+
+```text
+read_raw_count
+normalized_event_count
+skipped_count
+recorded_event_count
+duplicate_event_count
+error_count
+recorded_user_batch_count
+```
+
+### 14.2 repair/backfill：`NormalizePendingEvents`
+
+补偿 usecase：
+
+```text
+NormalizePendingEvents
 ```
 
 输入 DTO：
@@ -624,21 +749,21 @@ read_raw_count
 normalized_event_count
 skipped_count
 recorded_event_count
+duplicate_event_count
 error_count
+recorded_user_batch_count
 ```
 
 MVP 可以先按批次处理：
 
 ```text
 1. 读取 pending quiz raw facts。
-2. 调用 QuizMapper 生成 normalized events。
-3. 按 user_id 分组，调用 RecordLearningEvents。
-4. 读取 pending learning interaction raw facts。
-5. 调用 LearningInteractionMapper 生成 normalized events。
-6. 按 user_id 分组，调用 RecordLearningEvents。
+2. 读取 pending learning interaction raw facts。
+3. 调用 mapper 生成 normalized events 或 skipped。
+4. 按 user_id 分组，调用 RecordLearningEvents。
 ```
 
-如果同一批里同一个用户同一个 unit 同时有 exposure、lookup、quiz，`RecordLearningEvents` 会按 `coarse_unit_id` 分组并按 `occurred_at` 排序。
+如果同一批里同一个用户同一个 unit 同时有 exposure、lookup、quiz，`RecordLearningEvents` 会按 `coarse_unit_id` 分组并按 `occurred_at` 排序。已经存在的 duplicate normalized event 不再进入 reducer。
 
 ## 15. 领域规则结构
 
@@ -764,9 +889,13 @@ normalizer/application/repository/normalization_checkpoint_repository.go
 
 ```text
 ListPendingQuizEvents(ctx, filter) ([]RawQuizEvent, error)
+ListQuizEventsByIDs(ctx, user_id, event_ids) ([]RawQuizEvent, error)
 ```
 
-只读 `analytics.quiz_events`，并 anti-join `learning.unit_learning_events` 排除已 normalized 的 raw fact。
+只读 `analytics.quiz_events`。
+
+- pending 方法 anti-join `learning.unit_learning_events` 排除已 normalized 的 raw fact；
+- by-IDs 方法按 `user_id + event_ids` 精确读取本批 raw fact。
 
 ### 17.2 `RawLearningInteractionReader`
 
@@ -774,9 +903,14 @@ ListPendingQuizEvents(ctx, filter) ([]RawQuizEvent, error)
 
 ```text
 ListPendingLearningInteractions(ctx, filter) ([]RawLearningInteraction, error)
+ListLearningInteractionsByIDs(ctx, user_id, event_ids) ([]RawLearningInteraction, error)
 ```
 
-只读 `analytics.learning_interaction_events`，并 anti-join `learning.unit_learning_events` 排除已 normalized 的 raw fact。
+只读 `analytics.learning_interaction_events`。
+
+- pending 方法 anti-join `learning.unit_learning_events` 排除已 normalized 的 raw fact；
+- by-IDs 方法按 `user_id + event_ids` 精确读取本批 raw fact；
+- by-IDs 方法可读取 `coarse_unit_id is null` 的 lookup，然后由 mapper skipped。
 
 ### 17.3 `LearningEventRecorder`
 

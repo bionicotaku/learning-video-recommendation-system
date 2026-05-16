@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	learningdto "learning-video-recommendation-system/internal/learningengine/application/dto"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	"learning-video-recommendation-system/internal/test/e2e/testutil"
 )
 

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"time"
 
-	learningdto "learning-video-recommendation-system/internal/learningengine/application/dto"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	recommendationdto "learning-video-recommendation-system/internal/recommendation/application/dto"
 	"learning-video-recommendation-system/internal/test/e2e/testutil"
 )

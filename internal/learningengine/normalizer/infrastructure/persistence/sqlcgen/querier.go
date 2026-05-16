@@ -9,8 +9,10 @@ import (
 )
 
 type Querier interface {
+	ListLearningInteractionsByIDs(ctx context.Context, arg ListLearningInteractionsByIDsParams) ([]ListLearningInteractionsByIDsRow, error)
 	ListPendingLearningInteractions(ctx context.Context, arg ListPendingLearningInteractionsParams) ([]ListPendingLearningInteractionsRow, error)
 	ListPendingQuizEvents(ctx context.Context, arg ListPendingQuizEventsParams) ([]ListPendingQuizEventsRow, error)
+	ListQuizEventsByIDs(ctx context.Context, arg ListQuizEventsByIDsParams) ([]ListQuizEventsByIDsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

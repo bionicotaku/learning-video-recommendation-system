@@ -96,3 +96,79 @@ func (q *Queries) ListPendingQuizEvents(ctx context.Context, arg ListPendingQuiz
 	}
 	return items, nil
 }
+
+const listQuizEventsByIDs = `-- name: ListQuizEventsByIDs :many
+select
+  q.event_id,
+  q.user_id,
+  q.question_id,
+  q.coarse_unit_id,
+  q.video_id,
+  q.recommendation_run_id,
+  q.trigger_type,
+  q.selected_option_ids,
+  q.selection_interval_ms,
+  q.is_first_try_correct,
+  q.total_elapsed_ms,
+  q.shown_at,
+  q.completed_at
+from analytics.quiz_events q
+where q.user_id = $1
+  and q.event_id = any($2::uuid[])
+order by q.completed_at asc, q.event_id asc
+`
+
+type ListQuizEventsByIDsParams struct {
+	UserID   pgtype.UUID   `json:"user_id"`
+	EventIds []pgtype.UUID `json:"event_ids"`
+}
+
+type ListQuizEventsByIDsRow struct {
+	EventID             pgtype.UUID        `json:"event_id"`
+	UserID              pgtype.UUID        `json:"user_id"`
+	QuestionID          pgtype.UUID        `json:"question_id"`
+	CoarseUnitID        int64              `json:"coarse_unit_id"`
+	VideoID             pgtype.UUID        `json:"video_id"`
+	RecommendationRunID pgtype.UUID        `json:"recommendation_run_id"`
+	TriggerType         string             `json:"trigger_type"`
+	SelectedOptionIds   []string           `json:"selected_option_ids"`
+	SelectionIntervalMs []int32            `json:"selection_interval_ms"`
+	IsFirstTryCorrect   bool               `json:"is_first_try_correct"`
+	TotalElapsedMs      int32              `json:"total_elapsed_ms"`
+	ShownAt             pgtype.Timestamptz `json:"shown_at"`
+	CompletedAt         pgtype.Timestamptz `json:"completed_at"`
+}
+
+func (q *Queries) ListQuizEventsByIDs(ctx context.Context, arg ListQuizEventsByIDsParams) ([]ListQuizEventsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listQuizEventsByIDs, arg.UserID, arg.EventIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListQuizEventsByIDsRow{}
+	for rows.Next() {
+		var i ListQuizEventsByIDsRow
+		if err := rows.Scan(
+			&i.EventID,
+			&i.UserID,
+			&i.QuestionID,
+			&i.CoarseUnitID,
+			&i.VideoID,
+			&i.RecommendationRunID,
+			&i.TriggerType,
+			&i.SelectedOptionIds,
+			&i.SelectionIntervalMs,
+			&i.IsFirstTryCorrect,
+			&i.TotalElapsedMs,
+			&i.ShownAt,
+			&i.CompletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
