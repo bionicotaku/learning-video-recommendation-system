@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"testing"
 	"time"
 
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
@@ -156,33 +157,31 @@ func mustRecommendN(t interface {
 	return response
 }
 
-func assertSelectorMode(t interface {
-	Helper()
-	Fatalf(string, ...any)
-}, response recommendationdto.GenerateVideoRecommendationsResponse, want string) {
+func assertSelectorMode(t *testing.T, h *testutil.Harness, response recommendationdto.GenerateVideoRecommendationsResponse, want string) {
 	t.Helper()
-	if response.SelectorMode != want {
-		t.Fatalf("selector_mode = %q, want %q", response.SelectorMode, want)
+	run := h.LoadRecommendationRun(t, response.RunID)
+	if run.SelectorMode != want {
+		t.Fatalf("selector_mode = %q, want %q", run.SelectorMode, want)
 	}
 }
 
 func assertContainsVideo(t interface {
 	Helper()
 	Fatalf(string, ...any)
-}, videos []recommendationdto.RecommendationVideo, videoID string) {
+}, items []recommendationdto.RecommendationPlanItem, videoID string) {
 	t.Helper()
-	if videoIndex(videos, videoID) == -1 {
-		t.Fatalf("expected video %s in result set, got %v", videoID, videoIDs(videos))
+	if videoIndex(items, videoID) == -1 {
+		t.Fatalf("expected video %s in result set, got %v", videoID, videoIDs(items))
 	}
 }
 
 func assertNotContainsVideo(t interface {
 	Helper()
 	Fatalf(string, ...any)
-}, videos []recommendationdto.RecommendationVideo, videoID string) {
+}, items []recommendationdto.RecommendationPlanItem, videoID string) {
 	t.Helper()
-	if videoIndex(videos, videoID) != -1 {
-		t.Fatalf("expected video %s to be excluded, got %v", videoID, videoIDs(videos))
+	if videoIndex(items, videoID) != -1 {
+		t.Fatalf("expected video %s to be excluded, got %v", videoID, videoIDs(items))
 	}
 }
 
@@ -205,14 +204,14 @@ func assertLearningUnits(t interface {
 func assertAnyVideoHasLearningUnit(t interface {
 	Helper()
 	Fatalf(string, ...any)
-}, videos []recommendationdto.RecommendationVideo, unitID int64, role string) {
+}, items []recommendationdto.RecommendationPlanItem, unitID int64, role string) {
 	t.Helper()
-	for _, video := range videos {
+	for _, video := range items {
 		if containsUnit(learningUnitIDsByRole(video.LearningUnits, role), unitID) {
 			return
 		}
 	}
-	t.Fatalf("expected some video to include learning unit %d role=%s, got %+v", unitID, role, videos)
+	t.Fatalf("expected some video to include learning unit %d role=%s, got %+v", unitID, role, items)
 }
 
 func assertContiguousRanks(t interface {
@@ -278,16 +277,16 @@ func learningUnitIDsByRole(units []recommendationdto.ExpectedLearningUnit, role 
 	return result
 }
 
-func videoIDs(videos []recommendationdto.RecommendationVideo) []string {
-	result := make([]string, 0, len(videos))
-	for _, video := range videos {
+func videoIDs(items []recommendationdto.RecommendationPlanItem) []string {
+	result := make([]string, 0, len(items))
+	for _, video := range items {
 		result = append(result, video.VideoID)
 	}
 	return result
 }
 
-func videoIndex(videos []recommendationdto.RecommendationVideo, videoID string) int {
-	for i, video := range videos {
+func videoIndex(items []recommendationdto.RecommendationPlanItem, videoID string) int {
+	for i, video := range items {
 		if video.VideoID == videoID {
 			return i
 		}

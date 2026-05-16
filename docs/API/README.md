@@ -18,6 +18,8 @@
 - [学习事件上报API设计.md](学习事件上报API设计.md)：learning interactions batch 与 quiz attempt 单点上报。
 - [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md)：用户学习单元进度分页读取。
 - [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md)：视频观看进度上报。
+- [Feed-API-MVP设计.md](Feed-API-MVP设计.md)：feed 页面获取推荐视频列表的前端展示契约。
+- [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
@@ -29,6 +31,8 @@
 | [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`；HTTP success 只承诺 raw accepted。 |
 | [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md) | 已写入 | 未开始 | 只定义未来读取用户学习单元进度的分页契约；当前没有 HTTP handler。 |
 | [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 未开始 | 只定义未来观看进度上报与聚合边界；当前没有 HTTP handler。 |
+| [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 未开始 | 设计 API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段；当前没有 HTTP handler。 |
+| [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 未开始 | 设计视频末尾 quiz 批量取题接口；当前没有 HTTP handler 或 Catalog read usecase。 |
 
 ## 未开始范围
 
@@ -36,6 +40,8 @@
 
 - Learning Engine Unit Progress API handler。
 - Catalog watch-progress API handler。
+- Feed API handler 与 facade service。
+- End Quiz 批量取题 API handler 与 Catalog read usecase。
 - 生产级 auth verifier；当前模型仍是 trusted upstream principal。
 - 完整 OpenAPI / 客户端 SDK 生成。
 

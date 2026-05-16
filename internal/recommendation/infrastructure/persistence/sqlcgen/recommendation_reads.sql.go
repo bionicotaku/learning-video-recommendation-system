@@ -65,57 +65,53 @@ select
   coarse_unit_id,
   mention_count,
   sentence_count,
-  first_start_ms,
-  last_end_ms,
   coverage_ms,
   coverage_ratio,
   sentence_indexes,
   best_evidence_sentence_index,
   best_evidence_span_index,
-  best_evidence_source,
-  best_evidence_model,
-  best_evidence_version,
-  best_evidence_metadata,
   duration_ms,
-  mapped_span_ratio,
-  status,
-  visibility_status,
-  publish_at
+  mapped_span_ratio
 from recommendation.v_recommendable_video_units
 where coarse_unit_id = any($1::bigint[])
 order by coarse_unit_id asc, coverage_ratio desc, mention_count desc
 `
 
-func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVRecommendableVideoUnit, error) {
+type ListRecommendableVideoUnitsByUnitIDsRow struct {
+	VideoID                   pgtype.UUID    `json:"video_id"`
+	CoarseUnitID              pgtype.Int8    `json:"coarse_unit_id"`
+	MentionCount              pgtype.Int4    `json:"mention_count"`
+	SentenceCount             pgtype.Int4    `json:"sentence_count"`
+	CoverageMs                pgtype.Int4    `json:"coverage_ms"`
+	CoverageRatio             pgtype.Numeric `json:"coverage_ratio"`
+	SentenceIndexes           []int32        `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex pgtype.Int4    `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex     pgtype.Int4    `json:"best_evidence_span_index"`
+	DurationMs                pgtype.Int4    `json:"duration_ms"`
+	MappedSpanRatio           pgtype.Numeric `json:"mapped_span_ratio"`
+}
+
+func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]ListRecommendableVideoUnitsByUnitIDsRow, error) {
 	rows, err := q.db.Query(ctx, listRecommendableVideoUnitsByUnitIDs, coarseUnitIds)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []RecommendationVRecommendableVideoUnit{}
+	items := []ListRecommendableVideoUnitsByUnitIDsRow{}
 	for rows.Next() {
-		var i RecommendationVRecommendableVideoUnit
+		var i ListRecommendableVideoUnitsByUnitIDsRow
 		if err := rows.Scan(
 			&i.VideoID,
 			&i.CoarseUnitID,
 			&i.MentionCount,
 			&i.SentenceCount,
-			&i.FirstStartMs,
-			&i.LastEndMs,
 			&i.CoverageMs,
 			&i.CoverageRatio,
 			&i.SentenceIndexes,
 			&i.BestEvidenceSentenceIndex,
 			&i.BestEvidenceSpanIndex,
-			&i.BestEvidenceSource,
-			&i.BestEvidenceModel,
-			&i.BestEvidenceVersion,
-			&i.BestEvidenceMetadata,
 			&i.DurationMs,
 			&i.MappedSpanRatio,
-			&i.Status,
-			&i.VisibilityStatus,
-			&i.PublishAt,
 		); err != nil {
 			return nil, err
 		}

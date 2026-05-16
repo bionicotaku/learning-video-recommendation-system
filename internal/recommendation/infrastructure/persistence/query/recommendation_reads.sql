@@ -21,22 +21,13 @@ select
   coarse_unit_id,
   mention_count,
   sentence_count,
-  first_start_ms,
-  last_end_ms,
   coverage_ms,
   coverage_ratio,
   sentence_indexes,
   best_evidence_sentence_index,
   best_evidence_span_index,
-  best_evidence_source,
-  best_evidence_model,
-  best_evidence_version,
-  best_evidence_metadata,
   duration_ms,
-  mapped_span_ratio,
-  status,
-  visibility_status,
-  publish_at
+  mapped_span_ratio
 from recommendation.v_recommendable_video_units
 where coarse_unit_id = any(sqlc.arg(coarse_unit_ids)::bigint[])
 order by coarse_unit_id asc, coverage_ratio desc, mention_count desc;

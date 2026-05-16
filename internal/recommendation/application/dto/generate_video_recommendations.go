@@ -22,18 +22,13 @@ type ExpectedLearningUnit struct {
 	Evidence     *LearningUnitEvidence `json:"evidence,omitempty"`
 }
 
-type RecommendationVideo struct {
+type RecommendationPlanItem struct {
 	VideoID       string                 `json:"video_id"`
-	Rank          int                    `json:"rank"`
-	Score         float64                `json:"score"`
-	ReasonCodes   []string               `json:"reason_codes"`
+	DurationMs    int32                  `json:"duration_ms"`
 	LearningUnits []ExpectedLearningUnit `json:"learning_units"`
-	Explanation   string                 `json:"explanation"`
 }
 
 type GenerateVideoRecommendationsResponse struct {
-	RunID        string                `json:"run_id"`
-	SelectorMode string                `json:"selector_mode"`
-	Underfilled  bool                  `json:"underfilled"`
-	Videos       []RecommendationVideo `json:"videos"`
+	RunID string                   `json:"run_id"`
+	Items []RecommendationPlanItem `json:"items"`
 }

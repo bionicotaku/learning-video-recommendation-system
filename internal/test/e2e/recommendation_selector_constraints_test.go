@@ -32,12 +32,12 @@ func TestE2E_RecommendationSelectorMarksExtremeSparseWhenDemandUnderfills(t *tes
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 3)
-	assertSelectorMode(t, response, "extreme_sparse")
-	if !response.Underfilled {
+	assertSelectorMode(t, h, response, "extreme_sparse")
+	if !h.LoadRecommendationRun(t, response.RunID).Underfilled {
 		t.Fatalf("underfilled = false, want true")
 	}
-	if len(response.Videos) != 1 {
-		t.Fatalf("len(videos) = %d, want 1", len(response.Videos))
+	if len(response.Items) != 1 {
+		t.Fatalf("len(items) = %d, want 1", len(response.Items))
 	}
 }
 
@@ -172,7 +172,7 @@ func TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply(t *testing.T
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 4)
-	assertSelectorMode(t, response, "low_supply")
+	assertSelectorMode(t, h, response, "low_supply")
 	items := h.LoadRecommendationItems(t, response.RunID)
 	if got := countFutureLike(items); got > 2 {
 		t.Fatalf("future-like dominant selections = %d, want <= 2", got)

@@ -78,7 +78,7 @@ func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (mode
 	}, nil
 }
 
-func ToRecommendableVideoUnit(row recommendationsqlc.RecommendationVRecommendableVideoUnit) (model.RecommendableVideoUnit, error) {
+func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnitsByUnitIDsRow) (model.RecommendableVideoUnit, error) {
 	coarseUnitID := int64(0)
 	if row.CoarseUnitID.Valid {
 		coarseUnitID = row.CoarseUnitID.Int64
@@ -90,14 +90,6 @@ func ToRecommendableVideoUnit(row recommendationsqlc.RecommendationVRecommendabl
 	sentenceCount := int32(0)
 	if row.SentenceCount.Valid {
 		sentenceCount = row.SentenceCount.Int32
-	}
-	firstStartMs := int32(0)
-	if row.FirstStartMs.Valid {
-		firstStartMs = row.FirstStartMs.Int32
-	}
-	lastEndMs := int32(0)
-	if row.LastEndMs.Valid {
-		lastEndMs = row.LastEndMs.Int32
 	}
 	coverageMs := int32(0)
 	if row.CoverageMs.Valid {
@@ -121,8 +113,6 @@ func ToRecommendableVideoUnit(row recommendationsqlc.RecommendationVRecommendabl
 		CoarseUnitID:    coarseUnitID,
 		MentionCount:    mentionCount,
 		SentenceCount:   sentenceCount,
-		FirstStartMs:    firstStartMs,
-		LastEndMs:       lastEndMs,
 		CoverageMs:      coverageMs,
 		CoverageRatio:   coverageRatio,
 		SentenceIndexes: row.SentenceIndexes,
@@ -130,11 +120,8 @@ func ToRecommendableVideoUnit(row recommendationsqlc.RecommendationVRecommendabl
 			SentenceIndex: Int32FromPG(row.BestEvidenceSentenceIndex),
 			SpanIndex:     Int32FromPG(row.BestEvidenceSpanIndex),
 		},
-		DurationMs:       durationMs,
-		MappedSpanRatio:  mappedSpanRatio,
-		Status:           TextToString(row.Status),
-		VisibilityStatus: TextToString(row.VisibilityStatus),
-		PublishAt:        TimePointerFromPG(row.PublishAt),
+		DurationMs:      durationMs,
+		MappedSpanRatio: mappedSpanRatio,
 	}, nil
 }
 

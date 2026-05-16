@@ -13,7 +13,7 @@ import (
 	"learning-video-recommendation-system/internal/recommendation/domain/policy"
 )
 
-func TestDefaultExplanationBuilderGeneratesReasonCodesAndNarrative(t *testing.T) {
+func TestDefaultExplanationBuilderGeneratesReasonCodesAndPlanFields(t *testing.T) {
 	builder := recommendationexplain.NewDefaultExplanationBuilder()
 	start := int32(1240)
 	end := int32(1820)
@@ -21,6 +21,7 @@ func TestDefaultExplanationBuilderGeneratesReasonCodesAndNarrative(t *testing.T)
 	items, err := builder.Build(model.RecommendationContext{}, []model.VideoCandidate{
 		{
 			VideoID:             "video-1",
+			DurationMs:          90_000,
 			BaseScore:           0.91,
 			LaneSources:         []string{string(policy.LaneBundle)},
 			DominantRole:        model.LearningRoleHardReview,
@@ -44,8 +45,8 @@ func TestDefaultExplanationBuilderGeneratesReasonCodesAndNarrative(t *testing.T)
 	if !contains(items[0].ReasonCodes, string(policy.ReasonCodeBundleCoverageHigh)) {
 		t.Fatalf("expected bundle_coverage_high reason code, got %#v", items[0].ReasonCodes)
 	}
-	if items[0].Explanation == "" {
-		t.Fatal("expected non-empty explanation")
+	if items[0].DurationMs != 90_000 {
+		t.Fatalf("duration_ms = %d, want 90000", items[0].DurationMs)
 	}
 }
 
@@ -59,6 +60,7 @@ func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
 	items, err := builder.Build(model.RecommendationContext{}, []model.VideoCandidate{
 		{
 			VideoID:             "video-hard",
+			DurationMs:          92_000,
 			BaseScore:           0.93,
 			LaneSources:         []string{string(policy.LaneExactCore), string(policy.LaneBundle)},
 			DominantRole:        model.LearningRoleHardReview,
@@ -69,6 +71,7 @@ func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
 		},
 		{
 			VideoID:             "video-future",
+			DurationMs:          76_000,
 			BaseScore:           0.74,
 			LaneSources:         []string{string(policy.LaneSoftFuture)},
 			DominantRole:        model.LearningRoleNearFuture,

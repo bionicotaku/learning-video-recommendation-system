@@ -43,20 +43,22 @@ func TestE2E_EnsureTargetWithoutEventsFeedsRecommendation(t *testing.T) {
 	}
 
 	response := testutil.MustRecommend(t, recommendation, userID, 1)
-	if response.SelectorMode != "normal" {
-		t.Fatalf("selector_mode = %q, want normal", response.SelectorMode)
+	run := h.LoadRecommendationRun(t, response.RunID)
+	if run.SelectorMode != "normal" {
+		t.Fatalf("selector_mode = %q, want normal", run.SelectorMode)
 	}
-	if response.Underfilled {
+	if run.Underfilled {
 		t.Fatalf("underfilled = true, want false")
 	}
-	if len(response.Videos) != 1 || response.Videos[0].VideoID != videoID {
-		t.Fatalf("unexpected videos: %#v", videoIDs(response.Videos))
+	if len(response.Items) != 1 || response.Items[0].VideoID != videoID {
+		t.Fatalf("unexpected items: %#v", videoIDs(response.Items))
 	}
-	if !containsReason(response.Videos[0].ReasonCodes, "new_unit_introduced") {
-		t.Fatalf("reason codes = %#v, want new_unit_introduced", response.Videos[0].ReasonCodes)
+	auditItems := h.LoadRecommendationItems(t, response.RunID)
+	if len(auditItems) != 1 || !containsReason(auditItems[0].ReasonCodes, "new_unit_introduced") {
+		t.Fatalf("audit reason codes = %#v, want new_unit_introduced", auditItems)
 	}
-	if !containsUnit(learningUnitIDsByRole(response.Videos[0].LearningUnits, "new_now"), unitID) {
-		t.Fatalf("learning_units = %#v, want new_now unit %d", response.Videos[0].LearningUnits, unitID)
+	if !containsUnit(learningUnitIDsByRole(response.Items[0].LearningUnits, "new_now"), unitID) {
+		t.Fatalf("learning_units = %#v, want new_now unit %d", response.Items[0].LearningUnits, unitID)
 	}
 }
 
@@ -91,8 +93,8 @@ func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 	}
 
 	suspended := testutil.MustRecommend(t, recommendation, userID, 2)
-	if videoIndex(suspended.Videos, videoB) != -1 {
-		t.Fatalf("suspended video %s should be excluded, got %v", videoB, videoIDs(suspended.Videos))
+	if videoIndex(suspended.Items, videoB) != -1 {
+		t.Fatalf("suspended video %s should be excluded, got %v", videoB, videoIDs(suspended.Items))
 	}
 
 	if _, err := learning.ResumeTargetUnit.Execute(context.Background(), learningdto.ResumeTargetUnitRequest{
@@ -103,8 +105,8 @@ func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 	}
 
 	resumed := testutil.MustRecommend(t, recommendation, userID, 2)
-	if videoIndex(resumed.Videos, videoB) == -1 {
-		t.Fatalf("resumed video %s should be visible, got %v", videoB, videoIDs(resumed.Videos))
+	if videoIndex(resumed.Items, videoB) == -1 {
+		t.Fatalf("resumed video %s should be visible, got %v", videoB, videoIDs(resumed.Items))
 	}
 
 	if _, err := learning.SetTargetInactive.Execute(context.Background(), learningdto.SetTargetInactiveRequest{
@@ -115,11 +117,11 @@ func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 	}
 
 	inactive := testutil.MustRecommend(t, recommendation, userID, 2)
-	if videoIndex(inactive.Videos, videoA) != -1 {
-		t.Fatalf("inactive target video %s should be excluded, got %v", videoA, videoIDs(inactive.Videos))
+	if videoIndex(inactive.Items, videoA) != -1 {
+		t.Fatalf("inactive target video %s should be excluded, got %v", videoA, videoIDs(inactive.Items))
 	}
-	if videoIndex(inactive.Videos, videoB) == -1 {
-		t.Fatalf("remaining active target video %s should be visible, got %v", videoB, videoIDs(inactive.Videos))
+	if videoIndex(inactive.Items, videoB) == -1 {
+		t.Fatalf("remaining active target video %s should be visible, got %v", videoB, videoIDs(inactive.Items))
 	}
 }
 
@@ -180,11 +182,11 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 		t.Fatalf("ListUserUnitStates(before replay): %v", err)
 	}
 
-	if len(beforeReplay.Videos) == 0 || beforeReplay.Videos[0].VideoID != hardVideo {
-		t.Fatalf("expected hard-review video first before replay, got %v", videoIDs(beforeReplay.Videos))
+	if len(beforeReplay.Items) == 0 || beforeReplay.Items[0].VideoID != hardVideo {
+		t.Fatalf("expected hard-review video first before replay, got %v", videoIDs(beforeReplay.Items))
 	}
-	if videoIndex(beforeReplay.Videos, newVideo) == -1 {
-		t.Fatalf("expected new video to remain in result set, got %v", videoIDs(beforeReplay.Videos))
+	if videoIndex(beforeReplay.Items, newVideo) == -1 {
+		t.Fatalf("expected new video to remain in result set, got %v", videoIDs(beforeReplay.Items))
 	}
 
 	if _, err := learning.ReplayUserStates.Execute(context.Background(), learningdto.ReplayUserStatesRequest{UserID: userID}); err != nil {
@@ -201,7 +203,7 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 		t.Fatalf("ListUserUnitStates(after replay): %v", err)
 	}
 
-	if got, want := videoIDs(afterReplay.Videos), videoIDs(beforeReplay.Videos); len(got) != len(want) {
+	if got, want := videoIDs(afterReplay.Items), videoIDs(beforeReplay.Items); len(got) != len(want) {
 		t.Fatalf("video count changed after replay: before=%v after=%v", want, got)
 	} else {
 		for i := range got {

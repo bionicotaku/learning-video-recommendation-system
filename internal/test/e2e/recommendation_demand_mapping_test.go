@@ -53,16 +53,16 @@ func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testi
 	)
 
 	response := mustRecommendN(t, recommendation, userID, 5)
-	assertSelectorMode(t, response, "normal")
-	assertContainsVideo(t, response.Videos, hardVideo)
-	assertContainsVideo(t, response.Videos, newVideo)
-	assertContainsVideo(t, response.Videos, softMasteryVideo)
-	assertContainsVideo(t, response.Videos, softQualityVideo)
+	assertSelectorMode(t, h, response, "normal")
+	assertContainsVideo(t, response.Items, hardVideo)
+	assertContainsVideo(t, response.Items, newVideo)
+	assertContainsVideo(t, response.Items, softMasteryVideo)
+	assertContainsVideo(t, response.Items, softQualityVideo)
 
-	assertAnyVideoHasLearningUnit(t, response.Videos, hardUnit, "hard_review")
-	assertAnyVideoHasLearningUnit(t, response.Videos, newUnit, "new_now")
-	assertAnyVideoHasLearningUnit(t, response.Videos, softMasteryUnit, "soft_review")
-	assertAnyVideoHasLearningUnit(t, response.Videos, softQualityUnit, "soft_review")
+	assertAnyVideoHasLearningUnit(t, response.Items, hardUnit, "hard_review")
+	assertAnyVideoHasLearningUnit(t, response.Items, newUnit, "new_now")
+	assertAnyVideoHasLearningUnit(t, response.Items, softMasteryUnit, "soft_review")
+	assertAnyVideoHasLearningUnit(t, response.Items, softQualityUnit, "soft_review")
 }
 
 func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSparse(t *testing.T) {
@@ -78,12 +78,12 @@ func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSpars
 	testutil.MustEnsureTarget(t, learning, userID, targetSpec(unitID, 0.95, "no_supply_new"))
 
 	response := mustRecommendN(t, recommendation, userID, 1)
-	assertSelectorMode(t, response, "extreme_sparse")
-	if !response.Underfilled {
+	assertSelectorMode(t, h, response, "extreme_sparse")
+	if !h.LoadRecommendationRun(t, response.RunID).Underfilled {
 		t.Fatalf("underfilled = false, want true")
 	}
-	if len(response.Videos) != 0 {
-		t.Fatalf("videos = %#v, want empty", videoIDs(response.Videos))
+	if len(response.Items) != 0 {
+		t.Fatalf("items = %#v, want empty", videoIDs(response.Items))
 	}
 }
 
@@ -137,8 +137,8 @@ func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreEx
 	}
 
 	response := mustRecommendN(t, recommendation, userID, 4)
-	assertContainsVideo(t, response.Videos, activeVideo)
-	assertNotContainsVideo(t, response.Videos, suspendedVideo)
-	assertNotContainsVideo(t, response.Videos, inactiveVideoID)
-	assertNotContainsVideo(t, response.Videos, nonTargetVideo)
+	assertContainsVideo(t, response.Items, activeVideo)
+	assertNotContainsVideo(t, response.Items, suspendedVideo)
+	assertNotContainsVideo(t, response.Items, inactiveVideoID)
+	assertNotContainsVideo(t, response.Items, nonTargetVideo)
 }

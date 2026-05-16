@@ -131,14 +131,12 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 	demandBundle.Flags.ExtremeSparse = hasDemand(demandBundle) && underfilled
 	selectorMode := selectorModeForDemand(demandBundle)
 	response := dto.GenerateVideoRecommendationsResponse{
-		RunID:        runID,
-		SelectorMode: selectorMode,
-		Underfilled:  underfilled,
-		Videos:       mapFinalItems(finalItems),
+		RunID: runID,
+		Items: mapFinalItems(finalItems),
 	}
 
 	if u.resultWriter != nil {
-		run, items, err := buildAuditPayload(runID, contextModel.Request.UserID, contextModel.Request.RequestContext, selectorMode, demandBundle, candidates, selectedVideos, finalItems, response.Underfilled)
+		run, items, err := buildAuditPayload(runID, contextModel.Request.UserID, contextModel.Request.RequestContext, selectorMode, demandBundle, candidates, selectedVideos, finalItems, underfilled)
 		if err != nil {
 			return dto.GenerateVideoRecommendationsResponse{}, err
 		}
@@ -193,16 +191,13 @@ func hasDemand(demand model.DemandBundle) bool {
 	return len(demand.HardReview)+len(demand.NewNow)+len(demand.SoftReview)+len(demand.NearFuture) > 0
 }
 
-func mapFinalItems(items []model.FinalRecommendationItem) []dto.RecommendationVideo {
-	result := make([]dto.RecommendationVideo, 0, len(items))
+func mapFinalItems(items []model.FinalRecommendationItem) []dto.RecommendationPlanItem {
+	result := make([]dto.RecommendationPlanItem, 0, len(items))
 	for _, item := range items {
-		result = append(result, dto.RecommendationVideo{
+		result = append(result, dto.RecommendationPlanItem{
 			VideoID:       item.VideoID,
-			Rank:          item.Rank,
-			Score:         item.Score,
-			ReasonCodes:   item.ReasonCodes,
+			DurationMs:    item.DurationMs,
 			LearningUnits: mapLearningUnits(item.LearningUnits),
-			Explanation:   item.Explanation,
 		})
 	}
 	return result
@@ -273,11 +268,11 @@ func buildAuditPayload(
 	}
 
 	items := make([]model.RecommendationItem, 0, len(finalItems))
-	for _, finalItem := range finalItems {
+	for index, finalItem := range finalItems {
 		selected := selectedByVideo[finalItem.VideoID]
 		items = append(items, model.RecommendationItem{
 			RunID:          runID,
-			Rank:           int32(finalItem.Rank),
+			Rank:           int32(index + 1),
 			VideoID:        finalItem.VideoID,
 			Score:          finalItem.Score,
 			PrimaryLane:    primaryLane(selected.LaneSources),

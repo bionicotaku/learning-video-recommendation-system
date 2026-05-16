@@ -70,14 +70,17 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	if response.RunID == "" {
 		t.Fatal("expected generated run id")
 	}
-	if response.SelectorMode != "low_supply" {
-		t.Fatalf("expected low_supply selector mode, got %q", response.SelectorMode)
+	if len(response.Items) != 1 || response.Items[0].VideoID != "video-1" {
+		t.Fatalf("unexpected response items: %#v", response.Items)
 	}
-	if len(response.Videos) != 1 || response.Videos[0].VideoID != "video-1" {
-		t.Fatalf("unexpected response videos: %#v", response.Videos)
+	if response.Items[0].DurationMs != 90_000 {
+		t.Fatalf("duration_ms = %d, want 90000", response.Items[0].DurationMs)
 	}
 	if !writer.called {
 		t.Fatal("expected result writer to persist outputs")
+	}
+	if writer.run.SelectorMode != "low_supply" {
+		t.Fatalf("expected low_supply audit selector mode, got %q", writer.run.SelectorMode)
 	}
 	if ranker.lastContextVideoStates != 1 {
 		t.Fatalf("expected ranker to receive loaded video serving states, got %d", ranker.lastContextVideoStates)
@@ -139,6 +142,7 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 }
 
 func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnderfill(t *testing.T) {
+	writer := &spyResultWriter{}
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
@@ -158,7 +162,7 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
-		&spyResultWriter{},
+		writer,
 	)
 	if err != nil {
 		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
@@ -173,11 +177,14 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 		t.Fatalf("execute pipeline: %v", err)
 	}
 
-	if response.SelectorMode != "extreme_sparse" {
-		t.Fatalf("expected extreme_sparse selector mode, got %q", response.SelectorMode)
+	if len(response.Items) != 1 {
+		t.Fatalf("expected one response item, got %#v", response.Items)
 	}
-	if !response.Underfilled {
-		t.Fatal("expected underfilled response")
+	if writer.run.SelectorMode != "extreme_sparse" {
+		t.Fatalf("expected extreme_sparse audit selector mode, got %q", writer.run.SelectorMode)
+	}
+	if !writer.run.Underfilled {
+		t.Fatal("expected underfilled audit run")
 	}
 }
 
@@ -196,7 +203,7 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubExplainer{items: []model.FinalRecommendationItem{{
 			VideoID:     "video-1",
-			Rank:        1,
+			DurationMs:  90_000,
 			Score:       0.91,
 			ReasonCodes: []string{"hard_review_covered"},
 			LearningUnits: []model.ExpectedLearningUnit{{
@@ -210,7 +217,6 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 					EndMs:         int32Ptr(1820),
 				},
 			}},
-			Explanation: "ok",
 		}}},
 		&stubVideoStateEnricher{},
 		&spyResultWriter{},
@@ -228,14 +234,14 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 		t.Fatalf("execute pipeline: %v", err)
 	}
 
-	if len(response.Videos) != 1 {
-		t.Fatalf("expected 1 video, got %#v", response.Videos)
+	if len(response.Items) != 1 {
+		t.Fatalf("expected 1 item, got %#v", response.Items)
 	}
-	if len(response.Videos[0].LearningUnits) != 1 || response.Videos[0].LearningUnits[0].Evidence == nil {
-		t.Fatalf("expected learning unit evidence, got %#v", response.Videos[0])
+	if len(response.Items[0].LearningUnits) != 1 || response.Items[0].LearningUnits[0].Evidence == nil {
+		t.Fatalf("expected learning unit evidence, got %#v", response.Items[0])
 	}
-	if response.Videos[0].LearningUnits[0].Evidence.StartMs == nil || *response.Videos[0].LearningUnits[0].Evidence.StartMs != 1240 {
-		t.Fatalf("unexpected learning unit evidence bounds: %#v", response.Videos[0].LearningUnits[0].Evidence)
+	if response.Items[0].LearningUnits[0].Evidence.StartMs == nil || *response.Items[0].LearningUnits[0].Evidence.StartMs != 1240 {
+		t.Fatalf("unexpected learning unit evidence bounds: %#v", response.Items[0].LearningUnits[0].Evidence)
 	}
 }
 
@@ -277,6 +283,9 @@ func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSour
 	}
 	if writer.items[0].PrimaryLane != "exact_core" {
 		t.Fatalf("expected exact_core primary lane, got %#v", writer.items[0])
+	}
+	if writer.items[0].Rank != 1 {
+		t.Fatalf("expected audit rank from selected item order, got %#v", writer.items[0])
 	}
 }
 
@@ -361,11 +370,13 @@ var _ appservice.VideoStateEnricher = (*stubVideoStateEnricher)(nil)
 
 type spyResultWriter struct {
 	called bool
+	run    model.RecommendationRun
 	items  []model.RecommendationItem
 }
 
-func (s *spyResultWriter) Persist(_ context.Context, _ model.RecommendationRun, items []model.RecommendationItem, _ string, _ []model.FinalRecommendationItem) error {
+func (s *spyResultWriter) Persist(_ context.Context, run model.RecommendationRun, items []model.RecommendationItem, _ string, _ []model.FinalRecommendationItem) error {
 	s.called = true
+	s.run = run
 	s.items = append([]model.RecommendationItem(nil), items...)
 	return nil
 }
@@ -375,6 +386,7 @@ var _ appservice.RecommendationResultWriter = (*spyResultWriter)(nil)
 func testVideoCandidate(videoID string, unitID int64, role model.LearningRole) model.VideoCandidate {
 	return model.VideoCandidate{
 		VideoID:        videoID,
+		DurationMs:     90_000,
 		BaseScore:      0.91,
 		DominantRole:   role,
 		DominantUnitID: int64Ptr(unitID),
@@ -390,7 +402,7 @@ func testVideoCandidate(videoID string, unitID int64, role model.LearningRole) m
 func testFinalItem(videoID string, unitID int64, role model.LearningRole) model.FinalRecommendationItem {
 	return model.FinalRecommendationItem{
 		VideoID:     videoID,
-		Rank:        1,
+		DurationMs:  90_000,
 		Score:       0.91,
 		ReasonCodes: []string{"hard_review_covered"},
 		LearningUnits: []model.ExpectedLearningUnit{{
@@ -398,7 +410,6 @@ func testFinalItem(videoID string, unitID int64, role model.LearningRole) model.
 			Role:         role,
 			IsPrimary:    true,
 		}},
-		Explanation: "ok",
 	}
 }
 

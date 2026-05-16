@@ -1,7 +1,7 @@
 [
   {
     "VideoID": "video-hard",
-    "Rank": 1,
+    "DurationMs": 92000,
     "Score": 0.93,
     "ReasonCodes": [
       "hard_review_covered",
@@ -29,12 +29,11 @@
         "role": "soft_review",
         "is_primary": false
       }
-    ],
-    "Explanation": "覆盖 1 个当前应复习内容，支持 1 个近期不稳内容，主要学习证据集中在 00:01.24–00:01.82，最近未重复推荐"
+    ]
   },
   {
     "VideoID": "video-future",
-    "Rank": 2,
+    "DurationMs": 76000,
     "Score": 0.74,
     "ReasonCodes": [
       "near_future_warmup",
@@ -54,7 +53,6 @@
           "end_ms": 3560
         }
       }
-    ],
-    "Explanation": "主要学习证据集中在 00:03.00–00:03.56，最近未重复推荐"
+    ]
   }
 ]

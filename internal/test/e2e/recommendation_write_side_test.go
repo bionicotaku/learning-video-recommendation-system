@@ -54,14 +54,14 @@ func TestE2E_RecommendationWriteSideRunMetadataAndRanksStayConsistent(t *testing
 
 	response := mustRecommendN(t, recommendation, userID, 3)
 	run := h.LoadRecommendationRun(t, response.RunID)
-	if run.SelectorMode != response.SelectorMode {
-		t.Fatalf("run selector_mode = %q, want %q", run.SelectorMode, response.SelectorMode)
+	if run.SelectorMode == "" {
+		t.Fatal("expected audit run selector_mode")
 	}
-	if run.Underfilled != response.Underfilled {
-		t.Fatalf("run underfilled = %v, want %v", run.Underfilled, response.Underfilled)
+	if run.Underfilled && len(response.Items) >= 3 {
+		t.Fatalf("run underfilled = true with %d response items", len(response.Items))
 	}
-	if int(run.ResultCount) != len(response.Videos) {
-		t.Fatalf("run result_count = %d, want %d", run.ResultCount, len(response.Videos))
+	if int(run.ResultCount) != len(response.Items) {
+		t.Fatalf("run result_count = %d, want %d", run.ResultCount, len(response.Items))
 	}
 
 	items := h.LoadRecommendationItems(t, response.RunID)
@@ -117,10 +117,10 @@ func TestE2E_ReplayKeepsRecommendationOwnStateAccumulating(t *testing.T) {
 	testutil.MustEnsureTarget(t, learning, userID, targetSpec(unitID, 0.95, "replay"))
 
 	first := mustRecommendN(t, recommendation, userID, 1)
-	assertContainsVideo(t, first.Videos, videoID)
+	assertContainsVideo(t, first.Items, videoID)
 	mustReplay(t, learning, userID)
 	second := mustRecommendN(t, recommendation, userID, 1)
-	assertContainsVideo(t, second.Videos, videoID)
+	assertContainsVideo(t, second.Items, videoID)
 
 	if got := h.CountRecommendationRuns(t, userID); got != 2 {
 		t.Fatalf("run count = %d, want 2", got)

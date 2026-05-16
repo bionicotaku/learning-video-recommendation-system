@@ -95,16 +95,14 @@ func TestE2E_RecommendationNormalModeWithBundleCoverage(t *testing.T) {
 	}
 
 	response := testutil.MustRecommend(t, recommendation, userID, 3)
-	if response.SelectorMode != "normal" {
-		t.Fatalf("selector_mode = %q, want normal", response.SelectorMode)
-	}
-	if len(response.Videos) == 0 {
+	assertSelectorMode(t, h, response, "normal")
+	if len(response.Items) == 0 {
 		t.Fatal("expected non-empty response")
 	}
-	if videoIndex(response.Videos, bundleID) == -1 {
-		t.Fatalf("expected bundle video in result set, got %v", videoIDs(response.Videos))
+	if videoIndex(response.Items, bundleID) == -1 {
+		t.Fatalf("expected bundle video in result set, got %v", videoIDs(response.Items))
 	}
-	bundle := response.Videos[videoIndex(response.Videos, bundleID)]
+	bundle := response.Items[videoIndex(response.Items, bundleID)]
 	if !containsUnit(learningUnitIDsByRole(bundle.LearningUnits, "hard_review"), hardUnit) || !containsUnit(learningUnitIDsByRole(bundle.LearningUnits, "new_now"), newUnit) {
 		t.Fatalf("bundle coverage incomplete: %+v", bundle)
 	}
@@ -192,22 +190,20 @@ func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 	}
 
 	response := testutil.MustRecommend(t, recommendation, userID, 3)
-	if response.SelectorMode != "low_supply" {
-		t.Fatalf("selector_mode = %q, want low_supply", response.SelectorMode)
-	}
-	if len(response.Videos) == 0 {
+	assertSelectorMode(t, h, response, "low_supply")
+	if len(response.Items) == 0 {
 		t.Fatal("expected low-supply recommendation result")
 	}
 
 	coreCovered := false
-	for _, video := range response.Videos {
+	for _, video := range response.Items {
 		if containsUnit(learningUnitIDsByRole(video.LearningUnits, "hard_review"), hardUnit) {
 			coreCovered = true
 			break
 		}
 	}
 	if !coreCovered {
-		t.Fatalf("hard-review unit %d was not preserved in low-supply result: %+v", hardUnit, response.Videos)
+		t.Fatalf("hard-review unit %d was not preserved in low-supply result: %+v", hardUnit, response.Items)
 	}
 }
 
@@ -219,13 +215,14 @@ func TestE2E_RecommendationNoDemandDoesNotMarkExtremeSparse(t *testing.T) {
 	h.SeedUser(t, userID)
 
 	response := testutil.MustRecommend(t, recommendation, userID, 3)
-	if response.SelectorMode != "normal" {
-		t.Fatalf("selector_mode = %q, want normal", response.SelectorMode)
+	run := h.LoadRecommendationRun(t, response.RunID)
+	if run.SelectorMode != "normal" {
+		t.Fatalf("selector_mode = %q, want normal", run.SelectorMode)
 	}
-	if !response.Underfilled {
+	if !run.Underfilled {
 		t.Fatalf("underfilled = false, want true")
 	}
-	if len(response.Videos) != 0 {
-		t.Fatalf("videos = %#v, want empty", response.Videos)
+	if len(response.Items) != 0 {
+		t.Fatalf("items = %#v, want empty", response.Items)
 	}
 }

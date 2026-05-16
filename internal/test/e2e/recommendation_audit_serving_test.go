@@ -40,16 +40,16 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	}
 
 	response := testutil.MustRecommend(t, recommendation, userID, 1)
-	if len(response.Videos) != 1 {
-		t.Fatalf("expected exactly one video, got %d", len(response.Videos))
+	if len(response.Items) != 1 {
+		t.Fatalf("expected exactly one video, got %d", len(response.Items))
 	}
-	if len(response.Videos[0].LearningUnits) != 1 ||
-		response.Videos[0].LearningUnits[0].Evidence == nil ||
-		response.Videos[0].LearningUnits[0].Evidence.SentenceIndex == nil ||
-		response.Videos[0].LearningUnits[0].Evidence.SpanIndex == nil ||
-		response.Videos[0].LearningUnits[0].Evidence.StartMs == nil ||
-		response.Videos[0].LearningUnits[0].Evidence.EndMs == nil {
-		t.Fatalf("missing learning unit evidence in response: %+v", response.Videos[0])
+	if len(response.Items[0].LearningUnits) != 1 ||
+		response.Items[0].LearningUnits[0].Evidence == nil ||
+		response.Items[0].LearningUnits[0].Evidence.SentenceIndex == nil ||
+		response.Items[0].LearningUnits[0].Evidence.SpanIndex == nil ||
+		response.Items[0].LearningUnits[0].Evidence.StartMs == nil ||
+		response.Items[0].LearningUnits[0].Evidence.EndMs == nil {
+		t.Fatalf("missing learning unit evidence in response: %+v", response.Items[0])
 	}
 
 	if got := h.CountRecommendationRuns(t, userID); got != 1 {
@@ -69,7 +69,7 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 	if len(auditUnits) != 1 {
 		t.Fatalf("audit learning_units = %+v, want one unit", auditUnits)
 	}
-	responseEvidence := response.Videos[0].LearningUnits[0].Evidence
+	responseEvidence := response.Items[0].LearningUnits[0].Evidence
 	auditEvidence := auditUnits[0].Evidence
 	if auditEvidence == nil ||
 		auditEvidence.SentenceIndex == nil ||
@@ -80,7 +80,7 @@ func TestE2E_RecommendationWritesAuditAndServingStateWithEvidence(t *testing.T) 
 		*auditEvidence.SpanIndex != *responseEvidence.SpanIndex ||
 		*auditEvidence.StartMs != *responseEvidence.StartMs ||
 		*auditEvidence.EndMs != *responseEvidence.EndMs {
-		t.Fatalf("audit learning unit evidence mismatch: response=%+v audit=%+v", response.Videos[0].LearningUnits, auditUnits)
+		t.Fatalf("audit learning unit evidence mismatch: response=%+v audit=%+v", response.Items[0].LearningUnits, auditUnits)
 	}
 }
 
@@ -116,25 +116,25 @@ func TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty(t *testing.T
 	}
 
 	first := testutil.MustRecommend(t, recommendation, userID, 1)
-	if len(first.Videos) != 1 {
-		t.Fatalf("expected 1 first-run video, got %d", len(first.Videos))
+	if len(first.Items) != 1 {
+		t.Fatalf("expected 1 first-run video, got %d", len(first.Items))
 	}
 
 	lastWatchedAt := time.Now().UTC()
-	h.SeedVideoUserState(t, userID, first.Videos[0].VideoID, &lastWatchedAt, 5, 2, 81_000, 85_500, 180_000)
+	h.SeedVideoUserState(t, userID, first.Items[0].VideoID, &lastWatchedAt, 5, 2, 81_000, 85_500, 180_000)
 
 	second := testutil.MustRecommend(t, recommendation, userID, 1)
-	if len(second.Videos) != 1 {
-		t.Fatalf("expected 1 second-run video, got %d", len(second.Videos))
+	if len(second.Items) != 1 {
+		t.Fatalf("expected 1 second-run video, got %d", len(second.Items))
 	}
-	if second.Videos[0].VideoID == first.Videos[0].VideoID {
-		t.Fatalf("expected second run to avoid repeating top video after serving/watch penalty, got %s twice", second.Videos[0].VideoID)
+	if second.Items[0].VideoID == first.Items[0].VideoID {
+		t.Fatalf("expected second run to avoid repeating top video after serving/watch penalty, got %s twice", second.Items[0].VideoID)
 	}
 
-	if got := h.LoadVideoServingCount(t, userID, first.Videos[0].VideoID); got != 1 {
+	if got := h.LoadVideoServingCount(t, userID, first.Items[0].VideoID); got != 1 {
 		t.Fatalf("first video served_count should remain 1, got %d", got)
 	}
-	if got := h.LoadVideoServingCount(t, userID, second.Videos[0].VideoID); got != 1 {
+	if got := h.LoadVideoServingCount(t, userID, second.Items[0].VideoID); got != 1 {
 		t.Fatalf("second video served_count should be 1, got %d", got)
 	}
 }

@@ -33,10 +33,10 @@ func TestE2E_MultiUserRecommendationServingIsolation(t *testing.T) {
 
 	responseA := mustRecommendN(t, recommendation, userA, 1)
 	responseB := mustRecommendN(t, recommendation, userB, 1)
-	assertContainsVideo(t, responseA.Videos, videoA)
-	assertNotContainsVideo(t, responseA.Videos, videoB)
-	assertContainsVideo(t, responseB.Videos, videoB)
-	assertNotContainsVideo(t, responseB.Videos, videoA)
+	assertContainsVideo(t, responseA.Items, videoA)
+	assertNotContainsVideo(t, responseA.Items, videoB)
+	assertContainsVideo(t, responseB.Items, videoB)
+	assertNotContainsVideo(t, responseB.Items, videoA)
 
 	if got := h.LoadVideoServingCount(t, userA, videoA); got != 1 {
 		t.Fatalf("userA videoA served_count = %d, want 1", got)
@@ -77,9 +77,9 @@ func TestE2E_MultiUserReplayDoesNotAffectOtherUsersRecommendation(t *testing.T) 
 	mustReplay(t, learning, userA)
 	afterReplayB := mustRecommendN(t, recommendation, userB, 1)
 
-	assertContainsVideo(t, beforeReplayB.Videos, videoB)
-	assertContainsVideo(t, afterReplayB.Videos, videoB)
-	if got, want := videoIDs(afterReplayB.Videos), videoIDs(beforeReplayB.Videos); len(got) != len(want) {
+	assertContainsVideo(t, beforeReplayB.Items, videoB)
+	assertContainsVideo(t, afterReplayB.Items, videoB)
+	if got, want := videoIDs(afterReplayB.Items), videoIDs(beforeReplayB.Items); len(got) != len(want) {
 		t.Fatalf("userB recommendation drifted after userA replay: before=%v after=%v", want, got)
 	} else {
 		for i := range got {

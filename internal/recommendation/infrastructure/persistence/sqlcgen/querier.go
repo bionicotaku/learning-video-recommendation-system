@@ -16,7 +16,7 @@ type Querier interface {
 	InsertVideoRecommendationItems(ctx context.Context, items []byte) error
 	InsertVideoRecommendationRun(ctx context.Context, arg InsertVideoRecommendationRunParams) error
 	ListLearningStatesForRecommendation(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
-	ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVRecommendableVideoUnit, error)
+	ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]ListRecommendableVideoUnitsByUnitIDsRow, error)
 	ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]CatalogVideoSemanticSpan, error)
 	ListTranscriptSentencesByRefs(ctx context.Context, refs []byte) ([]CatalogVideoTranscriptSentence, error)
 	ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVUnitVideoInventory, error)

@@ -9,7 +9,7 @@ import (
 	"learning-video-recommendation-system/internal/test/e2e/testutil"
 )
 
-func TestE2E_RecommendationReadModelVisibility_RefreshGatesNewVideos(t *testing.T) {
+func TestE2E_RecommendationReadModelVisibility_RefreshGatesNewItems(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
 	recommendation := h.RecommendationUsecase()
@@ -24,17 +24,17 @@ func TestE2E_RecommendationReadModelVisibility_RefreshGatesNewVideos(t *testing.
 	h.SeedCatalogVideo(t, strongSupplyVideo(videoID, unitID, 1_000, 2_000, 0, "refresh-gated", 90_000))
 
 	beforeRefresh := mustRecommendN(t, recommendation, userID, 1)
-	if len(beforeRefresh.Videos) != 0 {
-		t.Fatalf("before refresh expected empty result, got %v", videoIDs(beforeRefresh.Videos))
+	if len(beforeRefresh.Items) != 0 {
+		t.Fatalf("before refresh expected empty result, got %v", videoIDs(beforeRefresh.Items))
 	}
 
 	h.RefreshRecommendationViews(t)
 
 	afterRefresh := mustRecommendN(t, recommendation, userID, 1)
-	assertContainsVideo(t, afterRefresh.Videos, videoID)
+	assertContainsVideo(t, afterRefresh.Items, videoID)
 }
 
-func TestE2E_RecommendationReadModelVisibility_FiltersInactiveHiddenAndFutureVideos(t *testing.T) {
+func TestE2E_RecommendationReadModelVisibility_FiltersInactiveHiddenAndFutureItems(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
 	recommendation := h.RecommendationUsecase()
@@ -57,10 +57,10 @@ func TestE2E_RecommendationReadModelVisibility_FiltersInactiveHiddenAndFutureVid
 	testutil.MustEnsureTarget(t, learning, userID, targetSpec(unitID, 0.95, "visibility"))
 
 	response := mustRecommendN(t, recommendation, userID, 3)
-	assertContainsVideo(t, response.Videos, visibleVideo)
-	assertNotContainsVideo(t, response.Videos, hiddenVideoID)
-	assertNotContainsVideo(t, response.Videos, inactiveVideoID)
-	assertNotContainsVideo(t, response.Videos, futureVideoID)
+	assertContainsVideo(t, response.Items, visibleVideo)
+	assertNotContainsVideo(t, response.Items, hiddenVideoID)
+	assertNotContainsVideo(t, response.Items, inactiveVideoID)
+	assertNotContainsVideo(t, response.Items, futureVideoID)
 }
 
 func TestE2E_RecommendationReadModelVisibility_InventorySupplyGradeContract(t *testing.T) {

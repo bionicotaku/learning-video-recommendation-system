@@ -2,9 +2,8 @@ package model
 
 type FinalRecommendationItem struct {
 	VideoID       string
-	Rank          int
+	DurationMs    int32
 	Score         float64
 	ReasonCodes   []string
 	LearningUnits []ExpectedLearningUnit
-	Explanation   string
 }

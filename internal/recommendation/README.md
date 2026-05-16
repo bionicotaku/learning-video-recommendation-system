@@ -12,7 +12,7 @@
   - `Video Evidence Aggregator`
   - `Video Ranker`
   - `Video Selector`
-  - `Explanation Builder`
+  - `Final Item Builder`
 - `GenerateVideoRecommendations` 的完整 orchestrator
 - Recommendation owner migration
 - 物化读视图与 SQL/query/sqlc 基础层
@@ -62,7 +62,7 @@
 - `domain/selector`
   - `normal / low_supply / extreme_sparse` 选择约束
 - `domain/explain`
-  - 模板化 `reason_codes + explanation`
+  - 从 selected video 构造最终 plan item，并生成 audit 用 `reason_codes`
 - `infrastructure/persistence`
   - query/sqlc/repository/tx
 - `test`
@@ -92,7 +92,7 @@
 - Recommendation persistence mappers 通过 `internal/platform/postgres/pgtime` 读写 UTC `time.Time`；serving state 写入前注入的 `now` 也归一化为 UTC。
 - UUID、nullable text、numeric 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；Recommendation 仍保留本地 mapper 函数作为模块边界。
 - `selector_mode=extreme_sparse` 由 selection 结果 underfill 后置判定，而不是 planner 预判。
-- `GenerateVideoRecommendations` 对外响应是 video learning plan：每个 video 通过 `learning_units` 暴露本轮预期学习 unit、role、primary 标记和 unit-level evidence；不再暴露 `Covered*` 或 video-level `best_evidence`。
+- `GenerateVideoRecommendations` 对外响应是精简 video learning plan：只返回 `run_id`、`items[].video_id`、`items[].duration_ms` 和 `items[].learning_units`。`selector_mode`、`underfilled`、`rank`、`score`、`reason_codes` 只保留在 Recommendation audit 中。
 - `video_recommendation_items` 审计表以 `dominant_role`、`dominant_unit_id` 和 `learning_units jsonb` 保存 item 快照；不再保存 covered count 或 video-level best evidence 字段。
 - `LaneSources` 是 video 级所有命中候选 lane 的集合，不是 per-unit winning candidate 的 lane 集合；`primary_lane` 从完整 `LaneSources` 按 lane priority 派生。
 - Selector 的 same-unit 硬上限只按 `learning_units` 中 `is_primary=true` 的 unit 计数；非 primary support units 只参与边际覆盖、解释和 serving state。
