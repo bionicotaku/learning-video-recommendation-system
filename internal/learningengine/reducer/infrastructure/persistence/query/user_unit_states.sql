@@ -218,7 +218,25 @@ set
   updated_at = now()
 returning *;
 
--- name: EnsureTargetUnit :exec
+-- name: EnsureTargetUnits :exec
+with raw_input as (
+  select
+    ordinality::integer as input_index,
+    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
+    nullif(item->>'target_source', '') as target_source,
+    nullif(item->>'target_source_ref_id', '') as target_source_ref_id,
+    (item->>'target_priority')::numeric as target_priority
+  from jsonb_array_elements(sqlc.arg(targets)::jsonb) with ordinality as targets(item, ordinality)
+),
+input as (
+  select distinct on (coarse_unit_id)
+    coarse_unit_id,
+    target_source,
+    target_source_ref_id,
+    target_priority
+  from raw_input
+  order by coarse_unit_id, input_index desc
+)
 insert into learning.user_unit_states (
   user_id,
   coarse_unit_id,
@@ -226,14 +244,15 @@ insert into learning.user_unit_states (
   target_source,
   target_source_ref_id,
   target_priority
-) values (
-  sqlc.arg(user_id),
-  sqlc.arg(coarse_unit_id),
-  true,
-  sqlc.narg(target_source),
-  sqlc.narg(target_source_ref_id),
-  sqlc.arg(target_priority)
 )
+select
+  sqlc.arg(user_id),
+  coarse_unit_id,
+  true,
+  target_source,
+  target_source_ref_id,
+  target_priority
+from input
 on conflict (user_id, coarse_unit_id) do update
 set
   is_target = true,

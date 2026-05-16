@@ -189,7 +189,25 @@ func (q *Queries) DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.
 	return err
 }
 
-const ensureTargetUnit = `-- name: EnsureTargetUnit :exec
+const ensureTargetUnits = `-- name: EnsureTargetUnits :exec
+with raw_input as (
+  select
+    ordinality::integer as input_index,
+    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
+    nullif(item->>'target_source', '') as target_source,
+    nullif(item->>'target_source_ref_id', '') as target_source_ref_id,
+    (item->>'target_priority')::numeric as target_priority
+  from jsonb_array_elements($2::jsonb) with ordinality as targets(item, ordinality)
+),
+input as (
+  select distinct on (coarse_unit_id)
+    coarse_unit_id,
+    target_source,
+    target_source_ref_id,
+    target_priority
+  from raw_input
+  order by coarse_unit_id, input_index desc
+)
 insert into learning.user_unit_states (
   user_id,
   coarse_unit_id,
@@ -197,14 +215,15 @@ insert into learning.user_unit_states (
   target_source,
   target_source_ref_id,
   target_priority
-) values (
-  $1,
-  $2,
-  true,
-  $3,
-  $4,
-  $5
 )
+select
+  $1,
+  coarse_unit_id,
+  true,
+  target_source,
+  target_source_ref_id,
+  target_priority
+from input
 on conflict (user_id, coarse_unit_id) do update
 set
   is_target = true,
@@ -214,22 +233,13 @@ set
   updated_at = now()
 `
 
-type EnsureTargetUnitParams struct {
-	UserID            pgtype.UUID    `json:"user_id"`
-	CoarseUnitID      int64          `json:"coarse_unit_id"`
-	TargetSource      pgtype.Text    `json:"target_source"`
-	TargetSourceRefID pgtype.Text    `json:"target_source_ref_id"`
-	TargetPriority    pgtype.Numeric `json:"target_priority"`
+type EnsureTargetUnitsParams struct {
+	UserID  pgtype.UUID `json:"user_id"`
+	Targets []byte      `json:"targets"`
 }
 
-func (q *Queries) EnsureTargetUnit(ctx context.Context, arg EnsureTargetUnitParams) error {
-	_, err := q.db.Exec(ctx, ensureTargetUnit,
-		arg.UserID,
-		arg.CoarseUnitID,
-		arg.TargetSource,
-		arg.TargetSourceRefID,
-		arg.TargetPriority,
-	)
+func (q *Queries) EnsureTargetUnits(ctx context.Context, arg EnsureTargetUnitsParams) error {
+	_, err := q.db.Exec(ctx, ensureTargetUnits, arg.UserID, arg.Targets)
 	return err
 }
 

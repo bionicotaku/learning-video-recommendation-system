@@ -43,6 +43,17 @@ func ParseRequiredTime(field string, value string) (time.Time, error) {
 	if value == "" {
 		return time.Time{}, fmt.Errorf("%s is required", field)
 	}
+	return parseTime(field, value)
+}
+
+func ParseOptionalTime(field string, value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+	return parseTime(field, value)
+}
+
+func parseTime(field string, value string) (time.Time, error) {
 	if !explicitOffsetPattern.MatchString(value) {
 		return time.Time{}, fmt.Errorf("%s must include explicit timezone offset", field)
 	}

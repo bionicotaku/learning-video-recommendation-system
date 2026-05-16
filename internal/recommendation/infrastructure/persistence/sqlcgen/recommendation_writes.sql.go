@@ -101,7 +101,7 @@ func (q *Queries) IncrementUserVideoServingStates(ctx context.Context, arg Incre
 	return err
 }
 
-const insertVideoRecommendationItem = `-- name: InsertVideoRecommendationItem :exec
+const insertVideoRecommendationItems = `-- name: InsertVideoRecommendationItems :exec
 insert into recommendation.video_recommendation_items (
   run_id,
   rank,
@@ -112,43 +112,41 @@ insert into recommendation.video_recommendation_items (
   dominant_unit_id,
   reason_codes,
   learning_units
-) values (
-  $1,
-  $2,
-  $3,
-  $4,
-  $5,
-  $6,
-  $7,
-  $8,
-  $9
 )
+select
+  input.run_id,
+  input.rank,
+  input.video_id,
+  input.score,
+  nullif(input.primary_lane, ''),
+  nullif(input.dominant_role, ''),
+  input.dominant_unit_id,
+  coalesce(input.reason_codes, array[]::text[]),
+  coalesce(input.learning_units, '[]'::jsonb)
+from (
+  select
+    (item->>'run_id')::uuid as run_id,
+    (item->>'rank')::integer as rank,
+    (item->>'video_id')::uuid as video_id,
+    (item->>'score')::numeric as score,
+    item->>'primary_lane' as primary_lane,
+    item->>'dominant_role' as dominant_role,
+    case
+      when item ? 'dominant_unit_id' and item->>'dominant_unit_id' is not null
+      then (item->>'dominant_unit_id')::bigint
+      else null
+    end as dominant_unit_id,
+    (
+      select array_agg(value::text order by ordinality)
+      from jsonb_array_elements_text(coalesce(item->'reason_codes', '[]'::jsonb)) with ordinality as codes(value, ordinality)
+    ) as reason_codes,
+    item->'learning_units' as learning_units
+  from jsonb_array_elements($1::jsonb) as items(item)
+) input
 `
 
-type InsertVideoRecommendationItemParams struct {
-	RunID          pgtype.UUID    `json:"run_id"`
-	Rank           int32          `json:"rank"`
-	VideoID        pgtype.UUID    `json:"video_id"`
-	Score          pgtype.Numeric `json:"score"`
-	PrimaryLane    pgtype.Text    `json:"primary_lane"`
-	DominantRole   pgtype.Text    `json:"dominant_role"`
-	DominantUnitID pgtype.Int8    `json:"dominant_unit_id"`
-	ReasonCodes    []string       `json:"reason_codes"`
-	LearningUnits  []byte         `json:"learning_units"`
-}
-
-func (q *Queries) InsertVideoRecommendationItem(ctx context.Context, arg InsertVideoRecommendationItemParams) error {
-	_, err := q.db.Exec(ctx, insertVideoRecommendationItem,
-		arg.RunID,
-		arg.Rank,
-		arg.VideoID,
-		arg.Score,
-		arg.PrimaryLane,
-		arg.DominantRole,
-		arg.DominantUnitID,
-		arg.ReasonCodes,
-		arg.LearningUnits,
-	)
+func (q *Queries) InsertVideoRecommendationItems(ctx context.Context, items []byte) error {
+	_, err := q.db.Exec(ctx, insertVideoRecommendationItems, items)
 	return err
 }
 

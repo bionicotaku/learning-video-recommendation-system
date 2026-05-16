@@ -24,16 +24,17 @@ func (w *DefaultAuditWriter) Write(ctx context.Context, run model.Recommendation
 		if err := insertRunWithQueries(ctx, queries, run); err != nil {
 			return err
 		}
-		for _, item := range items {
-			if err := insertItemWithQueries(ctx, queries, item); err != nil {
-				return err
-			}
+		if len(items) == 0 {
+			return nil
 		}
-		return nil
+		return insertItemsWithQueries(ctx, queries, items)
 	}
 
 	if err := w.repository.InsertRun(ctx, run); err != nil {
 		return err
+	}
+	if len(items) == 0 {
+		return nil
 	}
 	return w.repository.InsertItems(ctx, items)
 }
@@ -62,33 +63,10 @@ func insertRunWithQueries(ctx context.Context, queries *recommendationsqlc.Queri
 	})
 }
 
-func insertItemWithQueries(ctx context.Context, queries *recommendationsqlc.Queries, item model.RecommendationItem) error {
-	pgRunID, err := mapper.StringToUUID(item.RunID)
+func insertItemsWithQueries(ctx context.Context, queries *recommendationsqlc.Queries, items []model.RecommendationItem) error {
+	payload, err := mapper.RecommendationItemsToJSON(items)
 	if err != nil {
 		return err
 	}
-	pgVideoID, err := mapper.StringToUUID(item.VideoID)
-	if err != nil {
-		return err
-	}
-	score, err := mapper.Float64ToNumeric(item.Score)
-	if err != nil {
-		return err
-	}
-	learningUnits, err := mapper.LearningUnitsToJSON(item.LearningUnits)
-	if err != nil {
-		return err
-	}
-
-	return queries.InsertVideoRecommendationItem(ctx, recommendationsqlc.InsertVideoRecommendationItemParams{
-		RunID:          pgRunID,
-		Rank:           item.Rank,
-		VideoID:        pgVideoID,
-		Score:          score,
-		PrimaryLane:    mapper.StringToText(item.PrimaryLane),
-		DominantRole:   mapper.StringToText(string(item.DominantRole)),
-		DominantUnitID: mapper.Int64PointerToPG(item.DominantUnitID),
-		ReasonCodes:    item.ReasonCodes,
-		LearningUnits:  learningUnits,
-	})
+	return queries.InsertVideoRecommendationItems(ctx, payload)
 }

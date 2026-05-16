@@ -1,6 +1,12 @@
 # 观看进度上报 MVP 设计
 
-本文档描述“用户观看视频进度”的 MVP 设计方案。当前设计已经收敛为三层数据模型：
+本文档描述“用户观看视频进度”的 MVP 设计方案。当前 API 已实现为：
+
+```http
+POST /api/video-watch-progress
+```
+
+当前实现已经收敛为三层数据模型：
 
 ```text
 analytics.video_watch_events  -- 一次观看 session 的低频摘要事实
@@ -33,6 +39,8 @@ catalog.video_engagement_stats -- 视频级全局互动统计投影
 原始观看事实属于 Analytics owner。`analytics.video_watch_events` 只记录用户观看某个视频的一次播放会话摘要。它不是逐秒播放器日志，也不记录推荐曝光。
 
 聚合消费状态属于 Catalog owner。`catalog.video_user_states` 是用户与视频的聚合投影，`catalog.video_engagement_stats` 是视频级全局统计投影。Recommendation 当前只允许读取 `catalog.video_user_states` 中的 `last_watched_at`、`watch_count`、`completed_count`、`last_position_ms`、`max_position_ms` 作为轻量 penalty 输入；观看比例不再持久化，而是用 `max_position_ms / catalog.videos.duration_ms` 派生。
+
+后端业务 owner 是 `internal/catalog` 的 `RecordVideoWatchProgress` usecase。该命令会在同一事务内写入 `analytics.video_watch_events` 与两个 Catalog 投影；这是 watch-progress 的 session ledger 与消费投影原子一致性要求，不表示 Catalog 泛化拥有 Analytics raw fact 表。`internal/api` 只负责 HTTP 入口、principal、transport validation 和 DTO 映射，不直接读写数据库。
 
 `learning.unit_learning_events` 只记录学习事件。普通观看进度不应自动写入 Learning engine。只有当产品层明确把一次观看行为解释成学习行为时，才应由上层业务另行调用 Learning engine 的学习事件接口。
 
@@ -236,7 +244,7 @@ POST /api/video-watch-progress
 1. 视频开始播放时调用一次。
 2. 播放过程中每 10 到 15 秒调用一次。
 3. 切换视频、退出播放页、播放接近结束或结束时尽量补调用一次。
-4. 页面卸载时可以用 `navigator.sendBeacon` 尝试补发，但不能只依赖 unload 场景。
+4. 页面卸载时可以用 `navigator.sendBeacon` 尝试补发，但不能只依赖 unload 场景；若使用 `sendBeacon`，payload 必须用 `Blob` 设置 `application/json`，否则当前 API 会因为 Content-Type 不符合请求契约而返回 `400`。
 
 以上是前端 flush 策略建议，不是后端强制契约。后端只要求请求字段满足本节定义；是否在 pause / resume 时 flush 由前端 runtime 自己决定。
 
@@ -328,7 +336,7 @@ type PendingWatchProgress = {
 6. 在同一事务内 upsert `catalog.video_engagement_stats`。
 7. 返回 `{ "accepted": true }`。
 
-这里允许读取 `catalog.videos.duration_ms`，因为完成判定需要视频时长；但不应在应用层先 `SELECT analytics.video_watch_events` 再由业务代码计算后 `UPDATE / INSERT`。同一个 `watch_session_id` 的旧 session state 应由 `INSERT ... ON CONFLICT (watch_session_id) DO UPDATE` 在数据库内原子读取并计算，避免额外往返和并发竞态。
+这里允许读取 `catalog.videos.duration_ms`，因为完成判定需要视频时长；但不应在应用层先 `SELECT analytics.video_watch_events` 再由业务代码计算后 `UPDATE / INSERT`。同一个 `watch_session_id` 的旧 session state 应由数据库侧条件 upsert 完成；首次并发插入遇到冲突时，repository 只允许做一次同事务内重试，让第二次语句读取已存在 session 并继续走数据库侧计算，不把状态计算搬到 Go 层。
 
 session upsert 规则：
 

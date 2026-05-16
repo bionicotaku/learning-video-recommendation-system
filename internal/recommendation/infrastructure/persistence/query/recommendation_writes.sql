@@ -77,7 +77,7 @@ insert into recommendation.video_recommendation_runs (
   sqlc.arg(result_count)
 );
 
--- name: InsertVideoRecommendationItem :exec
+-- name: InsertVideoRecommendationItems :exec
 insert into recommendation.video_recommendation_items (
   run_id,
   rank,
@@ -88,17 +88,37 @@ insert into recommendation.video_recommendation_items (
   dominant_unit_id,
   reason_codes,
   learning_units
-) values (
-  sqlc.arg(run_id),
-  sqlc.arg(rank),
-  sqlc.arg(video_id),
-  sqlc.arg(score),
-  sqlc.narg(primary_lane),
-  sqlc.narg(dominant_role),
-  sqlc.narg(dominant_unit_id),
-  sqlc.arg(reason_codes),
-  sqlc.arg(learning_units)
-);
+)
+select
+  input.run_id,
+  input.rank,
+  input.video_id,
+  input.score,
+  nullif(input.primary_lane, ''),
+  nullif(input.dominant_role, ''),
+  input.dominant_unit_id,
+  coalesce(input.reason_codes, array[]::text[]),
+  coalesce(input.learning_units, '[]'::jsonb)
+from (
+  select
+    (item->>'run_id')::uuid as run_id,
+    (item->>'rank')::integer as rank,
+    (item->>'video_id')::uuid as video_id,
+    (item->>'score')::numeric as score,
+    item->>'primary_lane' as primary_lane,
+    item->>'dominant_role' as dominant_role,
+    case
+      when item ? 'dominant_unit_id' and item->>'dominant_unit_id' is not null
+      then (item->>'dominant_unit_id')::bigint
+      else null
+    end as dominant_unit_id,
+    (
+      select array_agg(value::text order by ordinality)
+      from jsonb_array_elements_text(coalesce(item->'reason_codes', '[]'::jsonb)) with ordinality as codes(value, ordinality)
+    ) as reason_codes,
+    item->'learning_units' as learning_units
+  from jsonb_array_elements(sqlc.arg(items)::jsonb) as items(item)
+) input;
 
 -- name: RefreshRecommendableVideoUnits :exec
 refresh materialized view recommendation.v_recommendable_video_units;

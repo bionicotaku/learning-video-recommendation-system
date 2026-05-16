@@ -11,14 +11,14 @@ import (
 )
 
 type Querier interface {
-	GetSemanticSpanByVideoUnitAndRef(ctx context.Context, arg GetSemanticSpanByVideoUnitAndRefParams) (CatalogVideoSemanticSpan, error)
 	IncrementUserUnitServingStates(ctx context.Context, arg IncrementUserUnitServingStatesParams) error
 	IncrementUserVideoServingStates(ctx context.Context, arg IncrementUserVideoServingStatesParams) error
-	InsertVideoRecommendationItem(ctx context.Context, arg InsertVideoRecommendationItemParams) error
+	InsertVideoRecommendationItems(ctx context.Context, items []byte) error
 	InsertVideoRecommendationRun(ctx context.Context, arg InsertVideoRecommendationRunParams) error
 	ListLearningStatesForRecommendation(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
 	ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVRecommendableVideoUnit, error)
-	ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, arg ListTranscriptSentencesByVideoAndIndexesParams) ([]CatalogVideoTranscriptSentence, error)
+	ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]CatalogVideoSemanticSpan, error)
+	ListTranscriptSentencesByRefs(ctx context.Context, refs []byte) ([]CatalogVideoTranscriptSentence, error)
 	ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVUnitVideoInventory, error)
 	ListUserUnitServingStatesByUnitIDs(ctx context.Context, arg ListUserUnitServingStatesByUnitIDsParams) ([]RecommendationUserUnitServingState, error)
 	ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg ListUserVideoServingStatesByVideoIDsParams) ([]RecommendationUserVideoServingState, error)

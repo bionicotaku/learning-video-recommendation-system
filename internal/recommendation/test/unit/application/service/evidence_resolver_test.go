@@ -11,13 +11,15 @@ import (
 )
 
 type stubSemanticSpanReader struct {
-	rows    map[string][]model.SemanticSpan
-	lastCtx context.Context
+	rows       map[string][]model.SemanticSpan
+	lastCtx    context.Context
+	batchCalls int
 }
 
 type stubTranscriptSentenceReader struct {
-	rows    map[string][]model.TranscriptSentence
-	lastCtx context.Context
+	rows       map[string][]model.TranscriptSentence
+	lastCtx    context.Context
+	batchCalls int
 }
 
 var _ apprepo.SemanticSpanReader = (*stubSemanticSpanReader)(nil)
@@ -31,38 +33,90 @@ func (s *stubSemanticSpanReader) ListByVideoAndUnit(ctx context.Context, videoID
 	return append([]model.SemanticSpan(nil), s.rows[spanKey(videoID, coarseUnitID)]...), nil
 }
 
-func (s *stubSemanticSpanReader) GetByVideoUnitAndRef(ctx context.Context, videoID string, coarseUnitID int64, ref model.EvidenceRef) (*model.SemanticSpan, error) {
+func (s *stubSemanticSpanReader) ListByVideoUnitRefs(ctx context.Context, refs []apprepo.SemanticSpanRef) ([]model.SemanticSpan, error) {
+	s.batchCalls++
 	s.lastCtx = ctx
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	for _, row := range s.rows[spanKey(videoID, coarseUnitID)] {
-		if row.SentenceIndex == ref.SentenceIndex && row.SpanIndex == ref.SpanIndex {
-			result := row
-			return &result, nil
-		}
-	}
-	return nil, nil
-}
 
-func (s *stubTranscriptSentenceReader) ListByVideoAndIndexes(ctx context.Context, videoID string, sentenceIndexes []int32) ([]model.TranscriptSentence, error) {
-	s.lastCtx = ctx
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	allowed := make(map[int32]struct{}, len(sentenceIndexes))
-	for _, index := range sentenceIndexes {
-		allowed[index] = struct{}{}
-	}
-
-	rows := s.rows[videoID]
-	result := make([]model.TranscriptSentence, 0, len(rows))
-	for _, row := range rows {
-		if _, ok := allowed[row.SentenceIndex]; ok {
-			result = append(result, row)
+	result := make([]model.SemanticSpan, 0, len(refs))
+	for _, ref := range refs {
+		for _, row := range s.rows[spanKey(ref.VideoID, ref.CoarseUnitID)] {
+			if row.SentenceIndex == ref.Ref.SentenceIndex && row.SpanIndex == ref.Ref.SpanIndex {
+				result = append(result, row)
+			}
 		}
 	}
 	return result, nil
+}
+
+func (s *stubTranscriptSentenceReader) ListByVideoAndIndexesBatch(ctx context.Context, refs []apprepo.TranscriptSentenceRef) ([]model.TranscriptSentence, error) {
+	s.batchCalls++
+	s.lastCtx = ctx
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	allowed := make(map[string]struct{}, len(refs))
+	for _, ref := range refs {
+		allowed[sentenceKey(ref.VideoID, ref.SentenceIndex)] = struct{}{}
+	}
+
+	result := make([]model.TranscriptSentence, 0, len(refs))
+	for videoID, rows := range s.rows {
+		for _, row := range rows {
+			if _, ok := allowed[sentenceKey(videoID, row.SentenceIndex)]; ok {
+				result = append(result, row)
+			}
+		}
+	}
+	return result, nil
+}
+
+func TestDefaultEvidenceResolverBatchesSpanAndSentenceReads(t *testing.T) {
+	spanReader := &stubSemanticSpanReader{
+		rows: map[string][]model.SemanticSpan{
+			spanKey("video-1", 101): {
+				{VideoID: "video-1", CoarseUnitID: int64Ptr(101), SentenceIndex: 1, SpanIndex: 1, StartMs: 1000, EndMs: 1400},
+			},
+			spanKey("video-2", 102): {
+				{VideoID: "video-2", CoarseUnitID: int64Ptr(102), SentenceIndex: 2, SpanIndex: 1, StartMs: 2000, EndMs: 2400},
+			},
+		},
+	}
+	sentenceReader := &stubTranscriptSentenceReader{
+		rows: map[string][]model.TranscriptSentence{
+			"video-1": {{VideoID: "video-1", SentenceIndex: 1, StartMs: 900, EndMs: 1500}},
+			"video-2": {{VideoID: "video-2", SentenceIndex: 2, StartMs: 1900, EndMs: 2500}},
+		},
+	}
+	resolver := recommendationservice.NewDefaultEvidenceResolver(spanReader, sentenceReader)
+
+	windows, err := resolver.Resolve(context.Background(), model.RecommendationContext{}, []model.VideoUnitCandidate{
+		{
+			VideoID:         "video-1",
+			CoarseUnitID:    101,
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
+		},
+		{
+			VideoID:         "video-2",
+			CoarseUnitID:    102,
+			BestEvidenceRef: &model.EvidenceRef{SentenceIndex: 2, SpanIndex: 1},
+		},
+	}, model.DemandBundle{})
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(windows) != 2 {
+		t.Fatalf("resolved windows = %d, want 2", len(windows))
+	}
+	if spanReader.batchCalls != 1 {
+		t.Fatalf("span batch calls = %d, want 1", spanReader.batchCalls)
+	}
+	if sentenceReader.batchCalls != 1 {
+		t.Fatalf("sentence batch calls = %d, want 1", sentenceReader.batchCalls)
+	}
 }
 
 func TestDefaultEvidenceResolverResolvesBestEvidenceSpanAndSentence(t *testing.T) {
@@ -213,6 +267,10 @@ func TestDefaultEvidenceResolverToleratesMissingSentences(t *testing.T) {
 
 func spanKey(videoID string, coarseUnitID int64) string {
 	return fmt.Sprintf("%s#%d", videoID, coarseUnitID)
+}
+
+func sentenceKey(videoID string, sentenceIndex int32) string {
+	return fmt.Sprintf("%s#%d", videoID, sentenceIndex)
 }
 
 func TestDefaultEvidenceResolverPropagatesContextToReaders(t *testing.T) {

@@ -15,8 +15,11 @@ import (
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
+	catalogservice "learning-video-recommendation-system/internal/catalog/application/service"
+	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/infrastructure/persistence/repository"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
@@ -48,6 +51,24 @@ func (h *Harness) LearningEventsAPIServer(t *testing.T, userID string) *httptest
 	)
 
 	handler := router.New(router.Options{LearningEvents: learningEvents})
+	handler = middleware.BodyLimit(1 << 20)(handler)
+	handler = middleware.Recover(handler)
+	handler = middleware.Timeout(15 * time.Second)(handler)
+	handler = auth.FakePrincipalMiddleware(auth.Principal{UserID: userID})(handler)
+	handler = middleware.RequestID(handler)
+
+	return httptest.NewServer(handler)
+}
+
+// WatchProgressAPIServer returns a real HTTP server wired to the real Catalog
+// watch-progress usecase over the harness database.
+func (h *Harness) WatchProgressAPIServer(t *testing.T, userID string) *httptest.Server {
+	t.Helper()
+
+	writer := catalogrepo.NewVideoWatchProgressWriter(h.Pool)
+	watchProgress := watchprogress.NewHandler(catalogservice.NewRecordVideoWatchProgressUsecase(writer))
+
+	handler := router.New(router.Options{WatchProgress: watchProgress})
 	handler = middleware.BodyLimit(1 << 20)(handler)
 	handler = middleware.Recover(handler)
 	handler = middleware.Timeout(15 * time.Second)(handler)

@@ -630,6 +630,35 @@ alter table if exists catalog.videos add column if not exists duration_ms intege
 alter table if exists catalog.videos add column if not exists status text not null default 'active';
 alter table if exists catalog.videos add column if not exists visibility_status text not null default 'public';
 alter table if exists catalog.videos add column if not exists publish_at timestamptz;
+
+create table if not exists catalog.video_user_states (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  video_id uuid not null references catalog.videos(video_id) on delete cascade,
+  has_liked boolean not null default false,
+  has_bookmarked boolean not null default false,
+  has_watched boolean not null default false,
+  liked_at timestamptz,
+  bookmarked_at timestamptz,
+  first_watched_at timestamptz,
+  last_watched_at timestamptz,
+  watch_count integer not null default 0,
+  completed_count integer not null default 0,
+  last_position_ms integer not null default 0,
+  max_position_ms integer not null default 0,
+  total_watch_ms bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, video_id)
+);
+
+create table if not exists catalog.video_engagement_stats (
+  video_id uuid primary key references catalog.videos(video_id) on delete cascade,
+  view_count bigint not null default 0,
+  like_count bigint not null default 0,
+  favorite_count bigint not null default 0,
+  completed_count bigint not null default 0,
+  total_watch_ms bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
 `
 }
 

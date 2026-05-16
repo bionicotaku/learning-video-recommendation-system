@@ -14,6 +14,47 @@ func LearningUnitsToJSON(units []model.ExpectedLearningUnit) ([]byte, error) {
 	return json.Marshal(units)
 }
 
+type recommendationItemJSON struct {
+	RunID          string                       `json:"run_id"`
+	Rank           int32                        `json:"rank"`
+	VideoID        string                       `json:"video_id"`
+	Score          float64                      `json:"score"`
+	PrimaryLane    string                       `json:"primary_lane"`
+	DominantRole   string                       `json:"dominant_role"`
+	DominantUnitID *int64                       `json:"dominant_unit_id"`
+	ReasonCodes    []string                     `json:"reason_codes"`
+	LearningUnits  []model.ExpectedLearningUnit `json:"learning_units"`
+}
+
+func RecommendationItemsToJSON(items []model.RecommendationItem) ([]byte, error) {
+	if items == nil {
+		items = []model.RecommendationItem{}
+	}
+	payload := make([]recommendationItemJSON, 0, len(items))
+	for _, item := range items {
+		reasonCodes := item.ReasonCodes
+		if reasonCodes == nil {
+			reasonCodes = []string{}
+		}
+		learningUnits := item.LearningUnits
+		if learningUnits == nil {
+			learningUnits = []model.ExpectedLearningUnit{}
+		}
+		payload = append(payload, recommendationItemJSON{
+			RunID:          item.RunID,
+			Rank:           item.Rank,
+			VideoID:        item.VideoID,
+			Score:          item.Score,
+			PrimaryLane:    item.PrimaryLane,
+			DominantRole:   string(item.DominantRole),
+			DominantUnitID: item.DominantUnitID,
+			ReasonCodes:    reasonCodes,
+			LearningUnits:  learningUnits,
+		})
+	}
+	return json.Marshal(payload)
+}
+
 func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (model.LearningStateSnapshot, error) {
 	targetPriority, err := NumericToFloat64(row.TargetPriority)
 	if err != nil {

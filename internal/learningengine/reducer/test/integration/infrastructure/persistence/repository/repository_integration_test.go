@@ -18,6 +18,7 @@ func TestUnitLearningEventRepositoryAppendAndList(t *testing.T) {
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
 
 	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
 	q4 := int16(4)
@@ -246,6 +247,7 @@ func TestTargetStateCommandRepositoryEnsureAndSetInactive(t *testing.T) {
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
 
 	targetRepo := persistrepo.NewTargetStateCommandRepository(db.Pool)
 	stateRepo := persistrepo.NewUserUnitStateRepository(db.Pool)
@@ -257,6 +259,12 @@ func TestTargetStateCommandRepositoryEnsureAndSetInactive(t *testing.T) {
 			TargetSourceRefID: "lesson_1",
 			TargetPriority:    0.9,
 		},
+		{
+			CoarseUnitID:      102,
+			TargetSource:      "manual",
+			TargetSourceRefID: "list_1",
+			TargetPriority:    0.7,
+		},
 	}); err != nil {
 		t.Fatalf("EnsureTargetUnits() error = %v", err)
 	}
@@ -265,8 +273,32 @@ func TestTargetStateCommandRepositoryEnsureAndSetInactive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListByUser() error = %v", err)
 	}
-	if len(states) != 1 || !states[0].IsTarget {
+	if len(states) != 2 || !states[0].IsTarget || !states[1].IsTarget {
 		t.Fatalf("unexpected states after ensure: %+v", states)
+	}
+	if err := targetRepo.EnsureTargetUnits(context.Background(), userID, []model.TargetUnitSpec{
+		{
+			CoarseUnitID:      101,
+			TargetSource:      "manual",
+			TargetSourceRefID: "updated",
+			TargetPriority:    0.4,
+		},
+	}); err != nil {
+		t.Fatalf("EnsureTargetUnits() update error = %v", err)
+	}
+
+	states, err = stateRepo.ListByUser(context.Background(), userID, model.UserUnitStateFilter{})
+	if err != nil {
+		t.Fatalf("ListByUser() after update error = %v", err)
+	}
+	var updated *model.UserUnitState
+	for i := range states {
+		if states[i].CoarseUnitID == 101 {
+			updated = &states[i]
+		}
+	}
+	if updated == nil || updated.TargetSource != "manual" || updated.TargetSourceRefID != "updated" || updated.TargetPriority != 0.4 {
+		t.Fatalf("unexpected updated target state: %+v", updated)
 	}
 
 	if err := targetRepo.SetTargetInactive(context.Background(), userID, 101); err != nil {

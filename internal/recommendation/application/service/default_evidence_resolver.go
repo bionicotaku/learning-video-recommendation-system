@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sort"
+	"strconv"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
@@ -30,22 +31,25 @@ func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationCon
 	_ = recommendationContext
 	_ = demand
 
+	bestSpans, err := r.loadBestSpans(ctx, candidates)
+	if err != nil {
+		return nil, err
+	}
+	sentencesByKey, err := r.loadWindowSentences(ctx, bestSpans)
+	if err != nil {
+		return nil, err
+	}
+
 	resolved := make([]model.ResolvedEvidenceWindow, 0, len(candidates))
 	for _, candidate := range candidates {
 		bestRef := candidate.BestEvidenceRef
-		bestSpan, err := r.resolveBestSpan(ctx, candidate)
-		if err != nil {
-			return nil, err
-		}
+		bestSpan := bestSpans[bestSpanKey(candidate.VideoID, candidate.CoarseUnitID, candidate.BestEvidenceRef)]
 		if bestSpan == nil {
 			bestRef = nil
 		}
 
 		windowSentenceIndexes := resolveWindowSentenceIndexes(bestSpan)
-		sentences, err := r.sentenceReader.ListByVideoAndIndexes(ctx, candidate.VideoID, windowSentenceIndexes)
-		if err != nil {
-			return nil, err
-		}
+		sentences := sentencesForWindow(candidate.VideoID, windowSentenceIndexes, sentencesByKey)
 		sort.SliceStable(sentences, func(i, j int) bool {
 			return sentences[i].SentenceIndex < sentences[j].SentenceIndex
 		})
@@ -69,11 +73,110 @@ func (r *DefaultEvidenceResolver) Resolve(ctx context.Context, recommendationCon
 	return resolved, nil
 }
 
-func (r *DefaultEvidenceResolver) resolveBestSpan(ctx context.Context, candidate model.VideoUnitCandidate) (*model.SemanticSpan, error) {
-	if candidate.BestEvidenceRef == nil {
-		return nil, nil
+func (r *DefaultEvidenceResolver) loadBestSpans(ctx context.Context, candidates []model.VideoUnitCandidate) (map[string]*model.SemanticSpan, error) {
+	refs := make([]apprepo.SemanticSpanRef, 0, len(candidates))
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.BestEvidenceRef == nil {
+			continue
+		}
+		key := bestSpanKey(candidate.VideoID, candidate.CoarseUnitID, candidate.BestEvidenceRef)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		refs = append(refs, apprepo.SemanticSpanRef{
+			VideoID:      candidate.VideoID,
+			CoarseUnitID: candidate.CoarseUnitID,
+			Ref:          *candidate.BestEvidenceRef,
+		})
 	}
-	return r.spanReader.GetByVideoUnitAndRef(ctx, candidate.VideoID, candidate.CoarseUnitID, *candidate.BestEvidenceRef)
+	if len(refs) == 0 {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return map[string]*model.SemanticSpan{}, nil
+	}
+
+	rows, err := r.spanReader.ListByVideoUnitRefs(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+
+	spans := make(map[string]*model.SemanticSpan, len(rows))
+	for _, row := range rows {
+		if row.CoarseUnitID == nil {
+			continue
+		}
+		rowCopy := row
+		ref := &model.EvidenceRef{SentenceIndex: row.SentenceIndex, SpanIndex: row.SpanIndex}
+		spans[bestSpanKey(row.VideoID, *row.CoarseUnitID, ref)] = &rowCopy
+	}
+	return spans, nil
+}
+
+func (r *DefaultEvidenceResolver) loadWindowSentences(ctx context.Context, bestSpans map[string]*model.SemanticSpan) (map[string]model.TranscriptSentence, error) {
+	refs := make([]apprepo.TranscriptSentenceRef, 0, len(bestSpans))
+	seen := make(map[string]struct{}, len(bestSpans))
+	for _, span := range bestSpans {
+		if span == nil {
+			continue
+		}
+		for _, sentenceIndex := range resolveWindowSentenceIndexes(span) {
+			key := sentenceKey(span.VideoID, sentenceIndex)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			refs = append(refs, apprepo.TranscriptSentenceRef{
+				VideoID:       span.VideoID,
+				SentenceIndex: sentenceIndex,
+			})
+		}
+	}
+	if len(refs) == 0 {
+		return map[string]model.TranscriptSentence{}, nil
+	}
+
+	rows, err := r.sentenceReader.ListByVideoAndIndexesBatch(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+
+	sentences := make(map[string]model.TranscriptSentence, len(rows))
+	for _, row := range rows {
+		sentences[sentenceKey(row.VideoID, row.SentenceIndex)] = row
+	}
+	return sentences, nil
+}
+
+func bestSpanKey(videoID string, coarseUnitID int64, ref *model.EvidenceRef) string {
+	if ref == nil {
+		return ""
+	}
+	return videoID + "#" + int64Key(coarseUnitID) + "#" + int32Key(ref.SentenceIndex) + "#" + int32Key(ref.SpanIndex)
+}
+
+func sentenceKey(videoID string, sentenceIndex int32) string {
+	return videoID + "#" + int32Key(sentenceIndex)
+}
+
+func sentencesForWindow(videoID string, sentenceIndexes []int32, sentencesByKey map[string]model.TranscriptSentence) []model.TranscriptSentence {
+	result := make([]model.TranscriptSentence, 0, len(sentenceIndexes))
+	for _, sentenceIndex := range sentenceIndexes {
+		if sentence, ok := sentencesByKey[sentenceKey(videoID, sentenceIndex)]; ok {
+			result = append(result, sentence)
+		}
+	}
+	return result
+}
+
+func int64Key(value int64) string {
+	return strconv.FormatInt(value, 10)
+}
+
+func int32Key(value int32) string {
+	return strconv.FormatInt(int64(value), 10)
 }
 
 func resolveWindowSentenceIndexes(bestSpan *model.SemanticSpan) []int32 {

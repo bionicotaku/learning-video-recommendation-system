@@ -11,6 +11,7 @@
 
 - [编码和结构规范.md](../编码和结构规范.md)
 - [学习事件上报API设计.md](学习事件上报API设计.md)
+- [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md)
 - [当前实现现状.md](../当前实现现状.md)
 
 ## 1. 一句话结论
@@ -261,6 +262,7 @@ API 不应复制业务模块 validation。业务模块返回的 validation error
 - `POST /api/learning-interactions:batch` 整批 validation；任意一条非法则整批拒绝。
 - `POST /api/quiz-attempts` 单点 completed attempt；非法则拒绝。
 - `POST /api/learning-units:mark-mastered` 单点 self mark；非法则拒绝。
+- `POST /api/video-watch-progress` 单点 watch session summary；非法则拒绝，成功只返回 `{ "accepted": true }`。
 
 ### 7.4 `client_context` 规范
 

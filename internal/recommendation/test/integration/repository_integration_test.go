@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
 	"learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/repository"
@@ -209,6 +210,50 @@ func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
 	}
 	if learningUnitCount != 1 {
 		t.Fatalf("expected 1 learning unit in audit item, got %d", learningUnitCount)
+	}
+}
+
+func TestEvidenceReadersBatchReadSpansAndSentences(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000113"
+	videoID1 := "00000000-0000-0000-0000-000000000213"
+	videoID2 := "00000000-0000-0000-0000-000000000214"
+	unitID1 := int64(313)
+	unitID2 := int64(314)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID1, unitID1)
+	seedBaseRefs(t, ctx, db, tx, userID, videoID2, unitID2)
+	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms) values ($1, 2, 1900, 2500), ($2, 3, 2900, 3500) on conflict do nothing`, videoID1, videoID2); err != nil {
+		t.Fatalf("seed extra transcript sentences: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms) values ($1, 2, 1, $2, 2000, 2400), ($3, 3, 1, $4, 3000, 3400) on conflict do nothing`, videoID1, unitID1, videoID2, unitID2); err != nil {
+		t.Fatalf("seed extra semantic spans: %v", err)
+	}
+
+	spanReader := repository.NewSemanticSpanReader(tx)
+	spans, err := spanReader.ListByVideoUnitRefs(ctx, []apprepo.SemanticSpanRef{
+		{VideoID: videoID1, CoarseUnitID: unitID1, Ref: model.EvidenceRef{SentenceIndex: 2, SpanIndex: 1}},
+		{VideoID: videoID2, CoarseUnitID: unitID2, Ref: model.EvidenceRef{SentenceIndex: 3, SpanIndex: 1}},
+	})
+	if err != nil {
+		t.Fatalf("list semantic spans by refs: %v", err)
+	}
+	if len(spans) != 2 {
+		t.Fatalf("spans = %d, want 2: %+v", len(spans), spans)
+	}
+
+	sentenceReader := repository.NewTranscriptSentenceReader(tx)
+	sentences, err := sentenceReader.ListByVideoAndIndexesBatch(ctx, []apprepo.TranscriptSentenceRef{
+		{VideoID: videoID1, SentenceIndex: 2},
+		{VideoID: videoID2, SentenceIndex: 3},
+	})
+	if err != nil {
+		t.Fatalf("list transcript sentences by refs: %v", err)
+	}
+	if len(sentences) != 2 {
+		t.Fatalf("sentences = %d, want 2: %+v", len(sentences), sentences)
 	}
 }
 

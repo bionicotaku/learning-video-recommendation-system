@@ -12,8 +12,11 @@ import (
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
+	catalogservice "learning-video-recommendation-system/internal/catalog/application/service"
+	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/infrastructure/persistence/repository"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
@@ -31,9 +34,11 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	if err != nil {
 		return nil, err
 	}
+	watchProgress := buildWatchProgressHandler(pool)
 
 	handler := router.New(router.Options{
 		LearningEvents: learningEvents,
+		WatchProgress:  watchProgress,
 	})
 	handler = middleware.BodyLimit(1 << 20)(handler)
 	handler = middleware.Recover(handler)
@@ -61,4 +66,10 @@ func buildLearningEventsHandler(pool *pgxpool.Pool, logger *slog.Logger) (*learn
 	quizService := apiservice.NewRecordQuizAttemptService(recordQuiz, normalizeQuiz, logger)
 	selfMarkService := apiservice.NewRecordSelfMarkMasteredService(recordSelfMark, normalizeSelfMark, logger)
 	return learningevents.NewHandler(interactionService, quizService, selfMarkService), nil
+}
+
+func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
+	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
+	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
+	return watchprogress.NewHandler(recordWatchProgress)
 }

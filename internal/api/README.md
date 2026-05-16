@@ -25,6 +25,7 @@ Current implemented endpoint group:
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
+POST /api/video-watch-progress
 ```
 
 These endpoints return only raw Analytics acceptance results. Learning Engine
@@ -36,6 +37,10 @@ interactions. Self-mark mastered is intentionally a separate endpoint so it can
 use the dedicated Analytics writer and `NormalizeSelfMarkMasteredByID`
 normalizer path.
 
+`POST /api/video-watch-progress` calls the Catalog `RecordVideoWatchProgress`
+usecase. It returns only `{ "accepted": true }` after the watch session ledger
+and Catalog projections have been updated in one backend transaction.
+
 `cmd/server` requires `API_TRUSTED_USER_ID_HEADER`. The header must be injected
 by a trusted upstream gateway or runtime that strips client-supplied identity
 headers before forwarding the request. This module does not implement JWT
@@ -43,6 +48,7 @@ verification and never trusts `user_id` from the body or query string.
 
 Transport errors use the shared JSON error envelope. Decode, field validation,
 and known business validation failures map to `400 invalid_request`; missing
-principal maps to `401 unauthorized`; timeouts or canceled contexts map to a
-request-id-bearing `503 service_unavailable`; unknown usecase failures map to
-`500 internal_error`.
+principal maps to `401 unauthorized`; known owner errors can map to `404
+not_found`, `409 conflict`, or `422 unprocessable_entity`; timeouts or canceled
+contexts map to a request-id-bearing `503 service_unavailable`; unknown usecase
+failures map to `500 internal_error`.

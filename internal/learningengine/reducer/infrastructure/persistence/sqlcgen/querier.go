@@ -14,7 +14,7 @@ type Querier interface {
 	AppendLearningEvents(ctx context.Context, events []byte) ([]AppendLearningEventsRow, error)
 	BatchUpsertUserUnitStates(ctx context.Context, states []byte) ([]LearningUserUnitState, error)
 	DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error
-	EnsureTargetUnit(ctx context.Context, arg EnsureTargetUnitParams) error
+	EnsureTargetUnits(ctx context.Context, arg EnsureTargetUnitsParams) error
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)

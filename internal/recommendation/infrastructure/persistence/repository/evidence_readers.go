@@ -2,8 +2,7 @@ package repository
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5"
+	"encoding/json"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
@@ -30,39 +29,67 @@ func NewTranscriptSentenceReader(db recommendationsqlc.DBTX) *TranscriptSentence
 	return &TranscriptSentenceReader{queries: recommendationsqlc.New(db)}
 }
 
-func (r *SemanticSpanReader) GetByVideoUnitAndRef(ctx context.Context, videoID string, coarseUnitID int64, ref model.EvidenceRef) (*model.SemanticSpan, error) {
-	pgVideoID, err := mapper.StringToUUID(videoID)
-	if err != nil {
-		return nil, err
-	}
-
-	row, err := r.queries.GetSemanticSpanByVideoUnitAndRef(ctx, recommendationsqlc.GetSemanticSpanByVideoUnitAndRefParams{
-		VideoID:       pgVideoID,
-		CoarseUnitID:  mapper.Int64PointerToPG(&coarseUnitID),
-		SentenceIndex: ref.SentenceIndex,
-		SpanIndex:     ref.SpanIndex,
-	})
-	if err == pgx.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	span := mapper.ToSemanticSpan(row)
-	return &span, nil
+type semanticSpanRefJSON struct {
+	VideoID       string `json:"video_id"`
+	CoarseUnitID  int64  `json:"coarse_unit_id"`
+	SentenceIndex int32  `json:"sentence_index"`
+	SpanIndex     int32  `json:"span_index"`
 }
 
-func (r *TranscriptSentenceReader) ListByVideoAndIndexes(ctx context.Context, videoID string, sentenceIndexes []int32) ([]model.TranscriptSentence, error) {
-	pgVideoID, err := mapper.StringToUUID(videoID)
+type transcriptSentenceRefJSON struct {
+	VideoID       string `json:"video_id"`
+	SentenceIndex int32  `json:"sentence_index"`
+}
+
+func (r *SemanticSpanReader) ListByVideoUnitRefs(ctx context.Context, refs []apprepo.SemanticSpanRef) ([]model.SemanticSpan, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+
+	payload := make([]semanticSpanRefJSON, 0, len(refs))
+	for _, ref := range refs {
+		payload = append(payload, semanticSpanRefJSON{
+			VideoID:       ref.VideoID,
+			CoarseUnitID:  ref.CoarseUnitID,
+			SentenceIndex: ref.Ref.SentenceIndex,
+			SpanIndex:     ref.Ref.SpanIndex,
+		})
+	}
+	rawPayload, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := r.queries.ListTranscriptSentencesByVideoAndIndexes(ctx, recommendationsqlc.ListTranscriptSentencesByVideoAndIndexesParams{
-		VideoID:         pgVideoID,
-		SentenceIndexes: sentenceIndexes,
-	})
+	rows, err := r.queries.ListSemanticSpansByRefs(ctx, rawPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.SemanticSpan, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapper.ToSemanticSpan(row))
+	}
+	return result, nil
+}
+
+func (r *TranscriptSentenceReader) ListByVideoAndIndexesBatch(ctx context.Context, refs []apprepo.TranscriptSentenceRef) ([]model.TranscriptSentence, error) {
+	if len(refs) == 0 {
+		return nil, nil
+	}
+
+	payload := make([]transcriptSentenceRefJSON, 0, len(refs))
+	for _, ref := range refs {
+		payload = append(payload, transcriptSentenceRefJSON{
+			VideoID:       ref.VideoID,
+			SentenceIndex: ref.SentenceIndex,
+		})
+	}
+	rawPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListTranscriptSentencesByRefs(ctx, rawPayload)
 	if err != nil {
 		return nil, err
 	}

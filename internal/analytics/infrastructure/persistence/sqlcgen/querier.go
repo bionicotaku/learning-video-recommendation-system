@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	InsertLearningInteractionEvent(ctx context.Context, arg InsertLearningInteractionEventParams) (InsertLearningInteractionEventRow, error)
+	InsertLearningInteractionEvents(ctx context.Context, events []byte) ([]InsertLearningInteractionEventsRow, error)
 	InsertQuizEvent(ctx context.Context, arg InsertQuizEventParams) (InsertQuizEventRow, error)
 }
 

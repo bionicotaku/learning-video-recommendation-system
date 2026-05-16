@@ -11,41 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getSemanticSpanByVideoUnitAndRef = `-- name: GetSemanticSpanByVideoUnitAndRef :one
-select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms
-from catalog.video_semantic_spans
-where video_id = $1
-  and coarse_unit_id = $2
-  and sentence_index = $3
-  and span_index = $4
-`
-
-type GetSemanticSpanByVideoUnitAndRefParams struct {
-	VideoID       pgtype.UUID `json:"video_id"`
-	CoarseUnitID  pgtype.Int8 `json:"coarse_unit_id"`
-	SentenceIndex int32       `json:"sentence_index"`
-	SpanIndex     int32       `json:"span_index"`
-}
-
-func (q *Queries) GetSemanticSpanByVideoUnitAndRef(ctx context.Context, arg GetSemanticSpanByVideoUnitAndRefParams) (CatalogVideoSemanticSpan, error) {
-	row := q.db.QueryRow(ctx, getSemanticSpanByVideoUnitAndRef,
-		arg.VideoID,
-		arg.CoarseUnitID,
-		arg.SentenceIndex,
-		arg.SpanIndex,
-	)
-	var i CatalogVideoSemanticSpan
-	err := row.Scan(
-		&i.VideoID,
-		&i.SentenceIndex,
-		&i.SpanIndex,
-		&i.CoarseUnitID,
-		&i.StartMs,
-		&i.EndMs,
-	)
-	return i, err
-}
-
 const listLearningStatesForRecommendation = `-- name: ListLearningStatesForRecommendation :many
 select
   user_id,
@@ -162,21 +127,69 @@ func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coar
 	return items, nil
 }
 
-const listTranscriptSentencesByVideoAndIndexes = `-- name: ListTranscriptSentencesByVideoAndIndexes :many
-select video_id, sentence_index, start_ms, end_ms
-from catalog.video_transcript_sentences
-where video_id = $1
-  and sentence_index = any($2::integer[])
-order by sentence_index asc
+const listSemanticSpansByRefs = `-- name: ListSemanticSpansByRefs :many
+with input as (
+  select distinct
+    (item->>'video_id')::uuid as video_id,
+    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
+    (item->>'sentence_index')::integer as sentence_index,
+    (item->>'span_index')::integer as span_index
+  from jsonb_array_elements($1::jsonb) as refs(item)
+)
+select spans.video_id, spans.sentence_index, spans.span_index, spans.coarse_unit_id, spans.start_ms, spans.end_ms
+from catalog.video_semantic_spans spans
+join input
+  on input.video_id = spans.video_id
+ and input.coarse_unit_id = spans.coarse_unit_id
+ and input.sentence_index = spans.sentence_index
+ and input.span_index = spans.span_index
+order by spans.video_id, spans.coarse_unit_id, spans.sentence_index, spans.span_index
 `
 
-type ListTranscriptSentencesByVideoAndIndexesParams struct {
-	VideoID         pgtype.UUID `json:"video_id"`
-	SentenceIndexes []int32     `json:"sentence_indexes"`
+func (q *Queries) ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]CatalogVideoSemanticSpan, error) {
+	rows, err := q.db.Query(ctx, listSemanticSpansByRefs, refs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogVideoSemanticSpan{}
+	for rows.Next() {
+		var i CatalogVideoSemanticSpan
+		if err := rows.Scan(
+			&i.VideoID,
+			&i.SentenceIndex,
+			&i.SpanIndex,
+			&i.CoarseUnitID,
+			&i.StartMs,
+			&i.EndMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) ListTranscriptSentencesByVideoAndIndexes(ctx context.Context, arg ListTranscriptSentencesByVideoAndIndexesParams) ([]CatalogVideoTranscriptSentence, error) {
-	rows, err := q.db.Query(ctx, listTranscriptSentencesByVideoAndIndexes, arg.VideoID, arg.SentenceIndexes)
+const listTranscriptSentencesByRefs = `-- name: ListTranscriptSentencesByRefs :many
+with input as (
+  select distinct
+    (item->>'video_id')::uuid as video_id,
+    (item->>'sentence_index')::integer as sentence_index
+  from jsonb_array_elements($1::jsonb) as refs(item)
+)
+select sentences.video_id, sentences.sentence_index, sentences.start_ms, sentences.end_ms
+from catalog.video_transcript_sentences sentences
+join input
+  on input.video_id = sentences.video_id
+ and input.sentence_index = sentences.sentence_index
+order by sentences.video_id, sentences.sentence_index
+`
+
+func (q *Queries) ListTranscriptSentencesByRefs(ctx context.Context, refs []byte) ([]CatalogVideoTranscriptSentence, error) {
+	rows, err := q.db.Query(ctx, listTranscriptSentencesByRefs, refs)
 	if err != nil {
 		return nil, err
 	}

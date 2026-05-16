@@ -70,20 +70,37 @@ where user_id = sqlc.arg(user_id)
   and video_id = any(sqlc.arg(video_ids)::uuid[])
 order by video_id asc;
 
--- name: GetSemanticSpanByVideoUnitAndRef :one
-select video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms
-from catalog.video_semantic_spans
-where video_id = sqlc.arg(video_id)
-  and coarse_unit_id = sqlc.arg(coarse_unit_id)
-  and sentence_index = sqlc.arg(sentence_index)
-  and span_index = sqlc.arg(span_index);
+-- name: ListSemanticSpansByRefs :many
+with input as (
+  select distinct
+    (item->>'video_id')::uuid as video_id,
+    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
+    (item->>'sentence_index')::integer as sentence_index,
+    (item->>'span_index')::integer as span_index
+  from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
+)
+select spans.video_id, spans.sentence_index, spans.span_index, spans.coarse_unit_id, spans.start_ms, spans.end_ms
+from catalog.video_semantic_spans spans
+join input
+  on input.video_id = spans.video_id
+ and input.coarse_unit_id = spans.coarse_unit_id
+ and input.sentence_index = spans.sentence_index
+ and input.span_index = spans.span_index
+order by spans.video_id, spans.coarse_unit_id, spans.sentence_index, spans.span_index;
 
--- name: ListTranscriptSentencesByVideoAndIndexes :many
-select video_id, sentence_index, start_ms, end_ms
-from catalog.video_transcript_sentences
-where video_id = sqlc.arg(video_id)
-  and sentence_index = any(sqlc.arg(sentence_indexes)::integer[])
-order by sentence_index asc;
+-- name: ListTranscriptSentencesByRefs :many
+with input as (
+  select distinct
+    (item->>'video_id')::uuid as video_id,
+    (item->>'sentence_index')::integer as sentence_index
+  from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
+)
+select sentences.video_id, sentences.sentence_index, sentences.start_ms, sentences.end_ms
+from catalog.video_transcript_sentences sentences
+join input
+  on input.video_id = sentences.video_id
+ and input.sentence_index = sentences.sentence_index
+order by sentences.video_id, sentences.sentence_index;
 
 -- name: ListVideoUserStatesByUserAndVideoIDs :many
 select user_id, video_id, last_watched_at, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms

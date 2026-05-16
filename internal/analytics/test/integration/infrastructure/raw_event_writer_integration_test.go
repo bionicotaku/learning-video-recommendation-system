@@ -83,6 +83,101 @@ func TestRawEventWriterReturnsExistingIDsForDuplicates(t *testing.T) {
 	}
 }
 
+func TestRawEventWriterUpsertsLearningInteractionBatchInInputOrder(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111112"
+	unitID := int64(102)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, unitID)
+
+	writer := analyticsrepo.NewRawEventWriter(db.Pool)
+	firstBatch := []model.RawLearningInteractionEvent{
+		learningInteraction(userID, unitID, "client-interaction-batch-1", now),
+	}
+	firstResults, err := writer.UpsertLearningInteractions(context.Background(), firstBatch)
+	if err != nil {
+		t.Fatalf("first UpsertLearningInteractions() error = %v", err)
+	}
+	if len(firstResults) != 1 || !firstResults[0].Inserted {
+		t.Fatalf("first results = %+v, want one inserted", firstResults)
+	}
+
+	secondBatch := []model.RawLearningInteractionEvent{
+		learningInteraction(userID, unitID, "client-interaction-batch-2", now.Add(time.Second)),
+		learningInteraction(userID, unitID, "client-interaction-batch-1", now),
+	}
+	secondResults, err := writer.UpsertLearningInteractions(context.Background(), secondBatch)
+	if err != nil {
+		t.Fatalf("second UpsertLearningInteractions() error = %v", err)
+	}
+	if len(secondResults) != 2 {
+		t.Fatalf("second results = %d, want 2", len(secondResults))
+	}
+	if secondResults[0].ClientEventID != "client-interaction-batch-2" || !secondResults[0].Inserted {
+		t.Fatalf("first returned batch row = %+v, want new inserted event in input order", secondResults[0])
+	}
+	if secondResults[1].ClientEventID != "client-interaction-batch-1" || secondResults[1].Inserted {
+		t.Fatalf("second returned batch row = %+v, want duplicate event in input order", secondResults[1])
+	}
+	if secondResults[1].EventID != firstResults[0].EventID {
+		t.Fatalf("duplicate event id = %q, want existing %q", secondResults[1].EventID, firstResults[0].EventID)
+	}
+
+	var count int
+	if err := db.Pool.QueryRow(context.Background(), `select count(*) from analytics.learning_interaction_events where user_id = $1`, userID).Scan(&count); err != nil {
+		t.Fatalf("count learning interaction events: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("event count = %d, want 2", count)
+	}
+}
+
+func TestNormalizerPendingIndexesExist(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	ctx := context.Background()
+
+	indexes := []string{
+		"idx_quiz_events_completed_at_event_id",
+		"idx_learning_interaction_events_pending_normalizer",
+	}
+	for _, indexName := range indexes {
+		var exists bool
+		if err := db.Pool.QueryRow(ctx, `
+			select exists (
+				select 1
+				from pg_indexes
+				where schemaname = 'analytics'
+				  and indexname = $1
+			)
+		`, indexName).Scan(&exists); err != nil {
+			t.Fatalf("check index %s: %v", indexName, err)
+		}
+		if !exists {
+			t.Fatalf("index %s does not exist", indexName)
+		}
+	}
+}
+
+func learningInteraction(userID string, unitID int64, clientEventID string, occurredAt time.Time) model.RawLearningInteractionEvent {
+	return model.RawLearningInteractionEvent{
+		ClientEventID:   clientEventID,
+		UserID:          userID,
+		ClientContext:   []byte(`{"platform":"ios"}`),
+		EventType:       "lookup",
+		SourceSurface:   "video_subtitle",
+		CoarseUnitID:    &unitID,
+		TokenText:       "example",
+		OccurredAt:      occurredAt,
+		LookupVisibleMS: int32Pointer(5000),
+		EventPayload:    []byte(`{}`),
+	}
+}
+
 func int32Pointer(value int32) *int32 {
 	return &value
 }

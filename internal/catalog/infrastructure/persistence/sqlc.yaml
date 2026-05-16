@@ -1,0 +1,18 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries:
+      - "query/*.sql"
+    schema:
+      - "schema/*.sql"
+      - "../migration/*.up.sql"
+      - "../../../analytics/infrastructure/migration/000001_create_analytics_schema.up.sql"
+      - "../../../analytics/infrastructure/migration/000003_create_video_watch_events.up.sql"
+    gen:
+      go:
+        package: "catalogsqlc"
+        out: "sqlcgen"
+        sql_package: "pgx/v5"
+        emit_interface: true
+        emit_json_tags: true
+        emit_empty_slices: true

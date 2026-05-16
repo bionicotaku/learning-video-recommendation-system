@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"learning-video-recommendation-system/internal/test/e2e/testutil"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -288,6 +290,82 @@ func TestE2E_TerminalSelfMarkIgnoresLaterQuizProgress(t *testing.T) {
 	assertTerminalMastered(t, loadLearningState(t, h.Pool, userID, unitID))
 }
 
+func TestE2E_VideoWatchProgressHTTPUpdatesCatalogProjections(t *testing.T) {
+	h := harness(t)
+
+	userID := h.NewUserID()
+	videoID := h.NewVideoID()
+	watchSessionID := h.NewVideoID()
+	h.SeedUser(t, userID)
+	h.SeedCatalogVideo(t, testutil.CatalogVideoFixture{
+		VideoID:         videoID,
+		DurationMs:      100_000,
+		MappedSpanRatio: 0,
+	})
+
+	server := h.WatchProgressAPIServer(t, userID)
+	t.Cleanup(server.Close)
+
+	first := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+videoID+`",
+		"watch_session_id": "`+watchSessionID+`",
+		"position_ms": 10000,
+		"active_watch_ms": 8000,
+		"occurred_at": "2026-05-15T10:00:00-07:00",
+		"source_surface": "fullscreen",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, first, http.StatusOK)
+	var firstBody struct {
+		Accepted bool `json:"accepted"`
+	}
+	decodeResponse(t, first, &firstBody)
+	if !firstBody.Accepted {
+		t.Fatalf("response = %+v, want accepted", firstBody)
+	}
+
+	retry := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+videoID+`",
+		"watch_session_id": "`+watchSessionID+`",
+		"position_ms": 5000,
+		"active_watch_ms": 7000,
+		"occurred_at": "2026-05-15T10:00:01-07:00",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, retry, http.StatusOK)
+	decodeResponse(t, retry, &struct {
+		Accepted bool `json:"accepted"`
+	}{})
+
+	completed := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+videoID+`",
+		"watch_session_id": "`+watchSessionID+`",
+		"position_ms": 92000,
+		"active_watch_ms": 12000,
+		"occurred_at": "2026-05-15T10:00:02-07:00",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, completed, http.StatusOK)
+	decodeResponse(t, completed, &struct {
+		Accepted bool `json:"accepted"`
+	}{})
+
+	state := loadVideoUserState(t, h.Pool, userID, videoID)
+	if state.WatchCount != 1 || state.CompletedCount != 1 || state.LastPositionMS != 92000 || state.MaxPositionMS != 92000 || state.TotalWatchMS != 12000 {
+		t.Fatalf("video user state = %+v, want single completed watch session", state)
+	}
+	stats := loadVideoEngagementStats(t, h.Pool, videoID)
+	if stats.ViewCount != 1 || stats.CompletedCount != 1 || stats.TotalWatchMS != 12000 {
+		t.Fatalf("video stats = %+v, want single completed view", stats)
+	}
+	if got := countRows(t, h.Pool, `select count(*) from learning.unit_learning_events where user_id = $1`, userID); got != 0 {
+		t.Fatalf("learning event rows = %d, want 0", got)
+	}
+	if got := countRows(t, h.Pool, `select count(*) from recommendation.user_video_serving_states where user_id = $1`, userID); got != 0 {
+		t.Fatalf("recommendation video serving rows = %d, want 0", got)
+	}
+}
+
 func postJSON(t *testing.T, server *httptest.Server, path string, body string) *http.Response {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodPost, server.URL+path, bytes.NewBufferString(body))
@@ -383,6 +461,52 @@ type learningStateRow struct {
 	LastProgressQuality *int16
 	NextReviewIsNull    bool
 	SuspendedReason     string
+}
+
+type videoUserStateRow struct {
+	WatchCount     int32
+	CompletedCount int32
+	LastPositionMS int32
+	MaxPositionMS  int32
+	TotalWatchMS   int64
+}
+
+func loadVideoUserState(t *testing.T, db queryer, userID string, videoID string) videoUserStateRow {
+	t.Helper()
+	var row videoUserStateRow
+	if err := db.QueryRow(context.Background(), `
+		select watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms
+		from catalog.video_user_states
+		where user_id = $1 and video_id = $2
+	`, userID, videoID).Scan(
+		&row.WatchCount,
+		&row.CompletedCount,
+		&row.LastPositionMS,
+		&row.MaxPositionMS,
+		&row.TotalWatchMS,
+	); err != nil {
+		t.Fatalf("load video user state: %v", err)
+	}
+	return row
+}
+
+type videoEngagementStatsRow struct {
+	ViewCount      int64
+	CompletedCount int64
+	TotalWatchMS   int64
+}
+
+func loadVideoEngagementStats(t *testing.T, db queryer, videoID string) videoEngagementStatsRow {
+	t.Helper()
+	var row videoEngagementStatsRow
+	if err := db.QueryRow(context.Background(), `
+		select view_count, completed_count, total_watch_ms
+		from catalog.video_engagement_stats
+		where video_id = $1
+	`, videoID).Scan(&row.ViewCount, &row.CompletedCount, &row.TotalWatchMS); err != nil {
+		t.Fatalf("load video engagement stats: %v", err)
+	}
+	return row
 }
 
 func loadLearningState(t *testing.T, db queryer, userID string, unitID int64) learningStateRow {

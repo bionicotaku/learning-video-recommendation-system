@@ -19,6 +19,7 @@
 - Does not import `internal/analytics`.
 - Does not decide raw fact semantics; that belongs to normalizer.
 - Is the only Learning Engine path that writes `learning.*`.
+- Batch target commands write through reducer-owned SQL; `EnsureTargetUnits` uses one batch upsert rather than one roundtrip per target.
 
 ## Directory Structure
 

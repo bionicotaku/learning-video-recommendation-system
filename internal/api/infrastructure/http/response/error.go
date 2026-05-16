@@ -29,6 +29,18 @@ func Unauthorized(message string) *Error {
 	return &Error{StatusCode: http.StatusUnauthorized, Code: "unauthorized", Message: message}
 }
 
+func NotFound(message string) *Error {
+	return &Error{StatusCode: http.StatusNotFound, Code: "not_found", Message: message}
+}
+
+func Conflict(message string) *Error {
+	return &Error{StatusCode: http.StatusConflict, Code: "conflict", Message: message}
+}
+
+func UnprocessableEntity(message string) *Error {
+	return &Error{StatusCode: http.StatusUnprocessableEntity, Code: "unprocessable_entity", Message: message}
+}
+
 func ServiceUnavailable(message string) *Error {
 	return &Error{StatusCode: http.StatusServiceUnavailable, Code: "service_unavailable", Message: message}
 }

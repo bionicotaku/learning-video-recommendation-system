@@ -43,7 +43,14 @@ func (u *RecordLearningInteractionsBatchUsecase) Execute(ctx context.Context, re
 	}
 
 	events := make([]model.RawLearningInteractionEvent, 0, len(request.Events))
+	seenClientEventIDs := make(map[string]int, len(request.Events))
 	for index, input := range request.Events {
+		if previousIndex, ok := seenClientEventIDs[input.ClientEventID]; input.ClientEventID != "" && ok {
+			return dto.RecordLearningInteractionsBatchResponse{}, validationError("events[%d].client_event_id duplicates events[%d].client_event_id", index, previousIndex)
+		}
+		if input.ClientEventID != "" {
+			seenClientEventIDs[input.ClientEventID] = index
+		}
 		event, err := mapLearningInteractionInput(request, clientContext, input, index)
 		if err != nil {
 			return dto.RecordLearningInteractionsBatchResponse{}, err

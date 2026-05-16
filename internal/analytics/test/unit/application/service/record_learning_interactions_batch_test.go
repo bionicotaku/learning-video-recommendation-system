@@ -107,6 +107,52 @@ func TestRecordLearningInteractionsBatchRejectsSelfMarkMastered(t *testing.T) {
 	}
 }
 
+func TestRecordLearningInteractionsBatchRejectsDuplicateClientEventIDBeforeWrite(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
+	writer := &fakeRawEventWriter{}
+	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+		UserID:         "11111111-1111-1111-1111-111111111111",
+		ClientContext:  []byte(`{"platform":"ios"}`),
+		VideoID:        "22222222-2222-2222-2222-222222222222",
+		WatchSessionID: "33333333-3333-3333-3333-333333333333",
+		Events: []dto.LearningInteractionEventInput{
+			{
+				ClientEventID: "interaction-duplicate",
+				EventType:     "lookup",
+				SourceSurface: "video_subtitle",
+				CoarseUnitID:  &unitID,
+				TokenText:     "test",
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
+				OccurredAt:    now,
+			},
+			{
+				ClientEventID: "interaction-duplicate",
+				EventType:     "exposure",
+				SourceSurface: "video_subtitle",
+				CoarseUnitID:  &unitID,
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
+				OccurredAt:    now.Add(time.Second),
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want duplicate client_event_id validation error")
+	}
+	if !service.IsValidationError(err) {
+		t.Fatalf("Execute() error = %v, want typed validation error", err)
+	}
+	if len(writer.interactions) != 0 {
+		t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
+	}
+}
+
 func TestRecordLearningInteractionsBatchRejectsMissingVideoContext(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	unitID := int64(101)

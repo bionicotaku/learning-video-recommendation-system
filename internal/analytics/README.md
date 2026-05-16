@@ -42,6 +42,7 @@ internal/analytics/
 - quiz raw fact 写入 `analytics.quiz_events`。
 - exposure / lookup / self_mark raw fact 写入 `analytics.learning_interaction_events`，但 self mark 不走 batch API。
 - `(user_id, client_event_id)` 重复时由单条幂等 SQL 返回已有 `event_id` 和 `Inserted=false`，不把重复当错误。
+- learning interaction batch raw write 使用单条批量 SQL 写入并按输入顺序返回每条 `client_event_id` 对应的 `event_id / Inserted`；quiz attempt 与 self mark 仍是单点 raw write。
 - 真实 repository 分别写入 quiz 与 learning interaction raw facts；两类事件由未来不同 API 调用，不再混入同一事务。
 - `user_id` 来自 usecase request；未来 HTTP 层必须从认证上下文传入，不能信任事件 payload。
 - `client_context` 只要求是 JSON object，不固定字段集合；当前 API 样例推荐四个基础字段，但后端不拒绝扩展字段。
