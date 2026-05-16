@@ -11,6 +11,7 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/normalizer/domain/rule"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningenum "learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 )
 
 type NormalizePendingEventsUsecase struct {
@@ -22,6 +23,7 @@ type NormalizePendingEventsUsecase struct {
 var _ normalizerusecase.NormalizePendingEventsUsecase = (*NormalizePendingEventsUsecase)(nil)
 var _ normalizerusecase.NormalizeLearningInteractionsByIDsUsecase = (*NormalizeLearningInteractionsByIDsUsecase)(nil)
 var _ normalizerusecase.NormalizeQuizAttemptByIDUsecase = (*NormalizeQuizAttemptByIDUsecase)(nil)
+var _ normalizerusecase.NormalizeSelfMarkMasteredByIDUsecase = (*NormalizeSelfMarkMasteredByIDUsecase)(nil)
 
 func NewNormalizePendingEventsUsecase(
 	quizReader normalizerrepo.RawQuizEventReader,
@@ -61,6 +63,21 @@ func NewNormalizeQuizAttemptByIDUsecase(
 ) *NormalizeQuizAttemptByIDUsecase {
 	return &NormalizeQuizAttemptByIDUsecase{
 		quizReader:            quizReader,
+		learningEventRecorder: learningEventRecorder,
+	}
+}
+
+type NormalizeSelfMarkMasteredByIDUsecase struct {
+	interactionReader     normalizerrepo.RawLearningInteractionReader
+	learningEventRecorder normalizerrepo.LearningEventRecorder
+}
+
+func NewNormalizeSelfMarkMasteredByIDUsecase(
+	interactionReader normalizerrepo.RawLearningInteractionReader,
+	learningEventRecorder normalizerrepo.LearningEventRecorder,
+) *NormalizeSelfMarkMasteredByIDUsecase {
+	return &NormalizeSelfMarkMasteredByIDUsecase{
+		interactionReader:     interactionReader,
 		learningEventRecorder: learningEventRecorder,
 	}
 }
@@ -153,6 +170,12 @@ func (u *NormalizeLearningInteractionsByIDsUsecase) Execute(ctx context.Context,
 	}
 	response.ReadRawCount += len(readInteractions)
 	interactions = append(interactions, readInteractions...)
+	for _, raw := range interactions {
+		if raw.EventType != learningenum.EventExposure && raw.EventType != learningenum.EventLookup {
+			response.ErrorCount++
+			return response, fmt.Errorf("learning interaction event %s is %s, want exposure or lookup", raw.EventID, raw.EventType)
+		}
+	}
 
 	normalizedEvents, skippedCount, err := mapRawEvents(nil, interactions)
 	if err != nil {
@@ -196,6 +219,54 @@ func (u *NormalizeQuizAttemptByIDUsecase) Execute(ctx context.Context, request d
 	response.ReadRawCount += len(readQuizEvents)
 
 	normalizedEvents, skippedCount, err := mapRawEvents(readQuizEvents, nil)
+	if err != nil {
+		response.ErrorCount++
+		return response, err
+	}
+	response.SkippedCount += skippedCount
+	response.NormalizedEventCount += len(normalizedEvents)
+
+	recordResult, err := recordNormalizedEvents(ctx, u.learningEventRecorder, normalizedEvents)
+	if err != nil {
+		response.ErrorCount++
+		return response, err
+	}
+	response.RecordedEventCount += recordResult.recordedCount
+	response.DuplicateEventCount += recordResult.duplicateCount
+	response.RecordedUserBatchCount += recordResult.userBatchCount
+	return response, nil
+}
+
+func (u *NormalizeSelfMarkMasteredByIDUsecase) Execute(ctx context.Context, request dto.NormalizeSelfMarkMasteredByIDRequest) (dto.NormalizeSelfMarkMasteredByIDResponse, error) {
+	if u.learningEventRecorder == nil {
+		return dto.NormalizeSelfMarkMasteredByIDResponse{}, fmt.Errorf("learning event recorder is required")
+	}
+	if request.UserID == "" {
+		return dto.NormalizeSelfMarkMasteredByIDResponse{}, fmt.Errorf("user_id is required")
+	}
+	if request.LearningInteractionEventID == "" {
+		return dto.NormalizeSelfMarkMasteredByIDResponse{}, fmt.Errorf("learning_interaction_event_id is required")
+	}
+	if u.interactionReader == nil {
+		return dto.NormalizeSelfMarkMasteredByIDResponse{}, fmt.Errorf("raw learning interaction reader is required")
+	}
+
+	response := dto.NormalizeSelfMarkMasteredByIDResponse{}
+	readInteractions, err := u.interactionReader.ListLearningInteractionsByIDs(ctx, request.UserID, []string{request.LearningInteractionEventID})
+	if err != nil {
+		response.ErrorCount++
+		return response, err
+	}
+	response.ReadRawCount += len(readInteractions)
+	if len(readInteractions) == 0 {
+		return response, nil
+	}
+	if readInteractions[0].EventType != learningenum.EventSelfMarkMastered {
+		response.ErrorCount++
+		return response, fmt.Errorf("learning interaction event %s is %s, want self_mark_mastered", request.LearningInteractionEventID, readInteractions[0].EventType)
+	}
+
+	normalizedEvents, skippedCount, err := mapRawEvents(nil, readInteractions)
 	if err != nil {
 		response.ErrorCount++
 		return response, err

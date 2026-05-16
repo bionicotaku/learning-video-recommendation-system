@@ -38,7 +38,7 @@ Rules:
 1. 设计文档放在 `docs/`，代码说明文档放在各目录的 `README.md`。
 2. API 设计文档统一放在 `docs/API/`，不要散落在 `docs/` 根目录。
 3. 文档映射保持一致：`docs/` 定义设计，代码实现落到 `internal/`，目录级 `README.md` 解释当前实现。
-4. 新模块或新的文件结构，默认必须遵循 [编码和结构规范.md](/Users/evan/Downloads/learning-video-recommendation-system/docs/编码和结构规范.md)。
+4. 新模块或新的文件结构，默认必须遵循 [编码和结构规范.md](docs/编码和结构规范.md)。
 5. 如确有必要偏离统一结构，可以自定义，但必须在对应目录的 `README.md` 中明确写出：
    - 为什么要偏离
    - 偏离了哪一条标准

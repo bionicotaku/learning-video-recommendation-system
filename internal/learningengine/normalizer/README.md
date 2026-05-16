@@ -59,7 +59,8 @@ NormalizeLearningInteractionsByIDs
   -> call reducer.RecordLearningEvents
 ```
 
-This is the main path for the future `POST /api/learning-interactions:batch` API after Analytics raw write returns raw `event_id` values.
+This is the main path for the future `POST /api/learning-interactions:batch` API after Analytics raw write returns raw `event_id` values. That API path is for exposure and lookup; self mark has a dedicated single-event usecase.
+If a self mark raw row is passed here, the usecase returns an error and does not call the reducer.
 
 ### NormalizeQuizAttemptByID
 
@@ -71,6 +72,18 @@ NormalizeQuizAttemptByID
 ```
 
 This is the main path for the future `POST /api/quiz-attempts` API after Analytics raw write returns `quiz_event_id`.
+
+### NormalizeSelfMarkMasteredByID
+
+```text
+NormalizeSelfMarkMasteredByID
+  -> read specified analytics.learning_interaction_events row by user_id + event_id
+  -> require raw event_type = self_mark_mastered
+  -> map raw fact with domain/rule
+  -> call reducer.RecordLearningEvents
+```
+
+This is the main path for the future `POST /api/learning-units/{coarse_unit_id}:mark-mastered` API after Analytics raw write returns `learning_interaction_event_id`.
 
 ### NormalizePendingEvents
 

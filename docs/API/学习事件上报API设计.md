@@ -2,10 +2,10 @@
 
 ## 0. 文档信息
 
-文档状态：MVP 设计，HTTP handler 尚未实现
+文档状态：MVP 当前实现说明
 目标读者：前端、后端、数据、后续接手维护的人
-当前范围：定义未来学习事件上报 API 的前端上传契约、字段语义、raw fact 落库语义、幂等响应、业务成功边界和后端内部归一化链路。
-当前明确不做：本轮不实现 HTTP handler，不创建真实路由，不引入 queue / checkpoint / dead-letter / `normalized_at`。
+当前范围：定义已落地学习事件上报 API 的前端上传契约、字段语义、raw fact 落库语义、幂等响应、业务成功边界和后端内部归一化链路。
+当前明确不做：不引入 queue / checkpoint / dead-letter / `normalized_at`，不让 HTTP success 承诺 Learning Engine 已完成归约。
 
 关联文档：
 
@@ -16,11 +16,12 @@
 
 ## 1. 一句话结论
 
-未来学习事件上报拆成两条 API，HTTP 层放在 `internal/api`：
+学习事件上报当前拆成三条 API，HTTP 层已落在 `internal/api`：
 
 ```http
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
+POST /api/learning-units:mark-mastered
 ```
 
 前端只上传 raw fact，不上传学习结论。后端先把 raw fact 幂等写入 Analytics，再在请求内同步尝试归一化本批 raw IDs：
@@ -35,6 +36,11 @@ POST /api/quiz-attempts
   -> internal/analytics RecordQuizAttempt
   -> internal/learningengine/normalizer NormalizeQuizAttemptByID
   -> internal/learningengine/reducer RecordLearningEvents
+
+POST /api/learning-units:mark-mastered
+  -> internal/analytics RecordSelfMarkMastered
+  -> internal/learningengine/normalizer NormalizeSelfMarkMasteredByID
+  -> internal/learningengine/reducer RecordLearningEvents
 ```
 
 API 成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, client_event_id)` 已存在而幂等存在。Learning Engine 是否已经更新学习状态是后端内部状态，不暴露为前端成功条件。
@@ -45,7 +51,7 @@ API 成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, cli
 
 本 API 遵守 [API模块总体设计规范.md](API模块总体设计规范.md) 的 principal 规则。生产认证默认由网关 / Auth provider 完成；`internal/api` 只从可信 principal 中解析 `user_id`。
 
-请求体不接收可信 `user_id`。未来 handler 必须把 principal 中的 `user_id` 传给 `internal/analytics`，不能从前端 payload 选择写入用户。
+请求体不接收可信 `user_id`。handler 必须把 principal 中的 `user_id` 传给 `internal/analytics`，不能从前端 payload 选择写入用户。
 
 ### 2.2 成功语义
 
@@ -84,8 +90,8 @@ Learning Engine normalizer 不写 Analytics，不直接写 `learning.*`，只调
 | --- | --- | --- | --- |
 | `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `exposure` | 是，observe-only。 |
 | `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `lookup` | mapped lookup 是，observe-only；unmapped lookup 只留 Analytics。 |
-| `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `self_mark_mastered` | 是，set-mastered。 |
 | `POST /api/quiz-attempts` | `analytics.quiz_events` | completed quiz attempt | 是，affects-progress。 |
+| `POST /api/learning-units:mark-mastered` | `analytics.learning_interaction_events` | `self_mark_mastered` | 是，set-mastered。 |
 
 明确不属于本 API 的事件：
 
@@ -154,6 +160,9 @@ Content-Type: application/json
     "os_version": "18.5",
     "device_model": "iPhone16,2"
   },
+  "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
   "events": []
 }
 ```
@@ -163,6 +172,9 @@ Content-Type: application/json
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
 | `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
+| `video_id` | string UUID | 是 | 当前 batch 所属视频。 |
+| `watch_session_id` | string UUID | 是 | 当前 batch 所属观看 session。 |
+| `recommendation_run_id` | string UUID | 否 | 如果本次视频来自推荐结果，记录对应 run。 |
 | `events` | array | 是 | interaction 事件数组。整批先 validation，任意一条非法则整批拒绝。 |
 
 `events[]` 通用字段：
@@ -170,16 +182,12 @@ Content-Type: application/json
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
-| `event_type` | string | 是 | `exposure` / `lookup` / `self_mark_mastered`。 |
+| `event_type` | string | 是 | `exposure` / `lookup`。`self_mark_mastered` 不允许放入 batch，必须调用单点 mark-mastered API。 |
 | `source_surface` | string | 是 | 事件发生的业务界面，例如 `video_subtitle`、`word_detail`。 |
-| `video_id` | string UUID | 否 | 关联视频。 |
-| `watch_session_id` | string UUID | 否 | 关联观看 session。 |
-| `recommendation_run_id` | string UUID | 否 | 关联推荐 run。 |
-| `related_quiz_event_id` | string UUID | 否 | 关联 quiz raw event。通常 MVP 不需要前端填写。 |
-| `coarse_unit_id` | integer | `exposure` / `self_mark_mastered` 必需；mapped `lookup` 必需 | 学习单元 ID。unmapped lookup 可以为空，只留 Analytics。 |
+| `coarse_unit_id` | integer | `exposure` 必需；mapped `lookup` 必需 | 学习单元 ID。填写时必须为正整数。unmapped lookup 可以为空，只留 Analytics。 |
 | `token_text` | string | `lookup` 必需 | 用户 lookup 的原始 token 文本。 |
-| `sentence_index` | integer | 否 | 字幕句子 index。 |
-| `span_index` | integer | 否 | token/span index。 |
+| `sentence_index` | integer | `exposure` / `lookup` 必需 | 字幕句子 index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
+| `span_index` | integer | `exposure` / `lookup` 必需 | token/span index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
 | `occurred_at` | RFC3339 datetime with explicit offset | 是 | 事件实际发生时间。必须带 `Z` 或 offset，后端按 UTC 时间点存储。 |
 | `event_payload` | object | 否 | 附加原始上下文。缺省 `{}`。 |
 
@@ -210,14 +218,14 @@ Content-Type: application/json
     "os_version": "18.5",
     "device_model": "iPhone16,2"
   },
+  "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
   "events": [
     {
       "client_event_id": "01JY_LOOKUP_0001",
       "event_type": "lookup",
       "source_surface": "video_subtitle",
-      "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-      "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
       "coarse_unit_id": 101,
       "token_text": "constrain",
       "sentence_index": 12,
@@ -235,9 +243,6 @@ Content-Type: application/json
       "client_event_id": "01JY_EXPOSURE_0001",
       "event_type": "exposure",
       "source_surface": "video_subtitle",
-      "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-      "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
       "coarse_unit_id": 102,
       "sentence_index": 13,
       "span_index": 1,
@@ -245,15 +250,6 @@ Content-Type: application/json
       "exposure_start_ms": 142000,
       "exposure_end_ms": 146300,
       "exposure_count": 1
-    },
-    {
-      "client_event_id": "01JY_SELF_MARK_0001",
-      "event_type": "self_mark_mastered",
-      "source_surface": "word_detail",
-      "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-      "coarse_unit_id": 103,
-      "token_text": "trivial",
-      "occurred_at": "2026-05-15T17:00:08Z"
     }
   ]
 }
@@ -263,8 +259,8 @@ Content-Type: application/json
 
 ```json
 {
-  "accepted_count": 3,
-  "inserted_count": 2,
+  "accepted_count": 2,
+  "inserted_count": 1,
   "duplicate_count": 1,
   "events": [
     {
@@ -276,11 +272,6 @@ Content-Type: application/json
       "client_event_id": "01JY_EXPOSURE_0001",
       "learning_interaction_event_id": "22222222-2222-2222-2222-222222222222",
       "inserted": false
-    },
-    {
-      "client_event_id": "01JY_SELF_MARK_0001",
-      "learning_interaction_event_id": "33333333-3333-3333-3333-333333333333",
-      "inserted": true
     }
   ]
 }
@@ -321,7 +312,7 @@ Content-Type: application/json
   "coarse_unit_id": 101,
   "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-  "trigger_type": "practice_now",
+  "trigger_type": "lookup_practice",
   "selected_option_ids": ["wrong-option-id", "correct"],
   "selection_interval_ms": [1800, 2200],
   "is_first_try_correct": false,
@@ -338,10 +329,10 @@ Content-Type: application/json
 | `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
 | `question_id` | string UUID | 是 | `catalog.questions.question_id`。 |
-| `coarse_unit_id` | integer | 是 | 本题对应学习单元。 |
+| `coarse_unit_id` | integer | 是 | 本题对应学习单元，必须为正整数。 |
 | `video_id` | string UUID | 否 | 触发题目的视频。 |
 | `recommendation_run_id` | string UUID | 否 | 触发题目的推荐 run。 |
-| `trigger_type` | string | 是 | 触发来源，例如 `practice_now`、`scheduled_review`。 |
+| `trigger_type` | string | 是 | 触发来源，必须使用 DB 枚举：`video_end` / `lookup_practice` / `feed_review` / `mid_video` / `manual`。 |
 | `selected_option_ids` | string[] | 是 | 用户选择过的 option ID 列表。最后一项必须表示正确答案。 |
 | `selection_interval_ms` | integer[] | 是 | 每次选择前的耗时，长度必须等于 `selected_option_ids`。每项非负。 |
 | `is_first_try_correct` | boolean | 是 | 第一项选择是否正确。必须和 `selected_option_ids[0]` 一致。 |
@@ -368,7 +359,7 @@ MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 comple
   "coarse_unit_id": 101,
   "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
   "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
-  "trigger_type": "practice_now",
+  "trigger_type": "lookup_practice",
   "selected_option_ids": ["correct"],
   "selection_interval_ms": [3200],
   "is_first_try_correct": true,
@@ -392,7 +383,7 @@ MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 comple
   "question_id": "55555555-5555-5555-5555-555555555555",
   "coarse_unit_id": 102,
   "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-  "trigger_type": "practice_now",
+  "trigger_type": "lookup_practice",
   "selected_option_ids": ["option-a", "correct"],
   "selection_interval_ms": [2100, 1900],
   "is_first_try_correct": false,
@@ -420,9 +411,85 @@ MVP 中前端可以一直选到正确再提交，因此 quiz 是“一次 comple
 | `quiz_event_id` | string UUID | `analytics.quiz_events.event_id`。 |
 | `inserted` | boolean | `true` 表示新插入；`false` 表示幂等命中已有 row。 |
 
-## 7. Normalizer 语义
+## 7. Self Mark Mastered 单点 API
 
-### 7.1 Learning Interaction
+### 7.1 Endpoint
+
+```http
+POST /api/learning-units:mark-mastered
+Content-Type: application/json
+```
+
+`coarse_unit_id` 放在 body 中，表示用户明确声明已掌握的学习单元。它不是 quiz 作答事实，也不放入 interaction batch。
+
+### 7.2 请求结构
+
+```json
+{
+  "client_context": {
+    "platform": "ios",
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
+  },
+  "client_event_id": "01JY_SELF_MARK_0001",
+  "coarse_unit_id": 103,
+  "source_surface": "word_detail",
+  "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  "related_quiz_event_id": "66666666-6666-6666-6666-666666666666",
+  "token_text": "trivial",
+  "sentence_index": 12,
+  "span_index": 4,
+  "occurred_at": "2026-05-15T17:04:00Z",
+  "event_payload": {
+    "entry": "lookup_sheet"
+  }
+}
+```
+
+字段：
+
+| 字段 | 类型 | 必需 | 说明 |
+| --- | --- | --- | --- |
+| `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
+| `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
+| `coarse_unit_id` | integer | 是 | 要标记为已掌握的学习单元 ID，必须为正整数。 |
+| `source_surface` | string | 是 | 用户点击“已学会”的界面，例如 `word_detail`、`quiz_result`。 |
+| `video_id` | string UUID | 否 | 关联视频。 |
+| `watch_session_id` | string UUID | 否 | 关联观看 session。 |
+| `recommendation_run_id` | string UUID | 否 | 关联推荐 run。 |
+| `related_quiz_event_id` | string UUID | 否 | 如果按钮出现在 quiz 页面，可关联刚写入的 `analytics.quiz_events.event_id`。 |
+| `token_text` | string | 否 | 用户看到或点击的原始 token 文本。 |
+| `sentence_index` | integer | 否 | 字幕句子 index。 |
+| `span_index` | integer | 否 | token/span index。 |
+| `occurred_at` | RFC3339 datetime with explicit offset | 是 | 用户点击“已学会”的实际时间。必须带 `Z` 或 offset，后端按 UTC 时间点存储。 |
+| `event_payload` | object | 否 | 附加原始上下文。缺省 `{}`。 |
+
+### 7.3 响应结构
+
+```json
+{
+  "accepted": true,
+  "learning_interaction_event_id": "33333333-3333-3333-3333-333333333333",
+  "inserted": true
+}
+```
+
+响应字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `accepted` | boolean | 成功时固定 `true`。 |
+| `learning_interaction_event_id` | string UUID | `analytics.learning_interaction_events.event_id`。 |
+| `inserted` | boolean | `true` 表示新插入；`false` 表示幂等命中已有 row。 |
+
+Self mark 的 API 成功语义仍然只是 raw accepted。后端会同步尝试 `NormalizeSelfMarkMasteredByID`；即使同步归一化失败，也由 pending repair/backfill 最终补偿。
+
+## 8. Normalizer 语义
+
+### 8.1 Learning Interaction
 
 ```text
 NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
@@ -432,9 +499,10 @@ NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
 | --- | --- | --- | --- | --- |
 | `exposure` | `exposure` | `observe_only` | `null` | 只更新 observation，不推进 progress。 |
 | `lookup` | `lookup` | `observe_only` | `null` | mapped lookup 进入 Learning Engine；unmapped lookup skipped。 |
-| `self_mark_mastered` | `self_mark_mastered` | `set_mastered` | `null` | 直接进入 terminal mastered。 |
 
-### 7.2 Quiz Attempt
+`NormalizeLearningInteractionsByIDs` 是 batch API 专属入口，只允许 exposure / lookup raw row。self mark raw row 必须走 `NormalizeSelfMarkMasteredByID`。
+
+### 8.2 Quiz Attempt
 
 ```text
 NormalizeQuizAttemptByID(user_id, quiz_event_id)
@@ -456,13 +524,31 @@ source_type = quiz_event
 source_ref_id = analytics.quiz_events.event_id
 ```
 
-## 8. 错误与补偿语义
+### 8.3 Self Mark Mastered
 
-### 8.1 Validation error
+```text
+NormalizeSelfMarkMasteredByID(user_id, learning_interaction_event_id)
+```
+
+raw row 必须满足 `event_type = self_mark_mastered`。如果传入 exposure / lookup 的 raw ID，该用例返回错误且不调用 reducer。
+
+normalized event 固定为：
+
+```text
+event_type = self_mark_mastered
+reducer_effect = set_mastered
+progress_quality = null
+source_type = learning_interaction_event
+source_ref_id = analytics.learning_interaction_events.event_id
+```
+
+## 9. 错误与补偿语义
+
+### 9.1 Validation error
 
 任意 validation 失败都不入库。
 
-interaction batch 是整批拒绝，不 partial success。quiz attempt 是单条拒绝。
+interaction batch 是整批拒绝，不 partial success。quiz attempt 和 self mark mastered 是单条拒绝。
 
 错误 envelope、状态码、`request_id` 遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。示例：
 
@@ -482,35 +568,41 @@ interaction batch 是整批拒绝，不 partial success。quiz attempt 是单条
 }
 ```
 
-### 8.2 Duplicate
+### 9.2 Duplicate
 
 本 API 的幂等命中不是错误。后端返回已有 raw event ID，并标记 `inserted=false`。
 
-### 8.3 Internal normalize failure
+### 9.3 Internal normalize failure
 
 如果 raw write 成功，但同步 normalizer 失败，HTTP 仍可以返回 raw accepted。后端需要记录错误日志，后续由 `NormalizePendingEvents` 修复。
 
 前端不需要因为 Learning Engine 内部归约失败而重试；如果前端因网络失败无法确认 raw accepted，才使用同一个 `client_event_id` 重试。
 
-## 9. 前端队列建议
+## 10. 前端队列建议
 
-### 9.1 Interaction queue
+### 10.1 Interaction queue
 
 learning interaction 可以本地排队并批量 flush：
 
-- lookup / self mark 需要尽快 flush。
+- lookup 需要尽快 flush。
 - exposure 可以短时间聚合后 flush。
 - 同一事件重试必须复用 `client_event_id`。
 - 不同事件不能共享 `client_event_id`。
 - 失败重试时保持原始 `occurred_at`，不要改成重试时间。
 
-### 9.2 Quiz submit
+### 10.2 Quiz submit
 
 quiz 不进入 interaction batch。完成一道题后直接调用 `POST /api/quiz-attempts`。
 
 如果网络失败，使用同一个 `client_event_id` 重试同一 completed attempt。不要把每次选项点击拆成单独事件上传。
 
-## 10. TypeScript 契约草稿
+### 10.3 Self mark submit
+
+self mark 不进入 interaction batch。用户点击“已学会”后直接调用 `POST /api/learning-units:mark-mastered`。
+
+前端可以做乐观 UI 更新，但服务端响应只表示 raw fact accepted；最终状态由同步 best-effort normalize 加 pending repair/backfill 保证。
+
+## 11. TypeScript 契约草稿
 
 ```ts
 export type ClientContext = {
@@ -526,12 +618,9 @@ export type LearningInteractionEvent =
       client_event_id: string;
       event_type: "exposure";
       source_surface: string;
-      video_id?: string;
-      watch_session_id?: string;
-      recommendation_run_id?: string;
       coarse_unit_id: number;
-      sentence_index?: number;
-      span_index?: number;
+      sentence_index: number;
+      span_index: number;
       occurred_at: string;
       exposure_start_ms?: number;
       exposure_end_ms?: number;
@@ -542,37 +631,23 @@ export type LearningInteractionEvent =
       client_event_id: string;
       event_type: "lookup";
       source_surface: string;
-      video_id?: string;
-      watch_session_id?: string;
-      recommendation_run_id?: string;
       coarse_unit_id?: number;
       token_text: string;
-      sentence_index?: number;
-      span_index?: number;
+      sentence_index: number;
+      span_index: number;
       occurred_at: string;
       lookup_visible_ms?: number;
       lookup_sentence_audio_replay_count?: number;
       lookup_word_audio_play_count?: number;
       lookup_practice_now_clicked?: boolean;
       event_payload?: Record<string, unknown>;
-    }
-  | {
-      client_event_id: string;
-      event_type: "self_mark_mastered";
-      source_surface: string;
-      video_id?: string;
-      watch_session_id?: string;
-      recommendation_run_id?: string;
-      coarse_unit_id: number;
-      token_text?: string;
-      sentence_index?: number;
-      span_index?: number;
-      occurred_at: string;
-      event_payload?: Record<string, unknown>;
     };
 
 export type RecordLearningInteractionsBatchRequest = {
   client_context?: ClientContext;
+  video_id: string;
+  watch_session_id: string;
+  recommendation_run_id?: string;
   events: LearningInteractionEvent[];
 };
 
@@ -587,6 +662,13 @@ export type RecordLearningInteractionsBatchResponse = {
   }>;
 };
 
+export type QuizTriggerType =
+  | "video_end"
+  | "lookup_practice"
+  | "feed_review"
+  | "mid_video"
+  | "manual";
+
 export type RecordQuizAttemptRequest = {
   client_context?: ClientContext;
   client_event_id: string;
@@ -594,7 +676,7 @@ export type RecordQuizAttemptRequest = {
   coarse_unit_id: number;
   video_id?: string;
   recommendation_run_id?: string;
-  trigger_type: string;
+  trigger_type: QuizTriggerType;
   selected_option_ids: string[];
   selection_interval_ms: number[];
   is_first_try_correct: boolean;
@@ -608,17 +690,39 @@ export type RecordQuizAttemptResponse = {
   quiz_event_id: string;
   inserted: boolean;
 };
+
+export type RecordSelfMarkMasteredRequest = {
+  client_context?: ClientContext;
+  client_event_id: string;
+  coarse_unit_id: number;
+  source_surface: string;
+  video_id?: string;
+  watch_session_id?: string;
+  recommendation_run_id?: string;
+  related_quiz_event_id?: string;
+  token_text?: string;
+  sentence_index?: number;
+  span_index?: number;
+  occurred_at: string;
+  event_payload?: Record<string, unknown>;
+};
+
+export type RecordSelfMarkMasteredResponse = {
+  accepted: true;
+  learning_interaction_event_id: string;
+  inserted: boolean;
+};
 ```
 
-## 11. 当前实现映射
+## 12. 当前实现映射
 
-当前本轮只落应用层和 normalizer 前置结构，不落 HTTP handler。
+当前已落 `internal/api` HTTP handler、API application service、Analytics raw write 与 normalizer by-ID 调用链。
 
-未来 `internal/api` 的学习事件 handler 应只做该 API 的薄适配：
+`internal/api` 的学习事件 handler 只做该 API 的薄适配：
 
 - 从可信 principal 取 `user_id`。
 - 把 JSON request 映射到 `internal/analytics` DTO。
 - raw write 成功后，把 raw event IDs 传给 `internal/learningengine/normalizer`。
 - 返回 raw accepted response。
 
-通用认证、错误 envelope、状态码、request id、body size、CORS、日志和 handler 目录规则不在本文重复定义，统一遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。不要在 HTTP 层生成 `progress_quality`、`reducer_effect` 或直接写 `learning.*`。
+通用认证、错误 envelope、状态码、request id、body size、日志和 handler 目录规则不在本文重复定义，统一遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。不要在 HTTP 层生成 `progress_quality`、`reducer_effect` 或直接写 `learning.*`。

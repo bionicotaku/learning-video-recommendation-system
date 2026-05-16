@@ -1,3 +1,5 @@
+//go:build integration
+
 package fixture
 
 import "learning-video-recommendation-system/internal/platform/postgres/pgtest"

@@ -25,7 +25,7 @@ Normalizer 是 Learning Engine 的 raw fact 解释子模块，和 reducer 是 `i
 ```text
 POST /api/learning-interactions:batch
         ↓
-analytics learning interaction raw fact batch write
+analytics learning interaction raw fact batch write (exposure / lookup)
         ↓
 NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
         ↓
@@ -36,6 +36,20 @@ POST /api/quiz-attempts
 analytics quiz raw fact write
         ↓
 NormalizeQuizAttemptByID(user_id, quiz_event_id)
+        ↓
+reducer.RecordLearningEvents
+        ↓
+learning.unit_learning_events
+        ↓
+reducer
+        ↓
+learning.user_unit_states
+
+POST /api/learning-units:mark-mastered
+        ↓
+analytics self_mark_mastered raw fact write
+        ↓
+NormalizeSelfMarkMasteredByID(user_id, learning_interaction_event_id)
         ↓
 reducer.RecordLearningEvents
         ↓
@@ -583,6 +597,10 @@ NormalizeLearningInteractionsByIDs
 NormalizeQuizAttemptByID
   user_id
   quiz_event_id
+
+NormalizeSelfMarkMasteredByID
+  user_id
+  learning_interaction_event_id
 ```
 
 by-ID reader 必须同时按 `user_id` 和 `event_id` 过滤。即使调用方传入了其他用户的 raw `event_id`，也不能被读取或归约。
@@ -657,7 +675,7 @@ MVP 查询应尽量在 SQL 层排除这些事实，避免每轮重复读：
 
 ### 14.1 API 主路径：`NormalizeLearningInteractionsByIDs`
 
-未来 `POST /api/learning-interactions:batch` 写 raw 成功后同步调用：
+未来 `POST /api/learning-interactions:batch` 写 exposure / lookup raw 成功后同步调用：
 
 ```text
 NormalizeLearningInteractionsByIDs
@@ -675,7 +693,9 @@ learning_interaction_event_ids required non-empty
 - `user_id` 必填；
 - `learning_interaction_event_ids` 必须非空；
 - reader 只返回该用户自己的 raw rows；
+- raw row 只允许 `event_type in ('exposure', 'lookup')`；
 - unmapped lookup 可以被读取，但 mapper 会 skipped，不进入 Learning Engine；
+- `self_mark_mastered` 不允许走这个 by-ID 用例；它有独立的 `NormalizeSelfMarkMasteredByID`；
 - recorder 失败时 fail-fast，返回已累计 response 和 `error_count = 1`。
 
 输出 DTO：
@@ -725,7 +745,44 @@ error_count
 recorded_user_batch_count
 ```
 
-### 14.2 repair/backfill：`NormalizePendingEvents`
+### 14.3 API 主路径：`NormalizeSelfMarkMasteredByID`
+
+未来 `POST /api/learning-units:mark-mastered` 写 raw 成功后同步调用：
+
+```text
+NormalizeSelfMarkMasteredByID
+```
+
+输入 DTO：
+
+```text
+user_id required
+learning_interaction_event_id required
+```
+
+要求：
+
+- `user_id` 必填；
+- `learning_interaction_event_id` 必填；
+- reader 只返回该用户自己的 raw row；
+- raw row 必须是 `event_type = self_mark_mastered`；
+- 如果调用方误传 exposure / lookup 的 raw ID，usecase 返回 error，不调用 recorder；
+- 找不到该用户的 raw row 时不处理、不报错；
+- recorder 失败时 fail-fast，返回已累计 response 和 `error_count = 1`。
+
+输出 DTO：
+
+```text
+read_raw_count
+normalized_event_count
+skipped_count
+recorded_event_count
+duplicate_event_count
+error_count
+recorded_user_batch_count
+```
+
+### 14.4 repair/backfill：`NormalizePendingEvents`
 
 补偿 usecase：
 
@@ -922,7 +979,7 @@ Normalizer 不应该直接依赖 repository 写 `unit_learning_events`。
 RecordLearningEvents(ctx, dto.RecordLearningEventsRequest) (dto.RecordLearningEventsResponse, error)
 ```
 
-实现可以直接注入现有 `learningengine/application/usecase.RecordLearningEventsUsecase`。
+实现可以直接注入现有 `learningengine/reducer/application/usecase.RecordLearningEventsUsecase`。
 
 ## 18. Metadata 契约
 
@@ -1050,19 +1107,13 @@ MVP 可以把该错误返回给调用方或记录日志。由于没有 checkpoin
 
 ## 20. 调用方式
 
-MVP 可先支持同步调用：
-
-```text
-POST /internal/learningengine/normalizer/run
-```
-
-或 CLI / job 调用：
+MVP 可先支持 application usecase 直接调用；repair/backfill 可以由 CLI / job 调用：
 
 ```text
 learningengine-normalize --source=all --limit=500
 ```
 
-本文不定 API 路径。实现时应优先先落 application usecase，再由 API 或 job 调用。
+本文不定义内部 HTTP 路径。对外 HTTP 入口统一由 `internal/api` 设计文档约束；normalizer 自身只暴露 application usecase，供 API 或 job 调用。
 
 ## 21. 测试策略
 

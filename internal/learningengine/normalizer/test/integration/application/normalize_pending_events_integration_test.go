@@ -127,11 +127,11 @@ func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	db.SeedQuestion(t, questionID)
 
 	quizEventID := "33333333-3333-3333-3333-333333333333"
-	selfMarkEventID := "44444444-4444-4444-4444-444444444444"
+	lookupEventID := "44444444-4444-4444-4444-444444444444"
 	otherUserEventID := "55555555-5555-5555-5555-555555555555"
 	occurredAt := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	seedQuizEvent(t, db, quizEventID, userID, questionID, 101, true, 5000, occurredAt)
-	seedLearningInteraction(t, db, selfMarkEventID, userID, 102, learningenum.EventSelfMarkMastered, occurredAt.Add(time.Second))
+	seedLearningInteraction(t, db, lookupEventID, userID, 102, learningenum.EventLookup, occurredAt.Add(time.Second))
 	seedLearningInteraction(t, db, otherUserEventID, otherUserID, 102, learningenum.EventLookup, occurredAt.Add(2*time.Second))
 
 	quizUsecase := newNormalizeQuizAttemptByIDUsecase(db)
@@ -149,7 +149,7 @@ func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	interactionUsecase := newNormalizeLearningInteractionsByIDsUsecase(db)
 	interactionResponse, err := interactionUsecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
 		UserID:                      userID,
-		LearningInteractionEventIDs: []string{selfMarkEventID, otherUserEventID},
+		LearningInteractionEventIDs: []string{lookupEventID, otherUserEventID},
 	})
 	if err != nil {
 		t.Fatalf("interaction Execute() error = %v", err)
@@ -162,9 +162,9 @@ func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	if quizState.progressEventCount != 1 || quizState.lastProgressQuality == nil || *quizState.lastProgressQuality != 5 {
 		t.Fatalf("quiz state = %+v, want one quality=5 progress event", quizState)
 	}
-	selfMarkState := readState(t, db, userID, 102)
-	if selfMarkState.status != "mastered" || selfMarkState.isTarget {
-		t.Fatalf("self mark state = %+v, want terminal mastered", selfMarkState)
+	lookupState := readState(t, db, userID, 102)
+	if lookupState.observationCount != 1 || lookupState.progressEventCount != 0 {
+		t.Fatalf("lookup state = %+v, want observation only", lookupState)
 	}
 
 	var otherUserStateCount int
@@ -173,6 +173,65 @@ func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	}
 	if otherUserStateCount != 0 {
 		t.Fatalf("other user states = %d, want 0", otherUserStateCount)
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDSetsTerminalMastered(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	eventID := "44444444-4444-4444-4444-444444444444"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	seedLearningInteraction(t, db, eventID, userID, 101, learningenum.EventSelfMarkMastered, time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC))
+
+	usecase := newNormalizeSelfMarkMasteredByIDUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     userID,
+		LearningInteractionEventID: eventID,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.ReadRawCount != 1 || response.RecordedEventCount != 1 {
+		t.Fatalf("response = %+v, want read=1 recorded=1", response)
+	}
+
+	state := readState(t, db, userID, 101)
+	if state.status != "mastered" || state.isTarget || state.progressPercent != 100 || state.masteryScore != 1 || !state.nextReviewIsNull {
+		t.Fatalf("state = %+v, want terminal mastered", state)
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDRejectsNonSelfMarkRawRow(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	eventID := "44444444-4444-4444-4444-444444444444"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	seedLearningInteraction(t, db, eventID, userID, 101, learningenum.EventLookup, time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC))
+
+	usecase := newNormalizeSelfMarkMasteredByIDUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     userID,
+		LearningInteractionEventID: eventID,
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want event type error")
+	}
+	if response.ReadRawCount != 1 || response.ErrorCount != 1 {
+		t.Fatalf("response = %+v, want read=1 error=1", response)
+	}
+
+	var eventCount int
+	if err := db.Pool.QueryRow(context.Background(), `select count(*) from learning.unit_learning_events`).Scan(&eventCount); err != nil {
+		t.Fatalf("count learning events: %v", err)
+	}
+	if eventCount != 0 {
+		t.Fatalf("learning events = %d, want 0", eventCount)
 	}
 }
 
@@ -238,6 +297,14 @@ func newNormalizeQuizAttemptByIDUsecase(db *fixture.TestDatabase) *normalizerser
 	recordUsecase := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(db.Pool))
 	return normalizerservice.NewNormalizeQuizAttemptByIDUsecase(
 		normalizerrepo.NewRawQuizEventReader(db.Pool),
+		recordUsecase,
+	)
+}
+
+func newNormalizeSelfMarkMasteredByIDUsecase(db *fixture.TestDatabase) *normalizerservice.NormalizeSelfMarkMasteredByIDUsecase {
+	recordUsecase := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(db.Pool))
+	return normalizerservice.NewNormalizeSelfMarkMasteredByIDUsecase(
+		normalizerrepo.NewRawLearningInteractionReader(db.Pool),
 		recordUsecase,
 	)
 }

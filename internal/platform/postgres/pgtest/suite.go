@@ -50,7 +50,11 @@ type Database struct {
 
 // OpenSuite starts embedded Postgres and prepares the configured template database.
 func OpenSuite(options Options) (*Suite, error) {
-	options = normalizeOptions(options)
+	var err error
+	options, err = normalizeOptions(options)
+	if err != nil {
+		return nil, err
+	}
 
 	baseDir := options.BaseDir
 	cleanupBaseDir := false
@@ -164,6 +168,10 @@ func (s *Suite) CreateTestDatabase(t *testing.T) *Database {
 
 // OpenDatabase clones the template database with a caller-provided name.
 func (s *Suite) OpenDatabase(ctx context.Context, name string) (*Database, error) {
+	if err := validateIdentifier(name, "database name"); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
@@ -251,7 +259,7 @@ func (s *Suite) databaseURL(name string) string {
 	return fmt.Sprintf("postgres://postgres:postgres@127.0.0.1:%d/%s?sslmode=disable", s.port, name)
 }
 
-func normalizeOptions(options Options) Options {
+func normalizeOptions(options Options) (Options, error) {
 	if options.TempDirPrefix == "" {
 		options.TempDirPrefix = "pgtest-*"
 	}
@@ -261,7 +269,30 @@ func normalizeOptions(options Options) Options {
 	if options.DatabaseNamePrefix == "" {
 		options.DatabaseNamePrefix = "pgtest_db"
 	}
-	return options
+	if err := validateIdentifier(options.TemplateDatabaseName, "template database name"); err != nil {
+		return Options{}, err
+	}
+	if err := validateIdentifier(options.DatabaseNamePrefix, "database name prefix"); err != nil {
+		return Options{}, err
+	}
+	return options, nil
+}
+
+func validateIdentifier(value string, field string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required", field)
+	}
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		valid := c == '_' || (c >= 'a' && c <= 'z') || (i > 0 && c >= '0' && c <= '9')
+		if !valid {
+			return fmt.Errorf("%s must contain only lowercase letters, digits, and underscores, and must start with a lowercase letter or underscore", field)
+		}
+	}
+	if value[0] >= '0' && value[0] <= '9' {
+		return fmt.Errorf("%s must contain only lowercase letters, digits, and underscores, and must start with a lowercase letter or underscore", field)
+	}
+	return nil
 }
 
 func waitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {

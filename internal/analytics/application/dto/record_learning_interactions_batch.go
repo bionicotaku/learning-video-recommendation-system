@@ -3,25 +3,24 @@ package dto
 import "time"
 
 type RecordLearningInteractionsBatchRequest struct {
-	UserID        string
-	ClientContext []byte
-	Events        []LearningInteractionEventInput
+	UserID              string
+	ClientContext       []byte
+	VideoID             string
+	WatchSessionID      string
+	RecommendationRunID string
+	Events              []LearningInteractionEventInput
 }
 
 type LearningInteractionEventInput struct {
 	ClientEventID string
 
-	EventType           string
-	SourceSurface       string
-	VideoID             string
-	WatchSessionID      string
-	RecommendationRunID string
-	RelatedQuizEventID  string
-	CoarseUnitID        *int64
-	TokenText           string
-	SentenceIndex       *int32
-	SpanIndex           *int32
-	OccurredAt          time.Time
+	EventType     string
+	SourceSurface string
+	CoarseUnitID  *int64
+	TokenText     string
+	SentenceIndex *int32
+	SpanIndex     *int32
+	OccurredAt    time.Time
 
 	ExposureStartMS *int32
 	ExposureEndMS   *int32

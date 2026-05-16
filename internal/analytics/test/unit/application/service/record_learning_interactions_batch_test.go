@@ -13,6 +13,8 @@ import (
 func TestRecordLearningInteractionsBatchWritesInteractions(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
 	writer := &fakeRawEventWriter{
 		interactionResults: []model.RawEventWriteResult{
 			{ClientEventID: "interaction-1", EventID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Inserted: true},
@@ -22,8 +24,11 @@ func TestRecordLearningInteractionsBatchWritesInteractions(t *testing.T) {
 	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
 
 	response, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
-		UserID:        "11111111-1111-1111-1111-111111111111",
-		ClientContext: []byte(`{"platform":"ios"}`),
+		UserID:              "11111111-1111-1111-1111-111111111111",
+		ClientContext:       []byte(`{"platform":"ios"}`),
+		VideoID:             "22222222-2222-2222-2222-222222222222",
+		WatchSessionID:      "33333333-3333-3333-3333-333333333333",
+		RecommendationRunID: "44444444-4444-4444-4444-444444444444",
 		Events: []dto.LearningInteractionEventInput{
 			{
 				ClientEventID: "interaction-1",
@@ -31,14 +36,18 @@ func TestRecordLearningInteractionsBatchWritesInteractions(t *testing.T) {
 				SourceSurface: "video_subtitle",
 				CoarseUnitID:  &unitID,
 				TokenText:     "test",
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
 				OccurredAt:    now,
 				EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
 			},
 			{
 				ClientEventID: "interaction-2",
-				EventType:     "self_mark_mastered",
-				SourceSurface: "word_detail",
+				EventType:     "exposure",
+				SourceSurface: "video_subtitle",
 				CoarseUnitID:  &unitID,
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
 				OccurredAt:    now.Add(time.Second),
 			},
 		},
@@ -60,18 +69,106 @@ func TestRecordLearningInteractionsBatchWritesInteractions(t *testing.T) {
 		if event.UserID != "11111111-1111-1111-1111-111111111111" {
 			t.Fatalf("writer user id = %q", event.UserID)
 		}
+		if event.VideoID != "22222222-2222-2222-2222-222222222222" || event.WatchSessionID != "33333333-3333-3333-3333-333333333333" || event.RecommendationRunID != "44444444-4444-4444-4444-444444444444" {
+			t.Fatalf("writer context = video:%q watch:%q recommendation:%q", event.VideoID, event.WatchSessionID, event.RecommendationRunID)
+		}
+	}
+}
+
+func TestRecordLearningInteractionsBatchRejectsSelfMarkMastered(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	writer := &fakeRawEventWriter{}
+	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+		UserID:         "11111111-1111-1111-1111-111111111111",
+		ClientContext:  []byte(`{"platform":"ios"}`),
+		VideoID:        "22222222-2222-2222-2222-222222222222",
+		WatchSessionID: "33333333-3333-3333-3333-333333333333",
+		Events: []dto.LearningInteractionEventInput{
+			{
+				ClientEventID: "self-mark-1",
+				EventType:     "self_mark_mastered",
+				SourceSurface: "word_detail",
+				CoarseUnitID:  &unitID,
+				OccurredAt:    now,
+			},
+		},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want validation error")
+	}
+	if !service.IsValidationError(err) {
+		t.Fatalf("Execute() error = %v, want typed validation error", err)
+	}
+	if len(writer.interactions) != 0 {
+		t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
+	}
+}
+
+func TestRecordLearningInteractionsBatchRejectsMissingVideoContext(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
+	cases := []struct {
+		name           string
+		videoID        string
+		watchSessionID string
+	}{
+		{name: "video", watchSessionID: "33333333-3333-3333-3333-333333333333"},
+		{name: "watch session", videoID: "22222222-2222-2222-2222-222222222222"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+				UserID:         "11111111-1111-1111-1111-111111111111",
+				VideoID:        tc.videoID,
+				WatchSessionID: tc.watchSessionID,
+				Events: []dto.LearningInteractionEventInput{
+					{
+						ClientEventID: "lookup-1",
+						EventType:     "lookup",
+						SourceSurface: "video_subtitle",
+						CoarseUnitID:  &unitID,
+						TokenText:     "test",
+						SentenceIndex: &sentenceIndex,
+						SpanIndex:     &spanIndex,
+						OccurredAt:    now,
+					},
+				},
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want validation error")
+			}
+			if !service.IsValidationError(err) {
+				t.Fatalf("Execute() error = %v, want typed validation error", err)
+			}
+			if len(writer.interactions) != 0 {
+				t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
+			}
+		})
 	}
 }
 
 func TestRecordLearningInteractionsBatchNormalizesOccurredAtToUTC(t *testing.T) {
 	localTime := time.Date(2026, 5, 15, 10, 0, 0, 0, time.FixedZone("PDT", -7*60*60))
 	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
 	writer := &fakeRawEventWriter{}
 	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
 
 	_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
-		UserID:        "11111111-1111-1111-1111-111111111111",
-		ClientContext: []byte(`{"platform":"ios","app_version":"1.3.0","os_version":"18.5","device_model":"iPhone16,2"}`),
+		UserID:         "11111111-1111-1111-1111-111111111111",
+		ClientContext:  []byte(`{"platform":"ios","app_version":"1.3.0","os_version":"18.5","device_model":"iPhone16,2"}`),
+		VideoID:        "22222222-2222-2222-2222-222222222222",
+		WatchSessionID: "33333333-3333-3333-3333-333333333333",
 		Events: []dto.LearningInteractionEventInput{
 			{
 				ClientEventID: "interaction-utc",
@@ -79,6 +176,8 @@ func TestRecordLearningInteractionsBatchNormalizesOccurredAtToUTC(t *testing.T) 
 				SourceSurface: "video_subtitle",
 				CoarseUnitID:  &unitID,
 				TokenText:     "test",
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
 				OccurredAt:    localTime,
 				EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
 			},
@@ -102,6 +201,8 @@ func TestRecordLearningInteractionsBatchNormalizesOccurredAtToUTC(t *testing.T) 
 func TestRecordLearningInteractionsBatchAcceptsLooseClientContextObject(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
 	cases := []struct {
 		name          string
 		idSuffix      string
@@ -119,8 +220,10 @@ func TestRecordLearningInteractionsBatchAcceptsLooseClientContextObject(t *testi
 			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
 
 			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
-				UserID:        "11111111-1111-1111-1111-111111111111",
-				ClientContext: tc.clientContext,
+				UserID:         "11111111-1111-1111-1111-111111111111",
+				ClientContext:  tc.clientContext,
+				VideoID:        "22222222-2222-2222-2222-222222222222",
+				WatchSessionID: "33333333-3333-3333-3333-333333333333",
 				Events: []dto.LearningInteractionEventInput{
 					{
 						ClientEventID: "interaction-" + tc.idSuffix,
@@ -128,6 +231,8 @@ func TestRecordLearningInteractionsBatchAcceptsLooseClientContextObject(t *testi
 						SourceSurface: "video_subtitle",
 						CoarseUnitID:  &unitID,
 						TokenText:     "test",
+						SentenceIndex: &sentenceIndex,
+						SpanIndex:     &spanIndex,
 						OccurredAt:    now,
 						EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
 					},
@@ -146,6 +251,8 @@ func TestRecordLearningInteractionsBatchAcceptsLooseClientContextObject(t *testi
 func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
 	cases := []struct {
 		name          string
 		clientContext []byte
@@ -162,8 +269,10 @@ func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing
 			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
 
 			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
-				UserID:        "11111111-1111-1111-1111-111111111111",
-				ClientContext: tc.clientContext,
+				UserID:         "11111111-1111-1111-1111-111111111111",
+				ClientContext:  tc.clientContext,
+				VideoID:        "22222222-2222-2222-2222-222222222222",
+				WatchSessionID: "33333333-3333-3333-3333-333333333333",
 				Events: []dto.LearningInteractionEventInput{
 					{
 						ClientEventID: "interaction-" + tc.name,
@@ -171,6 +280,8 @@ func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing
 						SourceSurface: "video_subtitle",
 						CoarseUnitID:  &unitID,
 						TokenText:     "test",
+						SentenceIndex: &sentenceIndex,
+						SpanIndex:     &spanIndex,
 						OccurredAt:    now,
 						EventPayload:  []byte(`{"lookup_visible_ms":5000}`),
 					},
@@ -178,6 +289,9 @@ func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing
 			})
 			if err == nil {
 				t.Fatalf("Execute() error = nil, want validation error")
+			}
+			if !service.IsValidationError(err) {
+				t.Fatalf("Execute() error = %v, want typed validation error", err)
 			}
 			if len(writer.interactions) != 0 {
 				t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
@@ -188,17 +302,23 @@ func TestRecordLearningInteractionsBatchRejectsNonObjectClientContext(t *testing
 
 func TestRecordLearningInteractionsBatchRejectsInvalidBatchBeforeWrite(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
 	writer := &fakeRawEventWriter{}
 	usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
 
 	_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
-		UserID: "11111111-1111-1111-1111-111111111111",
+		UserID:         "11111111-1111-1111-1111-111111111111",
+		VideoID:        "22222222-2222-2222-2222-222222222222",
+		WatchSessionID: "33333333-3333-3333-3333-333333333333",
 		Events: []dto.LearningInteractionEventInput{
 			{
 				ClientEventID: "valid-looking",
 				EventType:     "lookup",
 				SourceSurface: "video_subtitle",
 				TokenText:     "test",
+				SentenceIndex: &sentenceIndex,
+				SpanIndex:     &spanIndex,
 				OccurredAt:    now,
 			},
 			{
@@ -212,7 +332,90 @@ func TestRecordLearningInteractionsBatchRejectsInvalidBatchBeforeWrite(t *testin
 	if err == nil {
 		t.Fatalf("Execute() error = nil, want validation error")
 	}
+	if !service.IsValidationError(err) {
+		t.Fatalf("Execute() error = %v, want typed validation error", err)
+	}
 	if len(writer.interactions) != 0 || len(writer.quizEvents) != 0 {
 		t.Fatalf("writer was called interactions=%d quiz=%d, want no writes", len(writer.interactions), len(writer.quizEvents))
+	}
+}
+
+func TestRecordLearningInteractionsBatchRequiresSentenceAndSpanIndexesForCurrentEventTypes(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	unitID := int64(101)
+	sentenceIndex := int32(12)
+	spanIndex := int32(4)
+	cases := []struct {
+		name  string
+		event dto.LearningInteractionEventInput
+	}{
+		{
+			name: "lookup sentence_index",
+			event: dto.LearningInteractionEventInput{
+				ClientEventID: "lookup-1",
+				EventType:     "lookup",
+				SourceSurface: "video_subtitle",
+				TokenText:     "test",
+				SpanIndex:     &spanIndex,
+				OccurredAt:    now,
+			},
+		},
+		{
+			name: "lookup span_index",
+			event: dto.LearningInteractionEventInput{
+				ClientEventID: "lookup-1",
+				EventType:     "lookup",
+				SourceSurface: "video_subtitle",
+				TokenText:     "test",
+				SentenceIndex: &sentenceIndex,
+				OccurredAt:    now,
+			},
+		},
+		{
+			name: "exposure sentence_index",
+			event: dto.LearningInteractionEventInput{
+				ClientEventID: "exposure-1",
+				EventType:     "exposure",
+				SourceSurface: "video_subtitle",
+				CoarseUnitID:  &unitID,
+				SpanIndex:     &spanIndex,
+				OccurredAt:    now,
+			},
+		},
+		{
+			name: "exposure span_index",
+			event: dto.LearningInteractionEventInput{
+				ClientEventID: "exposure-1",
+				EventType:     "exposure",
+				SourceSurface: "video_subtitle",
+				CoarseUnitID:  &unitID,
+				SentenceIndex: &sentenceIndex,
+				OccurredAt:    now,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordLearningInteractionsBatchUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordLearningInteractionsBatchRequest{
+				UserID:         "11111111-1111-1111-1111-111111111111",
+				ClientContext:  []byte(`{"platform":"ios"}`),
+				VideoID:        "22222222-2222-2222-2222-222222222222",
+				WatchSessionID: "33333333-3333-3333-3333-333333333333",
+				Events:         []dto.LearningInteractionEventInput{tc.event},
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want validation error")
+			}
+			if !service.IsValidationError(err) {
+				t.Fatalf("Execute() error = %v, want typed validation error", err)
+			}
+			if len(writer.interactions) != 0 {
+				t.Fatalf("writer interactions = %d, want 0", len(writer.interactions))
+			}
+		})
 	}
 }

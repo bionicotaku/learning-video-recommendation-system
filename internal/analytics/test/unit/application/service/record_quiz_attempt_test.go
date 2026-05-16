@@ -163,6 +163,9 @@ func TestRecordQuizAttemptRejectsNonObjectClientContext(t *testing.T) {
 			if err == nil {
 				t.Fatalf("Execute() error = nil, want validation error")
 			}
+			if !service.IsValidationError(err) {
+				t.Fatalf("Execute() error = %v, want typed validation error", err)
+			}
 			if len(writer.quizEvents) != 0 {
 				t.Fatalf("writer quiz events = %d, want 0", len(writer.quizEvents))
 			}
@@ -191,7 +194,71 @@ func TestRecordQuizAttemptRejectsInvalidAttemptBeforeWrite(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Execute() error = nil, want validation error")
 	}
+	if !service.IsValidationError(err) {
+		t.Fatalf("Execute() error = %v, want typed validation error", err)
+	}
 	if len(writer.quizEvents) != 0 || len(writer.interactions) != 0 {
 		t.Fatalf("writer was called quiz=%d interactions=%d, want no writes", len(writer.quizEvents), len(writer.interactions))
+	}
+}
+
+func TestRecordQuizAttemptValidatesTriggerType(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	validTriggers := []string{"video_end", "lookup_practice", "feed_review", "mid_video", "manual"}
+	for _, triggerType := range validTriggers {
+		t.Run("valid "+triggerType, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordQuizAttemptUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordQuizAttemptRequest{
+				UserID:              "11111111-1111-1111-1111-111111111111",
+				ClientEventID:       "quiz-" + triggerType,
+				QuestionID:          "33333333-3333-3333-3333-333333333333",
+				CoarseUnitID:        101,
+				TriggerType:         triggerType,
+				SelectedOptionIDs:   []string{"correct"},
+				SelectionIntervalMS: []int32{1000},
+				IsFirstTryCorrect:   true,
+				TotalElapsedMS:      1000,
+				ShownAt:             now.Add(-time.Second),
+				CompletedAt:         now,
+			})
+			if err != nil {
+				t.Fatalf("Execute() error = %v", err)
+			}
+			if len(writer.quizEvents) != 1 {
+				t.Fatalf("writer quiz events = %d, want 1", len(writer.quizEvents))
+			}
+		})
+	}
+
+	for _, triggerType := range []string{"practice_now", "scheduled_review"} {
+		t.Run("invalid "+triggerType, func(t *testing.T) {
+			writer := &fakeRawEventWriter{}
+			usecase := service.NewRecordQuizAttemptUsecase(writer)
+
+			_, err := usecase.Execute(context.Background(), dto.RecordQuizAttemptRequest{
+				UserID:              "11111111-1111-1111-1111-111111111111",
+				ClientEventID:       "quiz-" + triggerType,
+				QuestionID:          "33333333-3333-3333-3333-333333333333",
+				CoarseUnitID:        101,
+				TriggerType:         triggerType,
+				SelectedOptionIDs:   []string{"correct"},
+				SelectionIntervalMS: []int32{1000},
+				IsFirstTryCorrect:   true,
+				TotalElapsedMS:      1000,
+				ShownAt:             now.Add(-time.Second),
+				CompletedAt:         now,
+			})
+			if err == nil {
+				t.Fatalf("Execute() error = nil, want validation error")
+			}
+			if !service.IsValidationError(err) {
+				t.Fatalf("Execute() error = %v, want typed validation error", err)
+			}
+			if len(writer.quizEvents) != 0 {
+				t.Fatalf("writer quiz events = %d, want 0", len(writer.quizEvents))
+			}
+		})
 	}
 }

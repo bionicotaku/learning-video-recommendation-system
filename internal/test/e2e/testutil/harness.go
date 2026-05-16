@@ -1,3 +1,5 @@
+//go:build e2e
+
 package testutil
 
 import (
@@ -104,24 +106,8 @@ type VideoUnitIndexFixture struct {
 	BestEvidenceSpanIndex     int32
 }
 
-func StartHarness(t *testing.T) *Harness {
-	t.Helper()
-
-	harness, err := OpenHarness(t.TempDir())
-	if err != nil {
-		t.Fatalf("open e2e harness: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := harness.Close(); err != nil {
-			t.Fatalf("close e2e harness: %v", err)
-		}
-	})
-	return harness
-}
-
-func OpenHarness(baseDir string) (*Harness, error) {
+func OpenHarness() (*Harness, error) {
 	suite, err := pgtest.OpenSuite(pgtest.Options{
-		BaseDir:              baseDir,
 		TempDirPrefix:        "learning-recommendation-e2e-*",
 		TemplateDatabaseName: "cross_module_e2e_template",
 		DatabaseNamePrefix:   "cross_module_e2e",
@@ -145,19 +131,6 @@ func OpenHarness(baseDir string) (*Harness, error) {
 		nextUnitID:  100,
 	}
 	return harness, nil
-}
-
-func (h *Harness) applySchema(t *testing.T) {
-	t.Helper()
-}
-
-func (h *Harness) ApplySchema(t *testing.T) {
-	t.Helper()
-	h.applySchema(t)
-}
-
-func (h *Harness) ApplySchemaForMain() error {
-	return nil
 }
 
 func (h *Harness) Close() error {
@@ -613,11 +586,17 @@ func e2eSchemaPlan() pgtest.SchemaPlan {
 		pgtest.SQLFile(pgtest.RepoPath(
 			"internal",
 			"learningengine",
-			"reducer",
+			"normalizer",
 			"infrastructure",
 			"persistence",
 			"schema",
 			"000000_external_refs.sql",
+		)),
+		pgtest.MigrationDir(pgtest.RepoPath(
+			"internal",
+			"analytics",
+			"infrastructure",
+			"migration",
 		)),
 		pgtest.MigrationDir(pgtest.RepoPath(
 			"internal",

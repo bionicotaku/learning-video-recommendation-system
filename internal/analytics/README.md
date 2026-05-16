@@ -36,10 +36,11 @@ internal/analytics/
 
 当前已实现 raw fact write 能力：
 
-- `RecordLearningInteractionsBatch` 应用用例负责 learning interaction 整批 validation。
+- `RecordLearningInteractionsBatch` 应用用例负责 exposure / lookup interaction 整批 validation。
 - `RecordQuizAttempt` 应用用例负责单次 completed quiz attempt validation。
+- `RecordSelfMarkMastered` 应用用例负责单次 self mark validation，并固定写入 `event_type = self_mark_mastered`。
 - quiz raw fact 写入 `analytics.quiz_events`。
-- exposure / lookup / self_mark raw fact 写入 `analytics.learning_interaction_events`。
+- exposure / lookup / self_mark raw fact 写入 `analytics.learning_interaction_events`，但 self mark 不走 batch API。
 - `(user_id, client_event_id)` 重复时返回已有 `event_id`，不把重复当错误。
 - 真实 repository 分别写入 quiz 与 learning interaction raw facts；两类事件由未来不同 API 调用，不再混入同一事务。
 - `user_id` 来自 usecase request；未来 HTTP 层必须从认证上下文传入，不能信任事件 payload。

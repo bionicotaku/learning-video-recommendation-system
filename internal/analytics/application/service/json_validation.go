@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 func normalizeJSONObject(raw []byte, field string) ([]byte, error) {
@@ -11,17 +10,17 @@ func normalizeJSONObject(raw []byte, field string) ([]byte, error) {
 	}
 	var value map[string]any
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, fmt.Errorf("%s must be a json object", field)
+		return nil, validationError("%s must be a json object", field)
 	}
 	if value == nil {
-		return nil, fmt.Errorf("%s must be a json object", field)
+		return nil, validationError("%s must be a json object", field)
 	}
 	return raw, nil
 }
 
 func validateNonNegativePointer(value *int32, field string) error {
 	if value != nil && *value < 0 {
-		return fmt.Errorf("%s must be non-negative", field)
+		return validationError("%s must be non-negative", field)
 	}
 	return nil
 }

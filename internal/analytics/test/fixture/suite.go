@@ -1,3 +1,5 @@
+//go:build integration
+
 package fixture
 
 import (
@@ -13,9 +15,8 @@ type Suite struct {
 }
 
 type TestDatabase struct {
-	inner *pgtest.Database
-	Name  string
-	Pool  *pgxpool.Pool
+	Name string
+	Pool *pgxpool.Pool
 }
 
 func OpenSuite() (*Suite, error) {
@@ -40,8 +41,7 @@ func (s *Suite) CreateTestDatabase(t *testing.T) *TestDatabase {
 
 	db := s.inner.CreateTestDatabase(t)
 	return &TestDatabase{
-		inner: db,
-		Name:  db.Name,
-		Pool:  db.Pool,
+		Name: db.Name,
+		Pool: db.Pool,
 	}
 }

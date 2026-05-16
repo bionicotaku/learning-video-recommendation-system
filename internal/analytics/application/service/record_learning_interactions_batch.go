@@ -25,10 +25,16 @@ func (u *RecordLearningInteractionsBatchUsecase) Execute(ctx context.Context, re
 		return dto.RecordLearningInteractionsBatchResponse{}, fmt.Errorf("raw event writer is required")
 	}
 	if request.UserID == "" {
-		return dto.RecordLearningInteractionsBatchResponse{}, fmt.Errorf("user_id is required")
+		return dto.RecordLearningInteractionsBatchResponse{}, validationError("user_id is required")
+	}
+	if request.VideoID == "" {
+		return dto.RecordLearningInteractionsBatchResponse{}, validationError("video_id is required")
+	}
+	if request.WatchSessionID == "" {
+		return dto.RecordLearningInteractionsBatchResponse{}, validationError("watch_session_id is required")
 	}
 	if len(request.Events) == 0 {
-		return dto.RecordLearningInteractionsBatchResponse{}, fmt.Errorf("events are required")
+		return dto.RecordLearningInteractionsBatchResponse{}, validationError("events are required")
 	}
 
 	clientContext, err := normalizeJSONObject(request.ClientContext, "client_context")
@@ -38,7 +44,7 @@ func (u *RecordLearningInteractionsBatchUsecase) Execute(ctx context.Context, re
 
 	events := make([]model.RawLearningInteractionEvent, 0, len(request.Events))
 	for index, input := range request.Events {
-		event, err := mapLearningInteractionInput(request.UserID, clientContext, input, index)
+		event, err := mapLearningInteractionInput(request, clientContext, input, index)
 		if err != nil {
 			return dto.RecordLearningInteractionsBatchResponse{}, err
 		}
@@ -66,32 +72,40 @@ func (u *RecordLearningInteractionsBatchUsecase) Execute(ctx context.Context, re
 	return response, nil
 }
 
-func mapLearningInteractionInput(userID string, clientContext []byte, input dto.LearningInteractionEventInput, index int) (model.RawLearningInteractionEvent, error) {
+func mapLearningInteractionInput(request dto.RecordLearningInteractionsBatchRequest, clientContext []byte, input dto.LearningInteractionEventInput, index int) (model.RawLearningInteractionEvent, error) {
 	if input.ClientEventID == "" {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].client_event_id is required", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].client_event_id is required", index)
 	}
 	if input.EventType == "" {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].event_type is required", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].event_type is required", index)
 	}
 	switch input.EventType {
-	case "exposure", "lookup", "self_mark_mastered":
+	case "exposure", "lookup":
 	default:
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].event_type is unsupported: %s", index, input.EventType)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].event_type is unsupported: %s", index, input.EventType)
 	}
 	if input.SourceSurface == "" {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].source_surface is required", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].source_surface is required", index)
 	}
 	if input.OccurredAt.IsZero() {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].occurred_at is required", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].occurred_at is required", index)
 	}
 	if input.EventType == "lookup" && input.TokenText == "" {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].token_text is required for lookup", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].token_text is required for lookup", index)
 	}
-	if input.EventType == "exposure" && (input.CoarseUnitID == nil || *input.CoarseUnitID == 0) {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].coarse_unit_id is required for exposure", index)
+	if input.EventType == "exposure" && (input.CoarseUnitID == nil || *input.CoarseUnitID <= 0) {
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].coarse_unit_id is required for exposure", index)
 	}
-	if input.EventType == "self_mark_mastered" && (input.CoarseUnitID == nil || *input.CoarseUnitID == 0) {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].coarse_unit_id is required for self_mark_mastered", index)
+	if input.EventType == "lookup" && input.CoarseUnitID != nil && *input.CoarseUnitID <= 0 {
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].coarse_unit_id must be positive when provided", index)
+	}
+	if learningInteractionEventRequiresSubtitleIndexes(input.EventType) {
+		if input.SentenceIndex == nil {
+			return model.RawLearningInteractionEvent{}, validationError("events[%d].sentence_index is required for %s", index, input.EventType)
+		}
+		if input.SpanIndex == nil {
+			return model.RawLearningInteractionEvent{}, validationError("events[%d].span_index is required for %s", index, input.EventType)
+		}
 	}
 	if err := validateNonNegativePointer(input.ExposureStartMS, fmt.Sprintf("events[%d].exposure_start_ms", index)); err != nil {
 		return model.RawLearningInteractionEvent{}, err
@@ -100,19 +114,19 @@ func mapLearningInteractionInput(userID string, clientContext []byte, input dto.
 		return model.RawLearningInteractionEvent{}, err
 	}
 	if input.ExposureStartMS != nil && input.ExposureEndMS != nil && *input.ExposureEndMS < *input.ExposureStartMS {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].exposure_end_ms must be >= exposure_start_ms", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].exposure_end_ms must be >= exposure_start_ms", index)
 	}
 	if input.ExposureCount != nil && *input.ExposureCount < 1 {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].exposure_count must be >= 1", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].exposure_count must be >= 1", index)
 	}
 	if err := validateNonNegativePointer(input.LookupVisibleMS, fmt.Sprintf("events[%d].lookup_visible_ms", index)); err != nil {
 		return model.RawLearningInteractionEvent{}, err
 	}
 	if input.LookupSentenceAudioReplayCount < 0 {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].lookup_sentence_audio_replay_count must be non-negative", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].lookup_sentence_audio_replay_count must be non-negative", index)
 	}
 	if input.LookupWordAudioPlayCount < 0 {
-		return model.RawLearningInteractionEvent{}, fmt.Errorf("events[%d].lookup_word_audio_play_count must be non-negative", index)
+		return model.RawLearningInteractionEvent{}, validationError("events[%d].lookup_word_audio_play_count must be non-negative", index)
 	}
 	eventPayload, err := normalizeJSONObject(input.EventPayload, fmt.Sprintf("events[%d].event_payload", index))
 	if err != nil {
@@ -121,14 +135,13 @@ func mapLearningInteractionInput(userID string, clientContext []byte, input dto.
 
 	return model.RawLearningInteractionEvent{
 		ClientEventID:                  input.ClientEventID,
-		UserID:                         userID,
+		UserID:                         request.UserID,
 		ClientContext:                  clientContext,
 		EventType:                      input.EventType,
 		SourceSurface:                  input.SourceSurface,
-		VideoID:                        input.VideoID,
-		WatchSessionID:                 input.WatchSessionID,
-		RecommendationRunID:            input.RecommendationRunID,
-		RelatedQuizEventID:             input.RelatedQuizEventID,
+		VideoID:                        request.VideoID,
+		WatchSessionID:                 request.WatchSessionID,
+		RecommendationRunID:            request.RecommendationRunID,
 		CoarseUnitID:                   input.CoarseUnitID,
 		TokenText:                      input.TokenText,
 		SentenceIndex:                  input.SentenceIndex,
@@ -143,4 +156,13 @@ func mapLearningInteractionInput(userID string, clientContext []byte, input dto.
 		LookupPracticeNowClicked:       input.LookupPracticeNowClicked,
 		EventPayload:                   eventPayload,
 	}, nil
+}
+
+func learningInteractionEventRequiresSubtitleIndexes(eventType string) bool {
+	switch eventType {
+	case "exposure", "lookup":
+		return true
+	default:
+		return false
+	}
 }

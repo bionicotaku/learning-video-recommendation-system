@@ -1,12 +1,13 @@
 # API 设计文档索引
 
-本目录统一收口尚未实现或后续实现时需要遵守的 API 设计文档。
+本目录统一收口已实现和后续实现时需要遵守的 API 设计文档。
 
 重要状态说明：
 
-- **API 实现状态：全部未开始。** 当前仓库还没有 `internal/api` 目录、HTTP server、router、middleware、handler、API DTO mapper 或 API 层测试。
-- **已完成只表示设计文档已落盘。** 文档中的 endpoint、request / response、错误语义和调用链都是未来实现契约，不表示接口已经可调用。
-- **当前没有“API 层部分完成”的 endpoint。** 个别下游模块已经有 application usecase 或数据库能力，但这些都不是 API 层实现。
+- **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
+- **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
+- **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
+- **其他业务 API 仍是设计文档。** Unit progress 与 Catalog watch-progress 尚未实现 HTTP handler。
 
 ## 总体规范
 
@@ -24,24 +25,18 @@
 
 | 文档 | 设计文档状态 | API 实现状态 | 说明 |
 |---|---|---|---|
-| [API模块总体设计规范.md](API模块总体设计规范.md) | 已写入 | 未开始 | 只定义未来 `internal/api` 的统一结构、认证上下文、错误响应、validation、测试和跨模块编排规则。 |
-| [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 未开始 | 未来包含 `POST /api/learning-interactions:batch` 与 `POST /api/quiz-attempts`；当前没有 HTTP handler。下游 `analytics` / `learningengine normalizer` 的部分应用层能力已存在，但 API 入口未实现。 |
+| [API模块总体设计规范.md](API模块总体设计规范.md) | 已写入 | 已实现基座 | `internal/api` 基座、server bootstrap、router、middleware、错误响应、测试底座已落地。 |
+| [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`；HTTP success 只承诺 raw accepted。 |
 | [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md) | 已写入 | 未开始 | 只定义未来读取用户学习单元进度的分页契约；当前没有 HTTP handler。 |
 | [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 未开始 | 只定义未来观看进度上报与聚合边界；当前没有 HTTP handler。 |
 
 ## 未开始范围
 
-以下内容在 API 层均未实现：
+以下内容在 API 层仍未实现：
 
-- `internal/api` 模块目录和目录级 `README.md` / `doc.go`
-- HTTP server bootstrap 与 router 装配
-- 认证 principal 解析 middleware
-- request id / logging / timeout / panic recovery middleware
-- endpoint handler
-- API request / response DTO
-- API DTO 到业务 usecase DTO 的 mapper
-- API 层 validation
-- 统一 error envelope 实现
-- API unit / integration / E2E tests
+- Learning Engine Unit Progress API handler。
+- Catalog watch-progress API handler。
+- 生产级 auth verifier；当前模型仍是 trusted upstream principal。
+- 完整 OpenAPI / 客户端 SDK 生成。
 
-因此，后续实现任一 API 时，应先以 [API模块总体设计规范.md](API模块总体设计规范.md) 建立 `internal/api` 基础结构，再按对应业务 API 文档逐个 endpoint 落地。
+后续新增 endpoint 时，应继续遵守 [API模块总体设计规范.md](API模块总体设计规范.md)，并按对应业务 API 文档逐个 endpoint 落地。

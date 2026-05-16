@@ -19,9 +19,7 @@ type Execer interface {
 }
 
 // SchemaPlan is an ordered set of schema setup steps.
-type SchemaPlan struct {
-	Steps []SchemaStep
-}
+type SchemaPlan []SchemaStep
 
 // SchemaStep is one schema setup step.
 type SchemaStep struct {
@@ -41,7 +39,7 @@ const (
 
 // NewSchemaPlan creates an ordered schema plan.
 func NewSchemaPlan(steps ...SchemaStep) SchemaPlan {
-	return SchemaPlan{Steps: steps}
+	return SchemaPlan(steps)
 }
 
 // SQLFile adds a SQL file execution step.
@@ -61,7 +59,7 @@ func MigrationDir(path string) SchemaStep {
 
 // Apply executes the schema plan against db.
 func (p SchemaPlan) Apply(ctx context.Context, db Execer) error {
-	for _, step := range p.Steps {
+	for _, step := range p {
 		if err := step.apply(ctx, db); err != nil {
 			return err
 		}
@@ -72,19 +70,19 @@ func (p SchemaPlan) Apply(ctx context.Context, db Execer) error {
 func (s SchemaStep) apply(ctx context.Context, db Execer) error {
 	switch s.kind {
 	case schemaStepSQLFile:
-		return ExecSQLFile(ctx, db, s.path)
+		return execSQLFile(ctx, db, s.path)
 	case schemaStepSQLText:
-		if err := ExecSQLText(ctx, db, s.sql); err != nil {
+		if err := execSQLText(ctx, db, s.sql); err != nil {
 			return fmt.Errorf("exec inline sql %s: %w", s.description, err)
 		}
 		return nil
 	case schemaStepMigrationDir:
-		files, err := MigrationFiles(s.path)
+		files, err := migrationFiles(s.path)
 		if err != nil {
 			return err
 		}
 		for _, path := range files {
-			if err := ExecSQLFile(ctx, db, path); err != nil {
+			if err := execSQLFile(ctx, db, path); err != nil {
 				return err
 			}
 		}
@@ -94,28 +92,25 @@ func (s SchemaStep) apply(ctx context.Context, db Execer) error {
 	}
 }
 
-// ExecSQLFile reads and executes one SQL file.
-func ExecSQLFile(ctx context.Context, db Execer, path string) error {
+func execSQLFile(ctx context.Context, db Execer, path string) error {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read sql file %s: %w", path, err)
 	}
-	if err := ExecSQLText(ctx, db, string(content)); err != nil {
+	if err := execSQLText(ctx, db, string(content)); err != nil {
 		return fmt.Errorf("exec sql file %s: %w", path, err)
 	}
 	return nil
 }
 
-// ExecSQLText executes one SQL string.
-func ExecSQLText(ctx context.Context, db Execer, sql string) error {
+func execSQLText(ctx context.Context, db Execer, sql string) error {
 	if _, err := db.Exec(ctx, sql); err != nil {
 		return err
 	}
 	return nil
 }
 
-// MigrationFiles returns .up.sql files in a migration directory in numeric version order.
-func MigrationFiles(dir string) ([]string, error) {
+func migrationFiles(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("read migration dir %s: %w", dir, err)
@@ -149,8 +144,7 @@ func migrationVersion(path string) int {
 	return version
 }
 
-// RepoRoot returns the repository root path.
-func RepoRoot() string {
+func repoRoot() string {
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		panic("resolve pgtest caller path")
@@ -160,6 +154,6 @@ func RepoRoot() string {
 
 // RepoPath joins path parts relative to the repository root.
 func RepoPath(parts ...string) string {
-	all := append([]string{RepoRoot()}, parts...)
+	all := append([]string{repoRoot()}, parts...)
 	return filepath.Join(all...)
 }

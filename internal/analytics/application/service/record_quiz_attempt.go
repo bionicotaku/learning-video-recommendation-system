@@ -42,50 +42,53 @@ func (u *RecordQuizAttemptUsecase) Execute(ctx context.Context, request dto.Reco
 
 func mapQuizAttemptRequest(request dto.RecordQuizAttemptRequest) (model.RawQuizEvent, error) {
 	if request.UserID == "" {
-		return model.RawQuizEvent{}, fmt.Errorf("user_id is required")
+		return model.RawQuizEvent{}, validationError("user_id is required")
 	}
 	if request.ClientEventID == "" {
-		return model.RawQuizEvent{}, fmt.Errorf("client_event_id is required")
+		return model.RawQuizEvent{}, validationError("client_event_id is required")
 	}
 	if request.QuestionID == "" {
-		return model.RawQuizEvent{}, fmt.Errorf("question_id is required")
+		return model.RawQuizEvent{}, validationError("question_id is required")
 	}
-	if request.CoarseUnitID == 0 {
-		return model.RawQuizEvent{}, fmt.Errorf("coarse_unit_id is required")
+	if request.CoarseUnitID <= 0 {
+		return model.RawQuizEvent{}, validationError("coarse_unit_id is required")
 	}
 	if request.TriggerType == "" {
-		return model.RawQuizEvent{}, fmt.Errorf("trigger_type is required")
+		return model.RawQuizEvent{}, validationError("trigger_type is required")
+	}
+	if !isValidQuizTriggerType(request.TriggerType) {
+		return model.RawQuizEvent{}, validationError("trigger_type is unsupported: %s", request.TriggerType)
 	}
 	if len(request.SelectedOptionIDs) == 0 {
-		return model.RawQuizEvent{}, fmt.Errorf("selected_option_ids is required")
+		return model.RawQuizEvent{}, validationError("selected_option_ids is required")
 	}
 	if len(request.SelectedOptionIDs) != len(request.SelectionIntervalMS) {
-		return model.RawQuizEvent{}, fmt.Errorf("selection_interval_ms must match selected_option_ids")
+		return model.RawQuizEvent{}, validationError("selection_interval_ms must match selected_option_ids")
 	}
 	if request.TotalElapsedMS < 0 {
-		return model.RawQuizEvent{}, fmt.Errorf("total_elapsed_ms must be non-negative")
+		return model.RawQuizEvent{}, validationError("total_elapsed_ms must be non-negative")
 	}
 	if request.ShownAt.IsZero() {
-		return model.RawQuizEvent{}, fmt.Errorf("shown_at is required")
+		return model.RawQuizEvent{}, validationError("shown_at is required")
 	}
 	if request.CompletedAt.IsZero() {
-		return model.RawQuizEvent{}, fmt.Errorf("completed_at is required")
+		return model.RawQuizEvent{}, validationError("completed_at is required")
 	}
 	shownAt := request.ShownAt.UTC()
 	completedAt := request.CompletedAt.UTC()
 	if completedAt.Before(shownAt) {
-		return model.RawQuizEvent{}, fmt.Errorf("completed_at must be >= shown_at")
+		return model.RawQuizEvent{}, validationError("completed_at must be >= shown_at")
 	}
 	lastOption := request.SelectedOptionIDs[len(request.SelectedOptionIDs)-1]
 	if lastOption != "correct" {
-		return model.RawQuizEvent{}, fmt.Errorf("selected_option_ids must end with correct")
+		return model.RawQuizEvent{}, validationError("selected_option_ids must end with correct")
 	}
 	if request.IsFirstTryCorrect != (request.SelectedOptionIDs[0] == "correct") {
-		return model.RawQuizEvent{}, fmt.Errorf("is_first_try_correct does not match selected_option_ids")
+		return model.RawQuizEvent{}, validationError("is_first_try_correct does not match selected_option_ids")
 	}
 	for index, interval := range request.SelectionIntervalMS {
 		if interval < 0 {
-			return model.RawQuizEvent{}, fmt.Errorf("selection_interval_ms[%d] must be non-negative", index)
+			return model.RawQuizEvent{}, validationError("selection_interval_ms[%d] must be non-negative", index)
 		}
 	}
 	clientContext, err := normalizeJSONObject(request.ClientContext, "client_context")
@@ -109,4 +112,13 @@ func mapQuizAttemptRequest(request dto.RecordQuizAttemptRequest) (model.RawQuizE
 		ShownAt:             shownAt,
 		CompletedAt:         completedAt,
 	}, nil
+}
+
+func isValidQuizTriggerType(value string) bool {
+	switch value {
+	case "video_end", "lookup_practice", "feed_review", "mid_video", "manual":
+		return true
+	default:
+		return false
+	}
 }

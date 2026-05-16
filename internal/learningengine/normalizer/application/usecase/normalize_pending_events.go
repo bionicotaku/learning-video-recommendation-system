@@ -17,3 +17,7 @@ type NormalizeLearningInteractionsByIDsUsecase interface {
 type NormalizeQuizAttemptByIDUsecase interface {
 	Execute(ctx context.Context, request dto.NormalizeQuizAttemptByIDRequest) (dto.NormalizeQuizAttemptByIDResponse, error)
 }
+
+type NormalizeSelfMarkMasteredByIDUsecase interface {
+	Execute(ctx context.Context, request dto.NormalizeSelfMarkMasteredByIDRequest) (dto.NormalizeSelfMarkMasteredByIDResponse, error)
+}

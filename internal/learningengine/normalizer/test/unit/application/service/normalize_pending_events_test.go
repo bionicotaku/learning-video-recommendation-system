@@ -87,7 +87,7 @@ func TestNormalizePendingEventsFailFastOnRecorderError(t *testing.T) {
 func TestNormalizeLearningInteractionsByIDsReadsSelectedRowsAndRecords(t *testing.T) {
 	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
 	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
-		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventSelfMarkMastered, now.Add(time.Second)),
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventLookup, now.Add(time.Second)),
 	}}
 	recorder := &fakeRecorder{}
 	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
@@ -114,6 +114,104 @@ func TestNormalizeLearningInteractionsByIDsReadsSelectedRowsAndRecords(t *testin
 	}
 	if len(recorder.requests[0].Events) != 1 {
 		t.Fatalf("recorded events = %d, want 1", len(recorder.requests[0].Events))
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDReadsSelectedRowAndRecordsSetMastered(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventSelfMarkMastered, now.Add(time.Second)),
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !interactionReader.byIDsCalled {
+		t.Fatalf("interaction by IDs reader was not called")
+	}
+	if response.ReadRawCount != 1 || response.NormalizedEventCount != 1 || response.RecordedEventCount != 1 {
+		t.Fatalf("response = %+v, want read=1 normalized=1 recorded=1", response)
+	}
+	if len(recorder.requests) != 1 || len(recorder.requests[0].Events) != 1 {
+		t.Fatalf("recorder requests = %+v, want one request with one event", recorder.requests)
+	}
+	recorded := recorder.requests[0].Events[0]
+	if recorded.EventType != learningenum.EventSelfMarkMastered || recorded.ReducerEffect != learningenum.ReducerEffectSetMastered {
+		t.Fatalf("recorded event = %+v, want self_mark_mastered set_mastered", recorded)
+	}
+	if recorded.ProgressQuality != nil {
+		t.Fatalf("progress_quality = %v, want nil", recorded.ProgressQuality)
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDIgnoresOtherUserMissingRow(t *testing.T) {
+	interactionReader := &fakeInteractionReader{}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.ReadRawCount != 0 || response.RecordedEventCount != 0 {
+		t.Fatalf("response = %+v, want no rows processed", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDRejectsNonSelfMarkRawEvent(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventLookup, now),
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want validation error")
+	}
+	if response.ErrorCount != 1 || response.ReadRawCount != 1 {
+		t.Fatalf("response = %+v, want read=1 error=1", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
+	}
+}
+
+func TestNormalizeSelfMarkMasteredByIDFailFastOnRecorderError(t *testing.T) {
+	wantErr := errors.New("record failed")
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventSelfMarkMastered, now),
+	}}
+	recorder := &fakeRecorder{err: wantErr}
+	usecase := service.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeSelfMarkMasteredByIDRequest{
+		UserID:                     "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Execute() error = %v, want %v", err, wantErr)
+	}
+	if response.ErrorCount != 1 || response.NormalizedEventCount != 1 || response.RecordedEventCount != 0 {
+		t.Fatalf("response = %+v, want error=1 normalized=1 recorded=0", response)
 	}
 }
 
@@ -167,6 +265,29 @@ func TestNormalizeLearningInteractionsByIDsSkipsUnmappedLookup(t *testing.T) {
 	}
 	if response.ReadRawCount != 1 || response.SkippedCount != 1 || response.RecordedEventCount != 0 {
 		t.Fatalf("response = %+v, want read=1 skipped=1 recorded=0", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDsRejectsSelfMarkRawEvent(t *testing.T) {
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	interactionReader := &fakeInteractionReader{eventsByID: []model.RawLearningInteraction{
+		validRawInteraction("11111111-1111-1111-1111-111111111111", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventSelfMarkMastered, now),
+	}}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      "11111111-1111-1111-1111-111111111111",
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want validation error")
+	}
+	if response.ErrorCount != 1 || response.ReadRawCount != 1 {
+		t.Fatalf("response = %+v, want read=1 error=1", response)
 	}
 	if len(recorder.requests) != 0 {
 		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))

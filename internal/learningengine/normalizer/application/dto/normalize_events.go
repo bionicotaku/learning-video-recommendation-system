@@ -56,3 +56,18 @@ type NormalizeQuizAttemptByIDResponse struct {
 	ErrorCount             int
 	RecordedUserBatchCount int
 }
+
+type NormalizeSelfMarkMasteredByIDRequest struct {
+	UserID                     string
+	LearningInteractionEventID string
+}
+
+type NormalizeSelfMarkMasteredByIDResponse struct {
+	ReadRawCount           int
+	NormalizedEventCount   int
+	SkippedCount           int
+	RecordedEventCount     int
+	DuplicateEventCount    int
+	ErrorCount             int
+	RecordedUserBatchCount int
+}

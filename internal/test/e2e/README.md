@@ -2,20 +2,21 @@
 
 这个目录放跨顶层模块、真实数据库链路的端到端测试。
 
-当前这里已经不是空目录，而是一套 **Learning engine × Recommendation** 的真实迁移驱动 E2E：
+当前这里已经不是空目录，而是一套真实迁移驱动的跨模块 E2E：
 
 - 使用一个共享 embedded Postgres，底层生命周期复用 `internal/platform/postgres/pgtest`
-- 直接执行 `learningengine` 与 `recommendation` 的真实 migration `*.up.sql`
+- 直接执行 `analytics`、`learningengine` 与 `recommendation` 的真实 migration `*.up.sql`
 - 不通过 `dbtool`
 - 不依赖 live DB
-- 不把任一侧降级成 stub
+- 不把被测业务链路降级成 stub
 
 ## 当前测试基座
 
-共享基座在 [testutil/harness.go](/Users/evan/Downloads/learning-video-recommendation-system/internal/test/e2e/testutil/harness.go)，底层 DB 生命周期和 schema plan 执行委托 `pgtest`，自身固定负责：
+共享基座在 [testutil/harness.go](testutil/harness.go)，底层 DB 生命周期和 schema plan 执行委托 `pgtest`，自身固定负责：
 
 - 顺序执行：
-  - `internal/learningengine/reducer/infrastructure/persistence/schema/000000_external_refs.sql`
+  - `internal/learningengine/normalizer/infrastructure/persistence/schema/000000_external_refs.sql`
+  - `internal/analytics/infrastructure/migration/*.up.sql`
   - `internal/learningengine/reducer/infrastructure/migration/*.up.sql`
   - 补齐 Recommendation 需要的外部 `catalog.videos` 字段
   - `internal/recommendation/infrastructure/persistence/schema/000000_external_refs.sql`
@@ -25,6 +26,8 @@
   - `auth.users`
   - `semantic.coarse_unit`
   - `catalog.videos`
+  - `catalog.questions`
+  - `analytics.video_watch_events`
   - `catalog.video_transcripts`
   - `catalog.video_unit_index`
   - `catalog.video_semantic_spans`
@@ -34,6 +37,9 @@
   - `recommendation.v_recommendable_video_units`
   - `recommendation.v_unit_video_inventory`
 - 装配真实 usecase：
+  - API：Learning Events HTTP handler + API application service
+  - Analytics：learning interaction / quiz / self mark raw fact write
+  - Normalizer：by-ID normalize
   - Learning engine：`EnsureTargetUnits`、`SetTargetInactive`、`SuspendTargetUnit`、`ResumeTargetUnit`、`RecordLearningEvents`、`ReplayUserStates`、`ListUserUnitStates`
   - Recommendation：完整 pipeline + `RecommendationResultWriter`
 
@@ -41,6 +47,12 @@
 
 当前已经覆盖：
 
+- `learning_events_api_test.go`
+  - `POST /api/learning-interactions:batch` 通过真实 HTTP 写入 `analytics.learning_interaction_events`，并经 normalizer / reducer 形成 observe-only learning state
+  - `POST /api/quiz-attempts` 通过真实 HTTP 写入 `analytics.quiz_events`，并归约为 quality=5 的 progress event
+  - `POST /api/learning-units:mark-mastered` 通过真实 HTTP 写入 self-mark raw fact，并归约为 terminal mastered state
+  - 相同 `client_event_id` 的 quiz 重试不会重复写 raw fact，也不会重复推进 reducer state
+  - self mark 后追加普通 quiz event 不会让 terminal mastered state 回落
 - `learning_to_recommendation_test.go`
   - `ensure target` 后零事件用户可被 Recommendation 读取
   - `suspend / resume / inactive` 对 Recommendation 输入即时生效
@@ -84,6 +96,11 @@
 
 当前稳定断言包括：
 
+- API / Analytics / Normalizer 输出：
+  - HTTP status 与 raw accepted response
+  - `(user_id, client_event_id)` 幂等行为
+  - `analytics.*` raw fact 行数与关键上下文字段
+  - `learning.unit_learning_events.event_type / reducer_effect / progress_quality`
 - Learning engine 输出：
   - `status`
   - `is_target`
