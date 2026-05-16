@@ -2,7 +2,7 @@
 
 ## 0. 文档信息
 
-文档状态：MVP 设计文档，尚未实现 HTTP endpoint
+文档状态：MVP 已实现
 目标读者：前端、后端、Catalog / Analytics / Learning Engine / API 维护者
 当前范围：定义视频末尾按 `video_id + coarse_unit_ids` 批量获取 quiz 题目的轻量 API 契约、fallback 规则、字段语义和与 quiz attempt 上报的边界。
 当前明确不做：不创建取题审计表，不创建 quiz session，不固定题目 assignment，不在 Feed API 内联返回 quiz，不在取题响应里隐藏正确选项。
@@ -36,7 +36,7 @@ video_id + coarse_unit_ids[]
 3. 仍没有则跳过该 unit
 ```
 
-`recommendation_run_id` 可以作为可选透传字段，用于日志或后续答题上报归因，但不参与取题主逻辑。
+`recommendation_run_id` 可以作为可选字段传入，HTTP 层只校验 UUID 格式；当前实现不写取题日志、不参与取题选择。后续 quiz attempt 上报时建议继续带上做推荐归因。
 
 ## 2. API 定位
 
@@ -65,7 +65,7 @@ Content-Type: application/json
 
 | 模块 | 职责 | 不做什么 |
 | --- | --- | --- |
-| `internal/api` | HTTP handler、请求 validation、调用 Catalog 取题能力、组装 response。 | 不写 SQL，不记录取题 audit，不计算学习进度。 |
+| `internal/api` | HTTP handler、请求 validation、调用 Catalog 取题能力、返回 response。 | 不写 SQL，不记录取题 audit，不计算学习进度。 |
 | `internal/catalog` | 提供按 `video_id + coarse_unit_ids[]` 批量取题并 fallback 的 read usecase / repository。 | 不记录用户答题结果，不写 Analytics。 |
 | `internal/analytics` | 在 quiz attempt 上报时记录答题事实。 | 不参与取题。 |
 | `internal/learningengine` | 通过 normalizer 消费 quiz attempt raw fact 并更新学习状态。 | 不参与取题。 |
@@ -95,7 +95,7 @@ Content-Type: application/json
 | `video_id` | string UUID | 是 | 当前视频 ID。 |
 | `coarse_unit_ids` | integer[] | 是 | 本次视频末尾要测试的学习单元列表。通常来自 Feed API 返回的 `learning_units[].coarse_unit_id`。 |
 | `recommendation_run_id` | string UUID | 否 | 本视频来自推荐 feed 时可带上。取题不依赖该字段；后续 quiz attempt 上报时建议继续带上做推荐归因。 |
-| `client_context` | object | 否 | 客户端环境上下文，主要用于日志和排障。 |
+| `client_context` | object | 否 | 客户端环境上下文。当前实现只做 JSON object 校验，不写入数据库。 |
 
 `coarse_unit_ids` 规则：
 
@@ -204,14 +204,13 @@ Content-Type: application/json
 
 ### 5.3 多题选择
 
-MVP 可以先使用稳定选择规则：
+当前实现使用稳定选择规则：
 
 ```sql
-order by created_at desc, question_id asc
-limit 1
+order by coarse_unit_id, created_at desc, question_id asc
 ```
 
-这样实现简单、结果可复现。未来如果需要题目轮换、最近未做、难度分层或 A/B，再引入 assignment/session 设计。
+Repository 不在 SQL 里对每个 unit `limit 1`，而是返回候选列表给 Go 层。Go 层会跳过 payload 不合法的候选，并继续尝试同一 unit 的下一道题；第一个合法候选即为本 unit 的返回题。这样实现仍然简单、结果可复现，同时避免坏题阻断 fallback。
 
 ### 5.4 题型限制
 
@@ -293,9 +292,11 @@ quiz attempt 请求应带回：
 | `400 Bad Request` | JSON 格式错误、字段类型错误、`video_id` 非 UUID、`coarse_unit_ids` 为空、unit id 非正整数、数组过长。 |
 | `401 Unauthorized` | 未登录或 principal 缺失。 |
 | `404 Not Found` | `video_id` 不存在或不可用。 |
-| `500 Internal Server Error` | Catalog 取题查询失败或 content payload 无法映射为 API response。 |
+| `500 Internal Server Error` | Catalog 取题查询失败或其他未知服务端错误。 |
 
 如果部分 unit 没有题，不返回错误；这些 unit 放入 `missing_coarse_unit_ids`。
+
+如果某道 active 题的 `content_payload` 不合法，后端跳过该候选并继续尝试同一 unit 的其他候选。若同一 unit 没有任何合法题，则该 unit 进入 `missing_coarse_unit_ids`，不因为单道坏题让整个请求失败。
 
 如果所有 unit 都没有题，仍返回 `200 OK`：
 
@@ -313,13 +314,13 @@ quiz attempt 请求应带回：
 
 ### 9.1 推荐内部接口
 
-Catalog 可提供一个批量 read usecase：
+Catalog 当前提供批量 read usecase：
 
 ```text
-ListEndQuizQuestions(video_id, coarse_unit_ids) -> EndQuizQuestion[]
+EndQuizQuestionLookupUsecase.Execute(video_id, coarse_unit_ids) -> EndQuizQuestionLookupResponse
 ```
 
-API 层调用该 usecase 后映射为 HTTP response。
+API 层调用该 usecase 后直接返回 HTTP response。`recommendation_run_id` 与 `client_context` 不传入 Catalog，因为当前取题不依赖这些字段。
 
 ### 9.2 查询策略
 
@@ -329,11 +330,11 @@ API 层调用该 usecase 后映射为 HTTP response。
 1. 一次查 video_unit active questions:
    where video_id = $1 and coarse_unit_id = any($2)
 
-2. 对未命中的 unit 一次查 unit active questions:
-   where video_id is null and coarse_unit_id = any($missing)
+2. 一次查 unit active questions:
+   where video_id is null and coarse_unit_id = any($2)
 ```
 
-Go 层按 `coarse_unit_id` 分组，每组选择一题。
+Go 层按 `coarse_unit_id` 分组，并按请求去重后的 unit 顺序选择：先尝试视频上下文题候选，再尝试通用题候选。
 
 ### 9.3 content payload validation
 
@@ -345,7 +346,7 @@ Go 层按 `coarse_unit_id` 分组，每组选择一题。
 - 至少存在一个 `option.id = "correct"`；
 - `explanation` 如果存在，必须是 string。
 
-payload 不合法的题目不应返回给前端；服务端应记录 warning，并继续尝试同一 unit 的其他 active 题。若没有可用题，则该 unit 进入 `missing_coarse_unit_ids`。
+payload 不合法的题目不返回给前端；服务端继续尝试同一 unit 的其他 active 题。若没有可用题，则该 unit 进入 `missing_coarse_unit_ids`。
 
 ## 10. 成功标准
 

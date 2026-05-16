@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **其他业务 API 仍是设计文档。** Unit progress 与 Catalog watch-progress 尚未实现 HTTP handler。
+- **Feed、End Quiz、Catalog watch-progress 已落地。** Unit progress 仍是设计文档，尚未实现 HTTP handler。
 
 ## 总体规范
 
@@ -30,18 +30,15 @@
 | [API模块总体设计规范.md](API模块总体设计规范.md) | 已写入 | 已实现基座 | `internal/api` 基座、server bootstrap、router、middleware、错误响应、测试底座已落地。 |
 | [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`；HTTP success 只承诺 raw accepted。 |
 | [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md) | 已写入 | 未开始 | 只定义未来读取用户学习单元进度的分页契约；当前没有 HTTP handler。 |
-| [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 未开始 | 只定义未来观看进度上报与聚合边界；当前没有 HTTP handler。 |
-| [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 未开始 | 设计 API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段；当前没有 HTTP handler。 |
-| [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 未开始 | 设计视频末尾 quiz 批量取题接口；当前没有 HTTP handler 或 Catalog read usecase。 |
+| [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/video-watch-progress`；Catalog 同事务维护 watch session ledger 与视频消费投影。 |
+| [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
+| [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 
 ## 未开始范围
 
 以下内容在 API 层仍未实现：
 
 - Learning Engine Unit Progress API handler。
-- Catalog watch-progress API handler。
-- Feed API handler 与 facade service。
-- End Quiz 批量取题 API handler 与 Catalog read usecase。
 - 生产级 auth verifier；当前模型仍是 trusted upstream principal。
 - 完整 OpenAPI / 客户端 SDK 生成。
 

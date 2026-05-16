@@ -12,8 +12,11 @@ import (
 
 type Querier interface {
 	GetVideoDurationMS(ctx context.Context, videoID pgtype.UUID) (int32, error)
+	HasVisibleVideoForEndQuiz(ctx context.Context, videoID pgtype.UUID) (bool, error)
 	ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error)
 	ListUnitLabelsByIDs(ctx context.Context, coarseUnitIds []int64) ([]ListUnitLabelsByIDsRow, error)
+	ListUnitQuizQuestionCandidates(ctx context.Context, coarseUnitIds []int64) ([]ListUnitQuizQuestionCandidatesRow, error)
+	ListVideoUnitQuizQuestionCandidates(ctx context.Context, arg ListVideoUnitQuizQuestionCandidatesParams) ([]ListVideoUnitQuizQuestionCandidatesRow, error)
 	UpsertVideoEngagementStatsFromWatchProgress(ctx context.Context, arg UpsertVideoEngagementStatsFromWatchProgressParams) error
 	UpsertVideoUserStateFromWatchProgress(ctx context.Context, arg UpsertVideoUserStateFromWatchProgressParams) error
 	UpsertVideoWatchSession(ctx context.Context, arg UpsertVideoWatchSessionParams) (UpsertVideoWatchSessionRow, error)

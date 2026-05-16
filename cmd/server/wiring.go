@@ -11,6 +11,7 @@ import (
 	analyticsrepo "learning-video-recommendation-system/internal/analytics/infrastructure/persistence/repository"
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
@@ -48,10 +49,12 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	if err != nil {
 		return nil, err
 	}
+	endQuiz := buildEndQuizHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 
 	handler := router.New(router.Options{
 		Feed:           feedHandler,
+		EndQuiz:        endQuiz,
 		LearningEvents: learningEvents,
 		WatchProgress:  watchProgress,
 	})
@@ -87,6 +90,12 @@ func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
 	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
 	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
 	return watchprogress.NewHandler(recordWatchProgress)
+}
+
+func buildEndQuizHandler(pool *pgxpool.Pool) *endquiz.Handler {
+	reader := catalogrepo.NewEndQuizQuestionReader(pool)
+	lookup := catalogservice.NewEndQuizQuestionLookupUsecase(reader)
+	return endquiz.NewHandler(lookup)
 }
 
 func buildFeedHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (*feed.Handler, error) {

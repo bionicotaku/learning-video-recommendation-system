@@ -8,6 +8,7 @@ type RouteGroup interface {
 
 type Options struct {
 	Feed           RouteGroup
+	EndQuiz        RouteGroup
 	LearningEvents RouteGroup
 	WatchProgress  RouteGroup
 }
@@ -16,6 +17,9 @@ func New(options Options) http.Handler {
 	mux := http.NewServeMux()
 	if options.Feed != nil {
 		options.Feed.RegisterRoutes(mux)
+	}
+	if options.EndQuiz != nil {
+		options.EndQuiz.RegisterRoutes(mux)
 	}
 	if options.LearningEvents != nil {
 		options.LearningEvents.RegisterRoutes(mux)

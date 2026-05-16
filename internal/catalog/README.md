@@ -11,6 +11,7 @@
 - 用户对视频的互动状态投影
 - 观看进度上报命令 `RecordVideoWatchProgress`
 - Feed facade 使用的批量读取能力：视频展示字段、互动统计、unit label
+- End Quiz 使用的批量取题能力：视频上下文题优先，通用 unit 题 fallback
 
 当前已落地结构：
 
@@ -72,3 +73,26 @@ internal/api FeedService
 `ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`。
 
 `ListUnitLabelsByIDs` 只补 `semantic.coarse_unit.status = active` 的 `label`。Catalog 在这里提供 lightweight read capability，是为了让 API facade 批量补齐展示文本；Catalog 不理解 Recommendation 的 role、rank、score，也不参与 quiz 选择。
+
+End Quiz lookup 是只读能力，服务 `POST /api/videos/end-quiz`：
+
+```text
+internal/api endquiz.Handler
+  -> catalog.EndQuizQuestionLookupUsecase
+  -> catalog.EndQuizQuestionReader.HasVisibleVideoForEndQuiz
+  -> catalog.videos
+
+internal/api endquiz.Handler
+  -> catalog.EndQuizQuestionLookupUsecase
+  -> catalog.EndQuizQuestionReader.ListVideoUnitQuizQuestionCandidates
+  -> catalog.questions
+
+internal/api endquiz.Handler
+  -> catalog.EndQuizQuestionLookupUsecase
+  -> catalog.EndQuizQuestionReader.ListUnitQuizQuestionCandidates
+  -> catalog.questions
+```
+
+`EndQuizQuestionLookupUsecase` 先校验视频是 active/public/已发布，再按请求中的 `coarse_unit_ids` 首次出现顺序去重。每个 unit 优先使用 `scope_type = 'video_unit'` 且匹配 `video_id` 的 active 题；没有合法视频上下文题时 fallback 到 `scope_type = 'unit'`、`video_id is null` 的 active 通用题。`content_payload` 必须包含非空 `question`、非空 options、每个 option 的 `id/text`，并且至少有一个 `id = correct`；坏候选会被跳过，最终无题的 unit 进入 `missing_coarse_unit_ids`。
+
+End Quiz lookup 不写 quiz session、delivery、Analytics 或 Learning Engine。答题结果仍由 API 层的 `POST /api/quiz-attempts` 写入 Analytics，再由 normalizer 推进 Learning Engine。

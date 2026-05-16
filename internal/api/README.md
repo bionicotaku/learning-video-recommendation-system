@@ -23,6 +23,7 @@ Current implemented endpoint group:
 
 ```text
 POST /api/feed
+POST /api/videos/end-quiz
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
@@ -39,6 +40,13 @@ Feed materialization is all-or-error: the facade does not silently drop plan
 items or learning units after Recommendation has written audit/serving state.
 Missing display data, incomplete evidence, missing unit labels, or invalid media
 URLs are treated as backend consistency failures.
+
+`POST /api/videos/end-quiz` is a read-only quiz lookup endpoint for the video
+ending experience. The handler validates `video_id`, de-duplicates up to eight
+`coarse_unit_ids`, validates optional `recommendation_run_id` and
+`client_context`, then calls Catalog. It does not write quiz delivery/session
+state and does not participate in Learning Engine progress updates; completed
+answers still go through `POST /api/quiz-attempts`.
 
 The learning-event endpoints return only raw Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is
