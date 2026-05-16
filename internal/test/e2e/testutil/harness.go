@@ -268,7 +268,7 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 
 	if _, err := h.Pool.Exec(
 		context.Background(),
-		`insert into catalog.items (video_id, duration_ms, status, visibility_status, publish_at)
+		`insert into catalog.videos (video_id, duration_ms, status, visibility_status, publish_at)
 		 values ($1, $2, $3, $4, $5)
 		 on conflict (video_id) do update
 		 set duration_ms = excluded.duration_ms,
@@ -281,7 +281,7 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 		visibility,
 		fixture.PublishAt,
 	); err != nil {
-		failNow(t, "seed catalog.items: %v", err)
+		failNow(t, "seed catalog.videos: %v", err)
 	}
 
 	if _, err := h.Pool.Exec(
@@ -629,14 +629,14 @@ func e2eSchemaPlan() pgtest.SchemaPlan {
 
 func supplementalExternalCatalogSQL() string {
 	return `-- supplemental-sql --
-alter table if exists catalog.items add column if not exists duration_ms integer not null default 0;
-alter table if exists catalog.items add column if not exists status text not null default 'active';
-alter table if exists catalog.items add column if not exists visibility_status text not null default 'public';
-alter table if exists catalog.items add column if not exists publish_at timestamptz;
+alter table if exists catalog.videos add column if not exists duration_ms integer not null default 0;
+alter table if exists catalog.videos add column if not exists status text not null default 'active';
+alter table if exists catalog.videos add column if not exists visibility_status text not null default 'public';
+alter table if exists catalog.videos add column if not exists publish_at timestamptz;
 
 create table if not exists catalog.video_user_states (
   user_id uuid not null references auth.users(id) on delete cascade,
-  video_id uuid not null references catalog.items(video_id) on delete cascade,
+  video_id uuid not null references catalog.videos(video_id) on delete cascade,
   has_liked boolean not null default false,
   has_bookmarked boolean not null default false,
   has_watched boolean not null default false,
@@ -654,7 +654,7 @@ create table if not exists catalog.video_user_states (
 );
 
 create table if not exists catalog.video_engagement_stats (
-  video_id uuid primary key references catalog.items(video_id) on delete cascade,
+  video_id uuid primary key references catalog.videos(video_id) on delete cascade,
   view_count bigint not null default 0,
   like_count bigint not null default 0,
   favorite_count bigint not null default 0,
