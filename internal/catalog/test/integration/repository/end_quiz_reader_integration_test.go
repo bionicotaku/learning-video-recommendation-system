@@ -23,8 +23,10 @@ func TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates(t *testin
 	seedQuizUnit(t, db, 102, "beta")
 	seedQuizQuestion(t, db, "11111111-1111-1111-1111-111111111111", "video_unit", "context_meaning_choice", 101, videoID, "older", "active", time.Now().UTC().Add(-time.Hour))
 	seedQuizQuestion(t, db, "22222222-2222-2222-2222-222222222222", "video_unit", "context_meaning_choice", 101, videoID, "newer", "active", time.Now().UTC())
+	seedQuizQuestion(t, db, "55555555-5555-5555-5555-555555555555", "video_unit", "reverse_identification_choice", 101, videoID, "wrong video type", "active", time.Now().UTC().Add(time.Hour))
 	seedQuizQuestion(t, db, "33333333-3333-3333-3333-333333333333", "unit", "unit_meaning_choice", 102, "", "generic", "active", time.Now().UTC())
 	seedQuizQuestion(t, db, "44444444-4444-4444-4444-444444444444", "unit", "unit_meaning_choice", 102, "", "retired", "retired", time.Now().UTC().Add(time.Hour))
+	seedQuizQuestion(t, db, "66666666-6666-6666-6666-666666666666", "unit", "context_cloze_choice", 102, "", "wrong unit type", "active", time.Now().UTC().Add(time.Hour))
 
 	reader := catalogrepo.NewEndQuizQuestionReader(db.Pool)
 	visible, err := reader.HasVisibleVideoForEndQuiz(ctx, videoID)

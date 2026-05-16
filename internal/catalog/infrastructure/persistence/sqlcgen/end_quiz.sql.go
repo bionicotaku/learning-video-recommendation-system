@@ -45,6 +45,7 @@ from catalog.questions q
 where q.video_id is null
   and q.coarse_unit_id = any($1::bigint[])
   and q.scope_type = 'unit'
+  and q.question_type in ('unit_meaning_choice', 'reverse_identification_choice')
   and q.status = 'active'
 order by q.coarse_unit_id, q.created_at desc, q.question_id
 `
@@ -109,6 +110,7 @@ from catalog.questions q
 where q.video_id = $1::uuid
   and q.coarse_unit_id = any($2::bigint[])
   and q.scope_type = 'video_unit'
+  and q.question_type in ('context_meaning_choice', 'context_cloze_choice')
   and q.status = 'active'
 order by q.coarse_unit_id, q.created_at desc, q.question_id
 `
