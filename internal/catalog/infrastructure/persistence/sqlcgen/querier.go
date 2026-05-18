@@ -17,6 +17,10 @@ type Querier interface {
 	ListUnitLabelsByIDs(ctx context.Context, coarseUnitIds []int64) ([]ListUnitLabelsByIDsRow, error)
 	ListUnitQuizQuestionCandidates(ctx context.Context, coarseUnitIds []int64) ([]ListUnitQuizQuestionCandidatesRow, error)
 	ListVideoUnitQuizQuestionCandidates(ctx context.Context, arg ListVideoUnitQuizQuestionCandidatesParams) ([]ListVideoUnitQuizQuestionCandidatesRow, error)
+	SetVideoFavorited(ctx context.Context, arg SetVideoFavoritedParams) (SetVideoFavoritedRow, error)
+	SetVideoLiked(ctx context.Context, arg SetVideoLikedParams) (SetVideoLikedRow, error)
+	SetVideoUnfavorited(ctx context.Context, arg SetVideoUnfavoritedParams) (SetVideoUnfavoritedRow, error)
+	SetVideoUnliked(ctx context.Context, arg SetVideoUnlikedParams) (SetVideoUnlikedRow, error)
 	UpsertVideoEngagementStatsFromWatchProgress(ctx context.Context, arg UpsertVideoEngagementStatsFromWatchProgressParams) error
 	UpsertVideoUserStateFromWatchProgress(ctx context.Context, arg UpsertVideoUserStateFromWatchProgressParams) error
 	UpsertVideoWatchSession(ctx context.Context, arg UpsertVideoWatchSessionParams) (UpsertVideoWatchSessionRow, error)

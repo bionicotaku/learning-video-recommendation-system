@@ -14,6 +14,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
@@ -50,13 +51,15 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		return nil, err
 	}
 	endQuiz := buildEndQuizHandler(pool)
+	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 
 	handler := router.New(router.Options{
-		Feed:           feedHandler,
-		EndQuiz:        endQuiz,
-		LearningEvents: learningEvents,
-		WatchProgress:  watchProgress,
+		Feed:              feedHandler,
+		EndQuiz:           endQuiz,
+		VideoInteractions: videoInteractions,
+		LearningEvents:    learningEvents,
+		WatchProgress:     watchProgress,
 	})
 	handler = middleware.BodyLimit(1 << 20)(handler)
 	handler = middleware.Recover(handler)
@@ -90,6 +93,13 @@ func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
 	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
 	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
 	return watchprogress.NewHandler(recordWatchProgress)
+}
+
+func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {
+	writer := catalogrepo.NewVideoInteractionWriter(pool)
+	setLike := catalogservice.NewSetVideoLikeUsecase(writer)
+	setFavorite := catalogservice.NewSetVideoFavoriteUsecase(writer)
+	return videointeractions.NewHandler(setLike, setFavorite)
 }
 
 func buildEndQuizHandler(pool *pgxpool.Pool) *endquiz.Handler {

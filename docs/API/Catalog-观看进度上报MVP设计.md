@@ -379,7 +379,7 @@ total_watch_ms += delta_active_watch_ms
 updated_at = now()
 ```
 
-点赞和收藏接口后续应维护 `like_count` 与 `favorite_count`，观看进度 API 不修改这两个字段。
+`Video Interactions API` 维护 `like_count` 与 `favorite_count`，观看进度 API 不修改这两个字段。
 
 注意事项：
 

@@ -10,6 +10,7 @@
 - 单视频入库审计
 - 用户对视频的互动状态投影
 - 观看进度上报命令 `RecordVideoWatchProgress`
+- 视频点赞/收藏 set-unset 命令 `SetVideoLike` / `SetVideoFavorite`
 - Feed facade 使用的批量读取能力：视频展示字段、互动统计、unit label
 - End Quiz 使用的批量取题能力：视频上下文题优先，通用 unit 题 fallback
 
@@ -55,6 +56,19 @@ POST /api/video-watch-progress
 `analytics.video_watch_events` 仍属于 Analytics schema，但在 watch-progress 命令中作为 session ledger 与 Catalog 投影同事务维护。Catalog repository 可以在这个命令内写入该表；这是为了保证 `watch_count`、`completed_count` 和 `total_watch_ms` 的去重依据与投影更新保持原子一致，不表示 Catalog 泛化拥有 Analytics raw fact 表。
 
 watch-progress 写入路径使用数据库内条件 upsert，不在 application 层 pre-read `analytics.video_watch_events`。同一 `watch_session_id` 首次并发上报时，repository 只做一次内部重试，让第二次 SQL 语句读取已存在 session 后继续由数据库侧计算 delta；同一 `watch_session_id` 绑定不同用户或视频时返回 conflict；不存在的视频返回 not found。普通观看进度不写 Learning Engine，也不写 Recommendation serving state。
+
+Video Interactions 写入路径维护当前用户对视频的点赞和收藏状态：
+
+```text
+PUT/DELETE /api/videos/{video_id}/like
+PUT/DELETE /api/videos/{video_id}/favorite
+  -> internal/api
+  -> catalog.SetVideoLike / catalog.SetVideoFavorite
+  -> catalog.video_user_states
+  -> catalog.video_engagement_stats
+```
+
+这两个命令都是幂等 set / unset，不做 toggle。Repository 在同一事务内更新 `catalog.video_user_states.has_liked` / `has_bookmarked` 与 `catalog.video_engagement_stats.like_count` / `favorite_count`。重复 set 不重复增加计数，重复 unset 不重复减少计数；unset 没有状态行时不创建空的 user state 行。MVP 不新增点赞/收藏审计表，不写 Analytics，不写 Learning Engine，也不写 Recommendation。
 
 Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 

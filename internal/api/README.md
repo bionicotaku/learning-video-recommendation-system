@@ -24,6 +24,10 @@ Current implemented endpoint group:
 ```text
 POST /api/feed
 POST /api/videos/end-quiz
+PUT /api/videos/{video_id}/like
+DELETE /api/videos/{video_id}/like
+PUT /api/videos/{video_id}/favorite
+DELETE /api/videos/{video_id}/favorite
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
@@ -47,6 +51,13 @@ ending experience. The handler validates `video_id`, de-duplicates up to eight
 `client_context`, then calls Catalog. It does not write quiz delivery/session
 state and does not participate in Learning Engine progress updates; completed
 answers still go through `POST /api/quiz-attempts`.
+
+`PUT/DELETE /api/videos/{video_id}/like` and
+`PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset
+endpoints. The handler reads `video_id` from the path, validates the trusted
+principal, and calls Catalog. Like responses return only `video_id`,
+`has_liked`, and `like_count`; favorite responses return only `video_id`,
+`has_favorited`, and `favorite_count`.
 
 The learning-event endpoints return only raw Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is

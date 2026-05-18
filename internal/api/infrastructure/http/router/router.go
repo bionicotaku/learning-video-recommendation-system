@@ -7,10 +7,11 @@ type RouteGroup interface {
 }
 
 type Options struct {
-	Feed           RouteGroup
-	EndQuiz        RouteGroup
-	LearningEvents RouteGroup
-	WatchProgress  RouteGroup
+	Feed              RouteGroup
+	EndQuiz           RouteGroup
+	VideoInteractions RouteGroup
+	LearningEvents    RouteGroup
+	WatchProgress     RouteGroup
 }
 
 func New(options Options) http.Handler {
@@ -20,6 +21,9 @@ func New(options Options) http.Handler {
 	}
 	if options.EndQuiz != nil {
 		options.EndQuiz.RegisterRoutes(mux)
+	}
+	if options.VideoInteractions != nil {
+		options.VideoInteractions.RegisterRoutes(mux)
 	}
 	if options.LearningEvents != nil {
 		options.LearningEvents.RegisterRoutes(mux)
