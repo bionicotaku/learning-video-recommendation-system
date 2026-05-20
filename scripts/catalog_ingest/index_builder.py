@@ -143,6 +143,8 @@ def _build_unit_index_rows(
                 best_evidence_scores=selected_ref.scores,
                 best_evidence_question_reject_reason=selected_ref.question_reject_reason,
                 best_evidence_selection_reason=selected_ref.selection_reason,
+                best_evidence_candidate_score=selected_ref.candidate_score,
+                best_evidence_target_text=selected_ref.target_text,
             )
         )
 
@@ -191,7 +193,7 @@ def _build_question_rows(clip_input: LoadedClipInput) -> tuple[QuestionRow, ...]
                 context_start_ms=question.context_start_ms,
                 context_end_ms=question.context_end_ms,
                 content_payload=question.content_payload,
-                status=question.status,
+                status="active",
             )
         )
     return tuple(rows)

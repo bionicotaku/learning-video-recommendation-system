@@ -45,6 +45,10 @@ class TranscriptSemanticElement:
     """表示 transcript token 下的 semantic_element 结构。"""
 
     coarse_id: int | None
+    base_form: str | None = None
+    translation: str | None = None
+    dictionary: str | None = None
+    reason: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -96,9 +100,11 @@ class SelectedCoarseUnitRef:
     """表示 question JSON 中为 coarse unit 选出的 best evidence 引用。"""
 
     coarse_unit_id: int
+    target_text: str
     sentence_index: int
     token_index: int
     scores: dict[str, Any]
+    candidate_score: float | None
     question_reject_reason: str | None
     selection_reason: str
 
@@ -173,6 +179,33 @@ class LoadedClipInput:
             "parent_video_name": self.parent_video_name,
             "source_clip_key": self.source_clip_key,
             "engagement": self.clip_metadata.engagement,
+            **self._question_generation_context(),
+        }
+
+    def _question_generation_context(self) -> dict[str, Any]:
+        if self.raw_question_payload is None:
+            return {}
+
+        selected_refs_payload = self.raw_question_payload.get("selected_coarse_unit_refs")
+        selected_refs_metadata: dict[str, Any] = {}
+        if isinstance(selected_refs_payload, dict):
+            selected_refs_metadata = {
+                key: selected_refs_payload[key]
+                for key in (
+                    "version",
+                    "selection_model",
+                    "selection_top_k",
+                    "allowed_question_types",
+                    "candidate_score_threshold",
+                    "score_weights",
+                )
+                if key in selected_refs_payload
+            }
+
+        return {
+            "question_source": self.raw_question_payload.get("source"),
+            "question_audit": self.raw_question_payload.get("audit"),
+            "selected_coarse_unit_refs_metadata": selected_refs_metadata,
         }
 
 
@@ -222,6 +255,8 @@ class VideoTranscriptSentenceRow:
     sentence_index: int
     start_ms: int
     end_ms: int
+    text: str = ""
+    translation: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -233,6 +268,12 @@ class VideoSemanticSpanRow:
     start_ms: int
     end_ms: int
     coarse_unit_id: int | None
+    surface_text: str = ""
+    explanation: str | None = None
+    base_form: str | None = None
+    translation: str | None = None
+    dictionary: str | None = None
+    mapping_reason: str | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -257,6 +298,8 @@ class VideoUnitIndexRow:
     best_evidence_scores: dict[str, Any]
     best_evidence_question_reject_reason: str | None
     best_evidence_selection_reason: str
+    best_evidence_candidate_score: float | None = None
+    best_evidence_target_text: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

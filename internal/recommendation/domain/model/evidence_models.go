@@ -7,6 +7,12 @@ type SemanticSpan struct {
 	CoarseUnitID  *int64
 	StartMs       int32
 	EndMs         int32
+	SurfaceText   string
+	Explanation   *string
+	BaseForm      *string
+	Translation   *string
+	Dictionary    *string
+	MappingReason *string
 }
 
 type TranscriptSentence struct {
@@ -14,4 +20,6 @@ type TranscriptSentence struct {
 	SentenceIndex int32
 	StartMs       int32
 	EndMs         int32
+	Text          string
+	Translation   *string
 }

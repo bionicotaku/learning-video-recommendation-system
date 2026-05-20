@@ -52,6 +52,8 @@ def normalize_clip_input(clip_input: LoadedClipInput) -> NormalizedCoreRows:
                 sentence_index=sentence.index,
                 start_ms=sentence.start_ms,
                 end_ms=sentence.end_ms,
+                text=sentence.text,
+                translation=sentence.translation,
             )
         )
 
@@ -64,6 +66,12 @@ def normalize_clip_input(clip_input: LoadedClipInput) -> NormalizedCoreRows:
                     start_ms=token.start_ms,
                     end_ms=token.end_ms,
                     coarse_unit_id=semantic_element.coarse_id if semantic_element else None,
+                    surface_text=token.text,
+                    explanation=token.explanation,
+                    base_form=semantic_element.base_form if semantic_element else None,
+                    translation=semantic_element.translation if semantic_element else None,
+                    dictionary=semantic_element.dictionary if semantic_element else None,
+                    mapping_reason=semantic_element.reason if semantic_element else None,
                 )
             )
 

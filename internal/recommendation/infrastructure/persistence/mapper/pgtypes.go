@@ -23,6 +23,13 @@ func TextToString(value pgtype.Text) string {
 	return pgtext.ToString(value)
 }
 
+func TextPointerFromPG(value pgtype.Text) *string {
+	if !value.Valid {
+		return nil
+	}
+	return &value.String
+}
+
 func StringToText(value string) pgtype.Text {
 	return pgtext.FromString(value)
 }
@@ -90,4 +97,15 @@ func Float64ToNumeric(value float64) (pgtype.Numeric, error) {
 
 func NumericToFloat64(value pgtype.Numeric) (float64, error) {
 	return pgnumeric.ToFloat64(value)
+}
+
+func NumericPointerToFloat64(value pgtype.Numeric) (*float64, error) {
+	if !value.Valid {
+		return nil, nil
+	}
+	result, err := pgnumeric.ToFloat64(value)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
 }

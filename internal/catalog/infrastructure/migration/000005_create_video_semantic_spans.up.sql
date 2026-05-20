@@ -5,6 +5,12 @@ create table if not exists catalog.video_semantic_spans (
   start_ms integer not null,
   end_ms integer not null,
   coarse_unit_id bigint,
+  surface_text text not null,
+  explanation text,
+  base_form text,
+  translation text,
+  dictionary text,
+  mapping_reason text,
   created_at timestamptz not null default now(),
 
   primary key (video_id, sentence_index, span_index),

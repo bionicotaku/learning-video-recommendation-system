@@ -26,6 +26,8 @@ select
   sentence_indexes,
   best_evidence_sentence_index,
   best_evidence_span_index,
+  best_evidence_candidate_score,
+  best_evidence_target_text,
   duration_ms,
   mapped_span_ratio
 from recommendation.v_recommendable_video_units
@@ -70,7 +72,19 @@ with input as (
     (item->>'span_index')::integer as span_index
   from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
 )
-select spans.video_id, spans.sentence_index, spans.span_index, spans.coarse_unit_id, spans.start_ms, spans.end_ms
+select
+  spans.video_id,
+  spans.sentence_index,
+  spans.span_index,
+  spans.coarse_unit_id,
+  spans.start_ms,
+  spans.end_ms,
+  spans.surface_text,
+  spans.explanation,
+  spans.base_form,
+  spans.translation,
+  spans.dictionary,
+  spans.mapping_reason
 from catalog.video_semantic_spans spans
 join input
   on input.video_id = spans.video_id
@@ -86,7 +100,13 @@ with input as (
     (item->>'sentence_index')::integer as sentence_index
   from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
 )
-select sentences.video_id, sentences.sentence_index, sentences.start_ms, sentences.end_ms
+select
+  sentences.video_id,
+  sentences.sentence_index,
+  sentences.start_ms,
+  sentences.end_ms,
+  sentences.text,
+  sentences.translation
 from catalog.video_transcript_sentences sentences
 join input
   on input.video_id = sentences.video_id

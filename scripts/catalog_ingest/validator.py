@@ -298,7 +298,6 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
         "context_cloze_choice",
         "reverse_identification_choice",
     }
-    valid_statuses = {"draft", "active", "retired", "rejected"}
 
     for question in clip_input.questions:
         if question.scope_type != "video_unit":
@@ -315,8 +314,6 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
                 "question.question_type 不合法",
                 {"question_type": question.question_type},
             )
-        if question.status not in valid_statuses:
-            raise _error(clip_input, "question_invalid", "question.status 不合法", {"status": question.status})
         if question.coarse_unit_id not in known_coarse_set:
             raise _error(
                 clip_input,
@@ -466,6 +463,14 @@ def _validate_selected_coarse_unit_refs(clip_input: LoadedClipInput) -> None:
 def _validate_selected_ref_metadata(clip_input: LoadedClipInput, ref) -> None:
     """校验 selected best evidence 的可审计打分字段。"""
 
+    if not isinstance(ref.target_text, str) or not ref.target_text.strip():
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.target_text 不能为空字符串",
+            {"coarse_unit_id": ref.coarse_unit_id},
+        )
+
     required_score_keys = (
         "visual_context",
         "context_clarity",
@@ -497,6 +502,24 @@ def _validate_selected_ref_metadata(clip_input: LoadedClipInput, ref) -> None:
                     "value": value,
                 },
             )
+
+    if ref.candidate_score is None:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.candidate_score 不能为空",
+            {"coarse_unit_id": ref.coarse_unit_id},
+        )
+    if type(ref.candidate_score) not in (int, float) or ref.candidate_score < 0 or ref.candidate_score > 10:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.candidate_score 必须为 0 到 10 的数字",
+            {
+                "coarse_unit_id": ref.coarse_unit_id,
+                "value": ref.candidate_score,
+            },
+        )
 
     if ref.question_reject_reason is not None and not ref.question_reject_reason.strip():
         raise _error(

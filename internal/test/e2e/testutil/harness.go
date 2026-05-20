@@ -296,12 +296,14 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	for _, sentence := range fixture.TranscriptEntries {
 		if _, err := h.Pool.Exec(
 			context.Background(),
-			`insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms)
-			 values ($1, $2, $3, $4)`,
+			`insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms, text, translation)
+			 values ($1, $2, $3, $4, $5, $6)`,
 			fixture.VideoID,
 			sentence.SentenceIndex,
 			sentence.StartMs,
 			sentence.EndMs,
+			fmt.Sprintf("sentence %d", sentence.SentenceIndex),
+			fmt.Sprintf("句子 %d", sentence.SentenceIndex),
 		); err != nil {
 			failNow(t, "seed catalog.video_transcript_sentences: %v", err)
 		}
@@ -310,14 +312,32 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 	for _, span := range fixture.SemanticSpans {
 		if _, err := h.Pool.Exec(
 			context.Background(),
-			`insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms)
-			 values ($1, $2, $3, $4, $5, $6)`,
+			`insert into catalog.video_semantic_spans (
+					video_id,
+					sentence_index,
+					span_index,
+					coarse_unit_id,
+					start_ms,
+					end_ms,
+					surface_text,
+					explanation,
+					base_form,
+					translation,
+					dictionary,
+					mapping_reason
+				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 			fixture.VideoID,
 			span.SentenceIndex,
 			span.SpanIndex,
 			span.CoarseUnitID,
 			span.StartMs,
 			span.EndMs,
+			fmt.Sprintf("span %d", span.SpanIndex),
+			"test explanation",
+			"span",
+			"跨度",
+			"test dictionary",
+			"test mapping reason",
 		); err != nil {
 			failNow(t, "seed catalog.video_semantic_spans: %v", err)
 		}
@@ -338,8 +358,10 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 					best_evidence_span_index,
 					best_evidence_scores,
 					best_evidence_question_reject_reason,
-					best_evidence_selection_reason
-				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb, null, 'test fixture')`,
+					best_evidence_selection_reason,
+					best_evidence_candidate_score,
+					best_evidence_target_text
+				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb, null, 'test fixture', 8.3500, 'test target')`,
 			fixture.VideoID,
 			entry.CoarseUnitID,
 			entry.MentionCount,

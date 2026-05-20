@@ -22,6 +22,7 @@ from scripts.catalog_ingest.models import (
     VideoSemanticSpanRow,
     VideoTranscriptSentenceRow,
 )
+from scripts.catalog_ingest.normalizer import normalize_clip_input
 from scripts.catalog_ingest.repository import CatalogRepository
 from scripts.catalog_ingest.validator import validate_loaded_clip
 
@@ -122,12 +123,23 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertLessEqual(before_load, clip_input.publish_at)
         self.assertLessEqual(clip_input.publish_at, after_load)
         self.assertEqual(clip_input.clip_metadata.engagement["humor"], 7)
+        self.assertEqual(clip_input.questions[0].status, "active")
+        self.assertEqual(clip_input.context["question_source"], {"model": "test-source"})
+        self.assertEqual(clip_input.context["question_audit"], {})
+        self.assertEqual(
+            clip_input.context["selected_coarse_unit_refs_metadata"]["selection_model"],
+            "test-model",
+        )
         token = clip_input.transcript_sentences[0].tokens[0]
         sentence = clip_input.transcript_sentences[0]
         self.assertEqual(sentence.translation, "帕姆！")
         self.assertFalse(hasattr(sentence, "explanation"))
         self.assertIsNotNone(token.semantic_element)
         self.assertEqual(token.semantic_element.coarse_id, 7)
+        self.assertEqual(token.semantic_element.base_form, "Pam")
+        self.assertEqual(token.semantic_element.dictionary, "Pam")
+        self.assertEqual(token.semantic_element.translation, "帕姆")
+        self.assertEqual(token.semantic_element.reason, "name")
         core_rows = NormalizedCoreRows(
             video=VideoRow(
                 source_clip_key=clip_input.source_clip_key,
@@ -155,6 +167,8 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                     sentence_index=0,
                     start_ms=110,
                     end_ms=150,
+                    text="Pam!",
+                    translation="帕姆！",
                 ),
             ),
             spans=(
@@ -164,6 +178,12 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                     start_ms=110,
                     end_ms=150,
                     coarse_unit_id=7,
+                    surface_text="Pam!",
+                    explanation="Pam",
+                    base_form="Pam",
+                    translation="帕姆",
+                    dictionary="Pam",
+                    mapping_reason="name",
                 ),
             ),
         )
@@ -171,17 +191,23 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertEqual(normalized.video.source_start_sentence_index, 0)
         self.assertEqual(normalized.video.source_end_sentence_index, 0)
         self.assertEqual(normalized.video.engagement_score["humor"], 7)
-        self.assertFalse(hasattr(normalized.sentences[0], "translation"))
+        self.assertEqual(normalized.sentences[0].text, "Pam!")
+        self.assertEqual(normalized.sentences[0].translation, "帕姆！")
+        self.assertEqual(normalized.spans[0].surface_text, "Pam!")
+        self.assertEqual(normalized.spans[0].explanation, "Pam")
+        self.assertEqual(normalized.spans[0].base_form, "Pam")
+        self.assertEqual(normalized.spans[0].dictionary, "Pam")
+        self.assertEqual(normalized.spans[0].translation, "帕姆")
+        self.assertEqual(normalized.spans[0].mapping_reason, "name")
         self.assertFalse(hasattr(normalized.sentences[0], "explanation"))
-        self.assertFalse(hasattr(normalized.spans[0], "base_form"))
         self.assertFalse(hasattr(normalized.spans[0], "dictionary_text"))
-        self.assertFalse(hasattr(normalized.spans[0], "translation"))
 
-    def test_unit_index_uses_selected_best_evidence_and_no_surface_forms(self) -> None:
+    def test_unit_index_uses_selected_best_evidence_metadata(self) -> None:
         clip_input = _build_clip_input(
             selected_refs=(
                 SelectedCoarseUnitRef(
                     coarse_unit_id=42,
+                    target_text="chosen target",
                     sentence_index=2,
                     token_index=3,
                     scores={
@@ -190,6 +216,7 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                         "learning_value": 9,
                         "representative_salience": 8,
                     },
+                    candidate_score=8.35,
                     question_reject_reason=None,
                     selection_reason="clear context",
                 ),
@@ -246,6 +273,8 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertEqual(unit_index.best_evidence_scores["visual_context"], 3)
         self.assertEqual(unit_index.best_evidence_selection_reason, "clear context")
         self.assertIsNone(unit_index.best_evidence_question_reject_reason)
+        self.assertEqual(unit_index.best_evidence_candidate_score, 8.35)
+        self.assertEqual(unit_index.best_evidence_target_text, "chosen target")
         self.assertFalse(hasattr(unit_index, "first_start_ms"))
         self.assertFalse(hasattr(unit_index, "last_end_ms"))
         self.assertFalse(hasattr(unit_index, "best_evidence_source"))
@@ -424,11 +453,67 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertIn("insert into catalog.questions", insert_sql)
         self.assertEqual(params[0][0], normalized.questions[0].question_id)
         self.assertEqual(params[0][5], "video-1")
+        self.assertEqual(params[0][11], "active")
         self.assertEqual(len(cursor.execute_calls), 1)
         retire_sql, retire_params = cursor.execute_calls[0]
         self.assertIn("status = 'retired'", retire_sql)
         self.assertEqual(retire_params[0], "video-1")
         self.assertEqual(retire_params[1], [normalized.questions[0].question_id])
+
+    def test_repository_writes_sentence_span_and_best_evidence_metadata(self) -> None:
+        clip_input = _build_clip_input(
+            transcript_sentences=(
+                TranscriptSentence(
+                    index=0,
+                    text="default sentence",
+                    translation="默认句子",
+                    start_ms=0,
+                    end_ms=100,
+                    tokens=(
+                        TranscriptToken(
+                            index=0,
+                            text="default",
+                            explanation="default explanation",
+                            start_ms=0,
+                            end_ms=50,
+                            semantic_element=TranscriptSemanticElement(
+                                coarse_id=1,
+                                base_form="default",
+                                translation="默认",
+                                dictionary="default dictionary",
+                                reason="default reason",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        normalized = build_normalized_clip_data(clip_input, normalize_clip_input(clip_input))
+        cursor = _FakeCursor()
+
+        CatalogRepository("postgresql://unused")._replace_transcript_related_rows(cursor, "video-1", normalized)
+
+        sentence_sql, sentence_params = cursor.executemany_calls[0]
+        self.assertIn("text", sentence_sql)
+        self.assertIn("translation", sentence_sql)
+        self.assertEqual(sentence_params[0][4], "default sentence")
+        self.assertEqual(sentence_params[0][5], "默认句子")
+
+        span_sql, span_params = cursor.executemany_calls[1]
+        self.assertIn("surface_text", span_sql)
+        self.assertIn("mapping_reason", span_sql)
+        self.assertEqual(span_params[0][6], "default")
+        self.assertEqual(span_params[0][7], "default explanation")
+        self.assertEqual(span_params[0][8], "default")
+        self.assertEqual(span_params[0][9], "默认")
+        self.assertEqual(span_params[0][10], "default dictionary")
+        self.assertEqual(span_params[0][11], "default reason")
+
+        unit_sql, unit_params = cursor.executemany_calls[2]
+        self.assertIn("best_evidence_candidate_score", unit_sql)
+        self.assertIn("best_evidence_target_text", unit_sql)
+        self.assertEqual(unit_params[0][12], 8.35)
+        self.assertEqual(unit_params[0][13], "token")
 
     def test_repository_upserts_video_sentence_indexes_and_engagement_score(self) -> None:
         clip_input = _build_clip_input()
@@ -674,6 +759,7 @@ def _question_payload(coarse_unit_id: int, sentence_index: int, token_index: int
             "refs": [
                 {
                     "coarse_unit_id": coarse_unit_id,
+                    "target_text": "demo",
                     "sentence_index": sentence_index,
                     "token_index": token_index,
                     "scores": {
@@ -682,6 +768,7 @@ def _question_payload(coarse_unit_id: int, sentence_index: int, token_index: int
                         "learning_value": 9,
                         "representative_salience": 8,
                     },
+                    "candidate_score": 8.35,
                     "question_reject_reason": None,
                     "selection_reason": "clear context",
                 }
@@ -724,6 +811,7 @@ def _sentence(index: int, coarse_unit_id: int) -> TranscriptSentence:
 def _selected_ref(coarse_unit_id: int, sentence_index: int, token_index: int) -> SelectedCoarseUnitRef:
     return SelectedCoarseUnitRef(
         coarse_unit_id=coarse_unit_id,
+        target_text="token",
         sentence_index=sentence_index,
         token_index=token_index,
         scores={
@@ -732,6 +820,7 @@ def _selected_ref(coarse_unit_id: int, sentence_index: int, token_index: int) ->
             "learning_value": 9,
             "representative_salience": 8,
         },
+        candidate_score=8.35,
         question_reject_reason=None,
         selection_reason="clear context",
     )

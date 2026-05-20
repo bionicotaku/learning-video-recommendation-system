@@ -55,7 +55,9 @@ create table if not exists catalog.video_unit_index (
   best_evidence_span_index integer not null,
   best_evidence_scores jsonb not null,
   best_evidence_question_reject_reason text,
-  best_evidence_selection_reason text
+  best_evidence_selection_reason text,
+  best_evidence_candidate_score numeric(8,4),
+  best_evidence_target_text text
 );
 
 create table if not exists catalog.video_semantic_spans (
@@ -64,14 +66,22 @@ create table if not exists catalog.video_semantic_spans (
   span_index integer not null,
   coarse_unit_id bigint,
   start_ms integer not null,
-  end_ms integer not null
+  end_ms integer not null,
+  surface_text text not null,
+  explanation text,
+  base_form text,
+  translation text,
+  dictionary text,
+  mapping_reason text
 );
 
 create table if not exists catalog.video_transcript_sentences (
   video_id uuid not null,
   sentence_index integer not null,
   start_ms integer not null,
-  end_ms integer not null
+  end_ms integer not null,
+  text text not null,
+  translation text
 );
 
 create table if not exists catalog.video_user_states (
@@ -111,6 +121,8 @@ select
   '{}'::jsonb as best_evidence_scores,
   null::text as best_evidence_question_reject_reason,
   null::text as best_evidence_selection_reason,
+  null::numeric(8,4) as best_evidence_candidate_score,
+  null::text as best_evidence_target_text,
   null::integer as duration_ms,
   null::numeric(6,5) as mapped_span_ratio,
   null::text as status,

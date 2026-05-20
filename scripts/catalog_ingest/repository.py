@@ -489,9 +489,11 @@ class CatalogRepository:
                   video_id,
                   sentence_index,
                   start_ms,
-                  end_ms
+                  end_ms,
+                  text,
+                  translation
                 )
-                values (%s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -499,6 +501,8 @@ class CatalogRepository:
                         sentence.sentence_index,
                         sentence.start_ms,
                         sentence.end_ms,
+                        sentence.text,
+                        sentence.translation,
                     )
                     for sentence in normalized_data.sentences
                 ],
@@ -513,9 +517,15 @@ class CatalogRepository:
                   span_index,
                   start_ms,
                   end_ms,
-                  coarse_unit_id
+                  coarse_unit_id,
+                  surface_text,
+                  explanation,
+                  base_form,
+                  translation,
+                  dictionary,
+                  mapping_reason
                 )
-                values (%s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -525,6 +535,12 @@ class CatalogRepository:
                         span.start_ms,
                         span.end_ms,
                         span.coarse_unit_id,
+                        span.surface_text,
+                        span.explanation,
+                        span.base_form,
+                        span.translation,
+                        span.dictionary,
+                        span.mapping_reason,
                     )
                     for span in normalized_data.spans
                 ],
@@ -545,9 +561,11 @@ class CatalogRepository:
                   best_evidence_span_index,
                   best_evidence_scores,
                   best_evidence_question_reject_reason,
-                  best_evidence_selection_reason
+                  best_evidence_selection_reason,
+                  best_evidence_candidate_score,
+                  best_evidence_target_text
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -563,6 +581,8 @@ class CatalogRepository:
                         Jsonb(unit.best_evidence_scores),
                         unit.best_evidence_question_reject_reason,
                         unit.best_evidence_selection_reason,
+                        unit.best_evidence_candidate_score,
+                        unit.best_evidence_target_text,
                     )
                     for unit in normalized_data.unit_indexes
                 ],
@@ -626,7 +646,7 @@ class CatalogRepository:
                         question.context_start_ms,
                         question.context_end_ms,
                         Jsonb(question.content_payload),
-                        question.status,
+                        "active",
                     )
                     for question in normalized_data.questions
                 ],

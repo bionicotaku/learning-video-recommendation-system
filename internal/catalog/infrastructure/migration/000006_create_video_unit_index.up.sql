@@ -13,6 +13,8 @@ create table if not exists catalog.video_unit_index (
   best_evidence_scores jsonb not null default '{}'::jsonb,
   best_evidence_question_reject_reason text,
   best_evidence_selection_reason text,
+  best_evidence_candidate_score numeric(8,4),
+  best_evidence_target_text text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
@@ -42,5 +44,9 @@ create table if not exists catalog.video_unit_index (
   ),
   constraint chk_video_unit_index_best_evidence_selection_reason_nonempty check (
     best_evidence_selection_reason is null or best_evidence_selection_reason <> ''
+  ),
+  constraint chk_video_unit_index_best_evidence_candidate_score_range check (
+    best_evidence_candidate_score is null
+    or (best_evidence_candidate_score >= 0 and best_evidence_candidate_score <= 10)
   )
 );

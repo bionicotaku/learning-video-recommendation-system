@@ -4,6 +4,8 @@ create table if not exists catalog.video_transcript_sentences (
   sentence_index integer not null,
   start_ms integer not null,
   end_ms integer not null,
+  text text not null,
+  translation text,
   created_at timestamptz not null default now(),
 
   primary key (video_id, sentence_index),

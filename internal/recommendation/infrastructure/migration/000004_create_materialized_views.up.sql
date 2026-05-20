@@ -12,6 +12,8 @@ select
   vui.best_evidence_scores,
   vui.best_evidence_question_reject_reason,
   vui.best_evidence_selection_reason,
+  vui.best_evidence_candidate_score,
+  vui.best_evidence_target_text,
   v.duration_ms,
   vt.mapped_span_ratio,
   v.status,

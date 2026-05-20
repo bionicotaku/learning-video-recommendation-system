@@ -107,6 +107,10 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnits
 	if err != nil {
 		return model.RecommendableVideoUnit{}, err
 	}
+	bestEvidenceCandidateScore, err := NumericPointerToFloat64(row.BestEvidenceCandidateScore)
+	if err != nil {
+		return model.RecommendableVideoUnit{}, err
+	}
 
 	return model.RecommendableVideoUnit{
 		VideoID:         UUIDToString(row.VideoID),
@@ -120,8 +124,10 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnits
 			SentenceIndex: Int32FromPG(row.BestEvidenceSentenceIndex),
 			SpanIndex:     Int32FromPG(row.BestEvidenceSpanIndex),
 		},
-		DurationMs:      durationMs,
-		MappedSpanRatio: mappedSpanRatio,
+		BestEvidenceCandidateScore: bestEvidenceCandidateScore,
+		BestEvidenceTargetText:     TextPointerFromPG(row.BestEvidenceTargetText),
+		DurationMs:                 durationMs,
+		MappedSpanRatio:            mappedSpanRatio,
 	}, nil
 }
 
@@ -176,6 +182,12 @@ func ToSemanticSpan(row recommendationsqlc.CatalogVideoSemanticSpan) model.Seman
 		CoarseUnitID:  Int64PointerFromPG(row.CoarseUnitID),
 		StartMs:       row.StartMs,
 		EndMs:         row.EndMs,
+		SurfaceText:   row.SurfaceText,
+		Explanation:   TextPointerFromPG(row.Explanation),
+		BaseForm:      TextPointerFromPG(row.BaseForm),
+		Translation:   TextPointerFromPG(row.Translation),
+		Dictionary:    TextPointerFromPG(row.Dictionary),
+		MappingReason: TextPointerFromPG(row.MappingReason),
 	}
 }
 
@@ -185,6 +197,8 @@ func ToTranscriptSentence(row recommendationsqlc.CatalogVideoTranscriptSentence)
 		SentenceIndex: row.SentenceIndex,
 		StartMs:       row.StartMs,
 		EndMs:         row.EndMs,
+		Text:          row.Text,
+		Translation:   TextPointerFromPG(row.Translation),
 	}
 }
 

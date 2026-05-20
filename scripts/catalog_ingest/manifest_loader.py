@@ -503,6 +503,10 @@ def _parse_transcript_sentences(
                     )
                 semantic_element = TranscriptSemanticElement(
                     coarse_id=_optional_int(semantic_payload.get("coarse_id")),
+                    base_form=_optional_str(semantic_payload.get("base_form")),
+                    translation=_optional_str(semantic_payload.get("translation")),
+                    dictionary=_optional_str(semantic_payload.get("dictionary")),
+                    reason=_optional_str(semantic_payload.get("reason")),
                 )
 
             try:
@@ -595,7 +599,7 @@ def _parse_questions(
                     context_start_ms=_optional_int(raw_question.get("context_start_ms")),
                     context_end_ms=_optional_int(raw_question.get("context_end_ms")),
                     content_payload=content_payload,
-                    status=str(raw_question.get("status", "active")),
+                    status="active",
                 )
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -671,9 +675,11 @@ def _parse_selected_coarse_unit_refs(
             parsed_refs.append(
                 SelectedCoarseUnitRef(
                     coarse_unit_id=int(raw_ref["coarse_unit_id"]),
+                    target_text=_required_raw_str(raw_ref["target_text"]),
                     sentence_index=int(raw_ref["sentence_index"]),
                     token_index=int(raw_ref["token_index"]),
                     scores=dict(scores),
+                    candidate_score=_optional_float(raw_ref.get("candidate_score")),
                     question_reject_reason=question_reject_reason,
                     selection_reason=selection_reason,
                 )
@@ -719,6 +725,20 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if type(value) not in (int, float):
+        raise ValueError("expected number")
+    return float(value)
+
+
+def _required_raw_str(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("required non-empty string")
+    return value
 
 
 def _optional_str(value: Any) -> str | None:

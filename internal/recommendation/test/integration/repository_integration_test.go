@@ -225,10 +225,10 @@ func TestEvidenceReadersBatchReadSpansAndSentences(t *testing.T) {
 	unitID2 := int64(314)
 	seedBaseRefs(t, ctx, db, tx, userID, videoID1, unitID1)
 	seedBaseRefs(t, ctx, db, tx, userID, videoID2, unitID2)
-	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms) values ($1, 2, 1900, 2500), ($2, 3, 2900, 3500) on conflict do nothing`, videoID1, videoID2); err != nil {
+	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms, text, translation) values ($1, 2, 1900, 2500, 'sentence one', '句子一'), ($2, 3, 2900, 3500, 'sentence two', '句子二') on conflict do nothing`, videoID1, videoID2); err != nil {
 		t.Fatalf("seed extra transcript sentences: %v", err)
 	}
-	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms) values ($1, 2, 1, $2, 2000, 2400), ($3, 3, 1, $4, 3000, 3400) on conflict do nothing`, videoID1, unitID1, videoID2, unitID2); err != nil {
+	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, surface_text, explanation, base_form, translation, dictionary, mapping_reason) values ($1, 2, 1, $2, 2000, 2400, 'span one', 'explain one', 'span', '跨度', 'dict one', 'reason one'), ($3, 3, 1, $4, 3000, 3400, 'span two', 'explain two', 'span', '跨度', 'dict two', 'reason two') on conflict do nothing`, videoID1, unitID1, videoID2, unitID2); err != nil {
 		t.Fatalf("seed extra semantic spans: %v", err)
 	}
 
@@ -243,6 +243,9 @@ func TestEvidenceReadersBatchReadSpansAndSentences(t *testing.T) {
 	if len(spans) != 2 {
 		t.Fatalf("spans = %d, want 2: %+v", len(spans), spans)
 	}
+	if spans[0].SurfaceText == "" || spans[0].Explanation == nil || spans[0].BaseForm == nil {
+		t.Fatalf("expected span display metadata, got %+v", spans[0])
+	}
 
 	sentenceReader := repository.NewTranscriptSentenceReader(tx)
 	sentences, err := sentenceReader.ListByVideoAndIndexesBatch(ctx, []apprepo.TranscriptSentenceRef{
@@ -254,6 +257,9 @@ func TestEvidenceReadersBatchReadSpansAndSentences(t *testing.T) {
 	}
 	if len(sentences) != 2 {
 		t.Fatalf("sentences = %d, want 2: %+v", len(sentences), sentences)
+	}
+	if sentences[0].Text == "" || sentences[0].Translation == nil {
+		t.Fatalf("expected sentence display text, got %+v", sentences[0])
 	}
 }
 
@@ -270,18 +276,19 @@ func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 	if _, err := tx.Exec(ctx, `insert into catalog.video_transcripts (video_id, mapped_span_ratio) values ($1, 0.70000)`, videoID); err != nil {
 		t.Fatalf("seed transcript: %v", err)
 	}
-	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms) values ($1, 1, 900, 1600)`, videoID); err != nil {
+	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms, text, translation) values ($1, 1, 900, 1600, 'fixture sentence', '测试句子')`, videoID); err != nil {
 		t.Fatalf("seed transcript sentence: %v", err)
 	}
-	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms) values ($1, 1, 1, $2, 1000, 1500)`, videoID, unitID); err != nil {
+	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, surface_text, explanation, base_form, translation, dictionary, mapping_reason) values ($1, 1, 1, $2, 1000, 1500, 'fixture span', 'fixture explanation', 'fixture', '测试', 'fixture dictionary', 'fixture reason')`, videoID, unitID); err != nil {
 		t.Fatalf("seed semantic span: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `
 			insert into catalog.video_unit_index (
 				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
 				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
-				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason
-			) values ($1, $2, 3, 2, 4000, 0.12000, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture')
+				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason,
+				best_evidence_candidate_score, best_evidence_target_text
+			) values ($1, $2, 3, 2, 4000, 0.12000, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture', 8.3500, 'fixture span')
 		`, videoID, unitID); err != nil {
 		t.Fatalf("seed unit index: %v", err)
 	}
@@ -304,6 +311,12 @@ func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 	}
 	if rows[0].VideoID != videoID || rows[0].CoarseUnitID != unitID {
 		t.Fatalf("unexpected recommendable row: %+v", rows[0])
+	}
+	if rows[0].BestEvidenceCandidateScore == nil || *rows[0].BestEvidenceCandidateScore != 8.35 {
+		t.Fatalf("expected best evidence candidate score, got %+v", rows[0])
+	}
+	if rows[0].BestEvidenceTargetText == nil || *rows[0].BestEvidenceTargetText != "fixture span" {
+		t.Fatalf("expected best evidence target text, got %+v", rows[0])
 	}
 
 	inventoryReader := repository.NewUnitInventoryReader(tx)
@@ -484,18 +497,19 @@ func seedInventoryVideo(t *testing.T, ctx context.Context, testDB *fixture.TestD
 	if _, err := db.Exec(ctx, `insert into catalog.video_transcripts (video_id, mapped_span_ratio) values ($1, $2) on conflict (video_id) do update set mapped_span_ratio = excluded.mapped_span_ratio`, videoID, mappedSpanRatio); err != nil {
 		t.Fatalf("seed inventory transcript: %v", err)
 	}
-	if _, err := db.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms) values ($1, 1, 900, 1600) on conflict do nothing`, videoID); err != nil {
+	if _, err := db.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms, text, translation) values ($1, 1, 900, 1600, 'inventory sentence', '库存句子') on conflict do nothing`, videoID); err != nil {
 		t.Fatalf("seed inventory transcript sentence: %v", err)
 	}
-	if _, err := db.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms) values ($1, 1, 1, $2, 1000, 1500) on conflict do nothing`, videoID, unitID); err != nil {
+	if _, err := db.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, surface_text, explanation, base_form, translation, dictionary, mapping_reason) values ($1, 1, 1, $2, 1000, 1500, 'inventory span', 'inventory explanation', 'inventory', '库存', 'inventory dictionary', 'inventory reason') on conflict do nothing`, videoID, unitID); err != nil {
 		t.Fatalf("seed inventory semantic span: %v", err)
 	}
 	if _, err := db.Exec(ctx, `
 			insert into catalog.video_unit_index (
 				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
 				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
-				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason
-			) values ($1, $2, $3, 2, 4000, $4, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture')
+				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason,
+				best_evidence_candidate_score, best_evidence_target_text
+			) values ($1, $2, $3, 2, 4000, $4, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture', 8.3500, 'inventory span')
 			on conflict do nothing
 		`, videoID, unitID, mentionCount, coverageRatio); err != nil {
 		t.Fatalf("seed inventory unit index: %v", err)

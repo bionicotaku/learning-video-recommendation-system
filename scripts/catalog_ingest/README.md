@@ -45,7 +45,7 @@
 
 - sentence: `index`, `text`, `translation`, `start`, `end`, `tokens`
 - token: `index`, `text`, `explanation`, `start`, `end`, `semantic_element`
-- semantic element: `coarse_id` 是当前唯一落库字段；`base_form`, `dictionary`, `translation`, `reason` 只保留在原始 JSON 中
+- semantic element: `coarse_id`, `base_form`, `dictionary`, `translation`, `reason`
 
 ### question JSON
 
@@ -66,9 +66,11 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 `selected_coarse_unit_refs.refs[]` 是 `video_unit_index.best_evidence_*` 的来源。每个 ref 至少包含：
 
 - `coarse_unit_id`
+- `target_text`
 - `sentence_index`
 - `token_index`
 - `scores`
+- `candidate_score`
 - `question_reject_reason`
 - `selection_reason`
 
@@ -118,8 +120,8 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 - `sentence_index`：`sentence.index`
 - `start_ms`：`sentence.start`
 - `end_ms`：`sentence.end`
-
-`sentence.text` 与 `sentence.translation` 不落库。
+- `text`：`sentence.text`
+- `translation`：`sentence.translation`
 
 ### `catalog.video_semantic_spans`
 
@@ -130,8 +132,12 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 - `start_ms`：`token.start`
 - `end_ms`：`token.end`
 - `coarse_unit_id`：`token.semantic_element.coarse_id`
-
-`token.text`、`token.explanation`、`semantic_element.base_form`、`semantic_element.dictionary`、`semantic_element.reason` 和 `semantic_element.translation` 不落库。
+- `surface_text`：`token.text`
+- `explanation`：`token.explanation`
+- `base_form`：`token.semantic_element.base_form`
+- `translation`：`token.semantic_element.translation`
+- `dictionary`：`token.semantic_element.dictionary`
+- `mapping_reason`：`token.semantic_element.reason`
 
 ### `catalog.video_unit_index`
 
@@ -147,6 +153,8 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 - `best_evidence_scores` 来自 `selected_coarse_unit_refs.refs[].scores`
 - `best_evidence_question_reject_reason` 来自 `selected_coarse_unit_refs.refs[].question_reject_reason`
 - `best_evidence_selection_reason` 来自 `selected_coarse_unit_refs.refs[].selection_reason`
+- `best_evidence_candidate_score` 来自 `selected_coarse_unit_refs.refs[].candidate_score`
+- `best_evidence_target_text` 来自 `selected_coarse_unit_refs.refs[].target_text`
 
 selected ref 必须能精确回查到同一 `(video_id, coarse_unit_id)` 下的 semantic span。
 
@@ -155,10 +163,13 @@ selected ref 必须能精确回查到同一 `(video_id, coarse_unit_id)` 下的 
 - `question_id`：脚本根据稳定输入生成 deterministic UUID
 - `scope_type`：固定写入 `video_unit`
 - `video_id`：当前 clip upsert 后回填
+- `status`：固定写入 `active`，忽略 question JSON 中的 `status`
 - `content_payload`：question JSON 原样写入
 - 本次未出现但属于同一 video 的旧 `video_unit` question 会更新为 `retired`
 
 当前 ingest 只写题库内容，不写 `analytics.quiz_events`。
+
+question JSON 顶层 `source`、`audit` 和 `selected_coarse_unit_refs` 的选择参数元信息会写入 `catalog.video_ingestion_records.context`，用于复现和排查生成过程。
 
 ## 校验
 

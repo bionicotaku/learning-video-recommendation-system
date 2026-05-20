@@ -70,6 +70,8 @@ select
   sentence_indexes,
   best_evidence_sentence_index,
   best_evidence_span_index,
+  best_evidence_candidate_score,
+  best_evidence_target_text,
   duration_ms,
   mapped_span_ratio
 from recommendation.v_recommendable_video_units
@@ -78,17 +80,19 @@ order by coarse_unit_id asc, coverage_ratio desc, mention_count desc
 `
 
 type ListRecommendableVideoUnitsByUnitIDsRow struct {
-	VideoID                   pgtype.UUID    `json:"video_id"`
-	CoarseUnitID              pgtype.Int8    `json:"coarse_unit_id"`
-	MentionCount              pgtype.Int4    `json:"mention_count"`
-	SentenceCount             pgtype.Int4    `json:"sentence_count"`
-	CoverageMs                pgtype.Int4    `json:"coverage_ms"`
-	CoverageRatio             pgtype.Numeric `json:"coverage_ratio"`
-	SentenceIndexes           []int32        `json:"sentence_indexes"`
-	BestEvidenceSentenceIndex pgtype.Int4    `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex     pgtype.Int4    `json:"best_evidence_span_index"`
-	DurationMs                pgtype.Int4    `json:"duration_ms"`
-	MappedSpanRatio           pgtype.Numeric `json:"mapped_span_ratio"`
+	VideoID                    pgtype.UUID    `json:"video_id"`
+	CoarseUnitID               pgtype.Int8    `json:"coarse_unit_id"`
+	MentionCount               pgtype.Int4    `json:"mention_count"`
+	SentenceCount              pgtype.Int4    `json:"sentence_count"`
+	CoverageMs                 pgtype.Int4    `json:"coverage_ms"`
+	CoverageRatio              pgtype.Numeric `json:"coverage_ratio"`
+	SentenceIndexes            []int32        `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex  pgtype.Int4    `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex      pgtype.Int4    `json:"best_evidence_span_index"`
+	BestEvidenceCandidateScore pgtype.Numeric `json:"best_evidence_candidate_score"`
+	BestEvidenceTargetText     pgtype.Text    `json:"best_evidence_target_text"`
+	DurationMs                 pgtype.Int4    `json:"duration_ms"`
+	MappedSpanRatio            pgtype.Numeric `json:"mapped_span_ratio"`
 }
 
 func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]ListRecommendableVideoUnitsByUnitIDsRow, error) {
@@ -110,6 +114,8 @@ func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coar
 			&i.SentenceIndexes,
 			&i.BestEvidenceSentenceIndex,
 			&i.BestEvidenceSpanIndex,
+			&i.BestEvidenceCandidateScore,
+			&i.BestEvidenceTargetText,
 			&i.DurationMs,
 			&i.MappedSpanRatio,
 		); err != nil {
@@ -132,7 +138,19 @@ with input as (
     (item->>'span_index')::integer as span_index
   from jsonb_array_elements($1::jsonb) as refs(item)
 )
-select spans.video_id, spans.sentence_index, spans.span_index, spans.coarse_unit_id, spans.start_ms, spans.end_ms
+select
+  spans.video_id,
+  spans.sentence_index,
+  spans.span_index,
+  spans.coarse_unit_id,
+  spans.start_ms,
+  spans.end_ms,
+  spans.surface_text,
+  spans.explanation,
+  spans.base_form,
+  spans.translation,
+  spans.dictionary,
+  spans.mapping_reason
 from catalog.video_semantic_spans spans
 join input
   on input.video_id = spans.video_id
@@ -158,6 +176,12 @@ func (q *Queries) ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]C
 			&i.CoarseUnitID,
 			&i.StartMs,
 			&i.EndMs,
+			&i.SurfaceText,
+			&i.Explanation,
+			&i.BaseForm,
+			&i.Translation,
+			&i.Dictionary,
+			&i.MappingReason,
 		); err != nil {
 			return nil, err
 		}
@@ -176,7 +200,13 @@ with input as (
     (item->>'sentence_index')::integer as sentence_index
   from jsonb_array_elements($1::jsonb) as refs(item)
 )
-select sentences.video_id, sentences.sentence_index, sentences.start_ms, sentences.end_ms
+select
+  sentences.video_id,
+  sentences.sentence_index,
+  sentences.start_ms,
+  sentences.end_ms,
+  sentences.text,
+  sentences.translation
 from catalog.video_transcript_sentences sentences
 join input
   on input.video_id = sentences.video_id
@@ -198,6 +228,8 @@ func (q *Queries) ListTranscriptSentencesByRefs(ctx context.Context, refs []byte
 			&i.SentenceIndex,
 			&i.StartMs,
 			&i.EndMs,
+			&i.Text,
+			&i.Translation,
 		); err != nil {
 			return nil, err
 		}

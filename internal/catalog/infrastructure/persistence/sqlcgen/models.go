@@ -104,6 +104,12 @@ type CatalogVideoSemanticSpan struct {
 	StartMs       int32              `json:"start_ms"`
 	EndMs         int32              `json:"end_ms"`
 	CoarseUnitID  pgtype.Int8        `json:"coarse_unit_id"`
+	SurfaceText   string             `json:"surface_text"`
+	Explanation   pgtype.Text        `json:"explanation"`
+	BaseForm      pgtype.Text        `json:"base_form"`
+	Translation   pgtype.Text        `json:"translation"`
+	Dictionary    pgtype.Text        `json:"dictionary"`
+	MappingReason pgtype.Text        `json:"mapping_reason"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -126,6 +132,8 @@ type CatalogVideoTranscriptSentence struct {
 	SentenceIndex int32              `json:"sentence_index"`
 	StartMs       int32              `json:"start_ms"`
 	EndMs         int32              `json:"end_ms"`
+	Text          string             `json:"text"`
+	Translation   pgtype.Text        `json:"translation"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -142,6 +150,8 @@ type CatalogVideoUnitIndex struct {
 	BestEvidenceScores               []byte             `json:"best_evidence_scores"`
 	BestEvidenceQuestionRejectReason pgtype.Text        `json:"best_evidence_question_reject_reason"`
 	BestEvidenceSelectionReason      pgtype.Text        `json:"best_evidence_selection_reason"`
+	BestEvidenceCandidateScore       pgtype.Numeric     `json:"best_evidence_candidate_score"`
+	BestEvidenceTargetText           pgtype.Text        `json:"best_evidence_target_text"`
 	CreatedAt                        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                        pgtype.Timestamptz `json:"updated_at"`
 }

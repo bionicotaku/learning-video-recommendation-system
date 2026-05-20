@@ -27,9 +27,9 @@ Catalog 只负责以下六类内容：切片视频内容资产主记录、transc
 
 第三，transcript 原始 JSON 继续保留在对象存储中，作为字幕展示、翻译、词典、解释与调试信息的权威来源。数据库不重复保存这些展示型字段，只保存原始 JSON 的对象路径、checksum、格式版本，以及 Recommendation 需要的句子/语义 span 时间定位和 coarse unit 索引。视频对象路径属于视频播放主资产，应放在 `catalog.videos.video_object_path`；transcript 原始 JSON 的对象路径、checksum、格式版本属于 transcript 上游元数据，应放在 `catalog.video_transcripts`。
 
-第四，最细粒度索引层是 `semantic span`，不是传统 token。当前 transcript JSON 中的最细单元更接近带时间戳的语义跨度，而非传统 tokenizer token。数据库中的 `catalog.video_semantic_spans` 只保存其索引、时间和 `coarse_unit_id`，不保存 token 文本、翻译、解释、词典释义或映射理由。
+第四，最细粒度索引层是 `semantic span`，不是传统 token。当前 transcript JSON 中的最细单元更接近带时间戳的语义跨度，而非传统 tokenizer token。数据库中的 `catalog.video_semantic_spans` 保存其索引、时间、`coarse_unit_id`，以及后端 evidence / 点击解释所需的轻量展示与映射解释字段。
 
-第五，先存推荐所需的确定性索引事实，再做轻量聚合，不伪造高层标签，也不重复保存前端字幕展示数据。当前 Catalog 入库只把 sentence/span 的索引、时间、`coarse_unit_id`、transcript checksum 和统计值落库，并生成直接服务 Recall 的轻聚合索引。当前不在 Catalog 中固化 `role`、`context_relevance`、`teachability_score`、`confidence_score`，也不保存 `base_form`、`dictionary`、`translation`、`reason` 等展示或调试字段；这些内容保留在原始 JSON。
+第五，先存推荐所需的确定性索引事实，再做轻量聚合，不伪造高层标签。当前 Catalog 入库把 sentence/span 的索引、时间、文本、翻译、`coarse_unit_id`、轻量映射解释、transcript checksum 和统计值落库，并生成直接服务 Recall 的轻聚合索引。当前不在 Catalog 中固化 `role`、`context_relevance`、`teachability_score`、`confidence_score` 等 Recommendation 高层判断；完整原始 transcript JSON 仍保留在对象存储中。
 
 第六，内容域时间单位统一使用毫秒。当前 transcript JSON 中的时间字段是毫秒级整数，因此 Catalog 内容域统一使用 `duration_ms`、`start_ms`、`end_ms`、`coverage_ms`、`source_start_ms`、`source_end_ms`。这既符合输入事实，也避免无意义的精度膨胀。
 
@@ -60,7 +60,7 @@ catalog.videos
     └── 1:1  -> catalog.video_engagement_stats
 ```
 
-未来最重要的读路径有四条：视频播放与字幕展示走 `videos -> video_transcripts.transcript_object_path -> 原始 JSON`；Recommendation / Recall 走 `coarse_unit_id -> video_unit_index -> candidate videos -> spans / sentences 时间定位`；用户视频消费状态读取走 `video_user_states`；feed/detail 的视频全局互动数字读取走 `video_engagement_stats`。
+未来最重要的读路径有四条：视频播放走 `videos.video_object_path`；字幕/evidence 轻量展示可走 `video_transcript_sentences` 与 `video_semantic_spans`，完整原始材料仍可通过 `video_transcripts.transcript_object_path` 回源；Recommendation / Recall 走 `coarse_unit_id -> video_unit_index -> candidate videos -> spans / sentences`；用户视频消费状态读取走 `video_user_states`；feed/detail 的视频全局互动数字读取走 `video_engagement_stats`。
 
 ## 5. `catalog.videos`
 
@@ -115,7 +115,7 @@ catalog.videos
 
 ## 7. `catalog.video_transcript_sentences`
 
-`catalog.video_transcript_sentences` 承接 transcript JSON 中的 `sentences[]` 索引与时间，形成句子级时间定位模型。它不承接字幕展示文本或 explanation；这些内容由前端通过 transcript JSON 读取。Recommendation 只用它在 `best_evidence_*` 回查后组装 sentence-window 的时间边界。
+`catalog.video_transcript_sentences` 承接 transcript JSON 中的 `sentences[]` 索引、时间、原文与翻译，形成句子级轻量读模型。Recommendation 使用它在 `best_evidence_*` 回查后组装 sentence-window 的时间边界；API 或 evidence 展示也可以直接读取句子文本与翻译，不必为了常规展示回源整份 JSON。
 
 建议字段如下：
 
@@ -123,13 +123,15 @@ catalog.videos
 - `sentence_index integer not null`
 - `start_ms integer not null`
 - `end_ms integer not null`
+- `text text not null`
+- `translation text null`
 - `created_at timestamptz not null default now()`
 
 必要约束应包括：`primary key (video_id, sentence_index)`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (sentence_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。推荐索引包括：`(video_id, start_ms)`、`(video_id, end_ms)`。由于 `video_semantic_spans` 要引用句子主键，因此 `video_transcript_sentences` 也是最细事实层的父表之一。
 
 ## 8. `catalog.video_semantic_spans`
 
-`catalog.video_semantic_spans` 是 transcript 中最细粒度的索引表，承接 JSON 中 sentence 下的 `tokens[]` 的索引、时间和 coarse unit 映射，但在数据库内部命名为 **semantic spans**。它不是字幕展示表，不保存 token 文本、翻译、解释、词典释义、base form 或映射理由。Recommendation 细粒度 evidence 只依赖这里的时间定位和 `coarse_unit_id`。
+`catalog.video_semantic_spans` 是 transcript 中最细粒度的索引表，承接 JSON 中 sentence 下的 `tokens[]` 的索引、时间、coarse unit 映射、词面、解释、base form、翻译、词典释义与映射理由，但在数据库内部命名为 **semantic spans**。Recommendation 细粒度 evidence 主要依赖这里的时间定位和 `coarse_unit_id`；前端点击解释与后端 evidence 展示可以读取这些轻量文本字段。
 
 建议字段如下：
 
@@ -139,11 +141,17 @@ catalog.videos
 - `start_ms integer not null`
 - `end_ms integer not null`
 - `coarse_unit_id bigint null`
+- `surface_text text not null`
+- `explanation text null`
+- `base_form text null`
+- `translation text null`
+- `dictionary text null`
+- `mapping_reason text null`
 - `created_at timestamptz not null default now()`
 
 必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及 Recommendation 证据回查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
 
-sentence-level `translation`、`semantic_element.base_form`、`semantic_element.dictionary`、`semantic_element.translation`、`semantic_element.reason` 与 token / sentence 的展示文本都不进入主查询表。它们保留在对象存储中的 transcript 原始 JSON 里；若未来需要后端返回字幕展示内容，应通过读取 JSON 或独立字幕服务实现，而不是重新塞回 Catalog 主表。
+完整 transcript JSON 仍保留在对象存储中，作为审计和回源材料；数据库只保存当前后端读路径需要的轻量文本与映射解释字段，不把整份 JSON 复制进主表。
 
 ## 9. `catalog.video_unit_index`
 
@@ -163,14 +171,16 @@ sentence-level `translation`、`semantic_element.base_form`、`semantic_element.
 - `best_evidence_scores jsonb not null default '{}'::jsonb`
 - `best_evidence_question_reject_reason text null`
 - `best_evidence_selection_reason text null`
+- `best_evidence_candidate_score numeric(8,4) null`
+- `best_evidence_target_text text null`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
-这里特别强调：最终设计中，`evidence_sentence_indexes`、`evidence_span_indexes` 与 `evidence_span_refs` 都不再是逻辑 schema 的一部分。`video_unit_index` 只保存单一 `best_evidence`，避免同一行里出现多套 evidence 真相。`best_evidence_sentence_index` 与 `best_evidence_span_index` 必须能在同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans` 中找到唯一行；`best_evidence_scores`、`best_evidence_question_reject_reason` 和 `best_evidence_selection_reason` 只保存 selected ref 的选择质量与理由，不参与热路径排序。
+这里特别强调：最终设计中，`evidence_sentence_indexes`、`evidence_span_indexes` 与 `evidence_span_refs` 都不再是逻辑 schema 的一部分。`video_unit_index` 只保存单一 `best_evidence`，避免同一行里出现多套 evidence 真相。`best_evidence_sentence_index` 与 `best_evidence_span_index` 必须能在同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans` 中找到唯一行；`best_evidence_scores`、`best_evidence_question_reject_reason`、`best_evidence_selection_reason`、`best_evidence_candidate_score` 和 `best_evidence_target_text` 保存 selected ref 的选择质量、理由、综合分与词面，不直接替代 Recommendation 自己的热路径排序分。
 
-必要约束应包括：`primary key (video_id, coarse_unit_id)`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete cascade`、`foreign key (video_id, coarse_unit_id, best_evidence_sentence_index, best_evidence_span_index) references catalog.video_semantic_spans(video_id, coarse_unit_id, sentence_index, span_index) on delete cascade`、`check (mention_count > 0)`、`check (sentence_count > 0)`、`check (coverage_ms > 0)`、`check (coverage_ratio between 0 and 1)`、`check (best_evidence_sentence_index >= 0)`、`check (best_evidence_span_index >= 0)`、`check (jsonb_typeof(best_evidence_scores) = 'object')`。推荐索引包括：`primary key (video_id, coarse_unit_id)`、`(coarse_unit_id, mention_count desc, coverage_ratio desc)`、`(video_id)`，以及为多 unit 候选聚合与 Bundle 路径补强的 `idx_video_unit_index_unit_video on (coarse_unit_id, video_id)`。
+必要约束应包括：`primary key (video_id, coarse_unit_id)`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete cascade`、`foreign key (video_id, coarse_unit_id, best_evidence_sentence_index, best_evidence_span_index) references catalog.video_semantic_spans(video_id, coarse_unit_id, sentence_index, span_index) on delete cascade`、`check (mention_count > 0)`、`check (sentence_count > 0)`、`check (coverage_ms > 0)`、`check (coverage_ratio between 0 and 1)`、`check (best_evidence_sentence_index >= 0)`、`check (best_evidence_span_index >= 0)`、`check (jsonb_typeof(best_evidence_scores) = 'object')`、`check (best_evidence_candidate_score is null or best_evidence_candidate_score between 0 and 10)`。推荐索引包括：`primary key (video_id, coarse_unit_id)`、`(coarse_unit_id, mention_count desc, coverage_ratio desc)`、`(video_id)`，以及为多 unit 候选聚合与 Bundle 路径补强的 `idx_video_unit_index_unit_video on (coarse_unit_id, video_id)`。
 
-在语义上，`video_unit_index` 只保留确定性聚合事实与单一定位事实：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes` 与 `best_evidence_*`。当前不在这里存 `role`、`context_relevance`、`teachability_score`、`confidence_score`、`sample_surface_forms` 或字幕展示文本。如果未来需要展示内容，应从原始 JSON 读取。
+在语义上，`video_unit_index` 只保留确定性聚合事实与单一定位事实：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes` 与 `best_evidence_*`。当前不在这里存 `role`、`context_relevance`、`teachability_score`、`confidence_score` 或 `sample_surface_forms`。
 
 ## 10. `catalog.video_ingestion_records`
 
@@ -239,19 +249,19 @@ sentence-level `translation`、`semantic_element.base_form`、`semantic_element.
 
 ## 13. 原始 transcript JSON 的保留策略
 
-原始 transcript JSON 仍然保留在对象存储中，作为权威原始输入、字幕展示和审计来源。数据库不把整坨 JSON 存成主读模型，也不重复保存 subtitle 文本、翻译、词典、解释或映射理由；数据库只保存 `catalog.video_transcripts` 元数据、`catalog.video_transcript_sentences` 时间定位、`catalog.video_semantic_spans` 时间定位与 coarse unit 映射，以及 `catalog.video_unit_index` 聚合索引。视频对象路径放在 `catalog.videos.video_object_path`，transcript 原始 JSON 路径、checksum、format version 放在 `catalog.video_transcripts`。
+原始 transcript JSON 仍然保留在对象存储中，作为权威原始输入、完整字幕和审计来源。数据库不把整坨 JSON 存成主读模型；数据库只保存 `catalog.video_transcripts` 元数据、`catalog.video_transcript_sentences` 句子时间/文本/翻译、`catalog.video_semantic_spans` span 时间/词面/解释/映射字段，以及 `catalog.video_unit_index` 聚合索引。视频对象路径放在 `catalog.videos.video_object_path`，transcript 原始 JSON 路径、checksum、format version 放在 `catalog.video_transcripts`。
 
 ## 14. 入库流程设计
 
 Catalog 的入库采用**单 clip 单事务 replace 写入，并为每次执行记录单条入库审计**。这意味着：每个 clip 的一次执行都由 `video_ingestion_records` 记录；每个 clip 在数据库中要么整体成功，要么整体不落地；transcript 展开和 `video_unit_index` 聚合都在同一事务内完成。
 
-单 clip 入库步骤应固定为：先读取 manifest、同名 transcript JSON 与同名 question JSON；再校验内容资产元数据，包括 `source_clip_key`、`parent_video_name`、`title`、`duration_ms`、`video_object_path`、`transcript_object_path`、`transcript_checksum` 必须合法；再校验 transcript 结构，包括存在 `sentences`、sentence 的 `index/text/start/end` 合法、`end_ms > start_ms`、span 的 `index/text/start/end` 合法；若 span 时间超出所属 sentence 时间区间，则当前阶段记 warning 后继续入库，因为上游 AssemblyAI transcript 的原始输出偶尔会出现这类边界异常；若 `coarse_id` 非空则必须存在于 `semantic.coarse_unit`。question JSON 中的 `selected_coarse_unit_refs.refs` 必须与 transcript 中出现的 mapped coarse unit 一对一，且每个 ref 都能回查到同一 coarse unit 的 token；`questions[]` 只作为视频上下文题入库，写库时固定使用 `scope_type = 'video_unit'` 并绑定当前 clip 的 `video_id`。之后在应用层归一化生成 transcript 统计、sentence 时间行、semantic span 时间/映射行、`video_unit_index` 聚合结果和 `catalog.questions` 写入行；最后在同一事务中依次 upsert `catalog.videos`、replace `catalog.video_transcripts`、replace `catalog.video_transcript_sentences`、replace `catalog.video_semantic_spans`、replace `catalog.video_unit_index`、upsert `catalog.questions`，成功则写 `status = succeeded` 并关联 `video_id`，失败则回滚并写 `status = failed`、`error_code` 与 `error_message`。
+单 clip 入库步骤应固定为：先读取 manifest、同名 transcript JSON 与同名 question JSON；再校验内容资产元数据，包括 `source_clip_key`、`parent_video_name`、`title`、`duration_ms`、`video_object_path`、`transcript_object_path`、`transcript_checksum` 必须合法；再校验 transcript 结构，包括存在 `sentences`、sentence 的 `index/text/start/end` 合法、`end_ms > start_ms`、span 的 `index/text/start/end` 合法；若 span 时间超出所属 sentence 时间区间，则当前阶段记 warning 后继续入库，因为上游 AssemblyAI transcript 的原始输出偶尔会出现这类边界异常；若 `coarse_id` 非空则必须存在于 `semantic.coarse_unit`。question JSON 中的 `selected_coarse_unit_refs.refs` 必须与 transcript 中出现的 mapped coarse unit 一对一，且每个 ref 都能回查到同一 coarse unit 的 token，并提供 `target_text` 与 `candidate_score`。`questions[]` 只作为视频上下文题入库，写库时固定使用 `scope_type = 'video_unit'`、`status = 'active'` 并绑定当前 clip 的 `video_id`。之后在应用层归一化生成 transcript 统计、sentence 时间/文本行、semantic span 时间/映射/解释行、`video_unit_index` 聚合结果和 `catalog.questions` 写入行；最后在同一事务中依次 upsert `catalog.videos`、replace `catalog.video_transcripts`、replace `catalog.video_transcript_sentences`、replace `catalog.video_semantic_spans`、replace `catalog.video_unit_index`、upsert `catalog.questions`，成功则写 `status = succeeded` 并关联 `video_id`，失败则回滚并写 `status = failed`、`error_code` 与 `error_message`。
 
 ## 15. 轻量后处理逻辑
 
 这里的后处理不是另一条重型异步流水线，而是单 clip 入库过程中的轻量派生计算。首先，根据 sentence 与 spans 生成 transcript 摘要：`sentence_count`、`semantic_span_count`、`mapped_span_count`、`unmapped_span_count`、`mapped_span_ratio`，写入 `catalog.video_transcripts`。其次，从 `catalog.video_semantic_spans` 中所有 `coarse_unit_id is not null` 的行，按 `(video_id, coarse_unit_id)` 聚合出 `mention_count`、`sentence_count`、`sentence_indexes`。再次，计算 `coverage_ms` 时，不能简单累加 span 时长，而应先取同一 `(video_id, coarse_unit_id)` 下所有 span 区间，按开始时间排序，合并重叠区间，再对合并后的区间求总时长，然后计算 `coverage_ratio = coverage_ms / videos.duration_ms`。最后，为每个 `(video_id, coarse_unit_id)` 生成一条 `best_evidence`。
 
-当前正式入库阶段，`best_evidence` 不再由 deterministic fallback 生成，而是直接来自同名 question JSON 的 `selected_coarse_unit_refs.refs`。每个 ref 必须与 transcript 中出现的 mapped coarse unit 严格一对一；`ref.token_index` 直接映射为 `catalog.video_semantic_spans.span_index`。如果 refs 与 transcript 中的 coarse unit 集合不一致、重复、缺失，或 ref 指向的 token 不存在 / token 的 `semantic_element.coarse_id` 不匹配，则该 clip 入库失败。`best_evidence_scores` 写入 ref 的 `scores` 对象，`best_evidence_question_reject_reason` 写入 `question_reject_reason`，`best_evidence_selection_reason` 写入 `selection_reason`。
+当前正式入库阶段，`best_evidence` 不再由 deterministic fallback 生成，而是直接来自同名 question JSON 的 `selected_coarse_unit_refs.refs`。每个 ref 必须与 transcript 中出现的 mapped coarse unit 严格一对一；`ref.token_index` 直接映射为 `catalog.video_semantic_spans.span_index`。如果 refs 与 transcript 中的 coarse unit 集合不一致、重复、缺失，或 ref 指向的 token 不存在 / token 的 `semantic_element.coarse_id` 不匹配，则该 clip 入库失败。`best_evidence_scores` 写入 ref 的 `scores` 对象，`best_evidence_question_reject_reason` 写入 `question_reject_reason`，`best_evidence_selection_reason` 写入 `selection_reason`，`best_evidence_candidate_score` 写入 `candidate_score`，`best_evidence_target_text` 写入 `target_text`。
 
 ## 16. 幂等与更新策略
 
@@ -261,7 +271,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 ## 17. 与 Recommendation / Recall 的数据契约
 
-当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 jump-to / 精细证据定位时，再通过 `best_evidence_sentence_index` 与 `best_evidence_span_index` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 只保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`best_evidence_*`、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证高层语义标签，不返回字幕文本；Recommendation 只消费 Catalog 已选定的 unit-level best evidence，并把本轮使用结果保存在 `video_recommendation_items.learning_units` 中。
+当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 jump-to / 精细证据定位时，再通过 `best_evidence_sentence_index` 与 `best_evidence_span_index` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`best_evidence_*`、sentence/span 文本与轻量解释、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证 Recommendation 高层语义标签；Recommendation 只消费 Catalog 已选定的 unit-level best evidence，并把本轮使用结果保存在 `video_recommendation_items.learning_units` 中。
 
 同时要明确：Recommendation 需要的 `v_recommendable_video_units`、`v_unit_video_inventory`、`user_video_serving_states`、`video_recommendation_runs`、`video_recommendation_items` 都属于 `recommendation` schema，而不是 Catalog 的一部分。Catalog 只提供内容事实与内容索引，不拥有 Recommendation serving/audit 对象。
 
