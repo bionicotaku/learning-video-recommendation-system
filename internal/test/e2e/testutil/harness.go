@@ -266,13 +266,27 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 
 	if _, err := h.Pool.Exec(
 		context.Background(),
-		`insert into catalog.videos (video_id, duration_ms, status, visibility_status, publish_at)
-		 values ($1, $2, $3, $4, $5)
+		`insert into catalog.videos (
+			video_id,
+			duration_ms,
+			status,
+			visibility_status,
+			publish_at,
+			title,
+			description,
+			video_object_path,
+			thumbnail_url
+		)
+		 values ($1::uuid, $2, $3, $4, $5, 'E2E Video ' || $1::text, 'E2E description', 'videos/' || $1::text || '/master.m3u8', 'covers/' || $1::text || '.webp')
 		 on conflict (video_id) do update
 		 set duration_ms = excluded.duration_ms,
 		     status = excluded.status,
 		     visibility_status = excluded.visibility_status,
-		     publish_at = excluded.publish_at`,
+		     publish_at = excluded.publish_at,
+		     title = excluded.title,
+		     description = excluded.description,
+		     video_object_path = excluded.video_object_path,
+		     thumbnail_url = excluded.thumbnail_url`,
 		fixture.VideoID,
 		fixture.DurationMs,
 		status,
@@ -647,6 +661,24 @@ alter table if exists catalog.videos add column if not exists duration_ms intege
 alter table if exists catalog.videos add column if not exists status text not null default 'active';
 alter table if exists catalog.videos add column if not exists visibility_status text not null default 'public';
 alter table if exists catalog.videos add column if not exists publish_at timestamptz;
+alter table if exists catalog.videos add column if not exists title text not null default 'E2E Video';
+alter table if exists catalog.videos add column if not exists description text;
+alter table if exists catalog.videos add column if not exists video_object_path text not null default 'videos/e2e/master.m3u8';
+alter table if exists catalog.videos add column if not exists thumbnail_url text;
+
+alter table if exists catalog.questions add column if not exists scope_type text not null default 'unit';
+alter table if exists catalog.questions add column if not exists question_type text not null default 'unit_meaning_choice';
+alter table if exists catalog.questions add column if not exists coarse_unit_id bigint not null default 0;
+alter table if exists catalog.questions add column if not exists target_text text not null default '';
+alter table if exists catalog.questions add column if not exists video_id uuid;
+alter table if exists catalog.questions add column if not exists context_sentence_index integer;
+alter table if exists catalog.questions add column if not exists context_span_index integer;
+alter table if exists catalog.questions add column if not exists context_start_ms integer;
+alter table if exists catalog.questions add column if not exists context_end_ms integer;
+alter table if exists catalog.questions add column if not exists content_payload jsonb not null default '{}'::jsonb;
+alter table if exists catalog.questions add column if not exists status text not null default 'active';
+alter table if exists catalog.questions add column if not exists created_at timestamptz not null default now();
+alter table if exists catalog.questions add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists catalog.video_user_states (
   user_id uuid not null references auth.users(id) on delete cascade,

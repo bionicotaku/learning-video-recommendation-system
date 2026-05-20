@@ -492,6 +492,8 @@ func loadVideoUserState(t *testing.T, db queryer, userID string, videoID string)
 
 type videoEngagementStatsRow struct {
 	ViewCount      int64
+	LikeCount      int64
+	FavoriteCount  int64
 	CompletedCount int64
 	TotalWatchMS   int64
 }
@@ -500,10 +502,10 @@ func loadVideoEngagementStats(t *testing.T, db queryer, videoID string) videoEng
 	t.Helper()
 	var row videoEngagementStatsRow
 	if err := db.QueryRow(context.Background(), `
-		select view_count, completed_count, total_watch_ms
+		select view_count, like_count, favorite_count, completed_count, total_watch_ms
 		from catalog.video_engagement_stats
 		where video_id = $1
-	`, videoID).Scan(&row.ViewCount, &row.CompletedCount, &row.TotalWatchMS); err != nil {
+	`, videoID).Scan(&row.ViewCount, &row.LikeCount, &row.FavoriteCount, &row.CompletedCount, &row.TotalWatchMS); err != nil {
 		t.Fatalf("load video engagement stats: %v", err)
 	}
 	return row
