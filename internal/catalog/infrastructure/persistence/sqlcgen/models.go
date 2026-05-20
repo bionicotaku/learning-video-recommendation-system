@@ -48,25 +48,28 @@ type CatalogQuestion struct {
 }
 
 type CatalogVideo struct {
-	VideoID               pgtype.UUID        `json:"video_id"`
-	SourceClipKey         string             `json:"source_clip_key"`
-	ParentVideoName       string             `json:"parent_video_name"`
-	ParentVideoSlug       string             `json:"parent_video_slug"`
-	ClipSeq               pgtype.Int4        `json:"clip_seq"`
-	SourceStartMs         pgtype.Int4        `json:"source_start_ms"`
-	SourceEndMs           pgtype.Int4        `json:"source_end_ms"`
-	Title                 string             `json:"title"`
-	Description           pgtype.Text        `json:"description"`
-	ClipReason            pgtype.Text        `json:"clip_reason"`
-	Language              string             `json:"language"`
-	DurationMs            int32              `json:"duration_ms"`
-	HlsMasterPlaylistPath string             `json:"hls_master_playlist_path"`
-	ThumbnailUrl          pgtype.Text        `json:"thumbnail_url"`
-	Status                string             `json:"status"`
-	VisibilityStatus      string             `json:"visibility_status"`
-	PublishAt             pgtype.Timestamptz `json:"publish_at"`
-	CreatedAt             pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	VideoID                  pgtype.UUID        `json:"video_id"`
+	SourceClipKey            string             `json:"source_clip_key"`
+	ParentVideoName          string             `json:"parent_video_name"`
+	ParentVideoSlug          string             `json:"parent_video_slug"`
+	ClipSeq                  pgtype.Int4        `json:"clip_seq"`
+	SourceStartMs            pgtype.Int4        `json:"source_start_ms"`
+	SourceEndMs              pgtype.Int4        `json:"source_end_ms"`
+	SourceStartSentenceIndex pgtype.Int4        `json:"source_start_sentence_index"`
+	SourceEndSentenceIndex   pgtype.Int4        `json:"source_end_sentence_index"`
+	Title                    string             `json:"title"`
+	Description              pgtype.Text        `json:"description"`
+	ClipReason               pgtype.Text        `json:"clip_reason"`
+	EngagementScore          []byte             `json:"engagement_score"`
+	Language                 string             `json:"language"`
+	DurationMs               int32              `json:"duration_ms"`
+	VideoObjectPath          string             `json:"video_object_path"`
+	ThumbnailUrl             pgtype.Text        `json:"thumbnail_url"`
+	Status                   string             `json:"status"`
+	VisibilityStatus         string             `json:"visibility_status"`
+	PublishAt                pgtype.Timestamptz `json:"publish_at"`
+	CreatedAt                pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 }
 
 type CatalogVideoEngagementStat struct {
@@ -127,23 +130,20 @@ type CatalogVideoTranscriptSentence struct {
 }
 
 type CatalogVideoUnitIndex struct {
-	VideoID                   pgtype.UUID        `json:"video_id"`
-	CoarseUnitID              int64              `json:"coarse_unit_id"`
-	MentionCount              int32              `json:"mention_count"`
-	SentenceCount             int32              `json:"sentence_count"`
-	FirstStartMs              int32              `json:"first_start_ms"`
-	LastEndMs                 int32              `json:"last_end_ms"`
-	CoverageMs                int32              `json:"coverage_ms"`
-	CoverageRatio             pgtype.Numeric     `json:"coverage_ratio"`
-	SentenceIndexes           []int32            `json:"sentence_indexes"`
-	BestEvidenceSentenceIndex int32              `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex     int32              `json:"best_evidence_span_index"`
-	BestEvidenceSource        string             `json:"best_evidence_source"`
-	BestEvidenceModel         pgtype.Text        `json:"best_evidence_model"`
-	BestEvidenceVersion       int32              `json:"best_evidence_version"`
-	BestEvidenceMetadata      []byte             `json:"best_evidence_metadata"`
-	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	VideoID                          pgtype.UUID        `json:"video_id"`
+	CoarseUnitID                     int64              `json:"coarse_unit_id"`
+	MentionCount                     int32              `json:"mention_count"`
+	SentenceCount                    int32              `json:"sentence_count"`
+	CoverageMs                       int32              `json:"coverage_ms"`
+	CoverageRatio                    pgtype.Numeric     `json:"coverage_ratio"`
+	SentenceIndexes                  []int32            `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex        int32              `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex            int32              `json:"best_evidence_span_index"`
+	BestEvidenceScores               []byte             `json:"best_evidence_scores"`
+	BestEvidenceQuestionRejectReason pgtype.Text        `json:"best_evidence_question_reject_reason"`
+	BestEvidenceSelectionReason      pgtype.Text        `json:"best_evidence_selection_reason"`
+	CreatedAt                        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type CatalogVideoUserState struct {

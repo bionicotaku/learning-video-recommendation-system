@@ -16,7 +16,7 @@ select
   v.video_id,
   v.title,
   coalesce(v.description, '')::text as description,
-  v.hls_master_playlist_path,
+  v.video_object_path,
   v.thumbnail_url,
   coalesce(s.view_count, 0)::bigint as view_count,
   coalesce(s.like_count, 0)::bigint as like_count,
@@ -31,14 +31,14 @@ order by v.video_id
 `
 
 type ListFeedVideosByIDsRow struct {
-	VideoID               pgtype.UUID `json:"video_id"`
-	Title                 string      `json:"title"`
-	Description           string      `json:"description"`
-	HlsMasterPlaylistPath string      `json:"hls_master_playlist_path"`
-	ThumbnailUrl          pgtype.Text `json:"thumbnail_url"`
-	ViewCount             int64       `json:"view_count"`
-	LikeCount             int64       `json:"like_count"`
-	FavoriteCount         int64       `json:"favorite_count"`
+	VideoID         pgtype.UUID `json:"video_id"`
+	Title           string      `json:"title"`
+	Description     string      `json:"description"`
+	VideoObjectPath string      `json:"video_object_path"`
+	ThumbnailUrl    pgtype.Text `json:"thumbnail_url"`
+	ViewCount       int64       `json:"view_count"`
+	LikeCount       int64       `json:"like_count"`
+	FavoriteCount   int64       `json:"favorite_count"`
 }
 
 func (q *Queries) ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error) {
@@ -54,7 +54,7 @@ func (q *Queries) ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUI
 			&i.VideoID,
 			&i.Title,
 			&i.Description,
-			&i.HlsMasterPlaylistPath,
+			&i.VideoObjectPath,
 			&i.ThumbnailUrl,
 			&i.ViewCount,
 			&i.LikeCount,

@@ -3,7 +3,7 @@ select
   v.video_id,
   v.title,
   coalesce(v.description, '')::text as description,
-  v.hls_master_playlist_path,
+  v.video_object_path,
   v.thumbnail_url,
   coalesce(s.view_count, 0)::bigint as view_count,
   coalesce(s.like_count, 0)::bigint as like_count,

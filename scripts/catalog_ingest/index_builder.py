@@ -105,14 +105,9 @@ def _build_unit_index_rows(
         ref.coarse_unit_id: ref
         for ref in clip_input.selected_coarse_unit_refs.refs
     }
-    question_source = clip_input.raw_question_payload.get("source", {}) if clip_input.raw_question_payload else {}
-    source_model = question_source.get("model") if isinstance(question_source, dict) else None
-
     rows: list[VideoUnitIndexRow] = []
     for coarse_unit_id, spans in sorted(grouped_spans.items(), key=lambda item: item[0]):
         sentence_indexes = tuple(sorted({span.sentence_index for span in spans}))
-        first_start_ms = min(span.start_ms for span in spans)
-        last_end_ms = max(span.end_ms for span in spans)
         coverage_ms = _merge_intervals_and_measure([(span.start_ms, span.end_ms) for span in spans])
         coverage_ratio = _safe_ratio(coverage_ms, video_duration_ms)
 
@@ -141,21 +136,13 @@ def _build_unit_index_rows(
                 coarse_unit_id=coarse_unit_id,
                 mention_count=len(spans),
                 sentence_count=len(sentence_indexes),
-                first_start_ms=first_start_ms,
-                last_end_ms=last_end_ms,
                 coverage_ms=coverage_ms,
                 coverage_ratio=coverage_ratio,
                 sentence_indexes=sentence_indexes,
                 best_evidence_ref=best_evidence_ref,
-                best_evidence_source="selected_coarse_unit_refs",
-                best_evidence_model=clip_input.selected_coarse_unit_refs.selection_model,
-                best_evidence_version=clip_input.selected_coarse_unit_refs.version,
-                best_evidence_metadata={
-                    "selection_top_k": clip_input.selected_coarse_unit_refs.selection_top_k,
-                    "allowed_question_types": list(clip_input.selected_coarse_unit_refs.allowed_question_types),
-                    "questions_file_path": str(clip_input.question_file_path) if clip_input.question_file_path else None,
-                    "source_model": source_model,
-                },
+                best_evidence_scores=selected_ref.scores,
+                best_evidence_question_reject_reason=selected_ref.question_reject_reason,
+                best_evidence_selection_reason=selected_ref.selection_reason,
             )
         )
 

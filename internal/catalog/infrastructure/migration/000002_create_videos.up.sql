@@ -6,12 +6,15 @@ create table if not exists catalog.videos (
   clip_seq integer,
   source_start_ms integer,
   source_end_ms integer,
+  source_start_sentence_index integer,
+  source_end_sentence_index integer,
   title text not null,
   description text,
   clip_reason text,
+  engagement_score jsonb not null default '{}'::jsonb,
   language text not null default 'en',
   duration_ms integer not null,
-  hls_master_playlist_path text not null,
+  video_object_path text not null,
   thumbnail_url text,
   status text not null default 'active'
     check (status in ('active', 'inactive', 'deleted')),
@@ -26,5 +29,13 @@ create table if not exists catalog.videos (
     source_end_ms is null
     or source_start_ms is null
     or source_end_ms > source_start_ms
-  )
+  ),
+  check (source_start_sentence_index is null or source_start_sentence_index >= 0),
+  check (source_end_sentence_index is null or source_end_sentence_index >= 0),
+  check (
+    source_start_sentence_index is null
+    or source_end_sentence_index is null
+    or source_end_sentence_index >= source_start_sentence_index
+  ),
+  check (jsonb_typeof(engagement_score) = 'object')
 );

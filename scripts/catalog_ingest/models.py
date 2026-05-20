@@ -25,12 +25,8 @@ class CatalogIngestError(Exception):
 
 
 @dataclass(slots=True, frozen=True)
-class ParentClipDescriptor:
-    """表示父视频描述文件中的单个 clip 条目。
-
-    这个对象只承接父文件里的切片事实，不混入 transcript 结构。
-    它是 manifest_loader 从父文件 JSON 里提炼出的最小稳定输入。
-    """
+class ClipMetadata:
+    """表示 mapped transcript JSON 顶层的单 clip 元数据。"""
 
     clip_id: int
     start_index: int | None
@@ -39,7 +35,9 @@ class ParentClipDescriptor:
     end_time: int | None
     buffered_start_time: int
     buffered_end_time: int
+    duration_time: int
     reasoning: str | None
+    engagement: dict[str, Any]
 
 
 @dataclass(slots=True, frozen=True)
@@ -100,16 +98,15 @@ class SelectedCoarseUnitRef:
     coarse_unit_id: int
     sentence_index: int
     token_index: int
+    scores: dict[str, Any]
+    question_reject_reason: str | None
+    selection_reason: str
 
 
 @dataclass(slots=True, frozen=True)
 class SelectedCoarseUnitRefs:
     """表示 selected_coarse_unit_refs 顶层结构。"""
 
-    version: int
-    selection_model: str | None
-    selection_top_k: int | None
-    allowed_question_types: tuple[str, ...]
     refs: tuple[SelectedCoarseUnitRef, ...]
 
 
@@ -119,13 +116,12 @@ class LoadedClipInput:
 
     这是整个脚本后续流程的主输入。
     它同时持有：
-    - 由父文件推导出的 clip 元数据
-    - transcript 文件路径与原文
+    - mapped transcript 文件路径、顶层 clip 元数据与 transcript 原文
     - question 文件路径、题目与 selected refs
     - 为写审计记录准备的上下文
 
-    注意：如果 transcript 或 question 文件缺失，这个对象仍然会被创建，
-    但会带上 skip_reason_code，供 main 直接走 skipped 分支。
+    注意：如果 question 文件缺失，这个对象仍然会被创建，但会带上
+    skip_reason_code，供 main 直接走 skipped 分支。
     """
 
     source_clip_key: str
@@ -139,23 +135,22 @@ class LoadedClipInput:
     clip_reason: str | None
     language: str
     duration_ms: int
-    hls_master_playlist_path: str
+    video_object_path: str
     thumbnail_url: str | None
     publish_at: datetime | None
     transcript_object_path: str | None
     transcript_checksum: str | None
     transcript_format_version: int
     source_name: str | None
-    parent_file_path: Path
+    source_file_path: Path
     expected_transcript_filename: str
     expected_question_filename: str
     transcript_file_path: Path | None
     question_file_path: Path | None
-    parent_clip: ParentClipDescriptor
+    clip_metadata: ClipMetadata
     transcript_sentences: tuple[TranscriptSentence, ...]
     questions: tuple[QuestionInput, ...]
     selected_coarse_unit_refs: SelectedCoarseUnitRefs | None
-    raw_parent_payload: dict[str, Any]
     raw_transcript_payload: dict[str, Any] | None
     raw_question_payload: dict[str, Any] | None
     skip_reason_code: str | None = None
@@ -169,14 +164,15 @@ class LoadedClipInput:
         """
 
         return {
-            "parent_file_path": str(self.parent_file_path),
+            "source_file_path": str(self.source_file_path),
             "expected_transcript_filename": self.expected_transcript_filename,
             "expected_question_filename": self.expected_question_filename,
             "transcript_file_path": str(self.transcript_file_path) if self.transcript_file_path else None,
             "question_file_path": str(self.question_file_path) if self.question_file_path else None,
-            "clip_id": self.parent_clip.clip_id,
+            "clip_id": self.clip_metadata.clip_id,
             "parent_video_name": self.parent_video_name,
             "source_clip_key": self.source_clip_key,
+            "engagement": self.clip_metadata.engagement,
         }
 
 
@@ -190,12 +186,15 @@ class VideoRow:
     clip_seq: int
     source_start_ms: int
     source_end_ms: int
+    source_start_sentence_index: int | None
+    source_end_sentence_index: int | None
     title: str
     description: str | None
     clip_reason: str | None
+    engagement_score: dict[str, Any]
     language: str
     duration_ms: int
-    hls_master_playlist_path: str
+    video_object_path: str
     thumbnail_url: str | None
     status: str
     visibility_status: str
@@ -251,16 +250,13 @@ class VideoUnitIndexRow:
     coarse_unit_id: int
     mention_count: int
     sentence_count: int
-    first_start_ms: int
-    last_end_ms: int
     coverage_ms: int
     coverage_ratio: Decimal
     sentence_indexes: tuple[int, ...]
     best_evidence_ref: BestEvidenceRef
-    best_evidence_source: str
-    best_evidence_model: str | None
-    best_evidence_version: int
-    best_evidence_metadata: dict[str, Any]
+    best_evidence_scores: dict[str, Any]
+    best_evidence_question_reject_reason: str | None
+    best_evidence_selection_reason: str
 
 
 @dataclass(slots=True, frozen=True)
@@ -344,7 +340,7 @@ class ExistingClipState:
     clip_reason: str | None
     language: str
     duration_ms: int
-    hls_master_playlist_path: str
+    video_object_path: str
     thumbnail_url: str | None
     publish_at: datetime | None
     transcript_checksum: str | None

@@ -43,7 +43,7 @@ def validate_loaded_clip(
     known_coarse_set = set(known_coarse_unit_ids)
 
     _validate_video_level_fields(clip_input)
-    _validate_parent_clip(clip_input)
+    _validate_clip_metadata(clip_input)
     _validate_transcript_level_fields(clip_input)
     _validate_time_range(clip_input, time_tolerance_ms=time_tolerance_ms)
     warnings = _validate_sentence_and_token_structure(clip_input)
@@ -68,24 +68,72 @@ def _validate_video_level_fields(clip_input: LoadedClipInput) -> None:
         raise _error(clip_input, "manifest_invalid", "title 不能为空")
     if clip_input.duration_ms <= 0:
         raise _error(clip_input, "manifest_invalid", "duration_ms 必须大于 0")
-    if not clip_input.hls_master_playlist_path:
-        raise _error(clip_input, "manifest_invalid", "hls_master_playlist_path 不能为空")
+    if not clip_input.video_object_path:
+        raise _error(clip_input, "manifest_invalid", "video_object_path 不能为空")
 
 
-def _validate_parent_clip(clip_input: LoadedClipInput) -> None:
-    """校验父文件中单个 clip 的基础事实。"""
+def _validate_clip_metadata(clip_input: LoadedClipInput) -> None:
+    """校验 mapped transcript 顶层 clip metadata 的基础事实。"""
 
-    clip = clip_input.parent_clip
+    clip = clip_input.clip_metadata
     if clip.clip_id <= 0:
         raise _error(clip_input, "manifest_invalid", "clip_id 必须为正整数")
+    if clip.start_index is not None and clip.start_index < 0:
+        raise _error(clip_input, "manifest_invalid", "start_index 不能为负数")
+    if clip.end_index is not None and clip.end_index < 0:
+        raise _error(clip_input, "manifest_invalid", "end_index 不能为负数")
+    if clip.start_index is not None and clip.end_index is not None and clip.end_index < clip.start_index:
+        raise _error(clip_input, "manifest_invalid", "end_index 必须大于等于 start_index")
     if clip.buffered_end_time <= clip.buffered_start_time:
         raise _error(clip_input, "manifest_invalid", "buffered_end_time 必须大于 buffered_start_time")
     if clip_input.source_start_ms != clip.buffered_start_time:
         raise _error(clip_input, "manifest_invalid", "source_start_ms 必须等于 buffered_start_time")
     if clip_input.source_end_ms != clip.buffered_end_time:
         raise _error(clip_input, "manifest_invalid", "source_end_ms 必须等于 buffered_end_time")
-    if clip_input.duration_ms != (clip.buffered_end_time - clip.buffered_start_time):
-        raise _error(clip_input, "manifest_invalid", "duration_ms 必须等于 buffered 区间长度")
+    expected_duration_ms = clip.buffered_end_time - clip.buffered_start_time
+    if clip.duration_time != expected_duration_ms:
+        raise _error(
+            clip_input,
+            "manifest_invalid",
+            "duration_time 必须等于 buffered 区间长度",
+            {"duration_time": clip.duration_time, "expected_duration_ms": expected_duration_ms},
+        )
+    if clip_input.duration_ms != clip.duration_time:
+        raise _error(clip_input, "manifest_invalid", "duration_ms 必须等于 duration_time")
+    _validate_engagement_score(clip_input)
+
+
+def _validate_engagement_score(clip_input: LoadedClipInput) -> None:
+    """校验可选内容打分字段的轻量结构。"""
+
+    engagement = clip_input.clip_metadata.engagement
+    for key in ("drama", "humor", "payoff", "standalone"):
+        value = engagement.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, int):
+            raise _error(
+                clip_input,
+                "manifest_invalid",
+                "engagement 数值字段必须为整数",
+                {"field": key, "value": value},
+            )
+        if value < 0 or value > 10:
+            raise _error(
+                clip_input,
+                "manifest_invalid",
+                "engagement 数值字段必须在 0 到 10 之间",
+                {"field": key, "value": value},
+            )
+
+    reasoning = engagement.get("reasoning")
+    if reasoning is not None and not isinstance(reasoning, str):
+        raise _error(
+            clip_input,
+            "manifest_invalid",
+            "engagement.reasoning 必须为字符串",
+            {"value": reasoning},
+        )
 
 
 def _validate_transcript_level_fields(clip_input: LoadedClipInput) -> None:
@@ -412,6 +460,58 @@ def _validate_selected_coarse_unit_refs(clip_input: LoadedClipInput) -> None:
                     "token_index": ref.token_index,
                 },
             )
+        _validate_selected_ref_metadata(clip_input, ref)
+
+
+def _validate_selected_ref_metadata(clip_input: LoadedClipInput, ref) -> None:
+    """校验 selected best evidence 的可审计打分字段。"""
+
+    required_score_keys = (
+        "visual_context",
+        "context_clarity",
+        "learning_value",
+        "representative_salience",
+    )
+    missing_score_keys = [key for key in required_score_keys if key not in ref.scores]
+    if missing_score_keys:
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.scores 缺少必填字段",
+            {
+                "coarse_unit_id": ref.coarse_unit_id,
+                "missing_score_keys": missing_score_keys,
+            },
+        )
+
+    for key in required_score_keys:
+        value = ref.scores.get(key)
+        if type(value) is not int or value < 0 or value > 10:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "selected_coarse_unit_refs ref.scores 数值字段必须为 0 到 10 的整数",
+                {
+                    "coarse_unit_id": ref.coarse_unit_id,
+                    "field": key,
+                    "value": value,
+                },
+            )
+
+    if ref.question_reject_reason is not None and not ref.question_reject_reason.strip():
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.question_reject_reason 不能是空字符串",
+            {"coarse_unit_id": ref.coarse_unit_id},
+        )
+    if not isinstance(ref.selection_reason, str) or not ref.selection_reason.strip():
+        raise _error(
+            clip_input,
+            "question_invalid",
+            "selected_coarse_unit_refs ref.selection_reason 不能为空字符串",
+            {"coarse_unit_id": ref.coarse_unit_id},
+        )
 
 
 def _error(

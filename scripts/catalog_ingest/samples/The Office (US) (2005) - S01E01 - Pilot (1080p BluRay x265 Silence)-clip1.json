@@ -1,4 +1,22 @@
 {
+  "clip_id": 1,
+  "title": "Mock sales call",
+  "description": "Michael coaches Jim through a mock sales call and demonstrates his preferred sales style.",
+  "engagement": {
+    "drama": 2,
+    "humor": 7,
+    "payoff": 6,
+    "standalone": 8,
+    "reasoning": "The scene is self-contained and has a clear comedic payoff."
+  },
+  "start_index": 0,
+  "end_index": 22,
+  "start_time": 55416,
+  "end_time": 113628,
+  "buffered_start_time": 54516,
+  "buffered_end_time": 114370,
+  "duration_time": 59854,
+  "reasoning": "Self-contained opening: Michael coaches Jim by making a mock sales call, with a clear payoff at 'So that's the way it's done.' Slightly short, but semantically complete.",
   "sentences": [
     {
       "index": 0,

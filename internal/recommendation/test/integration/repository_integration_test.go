@@ -277,11 +277,12 @@ func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 		t.Fatalf("seed semantic span: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `
-		insert into catalog.video_unit_index (
-			video_id, coarse_unit_id, mention_count, sentence_count, first_start_ms, last_end_ms, coverage_ms, coverage_ratio,
-			sentence_indexes, best_evidence_sentence_index, best_evidence_span_index, best_evidence_source, best_evidence_version, best_evidence_metadata
-		) values ($1, $2, 3, 2, 1000, 5000, 4000, 0.12000, '{1,2}', 1, 1, 'test_fixture', 1, '{}'::jsonb)
-	`, videoID, unitID); err != nil {
+			insert into catalog.video_unit_index (
+				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
+				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
+				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason
+			) values ($1, $2, 3, 2, 4000, 0.12000, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture')
+		`, videoID, unitID); err != nil {
 		t.Fatalf("seed unit index: %v", err)
 	}
 
@@ -490,12 +491,13 @@ func seedInventoryVideo(t *testing.T, ctx context.Context, testDB *fixture.TestD
 		t.Fatalf("seed inventory semantic span: %v", err)
 	}
 	if _, err := db.Exec(ctx, `
-		insert into catalog.video_unit_index (
-			video_id, coarse_unit_id, mention_count, sentence_count, first_start_ms, last_end_ms, coverage_ms, coverage_ratio,
-			sentence_indexes, best_evidence_sentence_index, best_evidence_span_index, best_evidence_source, best_evidence_version, best_evidence_metadata
-		) values ($1, $2, $3, 2, 1000, 5000, 4000, $4, '{1,2}', 1, 1, 'test_fixture', 1, '{}'::jsonb)
-		on conflict do nothing
-	`, videoID, unitID, mentionCount, coverageRatio); err != nil {
+			insert into catalog.video_unit_index (
+				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
+				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
+				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason
+			) values ($1, $2, $3, 2, 4000, $4, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture')
+			on conflict do nothing
+		`, videoID, unitID, mentionCount, coverageRatio); err != nil {
 		t.Fatalf("seed inventory unit index: %v", err)
 	}
 }

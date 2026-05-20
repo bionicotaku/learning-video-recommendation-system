@@ -30,14 +30,14 @@ func (u *FeedVideoLookupUsecase) Execute(ctx context.Context, request dto.FeedVi
 	result := make([]dto.FeedVideoDisplay, 0, len(videos))
 	for _, video := range videos {
 		result = append(result, dto.FeedVideoDisplay{
-			VideoID:               video.VideoID,
-			Title:                 video.Title,
-			Description:           video.Description,
-			HLSMasterPlaylistPath: video.HLSMasterPlaylistPath,
-			CoverImageURL:         video.CoverImageURL,
-			ViewCount:             video.ViewCount,
-			LikeCount:             video.LikeCount,
-			FavoriteCount:         video.FavoriteCount,
+			VideoID:         video.VideoID,
+			Title:           video.Title,
+			Description:     video.Description,
+			VideoObjectPath: video.VideoObjectPath,
+			CoverImageURL:   video.CoverImageURL,
+			ViewCount:       video.ViewCount,
+			LikeCount:       video.LikeCount,
+			FavoriteCount:   video.FavoriteCount,
 		})
 	}
 	return dto.FeedVideoLookupResponse{Videos: result}, nil

@@ -46,8 +46,6 @@ func singleUnitVideo(videoID string, unitID int64, startMs, endMs int32, sentenc
 				CoarseUnitID:              unitID,
 				MentionCount:              mentionCount,
 				SentenceCount:             2,
-				FirstStartMs:              startMs,
-				LastEndMs:                 endMs + 1_000,
 				CoverageMs:                endMs + 1_000 - startMs,
 				CoverageRatio:             coverageRatio,
 				SentenceIndexes:           []int32{sentenceIndex, sentenceIndex + 1},

@@ -55,7 +55,7 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	if !ok {
 		t.Fatalf("visible video missing from result: %+v", videos)
 	}
-	if visible.Title != "Visible title" || visible.Description != "Visible description" || visible.HLSMasterPlaylistPath != "hls/visible/master.m3u8" {
+	if visible.Title != "Visible title" || visible.Description != "Visible description" || visible.VideoObjectPath != "hls/visible/master.m3u8" {
 		t.Fatalf("unexpected visible video metadata: %+v", visible)
 	}
 	if visible.CoverImageURL == nil || *visible.CoverImageURL != "covers/visible.webp" {
@@ -135,7 +135,7 @@ func seedFeedVideo(
 			description,
 			language,
 			duration_ms,
-			hls_master_playlist_path,
+			video_object_path,
 			thumbnail_url,
 			status,
 			visibility_status,

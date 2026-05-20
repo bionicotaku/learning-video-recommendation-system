@@ -79,7 +79,9 @@ verification and never trusts `user_id` from the body or query string.
 
 `cmd/server` also requires `PUBLIC_ASSET_BASE_URL` for feed media URL assembly.
 Catalog paths that are already absolute `http://` or `https://` URLs pass
-through unchanged; relative HLS and cover paths are joined against this base URL.
+through unchanged; relative media and cover paths are joined against this base
+URL. Current catalog ingest writes absolute GCS mp4 and cover URLs, so those
+values pass through without using this prefix.
 
 Transport errors use the shared JSON error envelope. Decode, field validation,
 and known business validation failures map to `400 invalid_request`; missing

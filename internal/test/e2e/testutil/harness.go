@@ -98,8 +98,6 @@ type VideoUnitIndexFixture struct {
 	CoarseUnitID              int64
 	MentionCount              int32
 	SentenceCount             int32
-	FirstStartMs              int32
-	LastEndMs                 int32
 	CoverageMs                int32
 	CoverageRatio             float64
 	SentenceIndexes           []int32
@@ -329,27 +327,23 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 		if _, err := h.Pool.Exec(
 			context.Background(),
 			`insert into catalog.video_unit_index (
-				video_id,
-				coarse_unit_id,
-				mention_count,
-				sentence_count,
-				first_start_ms,
-				last_end_ms,
-				coverage_ms,
-				coverage_ratio,
-				sentence_indexes,
-				best_evidence_sentence_index,
-				best_evidence_span_index,
-				best_evidence_source,
-				best_evidence_version,
-				best_evidence_metadata
-			) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'test_fixture', 1, '{}'::jsonb)`,
+					video_id,
+					coarse_unit_id,
+					mention_count,
+					sentence_count,
+					coverage_ms,
+					coverage_ratio,
+					sentence_indexes,
+					best_evidence_sentence_index,
+					best_evidence_span_index,
+					best_evidence_scores,
+					best_evidence_question_reject_reason,
+					best_evidence_selection_reason
+				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb, null, 'test fixture')`,
 			fixture.VideoID,
 			entry.CoarseUnitID,
 			entry.MentionCount,
 			entry.SentenceCount,
-			entry.FirstStartMs,
-			entry.LastEndMs,
 			entry.CoverageMs,
 			entry.CoverageRatio,
 			entry.SentenceIndexes,
@@ -572,8 +566,6 @@ func happyPathVideo(videoID string, unitID int64, startMs, endMs int32, sentence
 				CoarseUnitID:              unitID,
 				MentionCount:              3,
 				SentenceCount:             2,
-				FirstStartMs:              startMs,
-				LastEndMs:                 endMs + 1_500,
 				CoverageMs:                endMs + 1_500 - startMs,
 				CoverageRatio:             0.08,
 				SentenceIndexes:           []int32{sentenceIndex, sentenceIndex + 1},

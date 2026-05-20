@@ -25,7 +25,7 @@ func (db *TestDatabase) SeedVideo(t *testing.T, videoID string, durationMS int32
 			title,
 			language,
 			duration_ms,
-			hls_master_playlist_path,
+			video_object_path,
 			status,
 			visibility_status
 		) values (

@@ -139,7 +139,7 @@ func (s *FeedService) buildFeedItem(
 		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", err)
 		return apvdto.FeedItem{}, err
 	}
-	videoURL, err := s.urlBuilder.Build(video.HLSMasterPlaylistPath)
+	videoURL, err := s.urlBuilder.Build(video.VideoObjectPath)
 	if err != nil {
 		wrapped := fmt.Errorf("build video_url for recommendation feed item: run_id=%s video_id=%s: %w", runID, planItem.VideoID, err)
 		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)

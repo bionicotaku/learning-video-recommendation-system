@@ -40,14 +40,14 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	videoLookup := &fakeFeedVideoLookup{
 		response: catalogdto.FeedVideoLookupResponse{Videos: []catalogdto.FeedVideoDisplay{
 			{
-				VideoID:               "11111111-1111-1111-1111-111111111111",
-				Title:                 "Title",
-				Description:           "Description",
-				HLSMasterPlaylistPath: "hls/111/master.m3u8",
-				CoverImageURL:         stringPtr("covers/111.webp"),
-				ViewCount:             12,
-				LikeCount:             3,
-				FavoriteCount:         2,
+				VideoID:         "11111111-1111-1111-1111-111111111111",
+				Title:           "Title",
+				Description:     "Description",
+				VideoObjectPath: "hls/111/master.m3u8",
+				CoverImageURL:   stringPtr("covers/111.webp"),
+				ViewCount:       12,
+				LikeCount:       3,
+				FavoriteCount:   2,
 			},
 		}},
 	}
@@ -212,9 +212,9 @@ func invalidDurationPlanItem(videoID string, unitID int64) recommendationdto.Rec
 
 func validVideoDisplay(videoID string) catalogdto.FeedVideoDisplay {
 	return catalogdto.FeedVideoDisplay{
-		VideoID:               videoID,
-		Title:                 "Title",
-		HLSMasterPlaylistPath: "https://cdn.example.com/hls/master.m3u8",
+		VideoID:         videoID,
+		Title:           "Title",
+		VideoObjectPath: "https://cdn.example.com/hls/master.m3u8",
 	}
 }
 

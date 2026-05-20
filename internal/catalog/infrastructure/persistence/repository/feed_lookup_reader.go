@@ -45,14 +45,14 @@ func (r *FeedLookupReader) ListFeedVideosByIDs(ctx context.Context, videoIDs []s
 	result := make([]model.FeedVideoDisplay, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, model.FeedVideoDisplay{
-			VideoID:               mapper.UUIDToString(row.VideoID),
-			Title:                 row.Title,
-			Description:           row.Description,
-			HLSMasterPlaylistPath: row.HlsMasterPlaylistPath,
-			CoverImageURL:         textPointer(row.ThumbnailUrl),
-			ViewCount:             row.ViewCount,
-			LikeCount:             row.LikeCount,
-			FavoriteCount:         row.FavoriteCount,
+			VideoID:         mapper.UUIDToString(row.VideoID),
+			Title:           row.Title,
+			Description:     row.Description,
+			VideoObjectPath: row.VideoObjectPath,
+			CoverImageURL:   textPointer(row.ThumbnailUrl),
+			ViewCount:       row.ViewCount,
+			LikeCount:       row.LikeCount,
+			FavoriteCount:   row.FavoriteCount,
 		})
 	}
 	return result, nil

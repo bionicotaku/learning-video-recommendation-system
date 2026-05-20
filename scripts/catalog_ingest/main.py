@@ -34,10 +34,9 @@ def build_parser() -> argparse.ArgumentParser:
     """构建 CLI 参数解析器。"""
 
     parser = argparse.ArgumentParser(
-        description="将本地父视频切片描述 JSON 和 transcript JSON 导入 catalog 数据库。"
+        description="将本地 mapped clip transcript JSON 和 question JSON 导入 catalog 数据库。"
     )
-    parser.add_argument("--parents-dir", required=True, help="父视频切片描述文件目录")
-    parser.add_argument("--transcripts-dir", required=True, help="clip transcript 文件目录")
+    parser.add_argument("--transcripts-dir", required=True, help="mapped clip transcript 文件目录")
     parser.add_argument("--questions-dir", required=True, help="clip question 文件目录")
     parser.add_argument("--source-name", default="local-json", help="写入审计记录时使用的来源名称")
     parser.add_argument("--limit", type=int, default=None, help="最多处理多少个 clip")
@@ -74,7 +73,6 @@ def main(argv: list[str] | None = None) -> int:
         repository = CatalogRepository(database_url)
 
         clip_inputs = load_clip_inputs(
-            parents_dir=Path(args.parents_dir),
             transcripts_dir=Path(args.transcripts_dir),
             questions_dir=Path(args.questions_dir),
             source_name=args.source_name,
@@ -272,7 +270,7 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
     """判断当前 clip 是否可直接 skipped。
 
     这里严格按 README 中的“无变化跳过”规则比较。
-    只要 transcript checksum、HLS 路径和关键元数据都没变，就不需要重写四张内容表。
+    只要 transcript checksum、video_object_path 和关键元数据都没变，就不需要重写四张内容表。
     """
 
     if existing_state is None:
@@ -284,7 +282,7 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
         return False
     if existing_state.transcript_checksum != clip_input.transcript_checksum:
         return False
-    if existing_state.hls_master_playlist_path != clip_input.hls_master_playlist_path:
+    if existing_state.video_object_path != clip_input.video_object_path:
         return False
 
     return (
@@ -293,9 +291,12 @@ def _should_skip_unchanged_clip(existing_state, clip_input: LoadedClipInput) -> 
         and existing_state.clip_seq == clip_input.clip_seq
         and existing_state.source_start_ms == clip_input.source_start_ms
         and existing_state.source_end_ms == clip_input.source_end_ms
+        and existing_state.source_start_sentence_index == clip_input.clip_metadata.start_index
+        and existing_state.source_end_sentence_index == clip_input.clip_metadata.end_index
         and existing_state.title == clip_input.title
         and existing_state.description == clip_input.description
         and existing_state.clip_reason == clip_input.clip_reason
+        and existing_state.engagement_score == clip_input.clip_metadata.engagement
         and existing_state.language == clip_input.language
         and existing_state.duration_ms == clip_input.duration_ms
         and existing_state.thumbnail_url == clip_input.thumbnail_url
