@@ -38,11 +38,12 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 		dominantRole := model.LearningRole("")
 
 		learningUnitCandidates := make([]aggregatedLearningUnit, 0, len(unitWindows))
+		preferredDurationSec := recommendationContext.PreferredDurationSec
 
 		for unitID, candidates := range unitWindows {
 			sort.SliceStable(candidates, func(i, j int) bool {
-				if evidenceStrength(candidates[i], recommendationContext.Request.PreferredDurationSec) != evidenceStrength(candidates[j], recommendationContext.Request.PreferredDurationSec) {
-					return evidenceStrength(candidates[i], recommendationContext.Request.PreferredDurationSec) > evidenceStrength(candidates[j], recommendationContext.Request.PreferredDurationSec)
+				if evidenceStrength(candidates[i], preferredDurationSec) != evidenceStrength(candidates[j], preferredDurationSec) {
+					return evidenceStrength(candidates[i], preferredDurationSec) > evidenceStrength(candidates[j], preferredDurationSec)
 				}
 				if candidates[i].BestEvidenceStartMs != nil && candidates[j].BestEvidenceStartMs != nil && *candidates[i].BestEvidenceStartMs != *candidates[j].BestEvidenceStartMs {
 					return *candidates[i].BestEvidenceStartMs < *candidates[j].BestEvidenceStartMs
@@ -52,13 +53,13 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 
 			best := candidates[0]
 			role := roleFromBucket(best.Candidate.Bucket)
-			unitStrength := evidenceStrength(best, recommendationContext.Request.PreferredDurationSec)
+			unitStrength := evidenceStrength(best, preferredDurationSec)
 			if len(candidates) > 1 {
-				unitStrength += evidenceStrength(candidates[1], recommendationContext.Request.PreferredDurationSec) * 0.15
+				unitStrength += evidenceStrength(candidates[1], preferredDurationSec) * 0.15
 			}
 			unitStrength = math.Min(1, unitStrength)
 
-			if pickAsDominantLearningUnit(best, dominantRole, bestVideoScore, dominantStartMs, unitStrength, recommendationContext.Request.PreferredDurationSec) {
+			if pickAsDominantLearningUnit(best, dominantRole, bestVideoScore, dominantStartMs, unitStrength, preferredDurationSec) {
 				bestVideoScore = unitStrength
 				dominantStartMs = bestStart(best)
 				dominantRole = role
@@ -72,7 +73,7 @@ func (a *DefaultVideoEvidenceAggregator) Aggregate(recommendationContext model.R
 					Evidence:     evidenceFromWindow(best),
 				},
 				strength:       unitStrength,
-				educationalFit: educationalFit(best, recommendationContext.Request.PreferredDurationSec),
+				educationalFit: educationalFit(best, preferredDurationSec),
 				futureValue:    futureValue(best.Candidate.Bucket),
 				startMs:        bestStart(best),
 			})

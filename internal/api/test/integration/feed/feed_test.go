@@ -40,8 +40,6 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 
 	response := postJSON(t, server, `{
 		"target_video_count": 6,
-		"preferred_duration_sec": {"min": 15, "max": 90},
-		"session_hint": "mixed",
 		"client_context": {"platform":"ios"}
 	}`)
 
@@ -53,7 +51,7 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 	if body.RecommendationRunID != "run-1" || len(body.Items) != 1 {
 		t.Fatalf("unexpected response: %+v", body)
 	}
-	if service.request.UserID != "user-1" || service.request.TargetVideoCount != 6 || service.request.PreferredDurationSec != [2]int{15, 90} {
+	if service.request.UserID != "user-1" || service.request.TargetVideoCount != 6 {
 		t.Fatalf("request not mapped: %+v", service.request)
 	}
 }
@@ -67,7 +65,7 @@ func TestFeedAppliesRequestDefaults(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
-	if service.request.TargetVideoCount != 8 || service.request.PreferredDurationSec != [2]int{45, 180} {
+	if service.request.TargetVideoCount != 8 {
 		t.Fatalf("defaults not applied: %+v", service.request)
 	}
 	if string(service.request.ClientContext) != "{}" {
@@ -75,57 +73,13 @@ func TestFeedAppliesRequestDefaults(t *testing.T) {
 	}
 }
 
-func TestFeedAppliesPartialPreferredDurationDefaults(t *testing.T) {
-	cases := []struct {
-		name string
-		body string
-		want [2]int
-	}{
-		{name: "min only", body: `{"preferred_duration_sec":{"min":15}}`, want: [2]int{15, 180}},
-		{name: "max only", body: `{"preferred_duration_sec":{"max":90}}`, want: [2]int{45, 90}},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			service := &fakeFeedService{response: apvdto.FeedResponse{RecommendationRunID: "run-1"}}
-			server := newServer(service)
-			t.Cleanup(server.Close)
-
-			response := postJSON(t, server, tt.body)
-			if response.StatusCode != http.StatusOK {
-				t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
-			}
-			if service.request.PreferredDurationSec != tt.want {
-				t.Fatalf("preferred_duration_sec = %+v, want %+v", service.request.PreferredDurationSec, tt.want)
-			}
-		})
-	}
-}
-
-func TestFeedRejectsInvalidTransportRequest(t *testing.T) {
-	service := &fakeFeedService{}
-	server := newServer(service)
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, `{"target_video_count": 21}`)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	if service.called {
-		t.Fatal("service should not be called")
-	}
-}
-
-func TestFeedRejectsInvalidPreferredDuration(t *testing.T) {
+func TestFeedRejectsRemovedRequestFields(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
 	}{
-		{name: "negative min", body: `{"preferred_duration_sec":{"min":-1,"max":90}}`},
-		{name: "negative max", body: `{"preferred_duration_sec":{"min":15,"max":-1}}`},
-		{name: "zero min", body: `{"preferred_duration_sec":{"min":0,"max":90}}`},
-		{name: "zero max", body: `{"preferred_duration_sec":{"min":15,"max":0}}`},
-		{name: "max less than min", body: `{"preferred_duration_sec":{"min":90,"max":15}}`},
+		{name: "preferred duration", body: `{"preferred_duration_sec":{"min":15,"max":90}}`},
+		{name: "session hint", body: `{"session_hint":"mixed"}`},
 	}
 
 	for _, tt := range cases {
@@ -142,6 +96,20 @@ func TestFeedRejectsInvalidPreferredDuration(t *testing.T) {
 				t.Fatal("service should not be called")
 			}
 		})
+	}
+}
+
+func TestFeedRejectsInvalidTransportRequest(t *testing.T) {
+	service := &fakeFeedService{}
+	server := newServer(service)
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, `{"target_video_count": 21}`)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if service.called {
+		t.Fatal("service should not be called")
 	}
 }
 

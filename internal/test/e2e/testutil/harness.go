@@ -713,11 +713,9 @@ func MustEnsureTarget(t *testing.T, suite *LearningSuite, userID string, specs .
 func MustRecommend(t *testing.T, usecase recommendationusecase.GenerateVideoRecommendationsUsecase, userID string, targetCount int) recommendationdto.GenerateVideoRecommendationsResponse {
 	t.Helper()
 	response, err := usecase.Execute(context.Background(), recommendationdto.GenerateVideoRecommendationsRequest{
-		UserID:               userID,
-		TargetVideoCount:     targetCount,
-		PreferredDurationSec: [2]int{45, 180},
-		SessionHint:          "e2e",
-		RequestContext:       []byte(`{"source":"e2e"}`),
+		UserID:           userID,
+		TargetVideoCount: targetCount,
+		RequestContext:   []byte(`{"source":"e2e"}`),
 	})
 	if err != nil {
 		t.Fatalf("GenerateVideoRecommendations.Execute(): %v", err)

@@ -79,11 +79,9 @@ func (s *FeedService) Execute(ctx context.Context, request apvdto.GetFeedRequest
 	}
 
 	plan, err := s.recommender.Execute(ctx, recommendationdto.GenerateVideoRecommendationsRequest{
-		UserID:               request.UserID,
-		TargetVideoCount:     request.TargetVideoCount,
-		PreferredDurationSec: request.PreferredDurationSec,
-		SessionHint:          request.SessionHint,
-		RequestContext:       request.ClientContext,
+		UserID:           request.UserID,
+		TargetVideoCount: request.TargetVideoCount,
+		RequestContext:   request.ClientContext,
 	})
 	if err != nil {
 		return apvdto.FeedResponse{}, err

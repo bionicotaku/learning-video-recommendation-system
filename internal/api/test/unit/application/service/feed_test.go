@@ -57,11 +57,9 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	service := apiservice.NewFeedService(recommender, videoLookup, labelLookup, apiservice.NewPublicAssetURLBuilder("https://cdn.example.com/assets"), discardLogger())
 
 	response, err := service.Execute(context.Background(), apvdto.GetFeedRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     8,
-		PreferredDurationSec: [2]int{20, 120},
-		SessionHint:          "mixed",
-		ClientContext:        []byte(`{"platform":"ios"}`),
+		UserID:           "user-1",
+		TargetVideoCount: 8,
+		ClientContext:    []byte(`{"platform":"ios"}`),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)

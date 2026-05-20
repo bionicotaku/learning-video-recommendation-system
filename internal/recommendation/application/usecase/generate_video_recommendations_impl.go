@@ -71,11 +71,9 @@ func NewGenerateVideoRecommendationsPipeline(
 
 func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, request dto.GenerateVideoRecommendationsRequest) (dto.GenerateVideoRecommendationsResponse, error) {
 	contextModel, err := u.assembler.Assemble(ctx, model.RecommendationRequest{
-		UserID:               request.UserID,
-		TargetVideoCount:     request.TargetVideoCount,
-		PreferredDurationSec: request.PreferredDurationSec,
-		SessionHint:          request.SessionHint,
-		RequestContext:       request.RequestContext,
+		UserID:           request.UserID,
+		TargetVideoCount: request.TargetVideoCount,
+		RequestContext:   request.RequestContext,
 	})
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err

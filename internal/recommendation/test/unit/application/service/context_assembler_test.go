@@ -45,8 +45,8 @@ func TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(t *t
 	if contextModel.Request.TargetVideoCount != 8 {
 		t.Fatalf("expected default target video count, got %d", contextModel.Request.TargetVideoCount)
 	}
-	if contextModel.Request.PreferredDurationSec != [2]int{45, 180} {
-		t.Fatalf("unexpected preferred duration: %#v", contextModel.Request.PreferredDurationSec)
+	if contextModel.PreferredDurationSec != [2]int{45, 200} {
+		t.Fatalf("unexpected preferred duration: %#v", contextModel.PreferredDurationSec)
 	}
 	if len(contextModel.ActiveUnitStates) != 3 {
 		t.Fatalf("expected 3 active unit states, got %d", len(contextModel.ActiveUnitStates))
@@ -117,21 +117,20 @@ var (
 	_ apprepo.UnitServingStateRepository = (*stubUnitServingStateRepository)(nil)
 )
 
-func TestNormalizeDurationResetsInvalidRange(t *testing.T) {
+func TestDefaultContextAssemblerSetsInternalPreferredDurationAndNow(t *testing.T) {
 	assembler := appservice.NewDefaultContextAssembler(
 		&stubLearningStateReader{},
 		&stubUnitInventoryReader{},
 		&stubUnitServingStateRepository{},
 	)
 	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
-		UserID:               "user-1",
-		PreferredDurationSec: [2]int{300, 30},
+		UserID: "user-1",
 	})
 	if err != nil {
 		t.Fatalf("assemble: %v", err)
 	}
-	if contextModel.Request.PreferredDurationSec != [2]int{45, 180} {
-		t.Fatalf("unexpected duration after normalization: %#v", contextModel.Request.PreferredDurationSec)
+	if contextModel.PreferredDurationSec != [2]int{45, 200} {
+		t.Fatalf("unexpected internal preferred duration: %#v", contextModel.PreferredDurationSec)
 	}
 	if contextModel.Now.After(time.Now().UTC().Add(5 * time.Second)) {
 		t.Fatalf("unexpected now value: %v", contextModel.Now)

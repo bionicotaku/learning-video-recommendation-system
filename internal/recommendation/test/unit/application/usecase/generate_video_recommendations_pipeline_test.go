@@ -33,7 +33,8 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
-				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2, PreferredDurationSec: [2]int{45, 180}},
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2},
 			},
 		},
 		&stubPlanner{
@@ -59,9 +60,8 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     2,
-		PreferredDurationSec: [2]int{45, 180},
+		UserID:           "user-1",
+		TargetVideoCount: 2,
 	})
 	if err != nil {
 		t.Fatalf("execute pipeline: %v", err)
@@ -94,7 +94,8 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
-				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2, PreferredDurationSec: [2]int{45, 180}},
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2},
 			},
 		},
 		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 2}},
@@ -112,9 +113,8 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     2,
-		PreferredDurationSec: [2]int{45, 180},
+		UserID:           "user-1",
+		TargetVideoCount: 2,
 	})
 	if err != nil {
 		t.Fatalf("execute pipeline: %v", err)
@@ -146,7 +146,8 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
-				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 3, PreferredDurationSec: [2]int{45, 180}},
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 3},
 			},
 		},
 		&stubPlanner{
@@ -169,9 +170,8 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     3,
-		PreferredDurationSec: [2]int{45, 180},
+		UserID:           "user-1",
+		TargetVideoCount: 3,
 	})
 	if err != nil {
 		t.Fatalf("execute pipeline: %v", err)
@@ -192,7 +192,8 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
-				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1, PreferredDurationSec: [2]int{45, 180}},
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1},
 			},
 		},
 		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 1}},
@@ -226,9 +227,8 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 	}
 
 	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     1,
-		PreferredDurationSec: [2]int{45, 180},
+		UserID:           "user-1",
+		TargetVideoCount: 1,
 	})
 	if err != nil {
 		t.Fatalf("execute pipeline: %v", err)
@@ -253,7 +253,8 @@ func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSour
 	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
 		&constructorStubContextAssembler{
 			context: model.RecommendationContext{
-				Request: model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1, PreferredDurationSec: [2]int{45, 180}},
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 1},
 			},
 		},
 		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 1}},
@@ -271,9 +272,8 @@ func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSour
 	}
 
 	if _, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:               "user-1",
-		TargetVideoCount:     1,
-		PreferredDurationSec: [2]int{45, 180},
+		UserID:           "user-1",
+		TargetVideoCount: 1,
 	}); err != nil {
 		t.Fatalf("execute pipeline: %v", err)
 	}

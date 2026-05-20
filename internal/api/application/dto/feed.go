@@ -1,11 +1,9 @@
 package dto
 
 type GetFeedRequest struct {
-	UserID               string
-	TargetVideoCount     int
-	PreferredDurationSec [2]int
-	SessionHint          string
-	ClientContext        []byte
+	UserID           string
+	TargetVideoCount int
+	ClientContext    []byte
 }
 
 type FeedResponse struct {

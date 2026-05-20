@@ -1,11 +1,9 @@
 package dto
 
 type GenerateVideoRecommendationsRequest struct {
-	UserID               string `json:"user_id"`
-	TargetVideoCount     int    `json:"target_video_count"`
-	PreferredDurationSec [2]int `json:"preferred_duration_sec"`
-	SessionHint          string `json:"session_hint"`
-	RequestContext       []byte `json:"request_context"`
+	UserID           string `json:"user_id"`
+	TargetVideoCount int    `json:"target_video_count"`
+	RequestContext   []byte `json:"request_context"`
 }
 
 type LearningUnitEvidence struct {

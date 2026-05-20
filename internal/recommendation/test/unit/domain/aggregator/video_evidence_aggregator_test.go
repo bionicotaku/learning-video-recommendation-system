@@ -127,10 +127,10 @@ func TestDefaultVideoEvidenceAggregatorPreservesAllVideoLaneSources(t *testing.T
 
 func recommendationContext() model.RecommendationContext {
 	return model.RecommendationContext{
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			UserID:               "user-1",
-			TargetVideoCount:     4,
-			PreferredDurationSec: [2]int{45, 180},
+			UserID:           "user-1",
+			TargetVideoCount: 4,
 		},
 	}
 }

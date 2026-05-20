@@ -15,10 +15,10 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 
 	ranker := recommendationranking.NewDefaultVideoRanker()
 	ranked, err := ranker.Rank(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     4,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 4,
 		},
 		VideoServingStates: []model.UserVideoServingState{
 			{VideoID: "video-penalized", LastServedAt: &recentServedAt, ServedCount: 3},
@@ -54,10 +54,10 @@ func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *t
 
 	ranker := recommendationranking.NewDefaultVideoRanker()
 	ranked, err := ranker.Rank(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     1,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 1,
 		},
 		VideoUserStates: []model.VideoUserState{
 			{VideoID: "video-1", LastWatchedAt: &recentWatchedAt, WatchCount: 4, CompletedCount: 2, MaxPositionMs: 114_000},
@@ -90,9 +90,9 @@ func TestDefaultVideoRankerAddsOverloadPenaltyForOverstuffedLongVideo(t *testing
 	ranker := recommendationranking.NewDefaultVideoRanker()
 
 	ranked, err := ranker.Rank(model.RecommendationContext{
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     4,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 4,
 		},
 	}, []model.VideoCandidate{
 		videoCandidate("video-compact", model.LearningRoleHardReview, 0.7, 0.6, 0.4, 0.6, 0.2, 140_000, []int64{101, 201}, int64Ptr(101)),

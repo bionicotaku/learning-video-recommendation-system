@@ -32,7 +32,7 @@ func (r *DefaultVideoRanker) Rank(recommendationContext model.RecommendationCont
 		candidate.FreshnessScore = freshnessScore(videoServingByID[candidate.VideoID], videoUserByID[candidate.VideoID], candidate.DurationMs, recommendationContext.Now)
 		candidate.RecentServedPenalty = recentServedPenalty(videoServingByID[candidate.VideoID], recommendationContext.Now)
 		candidate.RecentWatchedPenalty = recentWatchedPenalty(videoUserByID[candidate.VideoID], candidate.DurationMs, recommendationContext.Now)
-		candidate.OverloadPenalty = overloadPenalty(*candidate, recommendationContext.Request.PreferredDurationSec)
+		candidate.OverloadPenalty = overloadPenalty(*candidate, recommendationContext.PreferredDurationSec)
 
 		demandCoverage := 0.50*candidate.HardReviewCover +
 			0.20*candidate.NewNowCover +

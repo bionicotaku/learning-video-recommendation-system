@@ -27,7 +27,7 @@ func (p *DefaultDemandPlanner) Plan(context model.RecommendationContext) (model.
 
 	bundle := model.DemandBundle{
 		TargetVideoCount:     context.Request.TargetVideoCount,
-		PreferredDurationSec: context.Request.PreferredDurationSec,
+		PreferredDurationSec: context.PreferredDurationSec,
 	}
 
 	for _, state := range context.ActiveUnitStates {

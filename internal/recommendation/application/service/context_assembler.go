@@ -13,7 +13,7 @@ import (
 const (
 	defaultTargetVideoCount = 8
 	defaultMinDurationSec   = 45
-	defaultMaxDurationSec   = 180
+	defaultMaxDurationSec   = 200
 )
 
 type DefaultContextAssembler struct {
@@ -67,13 +67,14 @@ func (a *DefaultContextAssembler) Assemble(ctx context.Context, request model.Re
 	}
 
 	return model.RecommendationContext{
-		Request:            normalized,
-		Now:                a.now(),
-		ActiveUnitStates:   states,
-		UnitInventory:      inventory,
-		UnitServingStates:  unitServingStates,
-		VideoServingStates: []model.UserVideoServingState{},
-		VideoUserStates:    []model.VideoUserState{},
+		Request:              normalized,
+		PreferredDurationSec: [2]int{defaultMinDurationSec, defaultMaxDurationSec},
+		Now:                  a.now(),
+		ActiveUnitStates:     states,
+		UnitInventory:        inventory,
+		UnitServingStates:    unitServingStates,
+		VideoServingStates:   []model.UserVideoServingState{},
+		VideoUserStates:      []model.VideoUserState{},
 	}, nil
 }
 
@@ -81,17 +82,6 @@ func normalizeRequest(request model.RecommendationRequest) model.RecommendationR
 	result := request
 	if result.TargetVideoCount <= 0 {
 		result.TargetVideoCount = defaultTargetVideoCount
-	}
-
-	if result.PreferredDurationSec[0] <= 0 {
-		result.PreferredDurationSec[0] = defaultMinDurationSec
-	}
-	if result.PreferredDurationSec[1] <= 0 {
-		result.PreferredDurationSec[1] = defaultMaxDurationSec
-	}
-	if result.PreferredDurationSec[1] < result.PreferredDurationSec[0] {
-		result.PreferredDurationSec[0] = defaultMinDurationSec
-		result.PreferredDurationSec[1] = defaultMaxDurationSec
 	}
 
 	return result

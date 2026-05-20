@@ -19,10 +19,10 @@ func TestDefaultDemandPlannerRespectsBucketPrecedence(t *testing.T) {
 
 	planner := recommendationplanner.NewDefaultDemandPlanner()
 	bundle, err := planner.Plan(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     8,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 8,
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{
@@ -53,10 +53,10 @@ func TestDefaultDemandPlannerTreatsUnsuppliedNewUnitsAsNearFuture(t *testing.T) 
 	planner := recommendationplanner.NewDefaultDemandPlanner()
 
 	bundle, err := planner.Plan(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     8,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 8,
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{
@@ -87,10 +87,10 @@ func TestDefaultDemandPlannerRaisesBundleBudgetWhenHardReviewSupplyIsWeak(t *tes
 	planner := recommendationplanner.NewDefaultDemandPlanner()
 
 	bundle, err := planner.Plan(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     8,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 8,
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{
@@ -123,10 +123,10 @@ func TestDefaultDemandPlannerSeparatesSoftReviewAndNearFuture(t *testing.T) {
 	planner := recommendationplanner.NewDefaultDemandPlanner()
 
 	bundle, err := planner.Plan(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     8,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 8,
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{CoarseUnitID: 401, Status: "reviewing", TargetPriority: 0.8, NextReviewAt: &softDue},
@@ -157,10 +157,10 @@ func TestDefaultDemandPlannerGoldenReviewHeavy(t *testing.T) {
 
 	planner := recommendationplanner.NewDefaultDemandPlanner()
 	bundle, err := planner.Plan(model.RecommendationContext{
-		Now: now,
+		Now:                  now,
+		PreferredDurationSec: [2]int{45, 200},
 		Request: model.RecommendationRequest{
-			TargetVideoCount:     8,
-			PreferredDurationSec: [2]int{45, 180},
+			TargetVideoCount: 8,
 		},
 		ActiveUnitStates: []model.LearningStateSnapshot{
 			{CoarseUnitID: 101, Status: "reviewing", TargetPriority: 0.9, NextReviewAt: &dueAt},

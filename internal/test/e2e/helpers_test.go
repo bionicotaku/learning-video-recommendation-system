@@ -133,11 +133,9 @@ func mustReplay(t interface {
 
 func recommendRequest(userID string, targetCount int) recommendationdto.GenerateVideoRecommendationsRequest {
 	return recommendationdto.GenerateVideoRecommendationsRequest{
-		UserID:               userID,
-		TargetVideoCount:     targetCount,
-		PreferredDurationSec: [2]int{45, 180},
-		SessionHint:          "e2e",
-		RequestContext:       []byte(`{"source":"e2e"}`),
+		UserID:           userID,
+		TargetVideoCount: targetCount,
+		RequestContext:   []byte(`{"source":"e2e"}`),
 	}
 }
 

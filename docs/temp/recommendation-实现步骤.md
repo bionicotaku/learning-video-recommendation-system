@@ -310,7 +310,7 @@ Recommendation 的实现顺序固定如下，不允许跳步：
 
 - 规范化请求默认值：
   - `target_video_count`
-  - `preferred_duration_sec`
+- 写入 Recommendation 内部固定时长偏好 `[45, 200]`
 - 读取 active learning states
 - 抽取 unit IDs 并读取 `v_unit_video_inventory`
 - 读取 Recommendation 自己的 unit serving states

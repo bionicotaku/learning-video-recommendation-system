@@ -39,7 +39,7 @@
   "TargetVideoCount": 8,
   "PreferredDurationSec": [
     45,
-    180
+    200
   ],
   "LaneBudget": {
     "ExactCore": 0.35,
