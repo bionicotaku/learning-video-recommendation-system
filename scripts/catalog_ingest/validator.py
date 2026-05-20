@@ -152,24 +152,24 @@ def _validate_transcript_level_fields(clip_input: LoadedClipInput) -> None:
 
 
 def _validate_time_range(clip_input: LoadedClipInput, time_tolerance_ms: int) -> None:
-    """校验 transcript 时间轴整体是否落在 buffered 区间内。"""
+    """校验 transcript 时间轴整体是否落在当前 clip 时间轴内。"""
 
     earliest_start = min(sentence.start_ms for sentence in clip_input.transcript_sentences)
     latest_end = max(sentence.end_ms for sentence in clip_input.transcript_sentences)
 
-    if earliest_start < (clip_input.source_start_ms - time_tolerance_ms):
+    if earliest_start < (0 - time_tolerance_ms):
         raise _error(
             clip_input,
             "transcript_invalid",
-            "transcript 最早时间早于 buffered_start_time",
-            {"earliest_start": earliest_start, "source_start_ms": clip_input.source_start_ms},
+            "transcript 最早时间早于 clip 起点",
+            {"earliest_start": earliest_start},
         )
-    if latest_end > (clip_input.source_end_ms + time_tolerance_ms):
+    if latest_end > (clip_input.duration_ms + time_tolerance_ms):
         raise _error(
             clip_input,
             "transcript_invalid",
-            "transcript 最晚时间晚于 buffered_end_time",
-            {"latest_end": latest_end, "source_end_ms": clip_input.source_end_ms},
+            "transcript 最晚时间晚于 clip duration",
+            {"latest_end": latest_end, "duration_ms": clip_input.duration_ms},
         )
 
 
@@ -354,6 +354,20 @@ def _validate_questions(clip_input: LoadedClipInput, known_coarse_set: set[int])
                     "context_start_ms": question.context_start_ms,
                     "context_end_ms": question.context_end_ms,
                 },
+            )
+        if question.context_start_ms is not None and question.context_start_ms < 0:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "question.context_start_ms 不能早于 clip 起点",
+                {"context_start_ms": question.context_start_ms},
+            )
+        if question.context_end_ms is not None and question.context_end_ms > clip_input.duration_ms:
+            raise _error(
+                clip_input,
+                "question_invalid",
+                "question.context_end_ms 不能晚于 clip duration",
+                {"context_end_ms": question.context_end_ms, "duration_ms": clip_input.duration_ms},
             )
 
 

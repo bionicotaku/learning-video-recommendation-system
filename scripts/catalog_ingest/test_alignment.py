@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -334,6 +335,29 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
                 known_coarse_unit_ids={7},
                 time_tolerance_ms=0,
             )
+
+    def test_validate_accepts_clip_local_transcript_times_with_absolute_source_range(self) -> None:
+        clip_input = _build_clip_input()
+        clip_input = replace(
+            clip_input,
+            source_start_ms=50_000,
+            source_end_ms=51_000,
+            clip_metadata=replace(
+                clip_input.clip_metadata,
+                start_time=50_100,
+                end_time=50_900,
+                buffered_start_time=50_000,
+                buffered_end_time=51_000,
+            ),
+        )
+
+        warnings = validate_loaded_clip(
+            clip_input=clip_input,
+            known_coarse_unit_ids={1},
+            time_tolerance_ms=0,
+        )
+
+        self.assertEqual(warnings, tuple())
 
     def test_question_id_is_deterministic_for_same_question_payload(self) -> None:
         clip_input = _build_clip_input()

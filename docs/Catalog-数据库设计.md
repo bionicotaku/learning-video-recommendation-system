@@ -127,6 +127,8 @@ catalog.videos
 - `translation text null`
 - `created_at timestamptz not null default now()`
 
+这里的 `start_ms/end_ms` 是当前 clip 内的相对毫秒，不是原始父视频的绝对时间；父视频 buffered 区间只保存在 `catalog.videos.source_start_ms/source_end_ms`。
+
 必要约束应包括：`primary key (video_id, sentence_index)`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (sentence_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。推荐索引包括：`(video_id, start_ms)`、`(video_id, end_ms)`。由于 `video_semantic_spans` 要引用句子主键，因此 `video_transcript_sentences` 也是最细事实层的父表之一。
 
 ## 8. `catalog.video_semantic_spans`
@@ -148,6 +150,8 @@ catalog.videos
 - `dictionary text null`
 - `mapping_reason text null`
 - `created_at timestamptz not null default now()`
+
+这里的 `start_ms/end_ms` 同样是当前 clip 内的相对毫秒，用于前端定位当前 clip mp4 内的 evidence。
 
 必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及 Recommendation 证据回查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
 
@@ -255,7 +259,7 @@ catalog.videos
 
 Catalog 的入库采用**单 clip 单事务 replace 写入，并为每次执行记录单条入库审计**。这意味着：每个 clip 的一次执行都由 `video_ingestion_records` 记录；每个 clip 在数据库中要么整体成功，要么整体不落地；transcript 展开和 `video_unit_index` 聚合都在同一事务内完成。
 
-单 clip 入库步骤应固定为：先读取 manifest、同名 transcript JSON 与同名 question JSON；再校验内容资产元数据，包括 `source_clip_key`、`parent_video_name`、`title`、`duration_ms`、`video_object_path`、`transcript_object_path`、`transcript_checksum` 必须合法；再校验 transcript 结构，包括存在 `sentences`、sentence 的 `index/text/start/end` 合法、`end_ms > start_ms`、span 的 `index/text/start/end` 合法；若 span 时间超出所属 sentence 时间区间，则当前阶段记 warning 后继续入库，因为上游 AssemblyAI transcript 的原始输出偶尔会出现这类边界异常；若 `coarse_id` 非空则必须存在于 `semantic.coarse_unit`。question JSON 中的 `selected_coarse_unit_refs.refs` 必须与 transcript 中出现的 mapped coarse unit 一对一，且每个 ref 都能回查到同一 coarse unit 的 token，并提供 `target_text` 与 `candidate_score`。`questions[]` 只作为视频上下文题入库，写库时固定使用 `scope_type = 'video_unit'`、`status = 'active'` 并绑定当前 clip 的 `video_id`。之后在应用层归一化生成 transcript 统计、sentence 时间/文本行、semantic span 时间/映射/解释行、`video_unit_index` 聚合结果和 `catalog.questions` 写入行；最后在同一事务中依次 upsert `catalog.videos`、replace `catalog.video_transcripts`、replace `catalog.video_transcript_sentences`、replace `catalog.video_semantic_spans`、replace `catalog.video_unit_index`、upsert `catalog.questions`，成功则写 `status = succeeded` 并关联 `video_id`，失败则回滚并写 `status = failed`、`error_code` 与 `error_message`。
+单 clip 入库步骤应固定为：先读取 manifest、同名 transcript JSON 与同名 question JSON；再校验内容资产元数据，包括 `source_clip_key`、`parent_video_name`、`title`、`duration_ms`、`video_object_path`、`transcript_object_path`、`transcript_checksum` 必须合法；再校验 transcript 结构，包括存在 `sentences`、sentence 的 `index/text/start/end` 合法、`end_ms > start_ms`、sentence 时间落在当前 clip 的 `0..duration_ms` 区间内、span 的 `index/text/start/end` 合法；若 span 时间超出所属 sentence 时间区间，则当前阶段记 warning 后继续入库，因为上游 AssemblyAI transcript 的原始输出偶尔会出现这类边界异常；若 `coarse_id` 非空则必须存在于 `semantic.coarse_unit`。question JSON 中的 `selected_coarse_unit_refs.refs` 必须与 transcript 中出现的 mapped coarse unit 一对一，且每个 ref 都能回查到同一 coarse unit 的 token，并提供 `target_text` 与 `candidate_score`。`questions[]` 只作为视频上下文题入库，写库时固定使用 `scope_type = 'video_unit'`、`status = 'active'` 并绑定当前 clip 的 `video_id`。之后在应用层归一化生成 transcript 统计、sentence 时间/文本行、semantic span 时间/映射/解释行、`video_unit_index` 聚合结果和 `catalog.questions` 写入行；最后在同一事务中依次 upsert `catalog.videos`、replace `catalog.video_transcripts`、replace `catalog.video_transcript_sentences`、replace `catalog.video_semantic_spans`、replace `catalog.video_unit_index`、upsert `catalog.questions`，成功则写 `status = succeeded` 并关联 `video_id`，失败则回滚并写 `status = failed`、`error_code` 与 `error_message`。
 
 ## 15. 轻量后处理逻辑
 

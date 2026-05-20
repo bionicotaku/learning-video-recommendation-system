@@ -565,7 +565,7 @@ class CatalogRepository:
                   best_evidence_candidate_score,
                   best_evidence_target_text
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
