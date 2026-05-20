@@ -8,6 +8,7 @@
 - **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
 - **Feed、End Quiz、Catalog watch-progress、Video Interactions 已落地。** Unit progress 仍是设计文档，尚未实现 HTTP handler。
+- **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
 
@@ -41,7 +42,7 @@
 以下内容在 API 层仍未实现：
 
 - Learning Engine Unit Progress API handler。
-- 生产级 auth verifier；当前模型仍是 trusted upstream principal。
+- 后端内置生产级 JWT verifier；当前模型仍是 trusted Gateway userinfo principal。
 - 完整 OpenAPI / 客户端 SDK 生成。
 
 后续新增 endpoint 时，应继续遵守 [API模块总体设计规范.md](API模块总体设计规范.md)，并按对应业务 API 文档逐个 endpoint 落地。

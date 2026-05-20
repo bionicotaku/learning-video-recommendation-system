@@ -2,8 +2,8 @@ package main
 
 import "testing"
 
-func TestLoadConfigFromEnvRequiresTrustedUserIDHeader(t *testing.T) {
-	_, err := loadConfigFromEnv(func(key string) string {
+func TestLoadConfigFromEnvDefaultsAuthConfig(t *testing.T) {
+	config, err := loadConfigFromEnv(func(key string) string {
 		switch key {
 		case "DATABASE_URL":
 			return "postgres://example"
@@ -13,21 +13,29 @@ func TestLoadConfigFromEnvRequiresTrustedUserIDHeader(t *testing.T) {
 			return ""
 		}
 	})
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
 
-	if err == nil {
-		t.Fatalf("expected missing trusted user id header to fail")
+	if config.DevMode {
+		t.Fatalf("expected DEV_MODE to default false")
+	}
+	if config.APIGatewayUserinfoHeader != "X-Apigateway-Api-Userinfo" {
+		t.Fatalf("unexpected gateway userinfo header: %s", config.APIGatewayUserinfoHeader)
 	}
 }
 
-func TestLoadConfigFromEnvReadsTrustedUserIDHeader(t *testing.T) {
+func TestLoadConfigFromEnvReadsOptionalAuthConfig(t *testing.T) {
 	config, err := loadConfigFromEnv(func(key string) string {
 		switch key {
 		case "DATABASE_URL":
 			return "postgres://example"
-		case "API_TRUSTED_USER_ID_HEADER":
-			return "X-Trusted-User-ID"
 		case "PUBLIC_ASSET_BASE_URL":
 			return "https://cdn.example.com/assets/"
+		case "DEV_MODE":
+			return "true"
+		case "API_GATEWAY_USERINFO_HEADER":
+			return "X-Custom-Userinfo"
 		default:
 			return ""
 		}
@@ -39,18 +47,32 @@ func TestLoadConfigFromEnvReadsTrustedUserIDHeader(t *testing.T) {
 	if config.Addr != ":8080" {
 		t.Fatalf("unexpected default addr: %s", config.Addr)
 	}
-	if config.TrustedUserIDHeader != "X-Trusted-User-ID" {
-		t.Fatalf("unexpected trusted header: %s", config.TrustedUserIDHeader)
+	if !config.DevMode {
+		t.Fatalf("expected DEV_MODE true")
+	}
+	if config.APIGatewayUserinfoHeader != "X-Custom-Userinfo" {
+		t.Fatalf("unexpected gateway userinfo header: %s", config.APIGatewayUserinfoHeader)
 	}
 	if config.PublicAssetBaseURL != "https://cdn.example.com/assets" {
 		t.Fatalf("unexpected public asset base url: %s", config.PublicAssetBaseURL)
 	}
 }
 
-func TestBuildHTTPHandlerRequiresTrustedUserIDHeader(t *testing.T) {
-	_, err := buildHTTPHandler(nil, nil, config{})
+func TestLoadConfigFromEnvRejectsInvalidDevMode(t *testing.T) {
+	_, err := loadConfigFromEnv(func(key string) string {
+		switch key {
+		case "DATABASE_URL":
+			return "postgres://example"
+		case "PUBLIC_ASSET_BASE_URL":
+			return "https://cdn.example.com"
+		case "DEV_MODE":
+			return "sometimes"
+		default:
+			return ""
+		}
+	})
 
 	if err == nil {
-		t.Fatalf("expected missing trusted user id header to fail")
+		t.Fatalf("expected invalid DEV_MODE to fail")
 	}
 }

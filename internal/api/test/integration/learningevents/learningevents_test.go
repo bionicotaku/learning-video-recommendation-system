@@ -667,13 +667,13 @@ func TestSelfMarkMasteredMapsContextDeadlineToServiceUnavailable(t *testing.T) {
 	}
 }
 
-func TestTrustedHeaderPrincipalMiddlewareInjectsPrincipal(t *testing.T) {
+func TestGatewayUserinfoPrincipalMiddlewareInjectsPrincipal(t *testing.T) {
 	recorder := &fakeSelfMarkMasteredRecorder{
 		response: apvdto.RecordSelfMarkMasteredResponse{Accepted: true, LearningInteractionEventID: "22222222-2222-2222-2222-222222222222", Inserted: false},
 	}
 	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder)
 	handler := router.New(router.Options{LearningEvents: group})
-	handler = middleware.RequestID(auth.TrustedHeaderPrincipalMiddleware("X-Trusted-User-ID")(handler))
+	handler = middleware.RequestID(auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler))
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
@@ -687,7 +687,7 @@ func TestTrustedHeaderPrincipalMiddlewareInjectsPrincipal(t *testing.T) {
 		t.Fatalf("build request: %v", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Trusted-User-ID", "trusted-user")
+	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ0cnVzdGVkLXVzZXIifQ")
 
 	response, err := server.Client().Do(request)
 	if err != nil {
@@ -698,7 +698,45 @@ func TestTrustedHeaderPrincipalMiddlewareInjectsPrincipal(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
 	if recorder.userID != "trusted-user" {
-		t.Fatalf("expected trusted header user id, got %q", recorder.userID)
+		t.Fatalf("expected gateway userinfo user id, got %q", recorder.userID)
+	}
+}
+
+func TestDevModeAuthorizationFallbackInjectsPrincipal(t *testing.T) {
+	recorder := &fakeSelfMarkMasteredRecorder{
+		response: apvdto.RecordSelfMarkMasteredResponse{Accepted: true, LearningInteractionEventID: "22222222-2222-2222-2222-222222222222", Inserted: false},
+	}
+	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder)
+	handler := router.New(router.Options{LearningEvents: group})
+	handler = middleware.RequestID(auth.PrincipalMiddleware(auth.Options{
+		DevMode:               true,
+		GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo",
+	})(handler))
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/learning-units:mark-mastered", bytes.NewBufferString(`{
+		"client_event_id": "self-mark-1",
+		"coarse_unit_id": 101,
+		"source_surface": "word_detail",
+		"occurred_at": "2026-05-15T17:02:00Z"
+	}`))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer e30.eyJzdWIiOiJ1c2VyLWRldiJ9.sig")
+
+	response, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatalf("post json: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if recorder.userID != "user-dev" {
+		t.Fatalf("expected dev fallback user id, got %q", recorder.userID)
 	}
 }
 

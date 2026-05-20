@@ -72,10 +72,20 @@ normalizer path.
 usecase. It returns only `{ "accepted": true }` after the watch session ledger
 and Catalog projections have been updated in one backend transaction.
 
-`cmd/server` requires `API_TRUSTED_USER_ID_HEADER`. The header must be injected
-by a trusted upstream gateway or runtime that strips client-supplied identity
-headers before forwarding the request. This module does not implement JWT
-verification and never trusts `user_id` from the body or query string.
+`cmd/server` reads principal configuration from environment variables. In normal
+mode it expects GCP API Gateway to validate the client JWT and forward
+`X-Apigateway-Api-Userinfo`; the API auth middleware decodes that userinfo
+payload and uses the `sub` claim as `principal.UserID`.
+
+When `DEV_MODE=true`, the same gateway header is still preferred. If it is
+absent, the middleware may fall back to `Authorization: Bearer <JWT>` for trusted
+frontend direct-connect testing. That fallback only decodes the JWT payload; it
+does not verify signatures and must not be used as a production trust boundary.
+The module never trusts `user_id` from the body or query string.
+
+Relevant environment variables are documented in `.env.example`. `DATABASE_URL`
+and `PUBLIC_ASSET_BASE_URL` are required. `DEV_MODE` defaults to `false`, and
+`API_GATEWAY_USERINFO_HEADER` defaults to `X-Apigateway-Api-Userinfo`.
 
 `cmd/server` also requires `PUBLIC_ASSET_BASE_URL` for feed media URL assembly.
 Catalog paths that are already absolute `http://` or `https://` URLs pass

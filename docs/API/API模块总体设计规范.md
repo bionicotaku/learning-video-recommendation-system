@@ -86,14 +86,16 @@ internal/api -> business module infrastructure repository directly
 
 ## 4. 认证模型
 
-生产默认采用“网关 / Auth provider 完成认证，`internal/api` 解析可信 principal”的模型：
+生产默认采用“GCP API Gateway / Auth provider 完成认证，`internal/api` 解析可信 principal”的模型：
 
 ```text
-gateway / auth provider
+frontend
+  -> Authorization: Bearer <JWT>
+GCP API Gateway / auth provider
   -> verify token / session / cookie
-  -> attach trusted principal
+  -> attach X-Apigateway-Api-Userinfo
   -> internal/api
-       -> extract principal
+       -> decode userinfo payload
        -> enforce auth required
        -> pass user_id to business usecase
 ```
@@ -102,23 +104,26 @@ gateway / auth provider
 
 - 校验 token / session / cookie。
 - 校验签名、过期时间、issuer、audience。
-- 注入可信 principal，或通过受信任 runtime context 传递 identity。
+- 注入 `X-Apigateway-Api-Userinfo`，或通过受信任 runtime context 传递 identity。
 - 可选执行粗粒度限流、TLS、WAF 等边缘能力。
 
 `internal/api` 负责：
 
-- 只从可信上下文解析 principal。
+- 优先从 `X-Apigateway-Api-Userinfo` 解析 principal。
+- 当且仅当 `DEV_MODE=true` 且 gateway userinfo header 缺失时，从 `Authorization: Bearer <JWT>` 解码 payload 作为本地/联调 fallback。
+- 固定从 JWT payload 的 `sub` claim 取 `user_id`。
 - 对需要登录的 endpoint 强制 principal 存在。
 - 将 principal 中的 `user_id` 传给业务 usecase。
 - 检查 path / query 中的资源是否允许当前 principal 访问。
 - 为本地测试提供 fake principal middleware。
 
-`internal/api` 默认不自行实现 JWT verifier。若未来部署形态没有网关，可以在 `infrastructure/http/auth` 内增加 verifier，但这属于认证适配变化，不改变业务 endpoint 契约。
+`internal/api` 不自行实现 JWT 签名校验。生产必须由 API Gateway / Auth provider 验证 JWT 后再注入 userinfo header。`DEV_MODE=true` 的 Authorization fallback 只解码 payload，不验签，只用于可信前端直连测试。
 
 禁止：
 
 - 从 request body 读取可信 `user_id`。
-- 从普通客户端可伪造 header 读取可信 `user_id`。
+- 在 `DEV_MODE=false` 时从普通客户端可伪造 header 或 Authorization payload 读取可信 `user_id`。
+- 当 gateway userinfo header 存在但格式非法时 fallback 到 Authorization。
 - 让前端上传 `user_id` 来选择写入用户。
 - 在业务模块中处理 HTTP 认证细节。
 

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	analyticsservice "learning-video-recommendation-system/internal/analytics/application/service"
@@ -38,8 +37,8 @@ import (
 )
 
 func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (http.Handler, error) {
-	if strings.TrimSpace(config.TrustedUserIDHeader) == "" {
-		return nil, fmt.Errorf("trusted user id header is required")
+	if config.APIGatewayUserinfoHeader == "" {
+		return nil, fmt.Errorf("api gateway userinfo header is required")
 	}
 
 	learningEvents, err := buildLearningEventsHandler(pool, logger)
@@ -65,7 +64,10 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	handler = middleware.Recover(handler)
 	handler = middleware.Timeout(15 * time.Second)(handler)
 	handler = middleware.Logging(logger)(handler)
-	handler = auth.TrustedHeaderPrincipalMiddleware(config.TrustedUserIDHeader)(handler)
+	handler = auth.PrincipalMiddleware(auth.Options{
+		DevMode:               config.DevMode,
+		GatewayUserinfoHeader: config.APIGatewayUserinfoHeader,
+	})(handler)
 	handler = middleware.RequestID(handler)
 	return handler, nil
 }

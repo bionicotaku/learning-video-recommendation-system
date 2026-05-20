@@ -154,7 +154,7 @@ func TestFeedRequiresContentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
-	request.Header.Set("X-Trusted-User-ID", "user-1")
+	setGatewayPrincipal(request, "user-1")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("post: %v", err)
@@ -201,9 +201,13 @@ func TestFeedMapsErrors(t *testing.T) {
 }
 
 func newServer(feedService *fakeFeedService) *httptest.Server {
+	return newServerWithAuth(feedService, auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})
+}
+
+func newServerWithAuth(feedService *fakeFeedService, options auth.Options) *httptest.Server {
 	group := feed.NewHandler(feedService)
 	handler := router.New(router.Options{Feed: group})
-	handler = auth.TrustedHeaderPrincipalMiddleware("X-Trusted-User-ID")(handler)
+	handler = auth.PrincipalMiddleware(options)(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)
 }
@@ -215,12 +219,21 @@ func postJSON(t *testing.T, server *httptest.Server, body string) *http.Response
 		t.Fatalf("new request: %v", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Trusted-User-ID", "user-1")
+	setGatewayPrincipal(request, "user-1")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("post: %v", err)
 	}
 	return response
+}
+
+func setGatewayPrincipal(request *http.Request, userID string) {
+	switch userID {
+	case "user-1":
+		request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ1c2VyLTEifQ")
+	default:
+		panic("unsupported test user id")
+	}
 }
 
 func decodeJSON(t *testing.T, response *http.Response, target any) {

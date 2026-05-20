@@ -162,7 +162,7 @@ func TestEndQuizMapsErrors(t *testing.T) {
 func newServer(service *fakeEndQuizService) *httptest.Server {
 	group := endquiz.NewHandler(service)
 	handler := router.New(router.Options{EndQuiz: group})
-	handler = auth.TrustedHeaderPrincipalMiddleware("X-Trusted-User-ID")(handler)
+	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)
 }
@@ -174,7 +174,7 @@ func postJSON(t *testing.T, server *httptest.Server, body string) *http.Response
 		t.Fatalf("new request: %v", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Trusted-User-ID", "user-1")
+	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ1c2VyLTEifQ")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("post: %v", err)

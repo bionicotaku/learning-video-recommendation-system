@@ -171,7 +171,7 @@ func TestVideoInteractionsMapCatalogErrors(t *testing.T) {
 func newServer(like *fakeLikeUsecase, favorite *fakeFavoriteUsecase) *httptest.Server {
 	group := videointeractions.NewHandler(like, favorite)
 	handler := router.New(router.Options{VideoInteractions: group})
-	handler = auth.TrustedHeaderPrincipalMiddleware("X-Trusted-User-ID")(handler)
+	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)
 }
@@ -183,7 +183,7 @@ func requestInteraction(t *testing.T, server *httptest.Server, method string, pa
 		t.Fatalf("new request: %v", err)
 	}
 	if withPrincipal {
-		request.Header.Set("X-Trusted-User-ID", userID)
+		request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEifQ")
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

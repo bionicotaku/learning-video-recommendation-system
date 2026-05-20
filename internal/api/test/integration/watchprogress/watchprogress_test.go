@@ -80,7 +80,7 @@ func TestWatchProgressRequiresContentType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
-	request.Header.Set("X-Trusted-User-ID", "user-1")
+	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ1c2VyLTEifQ")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("post: %v", err)
@@ -150,7 +150,7 @@ func TestWatchProgressMapsUnexpectedErrorToInternal(t *testing.T) {
 func newServer(recorder *fakeRecorder) *httptest.Server {
 	group := watchprogress.NewHandler(recorder)
 	handler := router.New(router.Options{WatchProgress: group})
-	handler = auth.TrustedHeaderPrincipalMiddleware("X-Trusted-User-ID")(handler)
+	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)
 }
@@ -162,7 +162,7 @@ func postJSON(t *testing.T, server *httptest.Server, body string) *http.Response
 		t.Fatalf("new request: %v", err)
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Trusted-User-ID", "user-1")
+	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ1c2VyLTEifQ")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("post: %v", err)
