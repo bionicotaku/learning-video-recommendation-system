@@ -12,6 +12,7 @@ type Options struct {
 	VideoInteractions RouteGroup
 	LearningEvents    RouteGroup
 	WatchProgress     RouteGroup
+	UnitProgress      RouteGroup
 }
 
 func New(options Options) http.Handler {
@@ -30,6 +31,9 @@ func New(options Options) http.Handler {
 	}
 	if options.WatchProgress != nil {
 		options.WatchProgress.RegisterRoutes(mux)
+	}
+	if options.UnitProgress != nil {
+		options.UnitProgress.RegisterRoutes(mux)
 	}
 	return mux
 }

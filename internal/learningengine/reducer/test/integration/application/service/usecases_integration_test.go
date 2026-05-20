@@ -213,6 +213,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 		t.Fatalf("EnsureTargetUnits.Execute() error = %v", err)
 	}
 
+	selfMarkOccurredAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
 		Events: []dto.LearningEventInput{
@@ -222,7 +223,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 				ReducerEffect: "set_mastered",
 				SourceType:    "learning_interaction_event",
 				SourceRefID:   "self-mark-1",
-				OccurredAt:    time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC),
+				OccurredAt:    selfMarkOccurredAt,
 			},
 		},
 	}); err != nil {
@@ -250,7 +251,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 	if len(allStates.States) != 1 {
 		t.Fatalf("all states len = %d, want 1", len(allStates.States))
 	}
-	assertCompletedMasteredState(t, allStates.States[0])
+	assertCompletedMasteredState(t, allStates.States[0], selfMarkOccurredAt)
 
 	if _, err := replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID}); err != nil {
 		t.Fatalf("ReplayUserStates.Execute() error = %v", err)
@@ -265,7 +266,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 	if len(afterReplay.States) != 1 {
 		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
 	}
-	assertCompletedMasteredState(t, afterReplay.States[0])
+	assertCompletedMasteredState(t, afterReplay.States[0], selfMarkOccurredAt)
 }
 
 func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
@@ -558,7 +559,7 @@ func indexStatesByUnit(states []model.UserUnitState) map[int64]model.UserUnitSta
 	return indexed
 }
 
-func assertCompletedMasteredState(t *testing.T, state model.UserUnitState) {
+func assertCompletedMasteredState(t *testing.T, state model.UserUnitState, lastProgressAt time.Time) {
 	t.Helper()
 
 	if state.Status != "mastered" {
@@ -578,6 +579,9 @@ func assertCompletedMasteredState(t *testing.T, state model.UserUnitState) {
 	}
 	if state.SuspendedReason != "" {
 		t.Fatalf("suspended_reason = %q, want empty", state.SuspendedReason)
+	}
+	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(lastProgressAt) {
+		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, lastProgressAt)
 	}
 }
 

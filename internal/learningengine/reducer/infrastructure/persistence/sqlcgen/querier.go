@@ -18,6 +18,8 @@ type Querier interface {
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)
+	ListMasteredUnitProgress(ctx context.Context, arg ListMasteredUnitProgressParams) ([]ListMasteredUnitProgressRow, error)
+	ListUnmasteredUnitProgress(ctx context.Context, arg ListUnmasteredUnitProgressParams) ([]ListUnmasteredUnitProgressRow, error)
 	ListUserUnitStates(ctx context.Context, arg ListUserUnitStatesParams) ([]LearningUserUnitState, error)
 	ListUserUnitStatesForUpdateByUnitIDs(ctx context.Context, arg ListUserUnitStatesForUpdateByUnitIDsParams) ([]LearningUserUnitState, error)
 	SetTargetInactive(ctx context.Context, arg SetTargetInactiveParams) error

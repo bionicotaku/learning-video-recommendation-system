@@ -11,6 +11,8 @@
 - Reduces newly inserted events into `learning.user_unit_states`.
 - Replays user state from `learning.unit_learning_events`.
 - Maintains target/control commands and state query usecases.
+- Provides the Unit Progress read usecase for frontend mastered/unmastered
+  progress lists.
 
 ## Boundaries
 
@@ -80,6 +82,21 @@ request
 ```
 
 Replay never re-reads analytics raw facts. It only uses the reducer-owned normalized ledger.
+
+### ListUserUnitProgress
+
+```text
+request
+  -> validate user_id, bucket, limit and cursor
+  -> read learning.user_unit_states joined with semantic.coarse_unit
+  -> apply mastered/unmastered bucket filters
+  -> keyset paginate by label or progress_percent + label
+  -> return frontend display fields and opaque next_cursor
+```
+
+This is a read usecase only. Mastered rows are selected by
+`status = 'mastered'` without `is_target = true`; unmastered rows are limited to
+active targets with status `new`, `learning` or `reviewing`.
 
 ## Reducer Effects
 

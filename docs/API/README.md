@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、End Quiz、Catalog watch-progress、Video Interactions 已落地。** Unit progress 仍是设计文档，尚未实现 HTTP handler。
+- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -17,7 +17,7 @@
 ## 业务 API 设计
 
 - [学习事件上报API设计.md](学习事件上报API设计.md)：learning interactions batch 与 quiz attempt 单点上报。
-- [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md)：用户学习单元进度分页读取。
+- [Unit-Progress-API-MVP设计.md](Unit-Progress-API-MVP设计.md)：用户学习单元进度分页读取。
 - [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md)：视频观看进度上报。
 - [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md)：视频点赞/取消点赞、收藏/取消收藏。
 - [Feed-API-MVP设计.md](Feed-API-MVP设计.md)：feed 页面获取推荐视频列表的前端展示契约。
@@ -31,7 +31,7 @@
 |---|---|---|---|
 | [API模块总体设计规范.md](API模块总体设计规范.md) | 已写入 | 已实现基座 | `internal/api` 基座、server bootstrap、router、middleware、错误响应、测试底座已落地。 |
 | [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`；HTTP success 只承诺 raw accepted。 |
-| [Learning-Engine-Unit-Progress-API-MVP设计.md](Learning-Engine-Unit-Progress-API-MVP设计.md) | 已写入 | 未开始 | 只定义未来读取用户学习单元进度的分页契约；当前没有 HTTP handler。 |
+| [Unit-Progress-API-MVP设计.md](Unit-Progress-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning/unit-progress/mastered`、`GET /api/learning/unit-progress/unmastered`；API handler 从 principal 取 `user_id`，Learning Engine reducer read usecase join `semantic.coarse_unit` 返回展示字段。 |
 | [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/video-watch-progress`；Catalog 同事务维护 watch session ledger 与视频消费投影。 |
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
@@ -41,7 +41,6 @@
 
 以下内容在 API 层仍未实现：
 
-- Learning Engine Unit Progress API handler。
 - 后端内置生产级 JWT verifier；当前模型仍是 trusted Gateway userinfo principal。
 - 完整 OpenAPI / 客户端 SDK 生成。
 

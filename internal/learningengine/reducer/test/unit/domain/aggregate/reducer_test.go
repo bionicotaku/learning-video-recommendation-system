@@ -193,6 +193,9 @@ func TestReduce_SetMasteredMarksCompletedAndInactive(t *testing.T) {
 	if next.ProgressEventCount != 0 {
 		t.Fatalf("progress_event_count = %d, want 0", next.ProgressEventCount)
 	}
+	if next.LastProgressAt == nil || !next.LastProgressAt.Equal(eventTime) {
+		t.Fatalf("last_progress_at = %v, want %v", next.LastProgressAt, eventTime)
+	}
 	if next.ObservationCount != state.ObservationCount+1 {
 		t.Fatalf("observation_count = %d, want %d", next.ObservationCount, state.ObservationCount+1)
 	}

@@ -32,6 +32,8 @@ POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
 POST /api/video-watch-progress
+GET /api/learning/unit-progress/mastered
+GET /api/learning/unit-progress/unmastered
 ```
 
 `POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
@@ -71,6 +73,12 @@ normalizer path.
 `POST /api/video-watch-progress` calls the Catalog `RecordVideoWatchProgress`
 usecase. It returns only `{ "accepted": true }` after the watch session ledger
 and Catalog projections have been updated in one backend transaction.
+
+`GET /api/learning/unit-progress/mastered` and
+`GET /api/learning/unit-progress/unmastered` call the Learning Engine reducer
+read usecase. The handler reads only `limit` and `cursor` from query params,
+uses the trusted principal as `user_id`, and returns the frontend display
+contract defined in `docs/API/Unit-Progress-API-MVP设计.md`.
 
 `cmd/server` reads principal configuration from environment variables. In normal
 mode it expects GCP API Gateway to validate the client JWT and forward

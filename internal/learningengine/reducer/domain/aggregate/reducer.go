@@ -29,6 +29,7 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 	updateObservationFields(state, event.OccurredAt)
 
 	if policy.IsSetMasteredEffect(event.ReducerEffect) {
+		state.LastProgressAt = timePointer(event.OccurredAt)
 		applyCompletedMasteredState(state)
 		state.UpdatedAt = time.Now().UTC()
 		return state, nil

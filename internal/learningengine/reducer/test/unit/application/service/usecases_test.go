@@ -333,6 +333,9 @@ func TestRecordLearningEventsExecuteSetMasteredTerminalState(t *testing.T) {
 	if state.ProgressEventCount != 0 {
 		t.Fatalf("progress_event_count = %d, want 0", state.ProgressEventCount)
 	}
+	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(t1) {
+		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, t1)
+	}
 }
 
 func TestRecordLearningEventsExecuteRejectsLateProgressEvent(t *testing.T) {
@@ -553,6 +556,9 @@ func TestReplayUserStatesExecutePreservesSetMasteredInactiveTarget(t *testing.T)
 	}
 	if state.MasteryScore != 1 {
 		t.Fatalf("mastery_score = %v, want 1", state.MasteryScore)
+	}
+	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(eventTime) {
+		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, eventTime)
 	}
 }
 

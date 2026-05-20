@@ -13,6 +13,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
@@ -22,6 +23,7 @@ import (
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/infrastructure/persistence/repository"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
+	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 	recommendationservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
@@ -52,6 +54,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	endQuiz := buildEndQuizHandler(pool)
 	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
+	unitProgress := buildUnitProgressHandler(pool)
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
@@ -59,6 +62,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		VideoInteractions: videoInteractions,
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,
+		UnitProgress:      unitProgress,
 	})
 	handler = middleware.BodyLimit(1 << 20)(handler)
 	handler = middleware.Recover(handler)
@@ -95,6 +99,12 @@ func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
 	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
 	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
 	return watchprogress.NewHandler(recordWatchProgress)
+}
+
+func buildUnitProgressHandler(pool *pgxpool.Pool) *unitprogress.Handler {
+	reader := learningrepo.NewUserUnitProgressReader(pool)
+	listProgress := learningservice.NewListUserUnitProgressUsecase(reader)
+	return unitprogress.NewHandler(listProgress)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {
