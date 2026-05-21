@@ -4,6 +4,7 @@ package testutil
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	recommendationusecase "learning-video-recommendation-system/internal/recommendation/application/usecase"
 	recommendationaggregator "learning-video-recommendation-system/internal/recommendation/domain/aggregator"
 	recommendationexplain "learning-video-recommendation-system/internal/recommendation/domain/explain"
+	recommendationmodel "learning-video-recommendation-system/internal/recommendation/domain/model"
 	recommendationplanner "learning-video-recommendation-system/internal/recommendation/domain/planner"
 	recommendationranking "learning-video-recommendation-system/internal/recommendation/domain/ranking"
 	recommendationselector "learning-video-recommendation-system/internal/recommendation/domain/selector"
@@ -42,6 +44,7 @@ type Harness struct {
 
 type LearningSuite struct {
 	EnsureTargetUnits learningusecase.EnsureTargetUnitsUsecase
+	ActivateTarget    learningusecase.ActivateUnitCollectionTargetUsecase
 	SetTargetInactive learningusecase.SetTargetInactiveUsecase
 	SuspendTargetUnit learningusecase.SuspendTargetUnitUsecase
 	ResumeTargetUnit  learningusecase.ResumeTargetUnitUsecase
@@ -150,6 +153,7 @@ func (h *Harness) LearningSuite() *LearningSuite {
 
 	return &LearningSuite{
 		EnsureTargetUnits: learningservice.NewEnsureTargetUnitsUsecase(txManager),
+		ActivateTarget:    learningservice.NewActivateUnitCollectionTargetUsecase(txManager),
 		SetTargetInactive: learningservice.NewSetTargetInactiveUsecase(txManager),
 		SuspendTargetUnit: learningservice.NewSuspendTargetUnitUsecase(txManager),
 		ResumeTargetUnit:  learningservice.NewResumeTargetUnitUsecase(txManager),
@@ -163,7 +167,15 @@ func (h *Harness) RecommendationUsecase() recommendationusecase.GenerateVideoRec
 	return h.RecommendationUsecaseWithResultWriter(nil)
 }
 
+func (h *Harness) RecommendationUsecaseWithoutFill() recommendationusecase.GenerateVideoRecommendationsUsecase {
+	return h.recommendationUsecaseWithDependencies(nil, noOpVideoFillService{})
+}
+
 func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendationservice.RecommendationResultWriter) recommendationusecase.GenerateVideoRecommendationsUsecase {
+	return h.recommendationUsecaseWithDependencies(resultWriter, nil)
+}
+
+func (h *Harness) recommendationUsecaseWithDependencies(resultWriter recommendationservice.RecommendationResultWriter, fillService recommendationservice.VideoFillService) recommendationusecase.GenerateVideoRecommendationsUsecase {
 	learningStates := recommendationrepo.NewLearningStateReader(h.Pool)
 	inventory := recommendationrepo.NewUnitInventoryReader(h.Pool)
 	unitServing := recommendationrepo.NewUnitServingStateRepository(h.Pool)
@@ -188,6 +200,9 @@ func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendat
 			recommendationservice.NewDefaultServingStateManager(unitServing, videoServing),
 		)
 	}
+	if fillService == nil {
+		fillService = recommendationservice.NewDefaultVideoFillService(recommendationrepo.NewVideoFillCandidateReader(h.Pool))
+	}
 
 	usecase, err := recommendationusecase.NewGenerateVideoRecommendationsPipeline(
 		assembler,
@@ -197,7 +212,7 @@ func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendat
 		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),
-		recommendationservice.NewDefaultVideoFillService(recommendationrepo.NewVideoFillCandidateReader(h.Pool)),
+		fillService,
 		recommendationexplain.NewDefaultExplanationBuilder(),
 		videoStateEnricher,
 		resultWriter,
@@ -206,6 +221,12 @@ func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendat
 		panic(err)
 	}
 	return usecase
+}
+
+type noOpVideoFillService struct{}
+
+func (noOpVideoFillService) Fill(_ context.Context, _ recommendationmodel.RecommendationContext, selected []recommendationmodel.VideoCandidate, _ int) ([]recommendationmodel.VideoCandidate, error) {
+	return selected, nil
 }
 
 func (h *Harness) SeedUser(t *testing.T, userID string) {
@@ -247,6 +268,61 @@ func (h *Harness) SeedCoarseUnits(t *testing.T, unitIDs ...int64) {
 				'{}'::text[]
 			) on conflict (id) do nothing`, unitID); err != nil {
 			failNow(t, "seed semantic.coarse_unit %d: %v", unitID, err)
+		}
+	}
+}
+
+func (h *Harness) SeedUnitCollection(t *testing.T, collectionID string, slug string, name string, status string, unitIDs ...int64) {
+	if t != nil {
+		t.Helper()
+	}
+	if _, err := h.Pool.Exec(context.Background(), `
+		insert into semantic.unit_collections (
+			collection_id,
+			slug,
+			name,
+			description,
+			category,
+			status,
+			coarse_unit_count,
+			word_unit_count
+		) values (
+			$1::uuid,
+			$2,
+			$3,
+			null,
+			'wordbook',
+			$4,
+			$5,
+			$5
+		)
+		on conflict (collection_id) do update
+		set
+			slug = excluded.slug,
+			name = excluded.name,
+			status = excluded.status,
+			coarse_unit_count = excluded.coarse_unit_count,
+			word_unit_count = excluded.word_unit_count`, collectionID, slug, name, status, len(unitIDs)); err != nil {
+		failNow(t, "seed semantic.unit_collections: %v", err)
+	}
+	for index, unitID := range unitIDs {
+		if _, err := h.Pool.Exec(context.Background(), `
+			insert into semantic.unit_collection_members (
+				collection_id,
+				coarse_unit_id,
+				sort_order,
+				target_priority
+			) values (
+				$1::uuid,
+				$2,
+				$3,
+				0
+			)
+			on conflict (collection_id, coarse_unit_id) do update
+			set
+				sort_order = excluded.sort_order,
+				target_priority = excluded.target_priority`, collectionID, unitID, index+1); err != nil {
+			failNow(t, "seed semantic.unit_collection_members: %v", err)
 		}
 	}
 }
@@ -498,6 +574,21 @@ func (h *Harness) LoadRecommendationRun(t *testing.T, runID string) Recommendati
 	return run
 }
 
+func (h *Harness) LoadPlannerSnapshot(t *testing.T, runID string) []byte {
+	t.Helper()
+	var snapshot []byte
+	if err := h.Pool.QueryRow(
+		context.Background(),
+		`select planner_snapshot
+		 from recommendation.video_recommendation_runs
+		 where run_id = $1`,
+		runID,
+	).Scan(&snapshot); err != nil {
+		t.Fatalf("load planner snapshot: %v", err)
+	}
+	return snapshot
+}
+
 func (h *Harness) LoadRecommendationItems(t *testing.T, runID string) []RecommendationItemSummary {
 	t.Helper()
 	rows, err := h.Pool.Query(
@@ -516,11 +607,13 @@ func (h *Harness) LoadRecommendationItems(t *testing.T, runID string) []Recommen
 	items := make([]RecommendationItemSummary, 0)
 	for rows.Next() {
 		var item RecommendationItemSummary
+		var dominantRole sql.NullString
 		var reasonCodes []string
 		var learningUnits []byte
-		if err := rows.Scan(&item.Rank, &item.VideoID, &item.PrimaryLane, &item.DominantRole, &item.DominantUnitID, &reasonCodes, &learningUnits); err != nil {
+		if err := rows.Scan(&item.Rank, &item.VideoID, &item.PrimaryLane, &dominantRole, &item.DominantUnitID, &reasonCodes, &learningUnits); err != nil {
 			t.Fatalf("scan recommendation item: %v", err)
 		}
+		item.DominantRole = dominantRole.String
 		item.ReasonCodes = reasonCodes
 		if err := json.Unmarshal(learningUnits, &item.LearningUnits); err != nil {
 			t.Fatalf("decode recommendation item learning_units: %v", err)
@@ -615,6 +708,12 @@ func happyPathVideo(videoID string, unitID int64, startMs, endMs int32, sentence
 
 func e2eSchemaPlan() pgtest.SchemaPlan {
 	return pgtest.NewSchemaPlan(
+		pgtest.MigrationDir(pgtest.RepoPath(
+			"internal",
+			"semantic",
+			"infrastructure",
+			"migration",
+		)),
 		pgtest.SQLFile(pgtest.RepoPath(
 			"internal",
 			"learningengine",

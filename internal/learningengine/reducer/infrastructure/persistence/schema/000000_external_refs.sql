@@ -28,6 +28,23 @@ create table if not exists semantic.coarse_unit (
   original_defs text[] not null
 );
 
+create table if not exists semantic.unit_collections (
+  collection_id uuid primary key,
+  slug text not null unique,
+  name text not null default '',
+  status text not null default 'active',
+  coarse_unit_count integer not null default 0
+);
+
+create table if not exists semantic.unit_collection_members (
+  collection_id uuid not null references semantic.unit_collections(collection_id) on delete cascade,
+  coarse_unit_id bigint not null references semantic.coarse_unit(id) on delete cascade,
+  sort_order integer not null,
+  target_priority numeric(8,4) not null default 0,
+  created_at timestamptz not null default now(),
+  primary key (collection_id, coarse_unit_id)
+);
+
 create table if not exists catalog.videos (
   video_id uuid primary key
 );

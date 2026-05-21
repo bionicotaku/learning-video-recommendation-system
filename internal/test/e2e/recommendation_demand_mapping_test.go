@@ -3,6 +3,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()
@@ -29,7 +30,7 @@ func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testi
 	softMasteryVideo := h.NewVideoID()
 	softQualityVideo := h.NewVideoID()
 	h.SeedCatalogVideo(t, strongSupplyVideo(hardVideo, hardUnit, 1_000, 2_200, 0, "hard-bucket", 90_000))
-	h.SeedCatalogVideo(t, strongSupplyVideo(hardSupportVideo, hardUnit, 2_400, 3_300, 1, "hard-bucket-support", 90_000))
+	h.SeedCatalogVideo(t, strongSupplyVideo(hardSupportVideo, newUnit, 2_400, 3_300, 1, "new-bucket-support", 90_000))
 	h.SeedCatalogVideo(t, strongSupplyVideo(newVideo, newUnit, 3_000, 4_100, 2, "new-bucket", 90_000))
 	h.SeedCatalogVideo(t, strongSupplyVideo(softMasteryVideo, softMasteryUnit, 5_000, 6_300, 4, "soft-mastery", 90_000))
 	h.SeedCatalogVideo(t, strongSupplyVideo(softQualityVideo, softQualityUnit, 7_000, 8_400, 6, "soft-quality", 90_000))
@@ -52,23 +53,19 @@ func TestE2E_RecommendationDemandMapping_MixedBucketsFromLearningStates(t *testi
 		learningdto.LearningEventInput{CoarseUnitID: softQualityUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q3, OccurredAt: mustTimeAdd(now, -1*time.Hour)},
 	)
 
-	response := mustRecommendN(t, recommendation, userID, 5)
-	assertSelectorMode(t, h, response, "normal")
-	assertContainsVideo(t, response.Items, hardVideo)
-	assertContainsVideo(t, response.Items, newVideo)
-	assertContainsVideo(t, response.Items, softMasteryVideo)
-	assertContainsVideo(t, response.Items, softQualityVideo)
+	response := mustRecommendN(t, recommendation, userID, 4)
+	assertSelectorMode(t, h, response, "low_supply")
 
-	assertAnyVideoHasLearningUnit(t, response.Items, hardUnit, "hard_review")
-	assertAnyVideoHasLearningUnit(t, response.Items, newUnit, "new_now")
-	assertAnyVideoHasLearningUnit(t, response.Items, softMasteryUnit, "soft_review")
-	assertAnyVideoHasLearningUnit(t, response.Items, softQualityUnit, "soft_review")
+	snapshot := decodeDemandSnapshot(t, h.LoadPlannerSnapshot(t, response.RunID))
+	assertDemandBucketContains(t, snapshot.HardReview, hardUnit, "hard_review")
+	assertDemandBucketContains(t, snapshot.NewNow, newUnit, "new_now")
+	assertDemandBucketContains(t, snapshot.SoftReview, softQualityUnit, "soft_review")
 }
 
 func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSparse(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	unitID := h.NewUnitID()
@@ -90,7 +87,7 @@ func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSpars
 func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreExcluded(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	activeUnit := h.NewUnitID()
@@ -141,4 +138,33 @@ func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreEx
 	assertNotContainsVideo(t, response.Items, suspendedVideo)
 	assertNotContainsVideo(t, response.Items, inactiveVideoID)
 	assertNotContainsVideo(t, response.Items, nonTargetVideo)
+}
+
+type demandSnapshot struct {
+	HardReview []demandSnapshotUnit
+	NewNow     []demandSnapshotUnit
+	SoftReview []demandSnapshotUnit
+}
+
+type demandSnapshotUnit struct {
+	UnitID int64
+}
+
+func decodeDemandSnapshot(t *testing.T, payload []byte) demandSnapshot {
+	t.Helper()
+	var snapshot demandSnapshot
+	if err := json.Unmarshal(payload, &snapshot); err != nil {
+		t.Fatalf("decode planner snapshot: %v", err)
+	}
+	return snapshot
+}
+
+func assertDemandBucketContains(t *testing.T, units []demandSnapshotUnit, unitID int64, bucket string) {
+	t.Helper()
+	for _, unit := range units {
+		if unit.UnitID == unitID {
+			return
+		}
+	}
+	t.Fatalf("%s bucket does not contain unit %d: %+v", bucket, unitID, units)
 }

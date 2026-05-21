@@ -58,6 +58,10 @@ API 设计文档目录。包含未来 `internal/api` 的统一入口规范，以
 
 Learning Engine normalizer 的 MVP 设计草案。它定义 `internal/learningengine/normalizer` 子模块如何 read-only 读取 `analytics.*` raw fact，把 quiz、lookup、exposure 和 self mark 解释成 Learning Engine normalized event，并在暂不增加 checkpoint 的前提下依赖 source 幂等约束与 anti-join 查询完成可重试归一化。
 
+### [词书系统设计.md](词书系统设计.md)
+
+词书系统的 MVP 设计草案。它定义 `semantic.unit_collections` / `semantic.unit_collection_members` 的静态集合模型、`learning.user_learning_profiles` 的 active collection 控制状态，以及激活词书时如何用 set-based SQL 投影到 `learning.user_unit_states.is_target`。
+
 ## 运行时现状参考
 
 ### [当前数据库Schema现状.md](当前数据库Schema现状.md)

@@ -1,0 +1,1 @@
+-- semantic schema is shared by existing coarse unit data and is not dropped here.

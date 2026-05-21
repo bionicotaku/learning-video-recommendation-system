@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	appusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/aggregate"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
@@ -44,6 +46,47 @@ func (u *EnsureTargetUnitsUsecase) Execute(ctx context.Context, request dto.Ensu
 	}
 
 	return dto.EnsureTargetUnitsResponse{TargetCount: len(targets)}, nil
+}
+
+type ActivateUnitCollectionTargetUsecase struct {
+	txManager TxManager
+}
+
+var _ appusecase.ActivateUnitCollectionTargetUsecase = (*ActivateUnitCollectionTargetUsecase)(nil)
+
+func NewActivateUnitCollectionTargetUsecase(txManager TxManager) *ActivateUnitCollectionTargetUsecase {
+	return &ActivateUnitCollectionTargetUsecase{txManager: txManager}
+}
+
+func (u *ActivateUnitCollectionTargetUsecase) Execute(ctx context.Context, request dto.ActivateUnitCollectionTargetRequest) (dto.ActivateUnitCollectionTargetResponse, error) {
+	if request.UserID == "" {
+		return dto.ActivateUnitCollectionTargetResponse{}, fmt.Errorf("user_id is required")
+	}
+	if request.CollectionSlug == "" {
+		return dto.ActivateUnitCollectionTargetResponse{}, validationError("collection_slug is required")
+	}
+
+	var activated model.ActivatedUnitCollectionTarget
+	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
+		result, err := repos.TargetCommands().ActivateUnitCollectionTarget(ctx, request.UserID, request.CollectionSlug)
+		if err != nil {
+			return err
+		}
+		activated = result
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, apprepo.ErrUnitCollectionNotFound) {
+			return dto.ActivateUnitCollectionTargetResponse{}, ErrUnitCollectionNotFound
+		}
+		return dto.ActivateUnitCollectionTargetResponse{}, err
+	}
+
+	return dto.ActivateUnitCollectionTargetResponse{
+		CollectionID:   activated.CollectionID,
+		CollectionSlug: activated.CollectionSlug,
+		TargetCount:    activated.TargetCount,
+	}, nil
 }
 
 type SetTargetInactiveUsecase struct {

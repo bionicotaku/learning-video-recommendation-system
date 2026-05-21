@@ -6,3 +6,9 @@ type TargetUnitSpec struct {
 	TargetSourceRefID string
 	TargetPriority    float64
 }
+
+type ActivatedUnitCollectionTarget struct {
+	CollectionID   string
+	CollectionSlug string
+	TargetCount    int
+}

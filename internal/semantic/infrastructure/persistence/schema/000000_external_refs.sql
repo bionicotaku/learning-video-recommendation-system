@@ -1,0 +1,3 @@
+-- Semantic owns its schema through infrastructure/migration.
+-- This placeholder keeps sqlc.yaml's schema glob stable without defining
+-- partial owner tables that could drift from the real migrations.

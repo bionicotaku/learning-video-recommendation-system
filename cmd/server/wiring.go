@@ -13,6 +13,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
@@ -34,6 +35,8 @@ import (
 	recommendationselector "learning-video-recommendation-system/internal/recommendation/domain/selector"
 	recommendationrepo "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/repository"
 	recommendationtx "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/tx"
+	semanticservice "learning-video-recommendation-system/internal/semantic/application/service"
+	semanticrepo "learning-video-recommendation-system/internal/semantic/infrastructure/persistence/repository"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -52,6 +55,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		return nil, err
 	}
 	endQuiz := buildEndQuizHandler(pool)
+	unitCollections := buildUnitCollectionsHandler(pool)
 	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
@@ -59,6 +63,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
 		EndQuiz:           endQuiz,
+		UnitCollections:   unitCollections,
 		VideoInteractions: videoInteractions,
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,
@@ -105,6 +110,13 @@ func buildUnitProgressHandler(pool *pgxpool.Pool) *unitprogress.Handler {
 	reader := learningrepo.NewUserUnitProgressReader(pool)
 	listProgress := learningservice.NewListUserUnitProgressUsecase(reader)
 	return unitprogress.NewHandler(listProgress)
+}
+
+func buildUnitCollectionsHandler(pool *pgxpool.Pool) *unitcollections.Handler {
+	reader := semanticrepo.NewUnitCollectionReader(pool)
+	listCollections := semanticservice.NewListUnitCollectionsUsecase(reader)
+	activateTarget := learningservice.NewActivateUnitCollectionTargetUsecase(learningtx.NewManager(pool))
+	return unitcollections.NewHandler(listCollections, activateTarget)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {

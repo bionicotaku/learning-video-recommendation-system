@@ -14,7 +14,7 @@ import (
 func TestE2E_RecommendationNormalModeWithBundleCoverage(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()
@@ -107,7 +107,7 @@ func TestE2E_RecommendationNormalModeWithBundleCoverage(t *testing.T) {
 func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()
@@ -201,7 +201,7 @@ func TestE2E_RecommendationLowSupplyModePreservesCoreCoverage(t *testing.T) {
 
 func TestE2E_RecommendationNoDemandDoesNotMarkExtremeSparse(t *testing.T) {
 	h := harness(t)
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	h.SeedUser(t, userID)

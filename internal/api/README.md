@@ -17,13 +17,15 @@ configuration then.
 
 It does not own business tables, migrations, SQLC packages, repositories, or
 domain rules. Business rules remain in `catalog`, `analytics`,
-`learningengine`, and `recommendation`.
+`learningengine`, `recommendation`, and `semantic`.
 
 Current implemented endpoint group:
 
 ```text
 POST /api/feed
 POST /api/videos/end-quiz
+GET /api/unit-collections
+PUT /api/learning-targets/active-collection
 PUT /api/videos/{video_id}/like
 DELETE /api/videos/{video_id}/like
 PUT /api/videos/{video_id}/favorite
@@ -53,6 +55,12 @@ ending experience. The handler validates `video_id`, de-duplicates up to eight
 `client_context`, then calls Catalog. It does not write quiz delivery/session
 state and does not participate in Learning Engine progress updates; completed
 answers still go through `POST /api/quiz-attempts`.
+
+`GET /api/unit-collections` lists active Semantic unit collections for target
+selection. `PUT /api/learning-targets/active-collection` reads the trusted
+principal as `user_id`, validates `collection_slug`, and calls Learning Engine
+to switch the user's collection target projection in one transaction. API does
+not pull collection members into memory or write `learning.*` directly.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset

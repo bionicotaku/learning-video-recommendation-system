@@ -44,6 +44,40 @@ func TestEnsureTargetUnitsExecute(t *testing.T) {
 	}
 }
 
+func TestActivateUnitCollectionTargetExecuteUsesUserScopedTransaction(t *testing.T) {
+	targetRepo := &fakeTargetStateCommandRepository{
+		activation: model.ActivatedUnitCollectionTarget{
+			CollectionID:   "11111111-1111-4111-8111-111111111111",
+			CollectionSlug: "toefl-core",
+			TargetCount:    1000,
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			targetCommands: targetRepo,
+		},
+	}
+	usecase := service.NewActivateUnitCollectionTargetUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.ActivateUnitCollectionTargetRequest{
+		UserID:         "22222222-2222-4222-8222-222222222222",
+		CollectionSlug: "toefl-core",
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !txManager.withinUserCalled || txManager.lastLockedUserID != "22222222-2222-4222-8222-222222222222" {
+		t.Fatalf("expected user-scoped transaction lock, got called=%v user=%q", txManager.withinUserCalled, txManager.lastLockedUserID)
+	}
+	if targetRepo.activatedUserID != "22222222-2222-4222-8222-222222222222" || targetRepo.activatedSlug != "toefl-core" {
+		t.Fatalf("activation args = user:%q slug:%q", targetRepo.activatedUserID, targetRepo.activatedSlug)
+	}
+	if response.CollectionSlug != "toefl-core" || response.TargetCount != 1000 {
+		t.Fatalf("response = %+v", response)
+	}
+}
+
 func TestSetTargetInactiveExecute(t *testing.T) {
 	targetRepo := &fakeTargetStateCommandRepository{}
 	txManager := &fakeTxManager{
@@ -696,13 +730,22 @@ func (f fakeTransactionalRepositories) UnitLearningEvents() applearningrepo.Unit
 }
 
 type fakeTargetStateCommandRepository struct {
-	targets        []model.TargetUnitSpec
-	inactiveUnitID int64
+	targets         []model.TargetUnitSpec
+	inactiveUnitID  int64
+	activatedUserID string
+	activatedSlug   string
+	activation      model.ActivatedUnitCollectionTarget
 }
 
 func (f *fakeTargetStateCommandRepository) EnsureTargetUnits(_ context.Context, _ string, targets []model.TargetUnitSpec) error {
 	f.targets = targets
 	return nil
+}
+
+func (f *fakeTargetStateCommandRepository) ActivateUnitCollectionTarget(_ context.Context, userID string, collectionSlug string) (model.ActivatedUnitCollectionTarget, error) {
+	f.activatedUserID = userID
+	f.activatedSlug = collectionSlug
+	return f.activation, nil
 }
 
 func (f *fakeTargetStateCommandRepository) SetTargetInactive(_ context.Context, _ string, coarseUnitID int64) error {

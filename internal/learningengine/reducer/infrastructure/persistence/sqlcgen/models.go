@@ -32,6 +32,15 @@ type LearningUnitLearningEvent struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
+type LearningUserLearningProfile struct {
+	UserID                      pgtype.UUID        `json:"user_id"`
+	ActiveCollectionID          pgtype.UUID        `json:"active_collection_id"`
+	ActiveCollectionSlug        string             `json:"active_collection_slug"`
+	ActiveCollectionActivatedAt pgtype.Timestamptz `json:"active_collection_activated_at"`
+	CreatedAt                   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LearningUserUnitState struct {
 	UserID                  pgtype.UUID        `json:"user_id"`
 	CoarseUnitID            int64              `json:"coarse_unit_id"`
@@ -81,4 +90,20 @@ type SemanticCoarseUnit struct {
 	Version         int32              `json:"version"`
 	FineUnitIds     []int64            `json:"fine_unit_ids"`
 	OriginalDefs    []string           `json:"original_defs"`
+}
+
+type SemanticUnitCollection struct {
+	CollectionID    pgtype.UUID `json:"collection_id"`
+	Slug            string      `json:"slug"`
+	Name            string      `json:"name"`
+	Status          string      `json:"status"`
+	CoarseUnitCount int32       `json:"coarse_unit_count"`
+}
+
+type SemanticUnitCollectionMember struct {
+	CollectionID   pgtype.UUID        `json:"collection_id"`
+	CoarseUnitID   int64              `json:"coarse_unit_id"`
+	SortOrder      int32              `json:"sort_order"`
+	TargetPriority pgtype.Numeric     `json:"target_priority"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }

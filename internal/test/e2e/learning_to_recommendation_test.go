@@ -14,7 +14,7 @@ import (
 func TestE2E_EnsureTargetWithoutEventsFeedsRecommendation(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	unitID := h.NewUnitID()
@@ -65,7 +65,7 @@ func TestE2E_EnsureTargetWithoutEventsFeedsRecommendation(t *testing.T) {
 func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	unitA := h.NewUnitID()
@@ -128,7 +128,7 @@ func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()

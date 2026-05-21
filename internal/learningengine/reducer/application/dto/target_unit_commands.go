@@ -16,6 +16,17 @@ type EnsureTargetUnitsResponse struct {
 	TargetCount int
 }
 
+type ActivateUnitCollectionTargetRequest struct {
+	UserID         string
+	CollectionSlug string
+}
+
+type ActivateUnitCollectionTargetResponse struct {
+	CollectionID   string `json:"collection_id"`
+	CollectionSlug string `json:"collection_slug"`
+	TargetCount    int    `json:"target_count"`
+}
+
 type SetTargetInactiveRequest struct {
 	UserID       string
 	CoarseUnitID int64

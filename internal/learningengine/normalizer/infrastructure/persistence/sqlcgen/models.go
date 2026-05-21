@@ -100,6 +100,15 @@ type LearningUnitLearningEvent struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
+type LearningUserLearningProfile struct {
+	UserID                      pgtype.UUID        `json:"user_id"`
+	ActiveCollectionID          pgtype.UUID        `json:"active_collection_id"`
+	ActiveCollectionSlug        string             `json:"active_collection_slug"`
+	ActiveCollectionActivatedAt pgtype.Timestamptz `json:"active_collection_activated_at"`
+	CreatedAt                   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LearningUserUnitState struct {
 	UserID                  pgtype.UUID        `json:"user_id"`
 	CoarseUnitID            int64              `json:"coarse_unit_id"`

@@ -5,8 +5,8 @@ import "testing"
 func TestModuleSpecsContainExpectedRegistry(t *testing.T) {
 	specs := moduleSpecs()
 
-	if len(specs) != 4 {
-		t.Fatalf("expected 4 module specs, got %d", len(specs))
+	if len(specs) != 5 {
+		t.Fatalf("expected 5 module specs, got %d", len(specs))
 	}
 
 	analytics, ok := specs["analytics"]
@@ -15,6 +15,14 @@ func TestModuleSpecsContainExpectedRegistry(t *testing.T) {
 	}
 	if analytics.TrackingTable != "analytics_schema_migrations" {
 		t.Fatalf("unexpected analytics tracking table: %s", analytics.TrackingTable)
+	}
+
+	semantic, ok := specs["semantic"]
+	if !ok {
+		t.Fatalf("expected semantic module spec to exist")
+	}
+	if semantic.TrackingTable != "semantic_schema_migrations" {
+		t.Fatalf("unexpected semantic tracking table: %s", semantic.TrackingTable)
 	}
 
 	catalog, ok := specs["catalog"]

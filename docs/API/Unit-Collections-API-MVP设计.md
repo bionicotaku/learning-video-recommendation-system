@@ -1,0 +1,462 @@
+# Unit Collections API MVP 设计
+
+## 0. 文档信息
+
+文档状态：MVP 设计稿，已实现。
+目标读者：前端、后端 API、Semantic、Learning Engine、Recommendation 维护者。
+当前范围：定义词书列表读取和当前学习目标集合激活两个 API 的契约、字段语义、模块边界、事务要求和数据库访问策略。
+当前明确不做：不做词书详情分页、不做词书进度 summary、不做 target required feed guard、不做用户自定义词书、不做多 active collection。
+
+关联文档：
+
+- [API模块总体设计规范.md](API模块总体设计规范.md)
+- [../词书系统设计.md](../词书系统设计.md)
+- [../学习引擎设计.md](../学习引擎设计.md)
+- [../推荐模块设计.md](../推荐模块设计.md)
+
+## 1. API 定位
+
+词书 API 分成两个能力：
+
+```text
+GET /api/unit-collections
+  读取当前可选学习目标合集。
+
+PUT /api/learning-targets/active-collection
+  把某个词书激活为当前用户的学习目标集合。
+```
+
+`GET /api/unit-collections` 是纯读接口，只读 `semantic.unit_collections`。
+
+`PUT /api/learning-targets/active-collection` 是 Learning Engine target control 写接口。它会在一个用户级事务内：
+
+1. 校验目标 collection 存在且 active。
+2. 更新 `learning.user_learning_profiles` 当前激活集合。
+3. 把不属于新集合的旧词书 target 设为 `is_target = false`。
+4. 把新集合 members 批量 upsert 到 `learning.user_unit_states`，并设置 `is_target = true`。
+
+新注册用户不需要预先存在 `learning.user_learning_profiles` 或 `learning.user_unit_states` 行。首次激活 collection 时，本接口会在同一事务内创建 profile，并为 collection members 批量创建缺失的 unit state。
+
+Recommendation 不直接读取词书表，也不接收 `collection_slug`。Recommendation 仍只读取：
+
+```sql
+learning.user_unit_states
+where is_target = true
+  and status in ('new', 'learning', 'reviewing')
+```
+
+没有 active collection 时，feed 不返回 `target_required`。Recommendation 可以按无 target 逻辑返回视频。
+
+## 2. 模块边界
+
+| 模块 | 职责 | 不做什么 |
+|---|---|---|
+| `internal/api` | HTTP handler、principal 解析、request validation、调用 Semantic / Learning Engine usecase、错误映射。 | 不直接写 SQL，不拥有词书表或 learning target 表。 |
+| `internal/semantic` | 拥有词书定义和 membership 读取能力。 | 不写用户学习状态，不理解 Recommendation 排序。 |
+| `internal/learningengine/reducer` | 拥有用户当前 active collection 和 `user_unit_states` target 投影。 | 不拥有词书定义，不生成推荐列表。 |
+| `internal/recommendation` | 只读 `learning.user_unit_states` 生成推荐计划。 | 不接触 `unit_collections`，不处理 active collection。 |
+
+`PUT /api/learning-targets/active-collection` 的事务必须放在 Learning Engine usecase 内。API 层不能先把几千个 members 拉到内存后逐条调用 `EnsureTargetUnits`。
+
+## 3. GET /api/unit-collections
+
+### 3.1 Endpoint
+
+```http
+GET /api/unit-collections
+```
+
+`user_id` 不参与本接口查询。MVP 返回所有 active collections。
+
+### 3.2 Response
+
+```ts
+type UnitCollectionsResponse = {
+  items: UnitCollectionItem[];
+};
+
+type UnitCollectionItem = {
+  collection_id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  category: string;
+  coarse_unit_count: number;
+  word_unit_count: number;
+};
+```
+
+示例：
+
+```json
+{
+  "items": [
+    {
+      "collection_id": "11111111-1111-4111-8111-111111111111",
+      "slug": "toefl-1000-essential",
+      "name": "TOEFL 1000 Essential",
+      "description": "Core TOEFL vocabulary for short-video learning.",
+      "category": "wordbook",
+      "coarse_unit_count": 1000,
+      "word_unit_count": 1000
+    },
+    {
+      "collection_id": "22222222-2222-4222-8222-222222222222",
+      "slug": "ielts-core",
+      "name": "IELTS Core",
+      "description": null,
+      "category": "wordbook",
+      "coarse_unit_count": 1800,
+      "word_unit_count": 1640
+    }
+  ]
+}
+```
+
+### 3.3 字段说明
+
+| 字段 | 来源 | 说明 |
+|---|---|---|
+| `collection_id` | `semantic.unit_collections.collection_id` | 词书稳定 ID。前端一般不解析，但可以作为 key。 |
+| `slug` | `semantic.unit_collections.slug` | API 使用的可读唯一标识，例如 `toefl`、`ielts-core`。 |
+| `name` | `semantic.unit_collections.name` | 展示名。 |
+| `description` | `semantic.unit_collections.description` | 词书说明，可为空。 |
+| `category` | `semantic.unit_collections.category` | 集合类型。MVP 通常为 `wordbook`。 |
+| `coarse_unit_count` | `semantic.unit_collections.coarse_unit_count` | 该集合全部 coarse unit 数量。 |
+| `word_unit_count` | `semantic.unit_collections.word_unit_count` | 该集合中 `kind = 'word'` 的 coarse unit 数量。 |
+
+`coarse_unit_count` 和 `word_unit_count` 是缓存字段，权威来源仍是 `semantic.unit_collection_members`。
+
+### 3.4 查询策略
+
+```sql
+select
+  collection_id,
+  slug,
+  name,
+  description,
+  category,
+  coarse_unit_count,
+  word_unit_count
+from semantic.unit_collections
+where status = 'active'
+order by category asc, name asc, slug asc;
+```
+
+MVP 不分页。词书数量通常很小，直接返回全部 active collections。
+
+## 4. PUT /api/learning-targets/active-collection
+
+### 4.1 Endpoint
+
+```http
+PUT /api/learning-targets/active-collection
+Content-Type: application/json
+```
+
+`user_id` 必须从 trusted principal 获取，不允许 body/query/path 传入。
+
+### 4.2 Request
+
+```ts
+type ActivateUnitCollectionRequest = {
+  collection_slug: string;
+};
+```
+
+示例：
+
+```json
+{
+  "collection_slug": "toefl-1000-essential"
+}
+```
+
+规则：
+
+- `collection_slug` 必填。
+- 只能包含小写字母、数字、连字符，建议正则为 `^[a-z0-9][a-z0-9-]{0,80}$`。
+- 不能由前端传入 `collection_id`、`coarse_unit_ids`、`target_priority`。
+
+### 4.3 Response
+
+```ts
+type ActivateUnitCollectionResponse = {
+  collection_id: string;
+  collection_slug: string;
+  target_count: number;
+};
+```
+
+示例：
+
+```json
+{
+  "collection_id": "11111111-1111-4111-8111-111111111111",
+  "collection_slug": "toefl-1000-essential",
+  "target_count": 1000
+}
+```
+
+`target_count` 表示本次激活集合包含的 member 数量。MVP 可以直接使用 `semantic.unit_collections.coarse_unit_count`，也可以从本次 upserted members count 返回；两者应在数据维护正确时一致。
+
+### 4.4 业务语义
+
+本接口是幂等 set，不是 toggle。
+
+重复激活同一本词书：
+
+- 返回 `200 OK`。
+- `learning.user_learning_profiles` 仍指向同一 collection。
+- `learning.user_unit_states` target projection 最终一致。
+
+首次激活词书：
+
+- 如果 `learning.user_learning_profiles` 中没有当前用户行，则创建。
+- 如果某个 collection member 在 `learning.user_unit_states` 中没有当前用户状态行，则创建默认 `status = new` 的状态行。
+- 已有状态行只更新 target control 字段，不重置学习进度。
+
+从雅思切换到托福：
+
+- 不属于托福的新旧词书 target 被设为 `is_target = false`。
+- 托福 members 被批量 upsert 为 `is_target = true`。
+- 雅思和托福重合的 unit 不先 false 再 true，只保持或更新为新 collection target。
+- 所有已有学习状态、进度、掌握度、schedule、历史计数都保留。
+
+本接口只更新 control 字段：
+
+```text
+is_target
+target_source
+target_source_ref_id
+target_priority
+updated_at
+```
+
+本接口不更新：
+
+```text
+status
+progress_percent
+mastery_score
+next_review_at
+schedule_*
+observation_count
+progress_event_count
+recent_progress_*
+```
+
+MVP 中 `target_priority` 固定写 `0`。后续如果启用 collection-level priority，可以从 `semantic.unit_collection_members.target_priority` 复制。
+
+## 5. 数据库访问与事务
+
+### 5.1 原则
+
+`PUT /api/learning-targets/active-collection` 必须使用 set-based SQL：
+
+- 不按 member 逐条查询。
+- 不按 member 逐条 upsert。
+- 不把全部 `coarse_unit_ids` 从 Semantic 拉到 API 层再传给 Learning Engine。
+- 不循环调用现有 `EnsureTargetUnits`。
+
+Learning Engine usecase 应使用现有 user-scoped transaction 机制，保证同一用户并发切换串行化。
+
+### 5.2 推荐执行计划
+
+Learning Engine 新增 usecase：
+
+```text
+ActivateUnitCollectionTarget(user_id, collection_slug)
+```
+
+事务内执行：
+
+1. `selected_collection`：按 slug 找 active collection。
+2. `new_members`：读取该 collection 下所有 members。
+3. `profile_upsert`：更新 `learning.user_learning_profiles`。
+4. `deactivated`：只关闭不属于新 collection 的旧 `unit_collection` targets。
+5. `upserted`：批量 upsert 新 collection members 到 `learning.user_unit_states`。
+6. 返回 collection id、slug、target count。
+
+### 5.3 推荐 SQL 形态
+
+以下 SQL 是设计形态，最终可以按 sqlc 约束拆分或调整：
+
+```sql
+with selected_collection as (
+  select
+    collection_id,
+    slug,
+    coarse_unit_count
+  from semantic.unit_collections
+  where slug = sqlc.arg(collection_slug)
+    and status = 'active'
+),
+new_members as (
+  select
+    m.collection_id,
+    m.coarse_unit_id,
+    0::numeric as target_priority
+  from semantic.unit_collection_members m
+  join selected_collection c
+    on c.collection_id = m.collection_id
+),
+profile_upsert as (
+  insert into learning.user_learning_profiles (
+    user_id,
+    active_collection_id,
+    active_collection_slug,
+    active_collection_activated_at,
+    updated_at
+  )
+  select
+    sqlc.arg(user_id),
+    collection_id,
+    slug,
+    now(),
+    now()
+  from selected_collection
+  on conflict (user_id) do update
+  set
+    active_collection_id = excluded.active_collection_id,
+    active_collection_slug = excluded.active_collection_slug,
+    active_collection_activated_at = now(),
+    updated_at = now()
+  returning user_id
+),
+deactivated as (
+  update learning.user_unit_states s
+  set
+    is_target = false,
+    updated_at = now()
+  where s.user_id = sqlc.arg(user_id)
+    and s.target_source = 'unit_collection'
+    and s.is_target = true
+    and not exists (
+      select 1
+      from new_members nm
+      where nm.coarse_unit_id = s.coarse_unit_id
+    )
+  returning s.coarse_unit_id
+),
+upserted as (
+  insert into learning.user_unit_states (
+    user_id,
+    coarse_unit_id,
+    is_target,
+    target_source,
+    target_source_ref_id,
+    target_priority
+  )
+  select
+    sqlc.arg(user_id),
+    nm.coarse_unit_id,
+    true,
+    'unit_collection',
+    nm.collection_id::text,
+    nm.target_priority
+  from new_members nm
+  on conflict (user_id, coarse_unit_id) do update
+  set
+    is_target = true,
+    target_source = 'unit_collection',
+    target_source_ref_id = excluded.target_source_ref_id,
+    target_priority = excluded.target_priority,
+    updated_at = now()
+  returning coarse_unit_id
+)
+select
+  c.collection_id,
+  c.slug,
+  c.coarse_unit_count::integer as target_count
+from selected_collection c;
+```
+
+如果 `selected_collection` 为空，query 返回 0 rows，repository 映射为 `ErrUnitCollectionNotFound`，API 返回 `404 not_found`。
+
+### 5.4 重合 unit 优化
+
+deactivate 条件使用 `not exists (select 1 from new_members ...)`，避免重合 unit 被先关闭再开启。
+
+upsert 新 members 仍会触达重合 unit，用于更新：
+
+```text
+target_source = 'unit_collection'
+target_source_ref_id = new collection_id
+target_priority = 0
+```
+
+这比 API 层 diff 两个大集合更简单，也避免多次网络 roundtrip。
+
+## 6. 错误处理
+
+| HTTP | code | 场景 |
+|---|---|---|
+| `200 OK` | - | 列表读取成功，或 active collection 设置成功。 |
+| `400 Bad Request` | `invalid_request` | JSON 非法、未知字段、`collection_slug` 缺失或格式非法。 |
+| `401 Unauthorized` | `unauthorized` | trusted principal 缺失。 |
+| `404 Not Found` | `not_found` | collection 不存在或 inactive。 |
+| `500 Internal Server Error` | `internal_error` | 数据库或未知服务端错误。 |
+
+## 7. 与 Feed / Recommendation 的关系
+
+本 API 不控制 feed 是否可用。
+
+无 active collection 时：
+
+```text
+POST /api/feed
+  -> Recommendation 无 target / fill 逻辑
+  -> 仍可返回视频
+```
+
+有 active collection 时：
+
+```text
+PUT /api/learning-targets/active-collection
+  -> learning.user_unit_states target projection 更新
+POST /api/feed
+  -> Recommendation 读取 is_target=true 且未掌握 units
+```
+
+Feed API 不需要 `target_required` guard。
+
+## 8. 测试计划
+
+API integration：
+
+- `GET /api/unit-collections` 返回 active collections。
+- inactive collection 不返回。
+- `PUT /api/learning-targets/active-collection` 首次激活成功。
+- 重复激活同一 collection 幂等。
+- 切换 collection 后旧 collection 独有 unit `is_target=false`。
+- 切换 collection 后新 collection unit `is_target=true`。
+- 重合 unit 保留学习状态，并最终指向新 collection。
+- `status / progress_percent / mastery_score / schedule_*` 不被重置。
+- unknown collection 返回 `404 not_found`。
+- invalid slug 返回 `400 invalid_request`。
+- missing principal 返回 `401 unauthorized`。
+
+Learning Engine integration：
+
+- 单个事务完成 profile upsert、old target deactivate、new target upsert。
+- 并发切换同一用户时最终状态一致。
+- members 数量较大时仍只使用批量 SQL，不出现 per-unit roundtrip。
+
+Repository / SQL：
+
+- `selected_collection` 为空时返回 no rows。
+- 空 collection 可被激活，`target_count=0`，同时关闭旧 collection targets。
+- `target_source != 'unit_collection'` 的非词书 target 不被本接口关闭。
+
+## 9. 非目标
+
+MVP 不做：
+
+- 用户自定义词书。
+- 多个 active collections。
+- 词书详情分页接口。
+- active collection progress summary。
+- collection member 管理后台 API。
+- collection import audit。
+- 根据 collection 强制 feed target required。

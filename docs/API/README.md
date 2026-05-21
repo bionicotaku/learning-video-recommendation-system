@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint。
+- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -22,6 +22,7 @@
 - [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md)：视频点赞/取消点赞、收藏/取消收藏。
 - [Feed-API-MVP设计.md](Feed-API-MVP设计.md)：feed 页面获取推荐视频列表的前端展示契约。
 - [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
+- [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取与激活当前学习目标集合。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
@@ -40,6 +41,13 @@
 | Method | Path | 说明 |
 |---|---|---|
 | `POST` | `/api/videos/end-quiz` | 按 `video_id + coarse_unit_ids` 批量读取视频末尾 quiz 候选题；只读 Catalog，不写学习进度。 |
+
+### Unit Collections / 词书目标
+
+| Method | Path | 说明 |
+|---|---|---|
+| `GET` | `/api/unit-collections` | 读取当前 active 词书列表；只读 Semantic。 |
+| `PUT` | `/api/learning-targets/active-collection` | 为当前用户激活一本词书；Learning Engine 同事务维护 active profile 与 target projection。 |
 
 ### Video Interactions / 视频互动
 
@@ -82,6 +90,7 @@
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
+| [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；后者由 Learning Engine 事务性切换当前学习目标集合。 |
 
 ## 未开始范围
 

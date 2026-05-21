@@ -269,6 +269,97 @@ set
 where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id);
 
+-- name: ActivateUnitCollectionTarget :one
+with selected_collection as (
+  select
+    collection_id,
+    slug,
+    coarse_unit_count
+  from semantic.unit_collections
+  where slug = sqlc.arg(collection_slug)
+    and status = 'active'
+),
+new_members as (
+  select
+    m.collection_id,
+    m.coarse_unit_id,
+    0::numeric as target_priority
+  from semantic.unit_collection_members m
+  join selected_collection c
+    on c.collection_id = m.collection_id
+),
+profile_upsert as (
+  insert into learning.user_learning_profiles (
+    user_id,
+    active_collection_id,
+    active_collection_slug,
+    active_collection_activated_at,
+    updated_at
+  )
+  select
+    sqlc.arg(user_id),
+    collection_id,
+    slug,
+    now(),
+    now()
+  from selected_collection
+  on conflict (user_id) do update
+  set
+    active_collection_id = excluded.active_collection_id,
+    active_collection_slug = excluded.active_collection_slug,
+    active_collection_activated_at = now(),
+    updated_at = now()
+  returning user_id
+),
+deactivated as (
+  update learning.user_unit_states s
+  set
+    is_target = false,
+    updated_at = now()
+  where s.user_id = sqlc.arg(user_id)
+    and s.target_source = 'unit_collection'
+    and s.is_target = true
+    and not exists (
+      select 1
+      from new_members nm
+      where nm.coarse_unit_id = s.coarse_unit_id
+    )
+  returning s.coarse_unit_id
+),
+upserted as (
+  insert into learning.user_unit_states (
+    user_id,
+    coarse_unit_id,
+    is_target,
+    target_source,
+    target_source_ref_id,
+    target_priority
+  )
+  select
+    sqlc.arg(user_id),
+    nm.coarse_unit_id,
+    true,
+    'unit_collection',
+    nm.collection_id::text,
+    nm.target_priority
+  from new_members nm
+  on conflict (user_id, coarse_unit_id) do update
+  set
+    is_target = true,
+    target_source = 'unit_collection',
+    target_source_ref_id = excluded.target_source_ref_id,
+    target_priority = excluded.target_priority,
+    updated_at = now()
+  returning coarse_unit_id
+)
+select
+  c.collection_id,
+  c.slug,
+  coalesce(count(u.coarse_unit_id), 0)::integer as target_count
+from selected_collection c
+left join upserted u on true
+group by c.collection_id, c.slug;
+
 -- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
 where user_id = sqlc.arg(user_id);

@@ -18,6 +18,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
@@ -30,6 +31,8 @@ import (
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
+	semanticservice "learning-video-recommendation-system/internal/semantic/application/service"
+	semanticrepo "learning-video-recommendation-system/internal/semantic/infrastructure/persistence/repository"
 )
 
 // LearningEventsAPIServer returns a real HTTP server wired to real analytics,
@@ -113,6 +116,10 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 	)
 	endQuiz := endquiz.NewHandler(catalogservice.NewEndQuizQuestionLookupUsecase(catalogrepo.NewEndQuizQuestionReader(h.Pool)))
 	unitProgress := unitprogress.NewHandler(learningservice.NewListUserUnitProgressUsecase(learningrepo.NewUserUnitProgressReader(h.Pool)))
+	unitCollections := unitcollections.NewHandler(
+		semanticservice.NewListUnitCollectionsUsecase(semanticrepo.NewUnitCollectionReader(h.Pool)),
+		learningservice.NewActivateUnitCollectionTargetUsecase(learningtx.NewManager(h.Pool)),
+	)
 
 	lookupReader := catalogrepo.NewFeedLookupReader(h.Pool)
 	feedService := apiservice.NewFeedService(
@@ -127,6 +134,7 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
 		EndQuiz:           endQuiz,
+		UnitCollections:   unitCollections,
 		VideoInteractions: videoInteractions,
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,

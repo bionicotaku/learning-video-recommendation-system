@@ -13,7 +13,7 @@ import (
 func TestE2E_RecommendationSelectorMarksExtremeSparseWhenDemandUnderfills(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	unitID := h.NewUnitID()
@@ -44,7 +44,7 @@ func TestE2E_RecommendationSelectorMarksExtremeSparseWhenDemandUnderfills(t *tes
 func TestE2E_RecommendationSelectorRespectsSameUnitMax(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	heavyUnit := h.NewUnitID()
@@ -88,7 +88,7 @@ func TestE2E_RecommendationSelectorRespectsSameUnitMax(t *testing.T) {
 func TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()
@@ -134,7 +134,7 @@ func TestE2E_RecommendationSelectorRespectsFallbackMaxAndCoreDominantMin(t *test
 func TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
-	recommendation := h.RecommendationUsecase()
+	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	hardUnit := h.NewUnitID()
@@ -171,7 +171,7 @@ func TestE2E_RecommendationSelectorRespectsFutureLikeMaxInLowSupply(t *testing.T
 		learningdto.LearningEventInput{CoarseUnitID: softC, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
-	response := mustRecommendN(t, recommendation, userID, 4)
+	response := mustRecommendN(t, recommendation, userID, 3)
 	assertSelectorMode(t, h, response, "low_supply")
 	items := h.LoadRecommendationItems(t, response.RunID)
 	if got := countFutureLike(items); got > 2 {

@@ -3,11 +3,14 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
 	"learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/mapper"
 	learningenginesqlc "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/sqlcgen"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type TargetStateCommandRepository struct {
@@ -68,4 +71,28 @@ func (r *TargetStateCommandRepository) SetTargetInactive(ctx context.Context, us
 		UserID:       pgUserID,
 		CoarseUnitID: coarseUnitID,
 	})
+}
+
+func (r *TargetStateCommandRepository) ActivateUnitCollectionTarget(ctx context.Context, userID string, collectionSlug string) (model.ActivatedUnitCollectionTarget, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return model.ActivatedUnitCollectionTarget{}, err
+	}
+
+	row, err := r.queries.ActivateUnitCollectionTarget(ctx, learningenginesqlc.ActivateUnitCollectionTargetParams{
+		UserID:         pgUserID,
+		CollectionSlug: collectionSlug,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.ActivatedUnitCollectionTarget{}, apprepo.ErrUnitCollectionNotFound
+		}
+		return model.ActivatedUnitCollectionTarget{}, err
+	}
+
+	return model.ActivatedUnitCollectionTarget{
+		CollectionID:   mapper.UUIDToString(row.CollectionID),
+		CollectionSlug: row.Slug,
+		TargetCount:    int(row.TargetCount),
+	}, nil
 }

@@ -122,6 +122,12 @@
   - serving state `served_count`
   - `v_unit_video_inventory.supply_grade`
 
+Recommendation 语义类 E2E 可以使用 harness 的 no-op fill 构造来隔离
+`assemble -> plan -> candidate -> selector` 的学习目标路径，避免
+`mastered_target_fill / popular_fill` 用全局视频池补位后污染 selector
+和 read-model visibility 断言。需要验证完整 feed 补位语义时使用默认
+`RecommendationUsecase()`。
+
 当前故意不测：
 
 - 精确浮点分数

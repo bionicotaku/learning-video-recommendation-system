@@ -23,6 +23,12 @@ func schemaPlan() pgtest.SchemaPlan {
 		)),
 		pgtest.MigrationDir(pgtest.RepoPath(
 			"internal",
+			"semantic",
+			"infrastructure",
+			"migration",
+		)),
+		pgtest.MigrationDir(pgtest.RepoPath(
+			"internal",
 			"learningengine",
 			"reducer",
 			"infrastructure",

@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	ActivateUnitCollectionTarget(ctx context.Context, arg ActivateUnitCollectionTargetParams) (ActivateUnitCollectionTargetRow, error)
 	AppendLearningEvents(ctx context.Context, events []byte) ([]AppendLearningEventsRow, error)
 	BatchUpsertUserUnitStates(ctx context.Context, states []byte) ([]LearningUserUnitState, error)
 	DeleteUserUnitStatesByUser(ctx context.Context, userID pgtype.UUID) error

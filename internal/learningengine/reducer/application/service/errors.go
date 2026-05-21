@@ -35,6 +35,7 @@ var (
 	ErrUserUnitStateNotFound     = errors.New("user unit state not found")
 	ErrUserUnitStateNotSuspended = errors.New("user unit state is not suspended")
 	ErrLateProgressEvent         = errors.New("late progress event")
+	ErrUnitCollectionNotFound    = errors.New("unit collection not found")
 )
 
 func validationError(format string, args ...any) error {

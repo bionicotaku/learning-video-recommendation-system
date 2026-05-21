@@ -14,6 +14,7 @@
 - `normalizer` 可以调用 `reducer.RecordLearningEvents`，但不能直接写 `learning.*`。
 - `reducer` 不读取 `analytics.*`，也不能 import `normalizer` 或 `analytics`。
 - Recommendation 只读取 `learning.user_unit_states`，不能回写 Learning Engine 业务表。
+- `semantic.unit_collections` 定义系统词书；reducer 只拥有用户 active collection profile 和 target projection。
 
 ## Directory Structure
 
@@ -73,6 +74,17 @@ RecordLearningEvents
 ```
 
 `ReplayUserStates` 同样只从 `learning.unit_learning_events` 重建状态，不重新解释 analytics raw facts。
+
+### Active Collection Path
+
+```text
+internal/api
+  -> internal/learningengine/reducer ActivateUnitCollectionTarget
+  -> learning.user_learning_profiles
+  -> learning.user_unit_states
+```
+
+`ActivateUnitCollectionTarget` 在用户级事务内读取 active collection members，upsert 当前用户 profile，关闭旧 `target_source='unit_collection'` 且不属于新集合的 targets，并批量 upsert 新集合 members。它只更新 target control 字段，不重置 `status`、progress、mastery 或 schedule 字段。
 
 ## Local Checks
 

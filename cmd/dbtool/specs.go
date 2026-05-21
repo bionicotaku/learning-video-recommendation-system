@@ -18,6 +18,11 @@ func moduleSpecs() map[string]moduleSpec {
 			MigrationDir:  filepath.FromSlash("internal/analytics/infrastructure/migration"),
 			TrackingTable: "analytics_schema_migrations",
 		},
+		"semantic": {
+			Name:          "semantic",
+			MigrationDir:  filepath.FromSlash("internal/semantic/infrastructure/migration"),
+			TrackingTable: "semantic_schema_migrations",
+		},
 		"catalog": {
 			Name:          "catalog",
 			MigrationDir:  filepath.FromSlash("internal/catalog/infrastructure/migration"),

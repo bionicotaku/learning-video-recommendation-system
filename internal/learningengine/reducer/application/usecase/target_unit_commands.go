@@ -10,6 +10,10 @@ type EnsureTargetUnitsUsecase interface {
 	Execute(ctx context.Context, request dto.EnsureTargetUnitsRequest) (dto.EnsureTargetUnitsResponse, error)
 }
 
+type ActivateUnitCollectionTargetUsecase interface {
+	Execute(ctx context.Context, request dto.ActivateUnitCollectionTargetRequest) (dto.ActivateUnitCollectionTargetResponse, error)
+}
+
 type SetTargetInactiveUsecase interface {
 	Execute(ctx context.Context, request dto.SetTargetInactiveRequest) (dto.SetTargetInactiveResponse, error)
 }
