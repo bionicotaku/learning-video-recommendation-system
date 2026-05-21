@@ -12,10 +12,12 @@ const (
 type Lane string
 
 const (
-	LaneExactCore       Lane = "exact_core"
-	LaneBundle          Lane = "bundle"
-	LaneSoftFuture      Lane = "soft_future"
-	LaneQualityFallback Lane = "quality_fallback"
+	LaneExactCore          Lane = "exact_core"
+	LaneBundle             Lane = "bundle"
+	LaneSoftFuture         Lane = "soft_future"
+	LaneQualityFallback    Lane = "quality_fallback"
+	LaneMasteredTargetFill Lane = "mastered_target_fill"
+	LanePopularFill        Lane = "popular_fill"
 )
 
 type SelectorMode string
@@ -47,4 +49,6 @@ const (
 	ReasonCodeRecentlyNotServed  ReasonCode = "recently_not_served"
 	ReasonCodeLowSupplyPreserve  ReasonCode = "low_supply_core_preserved"
 	ReasonCodeFallbackQuality    ReasonCode = "fallback_quality_fill"
+	ReasonCodeMasteredTargetFill ReasonCode = "mastered_target_fill"
+	ReasonCodePopularFeedFill    ReasonCode = "popular_feed_fill"
 )

@@ -20,6 +20,16 @@ type CatalogVideo struct {
 	PublishAt        pgtype.Timestamptz `json:"publish_at"`
 }
 
+type CatalogVideoEngagementStat struct {
+	VideoID        pgtype.UUID        `json:"video_id"`
+	ViewCount      int64              `json:"view_count"`
+	LikeCount      int64              `json:"like_count"`
+	FavoriteCount  int64              `json:"favorite_count"`
+	CompletedCount int64              `json:"completed_count"`
+	TotalWatchMs   int64              `json:"total_watch_ms"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type CatalogVideoSemanticSpan struct {
 	VideoID       pgtype.UUID `json:"video_id"`
 	SentenceIndex int32       `json:"sentence_index"`

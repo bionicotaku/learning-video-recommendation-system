@@ -25,7 +25,7 @@ select
 from learning.user_unit_states
 where user_id = $1
   and is_target = true
-  and status <> 'suspended'
+  and status in ('new', 'learning', 'reviewing')
 order by target_priority desc, coarse_unit_id asc
 `
 
@@ -48,6 +48,216 @@ func (q *Queries) ListLearningStatesForRecommendation(ctx context.Context, userI
 			&i.LastProgressQuality,
 			&i.NextReviewAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMasteredTargetFillVideoCandidates = `-- name: ListMasteredTargetFillVideoCandidates :many
+with matched as (
+  select
+    rvu.video_id,
+    max(rvu.duration_ms)::integer as duration_ms,
+    count(distinct rvu.coarse_unit_id)::integer as matched_unit_count,
+    coalesce(sum(rvu.mention_count), 0)::bigint as total_mention_count,
+    coalesce(max(rvu.coverage_ratio), 0)::numeric(10,5) as max_coverage_ratio,
+    coalesce(avg(rvu.mapped_span_ratio), 0)::numeric(10,5) as mapped_span_ratio
+  from learning.user_unit_states as states
+  join recommendation.v_recommendable_video_units as rvu
+    on rvu.coarse_unit_id = states.coarse_unit_id
+  where states.user_id = $1
+    and states.is_target = true
+    and states.status = 'mastered'
+    and not (rvu.video_id = any($3::uuid[]))
+  group by rvu.video_id
+)
+select
+  matched.video_id,
+  matched.duration_ms,
+  matched.matched_unit_count,
+  matched.total_mention_count,
+  matched.max_coverage_ratio,
+  matched.mapped_span_ratio,
+  coalesce(stats.view_count, 0)::bigint as view_count,
+  coalesce(stats.like_count, 0)::bigint as like_count,
+  coalesce(stats.favorite_count, 0)::bigint as favorite_count,
+  serving.last_served_at,
+  coalesce(serving.served_count, 0)::integer as served_count,
+  user_state.last_watched_at,
+  coalesce(user_state.watch_count, 0)::integer as watch_count,
+  coalesce(user_state.completed_count, 0)::integer as completed_count,
+  coalesce(user_state.max_position_ms, 0)::integer as max_position_ms
+from matched
+left join catalog.video_engagement_stats as stats
+  on stats.video_id = matched.video_id
+left join recommendation.user_video_serving_states as serving
+  on serving.user_id = $1
+ and serving.video_id = matched.video_id
+left join catalog.video_user_states as user_state
+  on user_state.user_id = $1
+ and user_state.video_id = matched.video_id
+order by
+  matched.matched_unit_count desc,
+  matched.total_mention_count desc,
+  matched.max_coverage_ratio desc,
+  matched.mapped_span_ratio desc,
+  matched.video_id asc
+limit $2::integer
+`
+
+type ListMasteredTargetFillVideoCandidatesParams struct {
+	UserID           pgtype.UUID   `json:"user_id"`
+	FillLimit        int32         `json:"fill_limit"`
+	ExcludedVideoIds []pgtype.UUID `json:"excluded_video_ids"`
+}
+
+type ListMasteredTargetFillVideoCandidatesRow struct {
+	VideoID           pgtype.UUID        `json:"video_id"`
+	DurationMs        int32              `json:"duration_ms"`
+	MatchedUnitCount  int32              `json:"matched_unit_count"`
+	TotalMentionCount int64              `json:"total_mention_count"`
+	MaxCoverageRatio  pgtype.Numeric     `json:"max_coverage_ratio"`
+	MappedSpanRatio   pgtype.Numeric     `json:"mapped_span_ratio"`
+	ViewCount         int64              `json:"view_count"`
+	LikeCount         int64              `json:"like_count"`
+	FavoriteCount     int64              `json:"favorite_count"`
+	LastServedAt      pgtype.Timestamptz `json:"last_served_at"`
+	ServedCount       int32              `json:"served_count"`
+	LastWatchedAt     pgtype.Timestamptz `json:"last_watched_at"`
+	WatchCount        int32              `json:"watch_count"`
+	CompletedCount    int32              `json:"completed_count"`
+	MaxPositionMs     int32              `json:"max_position_ms"`
+}
+
+func (q *Queries) ListMasteredTargetFillVideoCandidates(ctx context.Context, arg ListMasteredTargetFillVideoCandidatesParams) ([]ListMasteredTargetFillVideoCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listMasteredTargetFillVideoCandidates, arg.UserID, arg.FillLimit, arg.ExcludedVideoIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMasteredTargetFillVideoCandidatesRow{}
+	for rows.Next() {
+		var i ListMasteredTargetFillVideoCandidatesRow
+		if err := rows.Scan(
+			&i.VideoID,
+			&i.DurationMs,
+			&i.MatchedUnitCount,
+			&i.TotalMentionCount,
+			&i.MaxCoverageRatio,
+			&i.MappedSpanRatio,
+			&i.ViewCount,
+			&i.LikeCount,
+			&i.FavoriteCount,
+			&i.LastServedAt,
+			&i.ServedCount,
+			&i.LastWatchedAt,
+			&i.WatchCount,
+			&i.CompletedCount,
+			&i.MaxPositionMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPopularFillVideoCandidates = `-- name: ListPopularFillVideoCandidates :many
+select
+  videos.video_id,
+  videos.duration_ms,
+  0::integer as matched_unit_count,
+  0::bigint as total_mention_count,
+  0::numeric(10,5) as max_coverage_ratio,
+  0::numeric(10,5) as mapped_span_ratio,
+  coalesce(stats.view_count, 0)::bigint as view_count,
+  coalesce(stats.like_count, 0)::bigint as like_count,
+  coalesce(stats.favorite_count, 0)::bigint as favorite_count,
+  serving.last_served_at,
+  coalesce(serving.served_count, 0)::integer as served_count,
+  user_state.last_watched_at,
+  coalesce(user_state.watch_count, 0)::integer as watch_count,
+  coalesce(user_state.completed_count, 0)::integer as completed_count,
+  coalesce(user_state.max_position_ms, 0)::integer as max_position_ms
+from catalog.videos as videos
+left join catalog.video_engagement_stats as stats
+  on stats.video_id = videos.video_id
+left join recommendation.user_video_serving_states as serving
+  on serving.user_id = $1
+ and serving.video_id = videos.video_id
+left join catalog.video_user_states as user_state
+  on user_state.user_id = $1
+ and user_state.video_id = videos.video_id
+where videos.status = 'active'
+  and videos.visibility_status = 'public'
+  and (videos.publish_at is null or videos.publish_at <= now())
+  and not (videos.video_id = any($2::uuid[]))
+order by
+  coalesce(stats.view_count, 0) desc,
+  coalesce(stats.like_count, 0) desc,
+  coalesce(stats.favorite_count, 0) desc,
+  videos.video_id asc
+limit $3::integer
+`
+
+type ListPopularFillVideoCandidatesParams struct {
+	UserID           pgtype.UUID   `json:"user_id"`
+	ExcludedVideoIds []pgtype.UUID `json:"excluded_video_ids"`
+	FillLimit        int32         `json:"fill_limit"`
+}
+
+type ListPopularFillVideoCandidatesRow struct {
+	VideoID           pgtype.UUID        `json:"video_id"`
+	DurationMs        int32              `json:"duration_ms"`
+	MatchedUnitCount  int32              `json:"matched_unit_count"`
+	TotalMentionCount int64              `json:"total_mention_count"`
+	MaxCoverageRatio  pgtype.Numeric     `json:"max_coverage_ratio"`
+	MappedSpanRatio   pgtype.Numeric     `json:"mapped_span_ratio"`
+	ViewCount         int64              `json:"view_count"`
+	LikeCount         int64              `json:"like_count"`
+	FavoriteCount     int64              `json:"favorite_count"`
+	LastServedAt      pgtype.Timestamptz `json:"last_served_at"`
+	ServedCount       int32              `json:"served_count"`
+	LastWatchedAt     pgtype.Timestamptz `json:"last_watched_at"`
+	WatchCount        int32              `json:"watch_count"`
+	CompletedCount    int32              `json:"completed_count"`
+	MaxPositionMs     int32              `json:"max_position_ms"`
+}
+
+func (q *Queries) ListPopularFillVideoCandidates(ctx context.Context, arg ListPopularFillVideoCandidatesParams) ([]ListPopularFillVideoCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listPopularFillVideoCandidates, arg.UserID, arg.ExcludedVideoIds, arg.FillLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPopularFillVideoCandidatesRow{}
+	for rows.Next() {
+		var i ListPopularFillVideoCandidatesRow
+		if err := rows.Scan(
+			&i.VideoID,
+			&i.DurationMs,
+			&i.MatchedUnitCount,
+			&i.TotalMentionCount,
+			&i.MaxCoverageRatio,
+			&i.MappedSpanRatio,
+			&i.ViewCount,
+			&i.LikeCount,
+			&i.FavoriteCount,
+			&i.LastServedAt,
+			&i.ServedCount,
+			&i.LastWatchedAt,
+			&i.WatchCount,
+			&i.CompletedCount,
+			&i.MaxPositionMs,
 		); err != nil {
 			return nil, err
 		}

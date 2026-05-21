@@ -197,6 +197,7 @@ func (h *Harness) RecommendationUsecaseWithResultWriter(resultWriter recommendat
 		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),
+		recommendationservice.NewDefaultVideoFillService(recommendationrepo.NewVideoFillCandidateReader(h.Pool)),
 		recommendationexplain.NewDefaultExplanationBuilder(),
 		videoStateEnricher,
 		resultWriter,

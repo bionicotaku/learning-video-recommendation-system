@@ -18,6 +18,10 @@ type VideoStateEnricher interface {
 	Enrich(ctx context.Context, contextModel model.RecommendationContext, videos []model.VideoCandidate) (model.RecommendationContext, error)
 }
 
+type VideoFillService interface {
+	Fill(ctx context.Context, contextModel model.RecommendationContext, selected []model.VideoCandidate, targetCount int) ([]model.VideoCandidate, error)
+}
+
 type RecommendationResultWriter interface {
 	Persist(ctx context.Context, run model.RecommendationRun, items []model.RecommendationItem, userID string, videos []model.FinalRecommendationItem) error
 }

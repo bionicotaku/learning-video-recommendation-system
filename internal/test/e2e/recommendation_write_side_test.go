@@ -174,6 +174,7 @@ func newFailingRecommendationUsecase(h *testutil.Harness) recommendationusecase.
 		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),
+		recommendationservice.NewDefaultVideoFillService(recommendationrepo.NewVideoFillCandidateReader(h.Pool)),
 		recommendationexplain.NewDefaultExplanationBuilder(),
 		videoStateEnricher,
 		resultWriter,

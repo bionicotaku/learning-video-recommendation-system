@@ -62,7 +62,22 @@ func buildReasonCodes(video model.VideoCandidate, demand model.DemandBundle) []s
 	if len(video.LaneSources) == 1 && video.LaneSources[0] == string(policy.LaneQualityFallback) {
 		reasonCodes = append(reasonCodes, string(policy.ReasonCodeFallbackQuality))
 	}
+	if hasLaneSource(video.LaneSources, string(policy.LaneMasteredTargetFill)) {
+		reasonCodes = append(reasonCodes, string(policy.ReasonCodeMasteredTargetFill))
+	}
+	if hasLaneSource(video.LaneSources, string(policy.LanePopularFill)) {
+		reasonCodes = append(reasonCodes, string(policy.ReasonCodePopularFeedFill))
+	}
 	return uniqueStrings(reasonCodes)
+}
+
+func hasLaneSource(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func uniqueStrings(values []string) []string {

@@ -37,6 +37,26 @@ func TestDefaultServingStateManagerApplySelectionDoesNotPreReadServingCounts(t *
 	}
 }
 
+func TestDefaultServingStateManagerApplySelectionSkipsUnitServingForFillItems(t *testing.T) {
+	unitRepo := &preReadFailingUnitServingRepository{}
+	videoRepo := &preReadFailingVideoServingRepository{}
+	manager := appservice.NewDefaultServingStateManager(unitRepo, videoRepo)
+
+	err := manager.ApplySelection(context.Background(), "00000000-0000-0000-0000-000000000401", "00000000-0000-0000-0000-000000000101", []model.FinalRecommendationItem{
+		{VideoID: "00000000-0000-0000-0000-000000000201", LearningUnits: []model.ExpectedLearningUnit{}},
+	})
+	if err != nil {
+		t.Fatalf("ApplySelection() error = %v", err)
+	}
+
+	if len(unitRepo.incrementedUnitIDs) != 0 {
+		t.Fatalf("incremented unit ids = %#v, want none", unitRepo.incrementedUnitIDs)
+	}
+	if len(videoRepo.incrementedVideoIDs) != 1 {
+		t.Fatalf("incremented video ids = %#v, want one video", videoRepo.incrementedVideoIDs)
+	}
+}
+
 type preReadFailingUnitServingRepository struct {
 	err                error
 	readCalled         bool

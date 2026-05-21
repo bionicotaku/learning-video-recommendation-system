@@ -75,11 +75,12 @@ func TestReduce_FirstProgressEventTransitionsToLearning(t *testing.T) {
 	if state.ScheduleRepetition != 1 {
 		t.Fatalf("schedule_repetition = %d, want 1", state.ScheduleRepetition)
 	}
-	if state.ScheduleIntervalDays != 1 {
-		t.Fatalf("schedule_interval_days = %v, want 1", state.ScheduleIntervalDays)
+	if state.ScheduleIntervalDays != 0.25 {
+		t.Fatalf("schedule_interval_days = %v, want 0.25", state.ScheduleIntervalDays)
 	}
-	if state.NextReviewAt == nil || !state.NextReviewAt.Equal(eventTime.Add(24*time.Hour)) {
-		t.Fatalf("next_review_at = %v, want %v", state.NextReviewAt, eventTime.Add(24*time.Hour))
+	wantNextReviewAt := eventTime.Add(6 * time.Hour)
+	if state.NextReviewAt == nil || !state.NextReviewAt.Equal(wantNextReviewAt) {
+		t.Fatalf("next_review_at = %v, want %v", state.NextReviewAt, wantNextReviewAt)
 	}
 }
 
@@ -107,17 +108,15 @@ func TestReduce_TwoPassingProgressEventsTransitionToReviewing(t *testing.T) {
 	if state.ScheduleRepetition != 2 {
 		t.Fatalf("schedule_repetition = %d, want 2", state.ScheduleRepetition)
 	}
-	if state.ScheduleIntervalDays != 3 {
-		t.Fatalf("schedule_interval_days = %v, want 3", state.ScheduleIntervalDays)
+	if state.ScheduleIntervalDays != 1 {
+		t.Fatalf("schedule_interval_days = %v, want 1", state.ScheduleIntervalDays)
 	}
 }
 
-func TestReduce_MasteredWhenStableAndIntervalLargeEnough(t *testing.T) {
+func TestReduce_MasteredAfterThreeConsecutivePassingProgressEvents(t *testing.T) {
 	t1 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
-	t2 := t1.Add(24 * time.Hour)
-	t3 := t2.Add(72 * time.Hour)
-	t4 := t3.Add(6 * 24 * time.Hour)
-	t5 := t4.Add(16 * 24 * time.Hour)
+	t2 := t1.Add(6 * time.Hour)
+	t3 := t2.Add(24 * time.Hour)
 	q4 := int16(4)
 	q5 := int16(5)
 
@@ -130,14 +129,6 @@ func TestReduce_MasteredWhenStableAndIntervalLargeEnough(t *testing.T) {
 		t.Fatalf("Reduce() error = %v", err)
 	}
 	state, err = aggregate.Reduce(state, learningEvent(enum.EventQuiz, enum.ReducerEffectAffectsProgress, &q5, t3))
-	if err != nil {
-		t.Fatalf("Reduce() error = %v", err)
-	}
-	state, err = aggregate.Reduce(state, learningEvent(enum.EventQuiz, enum.ReducerEffectAffectsProgress, &q5, t4))
-	if err != nil {
-		t.Fatalf("Reduce() error = %v", err)
-	}
-	state, err = aggregate.Reduce(state, learningEvent(enum.EventQuiz, enum.ReducerEffectAffectsProgress, &q5, t5))
 	if err != nil {
 		t.Fatalf("Reduce() error = %v", err)
 	}
@@ -156,6 +147,32 @@ func TestReduce_MasteredWhenStableAndIntervalLargeEnough(t *testing.T) {
 	}
 	if state.NextReviewAt != nil {
 		t.Fatalf("next_review_at = %v, want nil", state.NextReviewAt)
+	}
+}
+
+func TestReduce_RecentFailureBlocksFastMastery(t *testing.T) {
+	t1 := time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC)
+	qualities := []int16{4, 4, 2, 4, 4}
+
+	initialState := emptyState()
+	state := &initialState
+	var err error
+	for index, quality := range qualities {
+		quality := quality
+		state, err = aggregate.Reduce(state, learningEvent(enum.EventQuiz, enum.ReducerEffectAffectsProgress, &quality, t1.Add(time.Duration(index)*6*time.Hour)))
+		if err != nil {
+			t.Fatalf("Reduce() error = %v", err)
+		}
+	}
+
+	if state.Status == enum.StatusMastered {
+		t.Fatalf("status = mastered, want not mastered after recent failure: %+v", state)
+	}
+	if state.IsTarget == false {
+		t.Fatal("is_target = false, want still target after recent failure")
+	}
+	if state.ConsecutiveSuccessCount != 2 {
+		t.Fatalf("consecutive_success_count = %d, want 2", state.ConsecutiveSuccessCount)
 	}
 }
 
@@ -263,8 +280,8 @@ func TestReduce_FailureAfterRetargetedMasteredFallsBackToReviewing(t *testing.T)
 	if next.ScheduleRepetition != 0 {
 		t.Fatalf("schedule_repetition = %d, want 0", next.ScheduleRepetition)
 	}
-	if next.ScheduleIntervalDays != 1 {
-		t.Fatalf("schedule_interval_days = %v, want 1", next.ScheduleIntervalDays)
+	if next.ScheduleIntervalDays != 0.25 {
+		t.Fatalf("schedule_interval_days = %v, want 0.25", next.ScheduleIntervalDays)
 	}
 	if next.MasteryScore >= state.MasteryScore {
 		t.Fatalf("mastery_score = %v, want lower than %v", next.MasteryScore, state.MasteryScore)
@@ -364,8 +381,8 @@ func masteredState() model.UserUnitState {
 	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	lastQuality := int16(5)
 	lastObservedAt := lastProgressAt
-	firstObservedAt := lastProgressAt.Add(-14 * 24 * time.Hour)
-	nextReviewAt := lastProgressAt.Add(21 * 24 * time.Hour)
+	firstObservedAt := lastProgressAt.Add(-4 * 24 * time.Hour)
+	nextReviewAt := lastProgressAt.Add(4 * 24 * time.Hour)
 	return model.UserUnitState{
 		UserID:                  "11111111-1111-1111-1111-111111111111",
 		CoarseUnitID:            101,
@@ -380,7 +397,7 @@ func masteredState() model.UserUnitState {
 		RecentProgressQualities: []int16{4, 4, 5, 5},
 		RecentProgressPasses:    []bool{true, true, true, true},
 		ScheduleRepetition:      4,
-		ScheduleIntervalDays:    21,
+		ScheduleIntervalDays:    4,
 		ScheduleEaseFactor:      2.6,
 		ProgressPercent:         100,
 		MasteryScore:            0.9,

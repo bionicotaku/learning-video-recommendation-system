@@ -44,8 +44,9 @@
     - `DefaultContextAssembler`
     - `DefaultVideoStateEnricher`
     - `DefaultCandidateGenerator`
-    - `DefaultEvidenceResolver`
-    - `DefaultAuditWriter`
+  - `DefaultEvidenceResolver`
+  - `DefaultVideoFillService`
+  - `DefaultAuditWriter`
     - `DefaultServingStateManager`
     - `DefaultRecommendationResultWriter`
 - `application/usecase`
@@ -61,6 +62,10 @@
   - 第一版规则排序与 penalty
 - `domain/selector`
   - `normal / low_supply / extreme_sparse` 选择约束
+- `application/service/DefaultVideoFillService`
+  - 在 selector 后、final item builder / audit 前做轻量 video-level 补全
+  - 先补 `mastered_target_fill`，再补 `popular_fill`
+  - 只读取小候选池，不走 demand planning、evidence resolver 或 aggregator
 - `domain/explain`
   - 从 selected video 构造最终 plan item，并生成 audit 用 `reason_codes`
 - `infrastructure/persistence`
@@ -82,6 +87,20 @@
 - ML ranking
 - task layer / 非视频 fallback
 
+## Video-level 补全
+
+当正常学习推荐在 selector 后少于 `target_video_count` 时，Recommendation 会在内部追加轻量补全视频，顺序固定为：
+
+```text
+normal learning recommendations
+-> mastered_target_fill
+-> popular_fill
+```
+
+`mastered_target_fill` 从当前用户 `is_target=true AND status='mastered'` 的 unit 对应视频中补，保持和当前目标集合相关；`popular_fill` 从全局 active/public/published 视频中补，`catalog.video_engagement_stats` 缺失时按 0 热度处理，不会排除视频。两类补全都只查 video-level 小候选池与 freshness/watch 信号，不查 subtitle/span/sentence evidence，不生成 learning unit，也不触发 end quiz。
+
+补全 item 仍写入 Recommendation audit 和 `user_video_serving_states`，但 `learning_units=[]`，因此不会写 `user_unit_serving_states`。Feed facade 只继续补展示字段，不做补全决策。
+
 ## 维护约束
 
 - Recommendation 的审计中心始终是 video recommendation run/item。
@@ -93,6 +112,7 @@
 - UUID、nullable text、numeric 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；Recommendation 仍保留本地 mapper 函数作为模块边界。
 - `selector_mode=extreme_sparse` 由 selection 结果 underfill 后置判定，而不是 planner 预判。
 - `GenerateVideoRecommendations` 对外响应是精简 video learning plan：只返回 `run_id`、`items[].video_id`、`items[].duration_ms` 和 `items[].learning_units`。`selector_mode`、`underfilled`、`rank`、`score`、`reason_codes` 只保留在 Recommendation audit 中。
+- `learning_units=[]` 只用于 video-level 补全 item。它进入 video serving state，不进入 unit serving state，也不是本轮学习目标。
 - `video_recommendation_items` 审计表以 `dominant_role`、`dominant_unit_id` 和 `learning_units jsonb` 保存 item 快照；不再保存 covered count 或 video-level best evidence 字段。
 - `LaneSources` 是 video 级所有命中候选 lane 的集合，不是 per-unit winning candidate 的 lane 集合；`primary_lane` 从完整 `LaneSources` 按 lane priority 派生。
 - Selector 的 same-unit 硬上限只按 `learning_units` 中 `is_primary=true` 的 unit 计数；非 primary support units 只参与边际覆盖、解释和 serving state。

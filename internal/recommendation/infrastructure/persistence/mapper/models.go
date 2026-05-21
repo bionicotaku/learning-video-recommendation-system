@@ -131,6 +131,64 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnits
 	}, nil
 }
 
+func ToVideoFillCandidateFromMasteredTarget(row recommendationsqlc.ListMasteredTargetFillVideoCandidatesRow) (model.VideoFillCandidate, error) {
+	maxCoverageRatio, err := NumericToFloat64(row.MaxCoverageRatio)
+	if err != nil {
+		return model.VideoFillCandidate{}, err
+	}
+	mappedSpanRatio, err := NumericToFloat64(row.MappedSpanRatio)
+	if err != nil {
+		return model.VideoFillCandidate{}, err
+	}
+
+	return model.VideoFillCandidate{
+		VideoID:           UUIDToString(row.VideoID),
+		DurationMs:        row.DurationMs,
+		MatchedUnitCount:  row.MatchedUnitCount,
+		TotalMentionCount: row.TotalMentionCount,
+		MaxCoverageRatio:  maxCoverageRatio,
+		MappedSpanRatio:   mappedSpanRatio,
+		ViewCount:         row.ViewCount,
+		LikeCount:         row.LikeCount,
+		FavoriteCount:     row.FavoriteCount,
+		LastServedAt:      TimePointerFromPG(row.LastServedAt),
+		ServedCount:       row.ServedCount,
+		LastWatchedAt:     TimePointerFromPG(row.LastWatchedAt),
+		WatchCount:        row.WatchCount,
+		CompletedCount:    row.CompletedCount,
+		MaxPositionMs:     row.MaxPositionMs,
+	}, nil
+}
+
+func ToVideoFillCandidateFromPopular(row recommendationsqlc.ListPopularFillVideoCandidatesRow) (model.VideoFillCandidate, error) {
+	maxCoverageRatio, err := NumericToFloat64(row.MaxCoverageRatio)
+	if err != nil {
+		return model.VideoFillCandidate{}, err
+	}
+	mappedSpanRatio, err := NumericToFloat64(row.MappedSpanRatio)
+	if err != nil {
+		return model.VideoFillCandidate{}, err
+	}
+
+	return model.VideoFillCandidate{
+		VideoID:           UUIDToString(row.VideoID),
+		DurationMs:        row.DurationMs,
+		MatchedUnitCount:  row.MatchedUnitCount,
+		TotalMentionCount: row.TotalMentionCount,
+		MaxCoverageRatio:  maxCoverageRatio,
+		MappedSpanRatio:   mappedSpanRatio,
+		ViewCount:         row.ViewCount,
+		LikeCount:         row.LikeCount,
+		FavoriteCount:     row.FavoriteCount,
+		LastServedAt:      TimePointerFromPG(row.LastServedAt),
+		ServedCount:       row.ServedCount,
+		LastWatchedAt:     TimePointerFromPG(row.LastWatchedAt),
+		WatchCount:        row.WatchCount,
+		CompletedCount:    row.CompletedCount,
+		MaxPositionMs:     row.MaxPositionMs,
+	}, nil
+}
+
 func ToUnitVideoInventory(row recommendationsqlc.RecommendationVUnitVideoInventory) (model.UnitVideoInventory, error) {
 	coarseUnitID := int64(0)
 	if row.CoarseUnitID.Valid {

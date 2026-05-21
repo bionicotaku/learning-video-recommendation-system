@@ -28,6 +28,7 @@ func TestNewGenerateVideoRecommendationsPipelineRejectsIncompleteDependencies(t 
 		&constructorStubAggregator{},
 		&constructorStubRanker{},
 		&constructorStubSelector{},
+		&constructorStubVideoFillService{},
 		&constructorStubExplainer{},
 		nil,
 		nil,
@@ -47,6 +48,7 @@ func TestGenerateVideoRecommendationsPipelinePropagatesAssemblerError(t *testing
 		&constructorStubAggregator{},
 		&constructorStubRanker{},
 		&constructorStubSelector{},
+		&constructorStubVideoFillService{},
 		&constructorStubExplainer{},
 		&constructorStubVideoStateEnricher{},
 		nil,
@@ -121,6 +123,14 @@ func (s *constructorStubSelector) Select(model.RecommendationContext, []model.Vi
 }
 
 var _ domainselector.VideoSelector = (*constructorStubSelector)(nil)
+
+type constructorStubVideoFillService struct{}
+
+func (s *constructorStubVideoFillService) Fill(_ context.Context, _ model.RecommendationContext, selected []model.VideoCandidate, _ int) ([]model.VideoCandidate, error) {
+	return selected, nil
+}
+
+var _ appservice.VideoFillService = (*constructorStubVideoFillService)(nil)
 
 type constructorStubExplainer struct {
 	items []model.FinalRecommendationItem

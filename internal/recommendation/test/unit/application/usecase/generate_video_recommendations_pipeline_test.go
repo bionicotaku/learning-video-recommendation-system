@@ -17,6 +17,7 @@ import (
 	domainexplain "learning-video-recommendation-system/internal/recommendation/domain/explain"
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
 	domainplanner "learning-video-recommendation-system/internal/recommendation/domain/planner"
+	"learning-video-recommendation-system/internal/recommendation/domain/policy"
 	domainranking "learning-video-recommendation-system/internal/recommendation/domain/ranking"
 	domainresolver "learning-video-recommendation-system/internal/recommendation/domain/resolver"
 	domainselector "learning-video-recommendation-system/internal/recommendation/domain/selector"
@@ -48,6 +49,7 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		ranker,
 		&stubSelector{selected: ranker.ranked},
+		&stubVideoFillService{},
 		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{
 			videoServingStates: []model.UserVideoServingState{{VideoID: "video-1"}},
@@ -104,6 +106,7 @@ func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
 		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubVideoFillService{},
 		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
 		&spyResultWriter{},
@@ -161,6 +164,7 @@ func TestGenerateVideoRecommendationsPipelineMarksExtremeSparseAfterSelectionUnd
 		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubVideoFillService{},
 		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
 		writer,
@@ -202,6 +206,7 @@ func TestGenerateVideoRecommendationsPipelineMapsLearningUnitEvidence(t *testing
 		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
 		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
+		&stubVideoFillService{},
 		&stubExplainer{items: []model.FinalRecommendationItem{{
 			VideoID:     "video-1",
 			DurationMs:  90_000,
@@ -263,6 +268,7 @@ func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSour
 		&stubAggregator{videos: []model.VideoCandidate{selected}},
 		&stubRanker{ranked: []model.VideoCandidate{selected}},
 		&stubSelector{selected: []model.VideoCandidate{selected}},
+		&stubVideoFillService{},
 		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
 		&stubVideoStateEnricher{},
 		writer,
@@ -286,6 +292,78 @@ func TestGenerateVideoRecommendationsPipelinePersistsPrimaryLaneFromFullLaneSour
 	}
 	if writer.items[0].Rank != 1 {
 		t.Fatalf("expected audit rank from selected item order, got %#v", writer.items[0])
+	}
+}
+
+func TestGenerateVideoRecommendationsPipelineAuditsVideoFillItems(t *testing.T) {
+	writer := &spyResultWriter{}
+	learningVideo := testVideoCandidate("video-learning", 101, model.LearningRoleHardReview)
+	fillVideo := model.VideoCandidate{
+		VideoID:       "video-fill",
+		DurationMs:    120_000,
+		BaseScore:     0.51,
+		LaneSources:   []string{string(policy.LaneMasteredTargetFill)},
+		LearningUnits: []model.ExpectedLearningUnit{},
+	}
+
+	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
+		&constructorStubContextAssembler{
+			context: model.RecommendationContext{
+				PreferredDurationSec: [2]int{45, 200},
+				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2},
+			},
+		},
+		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 2}},
+		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-learning", CoarseUnitID: 101}}},
+		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-learning", CoarseUnitID: 101}}}},
+		&stubAggregator{videos: []model.VideoCandidate{learningVideo}},
+		&stubRanker{ranked: []model.VideoCandidate{learningVideo}},
+		&stubSelector{selected: []model.VideoCandidate{learningVideo}},
+		&stubVideoFillService{filled: []model.VideoCandidate{learningVideo, fillVideo}},
+		&mirrorSelectedExplainer{},
+		&stubVideoStateEnricher{},
+		writer,
+	)
+	if err != nil {
+		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
+	}
+
+	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
+		UserID:           "user-1",
+		TargetVideoCount: 2,
+	})
+	if err != nil {
+		t.Fatalf("execute pipeline: %v", err)
+	}
+
+	if len(response.Items) != 2 {
+		t.Fatalf("expected 2 response items, got %#v", response.Items)
+	}
+	if len(response.Items[1].LearningUnits) != 0 {
+		t.Fatalf("fill response learning_units = %#v, want empty", response.Items[1].LearningUnits)
+	}
+	if len(writer.items) != 2 {
+		t.Fatalf("expected 2 audit items, got %#v", writer.items)
+	}
+	if writer.items[1].PrimaryLane != string(policy.LaneMasteredTargetFill) {
+		t.Fatalf("fill primary lane = %q", writer.items[1].PrimaryLane)
+	}
+	if writer.items[1].DominantUnitID != nil {
+		t.Fatalf("fill dominant unit id = %#v, want nil", writer.items[1].DominantUnitID)
+	}
+	if len(writer.items[1].LearningUnits) != 0 {
+		t.Fatalf("fill audit learning_units = %#v, want empty", writer.items[1].LearningUnits)
+	}
+
+	var summary map[string]any
+	if err := json.Unmarshal(writer.run.CandidateSummary, &summary); err != nil {
+		t.Fatalf("unmarshal candidate summary: %v", err)
+	}
+	if summary["fill_triggered"] != true {
+		t.Fatalf("candidate summary fill_triggered = %#v", summary["fill_triggered"])
+	}
+	if summary["mastered_target_fill_count"] != float64(1) {
+		t.Fatalf("candidate summary mastered fill count = %#v", summary["mastered_target_fill_count"])
 	}
 }
 
@@ -345,6 +423,19 @@ func (s *stubSelector) Select(model.RecommendationContext, []model.VideoCandidat
 
 var _ domainselector.VideoSelector = (*stubSelector)(nil)
 
+type stubVideoFillService struct {
+	filled []model.VideoCandidate
+}
+
+func (s *stubVideoFillService) Fill(_ context.Context, _ model.RecommendationContext, selected []model.VideoCandidate, _ int) ([]model.VideoCandidate, error) {
+	if s.filled != nil {
+		return s.filled, nil
+	}
+	return selected, nil
+}
+
+var _ appservice.VideoFillService = (*stubVideoFillService)(nil)
+
 type stubExplainer struct {
 	items []model.FinalRecommendationItem
 }
@@ -354,6 +445,23 @@ func (s *stubExplainer) Build(model.RecommendationContext, []model.VideoCandidat
 }
 
 var _ domainexplain.ExplanationBuilder = (*stubExplainer)(nil)
+
+type mirrorSelectedExplainer struct{}
+
+func (e *mirrorSelectedExplainer) Build(_ model.RecommendationContext, selected []model.VideoCandidate, _ model.DemandBundle) ([]model.FinalRecommendationItem, error) {
+	items := make([]model.FinalRecommendationItem, 0, len(selected))
+	for _, video := range selected {
+		items = append(items, model.FinalRecommendationItem{
+			VideoID:       video.VideoID,
+			DurationMs:    video.DurationMs,
+			Score:         video.BaseScore,
+			LearningUnits: append([]model.ExpectedLearningUnit(nil), video.LearningUnits...),
+		})
+	}
+	return items, nil
+}
+
+var _ domainexplain.ExplanationBuilder = (*mirrorSelectedExplainer)(nil)
 
 type stubVideoStateEnricher struct {
 	videoServingStates []model.UserVideoServingState

@@ -378,9 +378,12 @@ class ExistingClipState:
     clip_seq: int
     source_start_ms: int
     source_end_ms: int
+    source_start_sentence_index: int | None
+    source_end_sentence_index: int | None
     title: str
     description: str | None
     clip_reason: str | None
+    engagement_score: dict[str, Any]
     language: str
     duration_ms: int
     video_object_path: str

@@ -8,8 +8,13 @@ import (
 )
 
 const (
-	recentWindowLimit = 5
-	easeFactorFloor   = 1.3
+	recentWindowLimit             = 5
+	easeFactorFloor               = 1.3
+	firstReviewIntervalDays       = 0.25
+	targetCompletionIntervalDays  = 4.0
+	maxScheduleIntervalDays       = 14.0
+	targetCompletionSuccessStreak = 3
+	targetCompletionMasteryScore  = 0.75
 )
 
 func RecentWindowLimit() int {
@@ -21,13 +26,15 @@ func ApplyProgressSuccessSchedule(state *model.UserUnitState, quality int16) {
 
 	switch state.ScheduleRepetition {
 	case 1:
-		state.ScheduleIntervalDays = 1
+		state.ScheduleIntervalDays = firstReviewIntervalDays
 	case 2:
-		state.ScheduleIntervalDays = 3
+		state.ScheduleIntervalDays = 1
 	case 3:
-		state.ScheduleIntervalDays = 6
+		state.ScheduleIntervalDays = 2
+	case 4:
+		state.ScheduleIntervalDays = targetCompletionIntervalDays
 	default:
-		state.ScheduleIntervalDays = math.Round(state.ScheduleIntervalDays * state.ScheduleEaseFactor)
+		state.ScheduleIntervalDays = math.Min(maxScheduleIntervalDays, math.Round(state.ScheduleIntervalDays*state.ScheduleEaseFactor))
 	}
 
 	delta := 0.1 - float64(5-quality)*(0.08+float64(5-quality)*0.02)
@@ -36,7 +43,7 @@ func ApplyProgressSuccessSchedule(state *model.UserUnitState, quality int16) {
 
 func ApplyProgressFailureSchedule(state *model.UserUnitState) {
 	state.ScheduleRepetition = 0
-	state.ScheduleIntervalDays = 1
+	state.ScheduleIntervalDays = firstReviewIntervalDays
 }
 
 func ComputeProgressPercent(state model.UserUnitState) float64 {
@@ -47,9 +54,9 @@ func ComputeProgressPercent(state model.UserUnitState) float64 {
 		return 100
 	}
 
-	intervalComponent := minFloat(state.ScheduleIntervalDays/21, 1)
+	intervalComponent := minFloat(state.ScheduleIntervalDays/targetCompletionIntervalDays, 1)
 	accuracyComponent := averageBoolWindow(state.RecentProgressPasses)
-	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/4, 1)
+	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/targetCompletionSuccessStreak, 1)
 	qualityComponent := averageInt16Window(state.RecentProgressQualities) / 5
 
 	score := 100 * clamp01(
@@ -67,10 +74,10 @@ func ComputeMasteryScore(state model.UserUnitState) float64 {
 		return 0
 	}
 
-	intervalComponent := minFloat(state.ScheduleIntervalDays/21, 1)
+	intervalComponent := minFloat(state.ScheduleIntervalDays/targetCompletionIntervalDays, 1)
 	accuracyComponent := averageBoolWindow(state.RecentProgressPasses)
-	stabilityComponent := minFloat(float64(state.ConsecutiveSuccessCount)/3, 1)
-	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/4, 1)
+	stabilityComponent := minFloat(float64(state.ConsecutiveSuccessCount)/targetCompletionSuccessStreak, 1)
+	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/targetCompletionSuccessStreak, 1)
 
 	failurePenalty := 0.0
 	if state.LastProgressQuality != nil && *state.LastProgressQuality < 3 {
@@ -97,11 +104,11 @@ func ComputeActiveStatus(state model.UserUnitState) string {
 		return enum.StatusReviewing
 	}
 
-	if !hasTwoRecentPassingQualities(state.RecentProgressQualities) || state.ProgressEventCount < 2 || state.ScheduleIntervalDays < 3 {
+	if !hasTwoRecentPassingQualities(state.RecentProgressQualities) || state.ProgressEventCount < 2 || state.ScheduleIntervalDays < 1 {
 		return enum.StatusLearning
 	}
 
-	if state.ScheduleIntervalDays >= 21 && noRecentFailures(state.RecentProgressPasses) && ComputeMasteryScore(state) >= 0.8 {
+	if state.ConsecutiveSuccessCount >= targetCompletionSuccessStreak && noRecentFailures(state.RecentProgressPasses) && ComputeMasteryScore(state) >= targetCompletionMasteryScore {
 		return enum.StatusMastered
 	}
 

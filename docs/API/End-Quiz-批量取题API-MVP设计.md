@@ -99,10 +99,10 @@ Content-Type: application/json
 
 `coarse_unit_ids` 规则：
 
-- 必须非空。
+- 必须非空。调用方应只传 Feed item 中非空 `learning_units[].coarse_unit_id`；若当前视频是补全视频且 `learning_units=[]`，前端应跳过 end quiz 请求。
 - 每个值必须为正整数。
 - 后端应去重，但 response 顺序以去重后的首次出现顺序为准。
-- MVP 建议限制最多 `8` 个，因为 Feed API 每个视频本身最多约 `1..8` 个 learning units。
+- MVP 建议限制最多 `8` 个，因为 Feed API 的学习推荐视频最多约 `1..8` 个 learning units；补全视频为空数组。
 
 请求中不需要传 `role`、`is_primary`、evidence 或题型偏好。取题只依赖 `video_id + coarse_unit_ids[]`。
 
@@ -308,7 +308,7 @@ quiz attempt 请求应带回：
 }
 ```
 
-前端看到 `items` 为空时，直接不展示结尾 quiz。
+前端看到 `items` 为空时，直接不展示结尾 quiz。若 Feed item 本身 `learning_units=[]`，这是 Recommendation 的 video-level 补全视频，不是本轮学习任务；前端应在请求前跳过，不需要用空 `coarse_unit_ids` 调用本 API。
 
 ## 9. 后端实现建议
 

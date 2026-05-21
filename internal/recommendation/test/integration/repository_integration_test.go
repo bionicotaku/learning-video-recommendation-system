@@ -53,6 +53,51 @@ func TestVideoUserStateReaderListByUserAndVideoIDs(t *testing.T) {
 	}
 }
 
+func TestLearningStateReaderListActiveByUserExcludesMasteredTargets(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000121"
+	db.SeedUser(t, userID)
+	for _, unitID := range []int64{321, 322, 323, 324, 325} {
+		db.SeedCoarseUnit(t, unitID)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		insert into learning.user_unit_states (
+			user_id,
+			coarse_unit_id,
+			is_target,
+			target_priority,
+			status,
+			mastery_score
+		) values
+			($1, 321, true, 0.90, 'mastered', 1.0),
+			($1, 322, true, 0.80, 'new', 0.0),
+			($1, 323, true, 0.70, 'learning', 0.3),
+			($1, 324, true, 0.60, 'reviewing', 0.7),
+			($1, 325, true, 0.50, 'suspended', 0.4)
+	`, userID); err != nil {
+		t.Fatalf("seed learning states: %v", err)
+	}
+
+	reader := repository.NewLearningStateReader(tx)
+	states, err := reader.ListActiveByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("list learning states: %v", err)
+	}
+
+	got := make([]int64, 0, len(states))
+	for _, state := range states {
+		got = append(got, state.CoarseUnitID)
+	}
+	want := []int64{322, 323, 324}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("unit ids = %v, want %v", got, want)
+	}
+}
+
 func TestServingStateRepositoriesListAndIncrement(t *testing.T) {
 	db := testDB(t)
 	tx := fixture.BeginTestTx(t, db.Pool)
@@ -390,6 +435,141 @@ func TestUnitInventoryReadModelCoversSupplyGradesAndNone(t *testing.T) {
 	}
 	if byUnit[505].SupplyGrade != "none" {
 		t.Fatalf("unit 505 supply grade = %q, want none", byUnit[505].SupplyGrade)
+	}
+}
+
+func TestVideoFillCandidateReaderListsMasteredTargetBeforePopularFill(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000106"
+	unitID := int64(601)
+	masteredVideoID := "00000000-0000-0000-0000-000000000601"
+	excludedVideoID := "00000000-0000-0000-0000-000000000602"
+	popularVideoID := "00000000-0000-0000-0000-000000000603"
+	seedBaseRefs(t, ctx, db, tx, userID, masteredVideoID, unitID)
+	seedInventoryVideo(t, ctx, db, tx, masteredVideoID, unitID, 7, 0.24000, 0.82000)
+	seedInventoryVideo(t, ctx, db, tx, excludedVideoID, unitID, 9, 0.32000, 0.90000)
+	db.SeedVideo(t, popularVideoID)
+
+	if _, err := tx.Exec(ctx, `
+		insert into learning.user_unit_states (user_id, coarse_unit_id, is_target, target_priority, status, mastery_score)
+		values ($1, $2, true, 1.0000, 'mastered', 1.0000)
+	`, userID, unitID); err != nil {
+		t.Fatalf("seed mastered user unit state: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into catalog.video_engagement_stats (video_id, view_count, like_count, favorite_count)
+		values
+			($1, 100, 10, 5),
+			($2, 1000, 100, 50),
+			($3, 900, 90, 45)
+		on conflict (video_id) do update set
+			view_count = excluded.view_count,
+			like_count = excluded.like_count,
+			favorite_count = excluded.favorite_count
+	`, masteredVideoID, excludedVideoID, popularVideoID); err != nil {
+		t.Fatalf("seed engagement stats: %v", err)
+	}
+
+	queries := recommendationsqlc.New(tx)
+	if err := queries.RefreshRecommendableVideoUnits(ctx); err != nil {
+		t.Fatalf("refresh recommendable: %v", err)
+	}
+
+	reader := repository.NewVideoFillCandidateReader(tx)
+	masteredRows, err := reader.ListMasteredTargetFillCandidates(ctx, userID, []string{excludedVideoID}, 10)
+	if err != nil {
+		t.Fatalf("list mastered target fill candidates: %v", err)
+	}
+	if len(masteredRows) != 1 {
+		t.Fatalf("expected 1 mastered target fill candidate, got %#v", masteredRows)
+	}
+	if masteredRows[0].VideoID != masteredVideoID {
+		t.Fatalf("mastered fill video id = %q, want %q", masteredRows[0].VideoID, masteredVideoID)
+	}
+	if masteredRows[0].MatchedUnitCount != 1 {
+		t.Fatalf("unexpected mastered fill candidate: %+v", masteredRows[0])
+	}
+	if masteredRows[0].ViewCount != 100 || masteredRows[0].LikeCount != 10 || masteredRows[0].FavoriteCount != 5 {
+		t.Fatalf("unexpected mastered fill engagement counts: %+v", masteredRows[0])
+	}
+
+	popularRows, err := reader.ListPopularFillCandidates(ctx, userID, []string{excludedVideoID, masteredVideoID}, 10)
+	if err != nil {
+		t.Fatalf("list popular fill candidates: %v", err)
+	}
+	if len(popularRows) != 1 {
+		t.Fatalf("expected 1 popular fill candidate, got %#v", popularRows)
+	}
+	if popularRows[0].VideoID != popularVideoID {
+		t.Fatalf("popular fill video id = %q, want %q", popularRows[0].VideoID, popularVideoID)
+	}
+	if popularRows[0].MatchedUnitCount != 0 || popularRows[0].ViewCount != 900 {
+		t.Fatalf("unexpected popular fill candidate: %+v", popularRows[0])
+	}
+}
+
+func TestVideoFillCandidateReaderPopularFillIncludesVideosWithoutEngagementStats(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000107"
+	videoWithStatsID := "00000000-0000-0000-0000-000000000611"
+	videoWithoutStatsID := "00000000-0000-0000-0000-000000000612"
+	inactiveVideoID := "00000000-0000-0000-0000-000000000613"
+	privateVideoID := "00000000-0000-0000-0000-000000000614"
+	futureVideoID := "00000000-0000-0000-0000-000000000615"
+	seedUser(t, ctx, db, tx, userID)
+	db.SeedVideo(t, videoWithStatsID)
+	db.SeedVideo(t, videoWithoutStatsID)
+	db.SeedVideo(t, inactiveVideoID)
+	db.SeedVideo(t, privateVideoID)
+	db.SeedVideo(t, futureVideoID)
+
+	if _, err := tx.Exec(ctx, `
+		update catalog.videos
+		set status = 'inactive'
+		where video_id = $1
+	`, inactiveVideoID); err != nil {
+		t.Fatalf("seed inactive video: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		update catalog.videos
+		set visibility_status = 'private'
+		where video_id = $1
+	`, privateVideoID); err != nil {
+		t.Fatalf("seed private video: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		update catalog.videos
+		set publish_at = now() + interval '24 hours'
+		where video_id = $1
+	`, futureVideoID); err != nil {
+		t.Fatalf("seed future video: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into catalog.video_engagement_stats (video_id, view_count, like_count, favorite_count)
+		values ($1, 1000, 100, 50)
+	`, videoWithStatsID); err != nil {
+		t.Fatalf("seed engagement stats: %v", err)
+	}
+
+	reader := repository.NewVideoFillCandidateReader(tx)
+	popularRows, err := reader.ListPopularFillCandidates(ctx, userID, nil, 10)
+	if err != nil {
+		t.Fatalf("list popular fill candidates: %v", err)
+	}
+
+	got := make([]string, 0, len(popularRows))
+	for _, row := range popularRows {
+		got = append(got, row.VideoID)
+	}
+	want := []string{videoWithStatsID, videoWithoutStatsID}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("popular fill video ids = %v, want %v", got, want)
 	}
 }
 

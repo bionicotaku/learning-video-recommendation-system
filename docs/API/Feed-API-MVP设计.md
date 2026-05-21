@@ -60,7 +60,7 @@ Content-Type: application/json
 | 模块 | 职责 | 不做什么 |
 | --- | --- | --- |
 | `internal/api` | HTTP handler、请求 validation、调用 Recommendation 和 Catalog unit label 读取能力、组装 FeedResponse。 | 不写 SQL，不拥有业务表，不实现推荐排序规则。 |
-| `internal/recommendation` | 生成 `run_id + videos + learning_units`，写 Recommendation audit / serving state。 | 不返回 `title`、`cover_image_url`、`like_count` 等 feed 展示字段。 |
+| `internal/recommendation` | 生成 `run_id + items[].video_id + items[].duration_ms + items[].learning_units`，写 Recommendation audit / serving state。 | 不返回 `title`、`cover_image_url`、`like_count` 等 feed 展示字段。 |
 | `internal/catalog` | 提供按 `video_id[]` 批量读取视频展示信息和互动统计的能力。 | 不理解 Recommendation 的 `role`、`is_primary`、`rank`、`score`。 |
 | Catalog unit label 读取能力 | 在 Catalog feed lookup reader 中提供按 `coarse_unit_id[]` 批量读取 `semantic.coarse_unit.label`。 | 不参与推荐排序或题目选择。 |
 
@@ -147,7 +147,7 @@ Feed API 不接受 `preferred_duration_sec` 或 `session_hint`。请求 JSON 使
 | `view_count` | integer | `catalog.video_engagement_stats.view_count` | 全局观看数，只用于展示。无统计行时返回 `0`。 |
 | `like_count` | integer | `catalog.video_engagement_stats.like_count` | 全局点赞数，作为 action rail 基础 count。无统计行时返回 `0`。 |
 | `favorite_count` | integer | `catalog.video_engagement_stats.favorite_count` | 全局收藏数，作为 action rail 基础 count。无统计行时返回 `0`。 |
-| `learning_units` | array | Recommendation item + semantic label 补齐 | 本视频在本次推荐中预期承载的学习单元。不是完整词表，最多约 `1..8` 个。 |
+| `learning_units` | array | Recommendation item + semantic label 补齐 | 本视频在本次推荐中预期承载的学习单元。学习推荐视频最多约 `1..8` 个；Recommendation video-level 补全视频返回空数组。 |
 
 ### 4.4 `FeedLearningUnit`
 
@@ -162,7 +162,9 @@ Feed API 不接受 `preferred_duration_sec` 或 `session_hint`。请求 JSON 使
 | `evidence_start_ms` | integer | Recommendation `learning_units[].evidence.start_ms` | 最佳证据开始时间，单位毫秒。用于字幕高亮、跳转、exposure 候选定位。 |
 | `evidence_end_ms` | integer | Recommendation `learning_units[].evidence.end_ms` | 最佳证据结束时间，单位毫秒。 |
 
-MVP Feed API 对前端返回的 `FeedLearningUnit` 要求 evidence 字段完整。若 Recommendation 返回某个 unit 但 evidence 缺失，说明 Catalog evidence 链路存在数据质量问题。Feed facade 不做静默裁剪，必须返回 `500 internal_error` 并记录服务端 error。
+MVP Feed API 对前端返回的非空 `FeedLearningUnit` 要求 evidence 字段完整。若 Recommendation 返回某个 unit 但 evidence 缺失，说明 Catalog evidence 链路存在数据质量问题。Feed facade 不做静默裁剪，必须返回 `500 internal_error` 并记录服务端 error。
+
+`learning_units: []` 是稳定业务语义：该视频是 Recommendation 为避免 feed 空返回或数量不足而追加的 video-level 补全视频，不代表本轮学习目标。前端仍可展示和播放该视频，但不应为它发起 exposure 候选判断或视频末尾 end quiz 请求。
 
 ## 5. 字段裁剪规则
 
@@ -211,8 +213,8 @@ items[].learning_units
 4. 从 Recommendation response 收集：
    - video_ids；
    - duration_ms；
-   - coarse_unit_ids；
-   - learning_units evidence。
+   - 非空 learning_units 的 coarse_unit_ids；
+   - 非空 learning_units 的 evidence。
 5. 批量读取视频展示信息：
    - catalog.videos 的 `title`、`description`、`video_object_path`、`thumbnail_url`；
    - catalog.video_engagement_stats。
@@ -243,7 +245,7 @@ URL 组装规则：
 | `like_count` | `catalog.video_engagement_stats.like_count` |
 | `favorite_count` | `catalog.video_engagement_stats.favorite_count` |
 | `learning_units[].coarse_unit_id` | Recommendation `learning_units` |
-| `learning_units[].text` | `semantic.coarse_unit.label` |
+| `learning_units[].text` | `semantic.coarse_unit.label`；`learning_units=[]` 时不查询 |
 | `learning_units[].role` | Recommendation `learning_units` |
 | `learning_units[].is_primary` | Recommendation `learning_units` |
 | `learning_units[].evidence_*` | Recommendation `learning_units[].evidence` |
@@ -276,7 +278,7 @@ learning_units[].text
 
 MVP 不把“推荐结果少于请求数量”作为错误。Recommendation 自己会记录 `underfilled` 到 audit；Feed API 返回 Recommendation plan 中实际生成的 items。
 
-但 Feed facade 对 Recommendation plan 采用完整补齐语义：缺少视频展示数据、`duration_ms <= 0`、unit evidence 不完整、unit label 缺失、URL 组装失败，都是后端数据一致性错误，返回 `500 internal_error`。这样 Recommendation audit / serving state 不会和前端实际收到的 feed item 静默分叉。
+但 Feed facade 对 Recommendation plan 采用完整补齐语义：缺少视频展示数据、`duration_ms <= 0`、非空 unit evidence 不完整、非空 unit label 缺失、URL 组装失败，都是后端数据一致性错误，返回 `500 internal_error`。这样 Recommendation audit / serving state 不会和前端实际收到的 feed item 静默分叉。
 
 ## 9. 前端使用约定
 
@@ -299,12 +301,14 @@ learning_units[]
 - 视频末尾批量 quiz 取题；
 - quiz attempt 上报时的推荐来源归因。
 
+如果某个 item 的 `learning_units` 为空，前端只按普通视频展示和播放，不做 learning exposure，也不调用 end quiz。若前端统一调用 end quiz，也必须先过滤出非空 `coarse_unit_ids`。
+
 ## 10. 成功标准
 
 实现本 API 时至少满足：
 
 1. 一次成功请求会生成 Recommendation run，并写入 `recommendation.video_recommendation_runs` 与 `recommendation.video_recommendation_items`。
 2. response 不暴露 `rank`、`score`、`reason_codes`、`explanation`、`selector_mode`、`underfilled`。
-3. response 中每个 `FeedItem` 都包含前端展示所需视频字段和至少一个 evidence 完整的 `learning_unit`。
+3. response 中每个 `FeedItem` 都包含前端展示所需视频字段；学习推荐 item 带 evidence 完整的 `learning_unit`，补全 item 允许 `learning_units=[]`。
 4. `items[]` 顺序严格保持 Recommendation 返回顺序。
 5. Catalog / semantic 补充读取必须按 batch 完成，不允许按 item 逐条查询。

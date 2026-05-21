@@ -14,3 +14,11 @@ create table if not exists catalog.video_engagement_stats (
   check (completed_count >= 0),
   check (total_watch_ms >= 0)
 );
+
+create index if not exists idx_video_engagement_stats_popularity
+on catalog.video_engagement_stats (
+  view_count desc,
+  like_count desc,
+  favorite_count desc,
+  video_id
+);

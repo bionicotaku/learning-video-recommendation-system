@@ -95,6 +95,16 @@ create table if not exists catalog.video_user_states (
   total_watch_ms bigint not null default 0
 );
 
+create table if not exists catalog.video_engagement_stats (
+  video_id uuid primary key,
+  view_count bigint not null default 0,
+  like_count bigint not null default 0,
+  favorite_count bigint not null default 0,
+  completed_count bigint not null default 0,
+  total_watch_ms bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists learning.user_unit_states (
   user_id uuid not null,
   coarse_unit_id bigint not null,

@@ -30,6 +30,7 @@ type GenerateVideoRecommendationsService struct {
 	aggregator         domainaggregator.VideoEvidenceAggregator
 	ranker             domainranking.VideoRanker
 	selector           domainselector.VideoSelector
+	videoFillService   appservice.VideoFillService
 	explainer          domainexplain.ExplanationBuilder
 	videoStateEnricher appservice.VideoStateEnricher
 	resultWriter       appservice.RecommendationResultWriter
@@ -47,11 +48,12 @@ func NewGenerateVideoRecommendationsPipeline(
 	aggregator domainaggregator.VideoEvidenceAggregator,
 	ranker domainranking.VideoRanker,
 	selector domainselector.VideoSelector,
+	videoFillService appservice.VideoFillService,
 	explainer domainexplain.ExplanationBuilder,
 	videoStateEnricher appservice.VideoStateEnricher,
 	resultWriter appservice.RecommendationResultWriter,
 ) (*GenerateVideoRecommendationsService, error) {
-	if assembler == nil || planner == nil || candidateGenerator == nil || resolver == nil || aggregator == nil || ranker == nil || selector == nil || explainer == nil || videoStateEnricher == nil {
+	if assembler == nil || planner == nil || candidateGenerator == nil || resolver == nil || aggregator == nil || ranker == nil || selector == nil || videoFillService == nil || explainer == nil || videoStateEnricher == nil {
 		return nil, ErrIncompletePipeline
 	}
 
@@ -63,6 +65,7 @@ func NewGenerateVideoRecommendationsPipeline(
 		aggregator:         aggregator,
 		ranker:             ranker,
 		selector:           selector,
+		videoFillService:   videoFillService,
 		explainer:          explainer,
 		videoStateEnricher: videoStateEnricher,
 		resultWriter:       resultWriter,
@@ -114,6 +117,12 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
+	targetCount := targetVideoCount(contextModel.Request, demandBundle)
+	selectedVideos, err = u.videoFillService.Fill(ctx, contextModel, selectedVideos, targetCount)
+	if err != nil {
+		return dto.GenerateVideoRecommendationsResponse{}, err
+	}
+
 	finalItems, err := u.explainer.Build(contextModel, selectedVideos, demandBundle)
 	if err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
@@ -124,7 +133,6 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	targetCount := targetVideoCount(contextModel.Request, demandBundle)
 	underfilled := len(finalItems) < targetCount
 	demandBundle.Flags.ExtremeSparse = hasDemand(demandBundle) && underfilled
 	selectorMode := selectorModeForDemand(demandBundle)
@@ -242,7 +250,7 @@ func buildAuditPayload(
 	if err != nil {
 		return model.RecommendationRun{}, nil, err
 	}
-	candidateSummary, err := json.Marshal(candidateSummary(candidates))
+	candidateSummary, err := json.Marshal(candidateSummary(candidates, selectedVideos))
 	if err != nil {
 		return model.RecommendationRun{}, nil, err
 	}
@@ -284,7 +292,7 @@ func buildAuditPayload(
 	return run, items, nil
 }
 
-func candidateSummary(candidates []model.VideoUnitCandidate) map[string]any {
+func candidateSummary(candidates []model.VideoUnitCandidate, selectedVideos []model.VideoCandidate) map[string]any {
 	laneCounts := make(map[string]int)
 	distinctVideos := make(map[string]struct{})
 	laneDistinctVideos := make(map[string]map[string]struct{})
@@ -301,11 +309,28 @@ func candidateSummary(candidates []model.VideoUnitCandidate) map[string]any {
 	for lane, videos := range laneDistinctVideos {
 		laneDistinctCounts[lane] = len(videos)
 	}
+	learningSelectedCount := 0
+	masteredFillCount := 0
+	popularFillCount := 0
+	for _, selected := range selectedVideos {
+		switch primaryLane(selected.LaneSources) {
+		case string(policy.LaneMasteredTargetFill):
+			masteredFillCount++
+		case string(policy.LanePopularFill):
+			popularFillCount++
+		default:
+			learningSelectedCount++
+		}
+	}
 
 	return map[string]any{
-		"lane_counts":          laneCounts,
-		"lane_distinct_videos": laneDistinctCounts,
-		"distinct_video_count": len(distinctVideos),
+		"lane_counts":                laneCounts,
+		"lane_distinct_videos":       laneDistinctCounts,
+		"distinct_video_count":       len(distinctVideos),
+		"learning_selected_count":    learningSelectedCount,
+		"mastered_target_fill_count": masteredFillCount,
+		"popular_fill_count":         popularFillCount,
+		"fill_triggered":             masteredFillCount+popularFillCount > 0,
 	}
 }
 
@@ -327,7 +352,13 @@ func lanePriority(lane string) int {
 		return 1
 	case string(policy.LaneSoftFuture):
 		return 2
-	default:
+	case string(policy.LaneQualityFallback):
 		return 3
+	case string(policy.LaneMasteredTargetFill):
+		return 4
+	case string(policy.LanePopularFill):
+		return 5
+	default:
+		return 6
 	}
 }

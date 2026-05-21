@@ -158,6 +158,7 @@ func buildRecommendationUsecase(pool *pgxpool.Pool) (*recommendationusecase.Gene
 		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),
+		recommendationservice.NewDefaultVideoFillService(recommendationrepo.NewVideoFillCandidateReader(pool)),
 		recommendationexplain.NewDefaultExplanationBuilder(),
 		recommendationservice.NewDefaultVideoStateEnricher(
 			videoServing,

@@ -104,6 +104,40 @@ func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
 	}
 }
 
+func TestDefaultExplanationBuilderGeneratesFillReasonCodes(t *testing.T) {
+	builder := recommendationexplain.NewDefaultExplanationBuilder()
+
+	items, err := builder.Build(model.RecommendationContext{}, []model.VideoCandidate{
+		{
+			VideoID:       "video-mastered-fill",
+			DurationMs:    120_000,
+			BaseScore:     0.62,
+			LaneSources:   []string{string(policy.LaneMasteredTargetFill)},
+			LearningUnits: []model.ExpectedLearningUnit{},
+		},
+		{
+			VideoID:       "video-popular-fill",
+			DurationMs:    90_000,
+			BaseScore:     0.54,
+			LaneSources:   []string{string(policy.LanePopularFill)},
+			LearningUnits: []model.ExpectedLearningUnit{},
+		},
+	}, recommendationDemand())
+	if err != nil {
+		t.Fatalf("build explanation: %v", err)
+	}
+
+	if !contains(items[0].ReasonCodes, string(policy.ReasonCodeMasteredTargetFill)) {
+		t.Fatalf("expected mastered fill reason code, got %#v", items[0].ReasonCodes)
+	}
+	if !contains(items[1].ReasonCodes, string(policy.ReasonCodePopularFeedFill)) {
+		t.Fatalf("expected popular fill reason code, got %#v", items[1].ReasonCodes)
+	}
+	if len(items[0].LearningUnits) != 0 || len(items[1].LearningUnits) != 0 {
+		t.Fatalf("fill items should carry empty learning units: %#v", items)
+	}
+}
+
 func recommendationDemand() model.DemandBundle {
 	return model.DemandBundle{
 		Flags: model.PlannerFlags{HardReviewLowSupply: true},
