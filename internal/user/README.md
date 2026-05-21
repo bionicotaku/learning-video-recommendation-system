@@ -19,12 +19,10 @@ need to update projections inside an existing transaction.
 
 ## Main Usecases
 
-- `GetMe`: returns profile fields and global activity stats. If the profile row
-  is missing, it repairs it from `auth.users`. A valid `X-Client-Timezone`
-  value updates the profile timezone.
-- `GetActivityCalendar`: returns today plus the previous six local dates,
-  filling missing days with zero values. It may use `X-Client-Timezone`, but it
-  never updates the stored profile timezone.
+- `GetMe`: returns profile fields, global activity stats, and the embedded
+  seven-day activity calendar. If the profile row is missing, it repairs it
+  from `auth.users`. A valid `X-Client-Timezone` value updates the profile
+  timezone before the activity calendar is computed.
 - `UpdateOnboardingStatus`: updates the profile onboarding state after flows
   such as learning target collection selection.
 - `ActivityStatsRecorder`: transaction-aware projection writer for watch time,
@@ -52,4 +50,3 @@ The HTTP handlers live under `internal/api`; User only provides usecases. Curren
 API endpoints:
 
 - `GET /api/me`
-- `GET /api/me/activity-calendar`

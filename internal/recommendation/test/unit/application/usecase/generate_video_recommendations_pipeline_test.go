@@ -36,6 +36,19 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 			context: model.RecommendationContext{
 				PreferredDurationSec: [2]int{45, 200},
 				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2},
+				RecallScope: model.RecallScopeSummary{
+					ActiveTargetUnitCount:         12,
+					QueueCandidateCount:           10,
+					PlannerScopeUnitCount:         5,
+					PlannerScopeUnitCountByBucket: map[string]int{"hard_review": 3, "new_now": 2},
+					NoSupplyScopeUnitCount:        1,
+					RecallFetchUnitCount:          4,
+					PerUnitRecallLimit:            20,
+					MaxPossibleRecallRows:         80,
+					ActualRecallRowCount:          42,
+					AggregatedVideoCandidateCount: 1,
+					VideoStateLookupCount:         1,
+				},
 			},
 		},
 		&stubPlanner{
@@ -89,6 +102,32 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	}
 	if ranker.lastContextUserStates != 1 {
 		t.Fatalf("expected ranker to receive loaded video user states, got %d", ranker.lastContextUserStates)
+	}
+
+	var summary map[string]any
+	if err := json.Unmarshal(writer.run.CandidateSummary, &summary); err != nil {
+		t.Fatalf("unmarshal candidate summary: %v", err)
+	}
+	if summary["planner_scope_unit_count"] != float64(5) {
+		t.Fatalf("planner scope count = %#v", summary["planner_scope_unit_count"])
+	}
+	if summary["no_supply_scope_unit_count"] != float64(1) {
+		t.Fatalf("no-supply scope count = %#v", summary["no_supply_scope_unit_count"])
+	}
+	timing, ok := summary["pipeline_timing_ms"].(map[string]any)
+	if !ok {
+		t.Fatalf("pipeline_timing_ms missing or invalid: %#v", summary["pipeline_timing_ms"])
+	}
+	for _, key := range []string{"context_assemble", "plan", "candidate_generate", "evidence_resolve", "aggregate", "video_state_enrich", "rank", "select", "fill", "final_item_build", "total"} {
+		value, ok := timing[key].(float64)
+		if !ok || value < 0 {
+			t.Fatalf("timing[%s] = %#v", key, timing[key])
+		}
+	}
+	for _, key := range []string{"audit_write", "serving_state_write"} {
+		if _, ok := timing[key]; ok {
+			t.Fatalf("timing[%s] should not be present in audit summary: %#v", key, timing)
+		}
 	}
 }
 

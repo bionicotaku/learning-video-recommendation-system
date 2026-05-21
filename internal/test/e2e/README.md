@@ -34,7 +34,7 @@
   - `catalog.video_transcript_sentences`
   - `catalog.video_user_states`
 - 刷新：
-  - `recommendation.v_recommendable_video_units`
+  - `recommendation.v_video_unit_recall_index`
   - `recommendation.v_unit_video_inventory`
 - 装配真实 usecase：
   - API：Learning Events HTTP handler + API application service

@@ -153,13 +153,11 @@ func newFailingRecommendationUsecase(h *testutil.Harness) recommendationusecase.
 	videoServing := recommendationrepo.NewVideoServingStateRepository(h.Pool)
 	videoUserState := recommendationrepo.NewVideoUserStateReader(h.Pool)
 	recommendable := recommendationrepo.NewRecommendableVideoUnitReader(h.Pool)
-	semanticSpans := recommendationrepo.NewSemanticSpanReader(h.Pool)
-	transcriptSentences := recommendationrepo.NewTranscriptSentenceReader(h.Pool)
 	auditRepo := recommendationrepo.NewRecommendationAuditRepository(h.Pool)
 
-	assembler := recommendationservice.NewDefaultContextAssembler(learningStates, inventory, unitServing)
+	assembler := recommendationservice.NewDefaultContextAssembler(learningStates, inventory, unitServing, nil, nil)
 	videoStateEnricher := recommendationservice.NewDefaultVideoStateEnricher(videoServing, videoUserState)
-	resolver := recommendationservice.NewDefaultEvidenceResolver(semanticSpans, transcriptSentences)
+	resolver := recommendationservice.NewDefaultEvidenceResolver()
 	resultWriter := recommendationservice.NewDefaultRecommendationResultWriter(
 		recommendationtx.NewManager(h.Pool),
 		failingAuditWriter{inner: recommendationservice.NewDefaultAuditWriter(auditRepo)},

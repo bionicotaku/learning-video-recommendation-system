@@ -18,7 +18,7 @@ func main() {
 
 func run(ctx context.Context, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: dbtool <migrate|refresh> ...")
+		return fmt.Errorf("usage: dbtool <migrate|refresh|reset> ...")
 	}
 
 	switch args[0] {
@@ -26,6 +26,8 @@ func run(ctx context.Context, args []string) error {
 		return runMigrate(ctx, args[1:])
 	case "refresh":
 		return runRefresh(ctx, args[1:])
+	case "reset":
+		return runReset(ctx, args[1:])
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -91,6 +93,29 @@ func runRefresh(ctx context.Context, args []string) error {
 	defer conn.Close()
 
 	return refreshRecommendation(ctx, conn.pool)
+}
+
+func runReset(ctx context.Context, args []string) error {
+	if len(args) == 0 || args[0] != "business" {
+		return fmt.Errorf("usage: dbtool reset business --confirm=RESET_BUSINESS_DATA")
+	}
+
+	fs := flag.NewFlagSet("business", flag.ContinueOnError)
+	confirm := fs.String("confirm", "", "must be RESET_BUSINESS_DATA")
+	if err := fs.Parse(args[1:]); err != nil {
+		return err
+	}
+	if *confirm != "RESET_BUSINESS_DATA" {
+		return fmt.Errorf("reset business requires --confirm=RESET_BUSINESS_DATA")
+	}
+
+	conn, err := openConn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	return resetBusinessData(ctx, conn.pool)
 }
 
 type dbConn struct {

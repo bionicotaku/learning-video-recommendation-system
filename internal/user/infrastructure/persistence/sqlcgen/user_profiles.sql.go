@@ -54,6 +54,62 @@ func (q *Queries) GetAuthUser(ctx context.Context, id pgtype.UUID) (AuthUser, er
 	return i, err
 }
 
+const getCurrentActivityStreakDays = `-- name: GetCurrentActivityStreakDays :one
+with recursive anchor as (
+  select candidate.local_date
+  from (
+    select $1::date as local_date
+    union all
+    select ($1::date - 1)::date as local_date
+  ) candidate
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = $2
+      and s.local_date = candidate.local_date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+  order by candidate.local_date desc
+  limit 1
+),
+streak(local_date) as (
+  select local_date
+  from anchor
+  union all
+  select (streak.local_date - 1)::date
+  from streak
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = $2
+      and s.local_date = (streak.local_date - 1)::date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+)
+select count(*)::bigint
+from streak
+`
+
+type GetCurrentActivityStreakDaysParams struct {
+	Today  pgtype.Date `json:"today"`
+	UserID pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetCurrentActivityStreakDays(ctx context.Context, arg GetCurrentActivityStreakDaysParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getCurrentActivityStreakDays, arg.Today, arg.UserID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const getUserProfile = `-- name: GetUserProfile :one
 select user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, created_at, updated_at
 from app_user.user_profiles

@@ -4,8 +4,8 @@
 
 文档状态：MVP 已实现，作为当前 API 契约维护。
 目标读者：前端、后端 API、User、Supabase Auth 维护者。
-当前范围：定义 `GET /api/me` 与 `GET /api/me/activity-calendar` 的请求、响应、profile lazy repair、timezone 顺手更新、活动统计读取、错误语义和模块边界。
-当前明确不做：不做用户资料编辑 API、不做邮箱修改、不做头像上传、不做登录注册 API、不做 streak 规则。
+当前范围：定义 `GET /api/me` 的请求、响应、profile lazy repair、timezone 顺手更新、累计活动统计、内嵌 activity calendar、错误语义和模块边界。
+当前明确不做：不做用户资料编辑 API、不做邮箱修改、不做头像上传、不做登录注册 API、不做复杂 streak 规则。
 
 关联文档：
 
@@ -15,9 +15,7 @@
 
 ## 1. API 定位
 
-`GET /api/me` 返回当前登录用户的基础 profile 和累计活动统计，用于 App 启动、首页初始化、onboarding 判断和本地时区同步。
-
-`GET /api/me/activity-calendar` 返回今天和过去 6 天的活动日历统计，用于个人页、学习日历或连续活跃 UI。
+`GET /api/me` 返回当前登录用户的基础 profile、累计活动统计和 activity calendar，用于 App 启动、首页初始化、个人页、onboarding 判断和本地时区同步。
 
 本接口从 trusted principal 获取 `user_id`，不接受 body/query/path 中的用户 ID。
 
@@ -28,16 +26,12 @@ MVP 中 `GET /api/me` 不是纯读接口。它可能做两个轻量写入：
 2. 如果 header 携带合法 timezone，且和库里不同，更新 timezone。
 ```
 
-两个接口都只读取 User 模块的 projection，不直接扫描 `analytics.*`、`catalog.*` 或 `learning.*` 原始表聚合。
+本接口只读取 User 模块的 projection，不直接扫描 `analytics.*`、`catalog.*` 或 `learning.*` 原始表聚合。
 
 ## 2. Endpoint
 
 ```http
 GET /api/me
-```
-
-```http
-GET /api/me/activity-calendar
 ```
 
 可选 header：
@@ -85,12 +79,27 @@ type MeResponse = {
   timezone: string | null;
   onboarding_status: "new" | "collection_selected" | "completed";
   stats: MeStats;
+  activity_calendar: ActivityCalendar;
 };
 
 type MeStats = {
   total_watch_seconds: number;
   quiz_attempt_count: number;
   started_unit_count: number;
+};
+
+type ActivityCalendar = {
+  timezone: string;
+  today: string;
+  current_streak_days: number;
+  days: ActivityDay[];
+};
+
+type ActivityDay = {
+  local_date: string;
+  watch_seconds: number;
+  quiz_attempt_count: number;
+  learning_interaction_count: number;
 };
 ```
 
@@ -110,6 +119,25 @@ type MeStats = {
     "total_watch_seconds": 3600,
     "quiz_attempt_count": 12,
     "started_unit_count": 48
+  },
+  "activity_calendar": {
+    "timezone": "Asia/Shanghai",
+    "today": "2026-05-22",
+    "current_streak_days": 5,
+    "days": [
+      {
+        "local_date": "2026-05-16",
+        "watch_seconds": 420,
+        "quiz_attempt_count": 3,
+        "learning_interaction_count": 8
+      },
+      {
+        "local_date": "2026-05-17",
+        "watch_seconds": 0,
+        "quiz_attempt_count": 0,
+        "learning_interaction_count": 0
+      }
+    ]
   }
 }
 ```
@@ -129,8 +157,17 @@ type MeStats = {
 | `stats.total_watch_seconds` | `app_user.user_activity_stats.total_watch_ms` | 用户累计有效观看时长，向下取整为秒。 |
 | `stats.quiz_attempt_count` | `app_user.user_activity_stats.quiz_attempt_count` | 用户累计完成 quiz 次数。 |
 | `stats.started_unit_count` | `app_user.user_activity_stats.started_unit_count` | 用户历史上第一次让 learning unit 产生正进度的数量。 |
+| `activity_calendar.timezone` | request header / profile / default | 本次计算 today 和日期窗口使用的 timezone。 |
+| `activity_calendar.today` | 服务端按 timezone 计算 | 当前本地日期，格式 `YYYY-MM-DD`。 |
+| `activity_calendar.current_streak_days` | API 计算 | 当前连续活跃天数。如果今天活跃，从今天往前数；如果今天未活跃但昨天活跃，从昨天往前数；如果今天和昨天都未活跃，返回 0。 |
+| `activity_calendar.days[].local_date` | 日期窗口补齐 | 本地日期，格式 `YYYY-MM-DD`。 |
+| `activity_calendar.days[].watch_seconds` | `app_user.user_daily_activity_stats.watch_ms` | 当日有效观看时长，向下取整为秒。 |
+| `activity_calendar.days[].quiz_attempt_count` | `app_user.user_daily_activity_stats.quiz_attempt_count` | 当日完成 quiz 次数。 |
+| `activity_calendar.days[].learning_interaction_count` | `app_user.user_daily_activity_stats.learning_interaction_count` | 当日 exposure / lookup 学习互动次数。 |
 
 `started_unit_count` 不是 learned word 数，也不是每日学习次数。它表示“有过学习进度的 learning unit 数量”，只增不减。
+
+`activity_calendar.days` 固定 7 个元素，按 `local_date` 升序返回。没有 activity stats 行的日期必须补 0。活跃日判断是后端内部规则，不作为 `days[]` 字段返回：`watch_ms > 0`、`quiz_attempt_count > 0` 或 `learning_interaction_count > 0` 任一成立即为活跃。
 
 ## 5. 处理流程
 
@@ -183,80 +220,7 @@ where user_id = $1
 
 MVP 删除 `timezone_source` 字段，所以 `/api/me` 可以自动覆盖之前保存的 timezone。后续如果支持用户手动设置时区，再补 `timezone_source` 或拆出设置 API。
 
-## 6. GET /api/me/activity-calendar
-
-### 6.1 Endpoint
-
-```http
-GET /api/me/activity-calendar
-```
-
-可选 header：
-
-```http
-X-Client-Timezone: Asia/Shanghai
-```
-
-本接口固定返回“今天 + 过去 6 天”，共 7 天。MVP 不接受 `from/to` query，避免前端传入过大范围，也降低分页和补洞复杂度。
-
-### 6.2 Response
-
-```ts
-type ActivityCalendarResponse = {
-  timezone: string;
-  today: string;
-  days: ActivityDay[];
-};
-
-type ActivityDay = {
-  local_date: string;
-  watch_seconds: number;
-  quiz_attempt_count: number;
-  learning_interaction_count: number;
-  is_active: boolean;
-};
-```
-
-示例：
-
-```json
-{
-  "timezone": "Asia/Shanghai",
-  "today": "2026-05-22",
-  "days": [
-    {
-      "local_date": "2026-05-16",
-      "watch_seconds": 420,
-      "quiz_attempt_count": 3,
-      "learning_interaction_count": 8,
-      "is_active": true
-    },
-    {
-      "local_date": "2026-05-17",
-      "watch_seconds": 0,
-      "quiz_attempt_count": 0,
-      "learning_interaction_count": 0,
-      "is_active": false
-    }
-  ]
-}
-```
-
-字段说明：
-
-| 字段 | 来源 | 说明 |
-|---|---|---|
-| `timezone` | request header / profile / default | 本次计算 today 和日期窗口使用的 timezone。 |
-| `today` | 服务端按 timezone 计算 | 当前本地日期，格式 `YYYY-MM-DD`。 |
-| `days[].local_date` | 日期窗口补齐 | 本地日期，格式 `YYYY-MM-DD`。 |
-| `days[].watch_seconds` | `app_user.user_daily_activity_stats.watch_ms` | 当日有效观看时长，向下取整为秒。 |
-| `days[].quiz_attempt_count` | `app_user.user_daily_activity_stats.quiz_attempt_count` | 当日完成 quiz 次数。 |
-| `days[].learning_interaction_count` | `app_user.user_daily_activity_stats.learning_interaction_count` | 当日 exposure / lookup 学习互动次数。 |
-| `days[].is_active` | API 计算 | 三个统计任一大于 0 即为 true。 |
-
-`days` 固定 7 个元素，按 `local_date` 升序返回。没有 activity stats 行的日期必须补 0。
-
-### 6.3 Timezone 选择
+## 6. Activity Calendar
 
 timezone 选择顺序：
 
@@ -266,11 +230,11 @@ timezone 选择顺序：
 3. UTC
 ```
 
-和 `/api/me` 不同，本接口只使用 timezone，不更新 `app_user.user_profiles.timezone`。原因是 activity calendar 是只读查询，避免隐式副作用扩散到多个 GET endpoint。
+`/api/me` 会先处理合法 `X-Client-Timezone` 的 profile timezone 更新，再用更新后的 profile timezone 计算 `activity_calendar`。因此同一个请求内，`timezone` 字段和 `activity_calendar.timezone` 应保持一致。
 
 非法 `X-Client-Timezone` 直接忽略，继续使用 profile timezone 或 UTC。
 
-### 6.4 查询逻辑
+### 6.1 查询逻辑
 
 后端按 timezone 计算：
 
@@ -296,11 +260,19 @@ order by local_date asc;
 
 后端补齐缺失日期，保证 response shape 稳定。
 
+`current_streak_days` 额外按 `today` 和 `today - 1 day` 选择 streak 起点：
+
+- 今天活跃：从今天开始向前连续计数。
+- 今天未活跃但昨天活跃：从昨天开始向前连续计数。
+- 今天和昨天都未活跃：返回 0。
+
+该查询只读 `app_user.user_daily_activity_stats`，不扫描 raw events，不受 7 天 calendar 窗口限制。
+
 ## 7. 错误
 
 | HTTP | code | 场景 |
 |---|---|---|
-| `200 OK` | 无 | 成功返回当前用户 profile 或 activity calendar。 |
+| `200 OK` | 无 | 成功返回当前用户 profile、累计 stats 和内嵌 activity calendar。 |
 | `401 Unauthorized` | `unauthorized` | trusted principal 缺失、无法解析，或 principal 指向不存在的 Auth user。 |
 | `500 Internal Server Error` | `internal_error` | 数据库错误或未知服务端错误。 |
 
@@ -388,7 +360,7 @@ on conflict (user_id) do nothing;
 
 如果发生并发 lazy repair，`on conflict do nothing` 后重新读取 profile 即可。
 
-`GET /api/me/activity-calendar` 只读：
+`GET /api/me` 的 `activity_calendar` 只读 daily stats：
 
 ```sql
 select
@@ -400,6 +372,52 @@ from app_user.user_daily_activity_stats
 where user_id = $1
   and local_date between $2 and $3
 order by local_date asc;
+```
+
+连续活跃天数查询按 `(user_id, local_date)` 主键逐日回查：
+
+```sql
+with recursive anchor as (
+  select candidate.local_date
+  from (
+    select $2::date as local_date
+    union all
+    select ($2::date - 1)::date as local_date
+  ) candidate
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = $1
+      and s.local_date = candidate.local_date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+  order by candidate.local_date desc
+  limit 1
+),
+streak(local_date) as (
+  select local_date
+  from anchor
+  union all
+  select (streak.local_date - 1)::date
+  from streak
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = $1
+      and s.local_date = (streak.local_date - 1)::date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+)
+select count(*)::bigint
+from streak;
 ```
 
 ## 10. 活动统计写入语义
@@ -440,14 +458,7 @@ PUT /api/learning-targets/active-collection
 
 后端可以在词书激活成功后更新 `onboarding_status`。
 
-个人页或日历组件调用：
-
-```http
-GET /api/me/activity-calendar
-X-Client-Timezone: Asia/Shanghai
-```
-
-前端不需要传日期范围。后端固定返回 7 天并补齐空日期。
+个人页或日历组件直接使用 `/api/me` 响应里的 `activity_calendar`。前端不需要传日期范围。后端固定返回 7 天并补齐空日期。
 
 ## 12. 不做事项
 
@@ -459,7 +470,6 @@ PATCH /api/me
 修改邮箱
 修改密码
 返回 active collection
-返回 streak
 返回推荐摘要
 activity calendar 自定义日期范围
 根据 raw_user_meta_data 同步昵称
@@ -489,9 +499,10 @@ make quick-check
 - 非法 `X-Client-Timezone` 被忽略，仍返回 `200 OK`。
 - `/api/me` 返回 `stats.total_watch_seconds`、`quiz_attempt_count`、`started_unit_count`。
 - stats 缺失时返回 0 或补建默认 stats 行。
-- `/api/me/activity-calendar` 缺 principal 返回 `401 unauthorized`。
-- `/api/me/activity-calendar` 固定返回 7 天，日期升序。
-- `/api/me/activity-calendar` 对缺失日期补 0。
-- `/api/me/activity-calendar` 使用 header timezone 计算 today，但不更新 profile timezone。
-- `is_active` 在三个活动统计任一大于 0 时为 true。
+- `/api/me` 返回 `activity_calendar`，固定 7 天，日期升序。
+- `activity_calendar` 对缺失日期补 0。
+- `activity_calendar` 使用本次请求最终生效的 timezone 计算 today。
+- `activity_calendar` 返回 `current_streak_days`。
+- `activity_calendar` 不返回 `days[].is_active`。
+- `GET /api/me/activity-calendar` 未注册。
 - response 不包含 password、raw metadata、provider identity、Auth token。

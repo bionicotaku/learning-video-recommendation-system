@@ -11,6 +11,9 @@ import (
 )
 
 type Querier interface {
+	GetLearningStateVersionForRecommendation(ctx context.Context, userID pgtype.UUID) (GetLearningStateVersionForRecommendationRow, error)
+	GetRecallProjectionMetadata(ctx context.Context) (pgtype.Timestamptz, error)
+	GetUserRecallQueueState(ctx context.Context, userID pgtype.UUID) (RecommendationUserUnitRecallQueueState, error)
 	IncrementUserUnitServingStates(ctx context.Context, arg IncrementUserUnitServingStatesParams) error
 	IncrementUserVideoServingStates(ctx context.Context, arg IncrementUserVideoServingStatesParams) error
 	InsertVideoRecommendationItems(ctx context.Context, items []byte) error
@@ -18,15 +21,16 @@ type Querier interface {
 	ListLearningStatesForRecommendation(ctx context.Context, userID pgtype.UUID) ([]LearningUserUnitState, error)
 	ListMasteredTargetFillVideoCandidates(ctx context.Context, arg ListMasteredTargetFillVideoCandidatesParams) ([]ListMasteredTargetFillVideoCandidatesRow, error)
 	ListPopularFillVideoCandidates(ctx context.Context, arg ListPopularFillVideoCandidatesParams) ([]ListPopularFillVideoCandidatesRow, error)
-	ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]ListRecommendableVideoUnitsByUnitIDsRow, error)
-	ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]CatalogVideoSemanticSpan, error)
-	ListTranscriptSentencesByRefs(ctx context.Context, refs []byte) ([]CatalogVideoTranscriptSentence, error)
 	ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]RecommendationVUnitVideoInventory, error)
+	ListUserRecallQueueCandidates(ctx context.Context, arg ListUserRecallQueueCandidatesParams) ([]ListUserRecallQueueCandidatesRow, error)
 	ListUserUnitServingStatesByUnitIDs(ctx context.Context, arg ListUserUnitServingStatesByUnitIDsParams) ([]RecommendationUserUnitServingState, error)
 	ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg ListUserVideoServingStatesByVideoIDsParams) ([]RecommendationUserVideoServingState, error)
+	ListVideoUnitRecallRowsByUnitIDs(ctx context.Context, arg ListVideoUnitRecallRowsByUnitIDsParams) ([]ListVideoUnitRecallRowsByUnitIDsRow, error)
 	ListVideoUserStatesByUserAndVideoIDs(ctx context.Context, arg ListVideoUserStatesByUserAndVideoIDsParams) ([]CatalogVideoUserState, error)
-	RefreshRecommendableVideoUnits(ctx context.Context) error
+	RebuildUserUnitRecallQueue(ctx context.Context, arg RebuildUserUnitRecallQueueParams) (RecommendationUserUnitRecallQueueState, error)
 	RefreshUnitVideoInventory(ctx context.Context) error
+	RefreshVideoUnitRecallIndex(ctx context.Context) error
+	UpsertRecallProjectionMetadata(ctx context.Context, projectionUpdatedAt pgtype.Timestamptz) error
 }
 
 var _ Querier = (*Queries)(nil)

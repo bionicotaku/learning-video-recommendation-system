@@ -15,7 +15,142 @@ where user_id = sqlc.arg(user_id)
   and status in ('new', 'learning', 'reviewing')
 order by target_priority desc, coarse_unit_id asc;
 
--- name: ListRecommendableVideoUnitsByUnitIDs :many
+-- name: GetLearningStateVersionForRecommendation :one
+select
+  count(*)::integer as active_target_unit_count,
+  max(updated_at)::timestamptz as source_learning_max_updated_at
+from learning.user_unit_states
+where user_id = sqlc.arg(user_id)
+  and is_target = true
+  and status in ('new', 'learning', 'reviewing');
+
+-- name: GetRecallProjectionMetadata :one
+select projection_updated_at
+from recommendation.recall_projection_metadata
+where projection_name = 'video_unit_recall_index';
+
+-- name: GetUserRecallQueueState :one
+select
+  user_id,
+  source_learning_max_updated_at,
+  source_projection_updated_at,
+  active_target_unit_count,
+  rebuilt_at
+from recommendation.user_unit_recall_queue_states
+where user_id = sqlc.arg(user_id);
+
+-- name: ListUserRecallQueueCandidates :many
+with bucketed as (
+  select
+    queue.user_id,
+    queue.coarse_unit_id,
+    queue.status,
+    queue.target_priority,
+    queue.mastery_score,
+    queue.last_progress_quality,
+    queue.next_review_at,
+    queue.supply_grade,
+    queue.state_updated_at,
+    serving.last_served_at,
+    coalesce(serving.served_count, 0)::integer as served_count,
+    case
+      when queue.last_progress_quality is not null and queue.last_progress_quality < 3 then 'hard_review'
+      when queue.next_review_at is not null and queue.next_review_at <= sqlc.arg(now_at)::timestamptz then 'hard_review'
+      when queue.status = 'new' and queue.supply_grade <> 'none' then 'new_now'
+      when queue.next_review_at is not null and queue.next_review_at <= sqlc.arg(now_at)::timestamptz + interval '72 hours' then 'soft_review'
+      when queue.mastery_score < 0.6000 then 'soft_review'
+      when queue.last_progress_quality is not null and queue.last_progress_quality < 4 then 'soft_review'
+      else 'near_future'
+    end as bucket
+  from recommendation.user_unit_recall_queue as queue
+  left join recommendation.user_unit_serving_states as serving
+    on serving.user_id = queue.user_id
+   and serving.coarse_unit_id = queue.coarse_unit_id
+  where queue.user_id = sqlc.arg(user_id)
+),
+scored as (
+  select
+    bucketed.*,
+    (
+      case bucket
+        when 'hard_review' then 1.00
+        when 'new_now' then 0.85
+        when 'soft_review' then 0.65
+        else 0.45
+      end
+      + bucketed.target_priority
+      + case bucketed.supply_grade
+          when 'strong' then 0.08
+          when 'ok' then 0.04
+          when 'weak' then -0.03
+          else -0.08
+        end
+      + case
+          when bucketed.last_served_at is null then 0.12
+          when bucketed.last_served_at <= sqlc.arg(now_at)::timestamptz - interval '7 days' then 0.08
+          when bucketed.last_served_at <= sqlc.arg(now_at)::timestamptz - interval '24 hours' then 0.04
+          else -0.10
+        end
+      - least(bucketed.served_count::numeric / 10.0, 0.20)
+    )::numeric(10,6) as dynamic_priority
+  from bucketed
+),
+ranked as (
+  select *
+  from (
+    select
+      scored.*,
+      row_number() over (
+        partition by bucket
+        order by dynamic_priority desc, last_served_at asc nulls first, coarse_unit_id asc
+      )::integer as bucket_rank
+    from scored
+    where supply_grade <> 'none'
+  ) as supplied_ranked
+  where bucket_rank <= sqlc.arg(supplied_per_bucket_limit)::integer
+  union all
+  select *
+  from (
+    select
+      scored.*,
+      row_number() over (
+        partition by bucket
+        order by dynamic_priority desc, last_served_at asc nulls first, coarse_unit_id asc
+      )::integer as bucket_rank
+    from scored
+    where supply_grade = 'none'
+  ) as no_supply_ranked
+  where bucket_rank <= sqlc.arg(no_supply_per_bucket_limit)::integer
+)
+select
+  user_id,
+  coarse_unit_id,
+  status,
+  target_priority,
+  mastery_score,
+  last_progress_quality,
+  next_review_at,
+  supply_grade,
+  state_updated_at,
+  last_served_at,
+  served_count,
+  bucket,
+  dynamic_priority,
+  bucket_rank
+from ranked
+order by
+  case bucket
+    when 'hard_review' then 0
+    when 'new_now' then 1
+    when 'soft_review' then 2
+    else 3
+  end,
+  case when supply_grade = 'none' then 1 else 0 end,
+  dynamic_priority desc,
+  last_served_at asc nulls first,
+  coarse_unit_id asc;
+
+-- name: ListVideoUnitRecallRowsByUnitIDs :many
 select
   video_id,
   coarse_unit_id,
@@ -26,13 +161,18 @@ select
   sentence_indexes,
   best_evidence_sentence_index,
   best_evidence_span_index,
+  best_evidence_start_ms,
+  best_evidence_end_ms,
   best_evidence_candidate_score,
   best_evidence_target_text,
   duration_ms,
-  mapped_span_ratio
-from recommendation.v_recommendable_video_units
+  mapped_span_ratio,
+  content_quality_score,
+  rank_within_unit
+from recommendation.v_video_unit_recall_index
 where coarse_unit_id = any(sqlc.arg(coarse_unit_ids)::bigint[])
-order by coarse_unit_id asc, coverage_ratio desc, mention_count desc;
+  and rank_within_unit <= sqlc.arg(per_unit_limit)::integer
+order by coarse_unit_id asc, rank_within_unit asc;
 
 -- name: ListMasteredTargetFillVideoCandidates :many
 with matched as (
@@ -44,7 +184,7 @@ with matched as (
     coalesce(max(rvu.coverage_ratio), 0)::numeric(10,5) as max_coverage_ratio,
     coalesce(avg(rvu.mapped_span_ratio), 0)::numeric(10,5) as mapped_span_ratio
   from learning.user_unit_states as states
-  join recommendation.v_recommendable_video_units as rvu
+  join recommendation.v_video_unit_recall_index as rvu
     on rvu.coarse_unit_id = states.coarse_unit_id
   where states.user_id = sqlc.arg(user_id)
     and states.is_target = true
@@ -150,56 +290,6 @@ from recommendation.user_video_serving_states
 where user_id = sqlc.arg(user_id)
   and video_id = any(sqlc.arg(video_ids)::uuid[])
 order by video_id asc;
-
--- name: ListSemanticSpansByRefs :many
-with input as (
-  select distinct
-    (item->>'video_id')::uuid as video_id,
-    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
-    (item->>'sentence_index')::integer as sentence_index,
-    (item->>'span_index')::integer as span_index
-  from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
-)
-select
-  spans.video_id,
-  spans.sentence_index,
-  spans.span_index,
-  spans.coarse_unit_id,
-  spans.start_ms,
-  spans.end_ms,
-  spans.surface_text,
-  spans.explanation,
-  spans.base_form,
-  spans.translation,
-  spans.dictionary,
-  spans.mapping_reason
-from catalog.video_semantic_spans spans
-join input
-  on input.video_id = spans.video_id
- and input.coarse_unit_id = spans.coarse_unit_id
- and input.sentence_index = spans.sentence_index
- and input.span_index = spans.span_index
-order by spans.video_id, spans.coarse_unit_id, spans.sentence_index, spans.span_index;
-
--- name: ListTranscriptSentencesByRefs :many
-with input as (
-  select distinct
-    (item->>'video_id')::uuid as video_id,
-    (item->>'sentence_index')::integer as sentence_index
-  from jsonb_array_elements(sqlc.arg(refs)::jsonb) as refs(item)
-)
-select
-  sentences.video_id,
-  sentences.sentence_index,
-  sentences.start_ms,
-  sentences.end_ms,
-  sentences.text,
-  sentences.translation
-from catalog.video_transcript_sentences sentences
-join input
-  on input.video_id = sentences.video_id
- and input.sentence_index = sentences.sentence_index
-order by sentences.video_id, sentences.sentence_index;
 
 -- name: ListVideoUserStatesByUserAndVideoIDs :many
 select user_id, video_id, last_watched_at, watch_count, completed_count, last_position_ms, max_position_ms, total_watch_ms

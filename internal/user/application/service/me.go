@@ -13,41 +13,42 @@ import (
 type GetMeUsecase struct {
 	profiles repository.ProfileRepository
 	stats    repository.ActivityStatsRepository
+	now      func() time.Time
 }
 
-func NewGetMeUsecase(profiles repository.ProfileRepository, stats repository.ActivityStatsRepository) *GetMeUsecase {
-	return &GetMeUsecase{profiles: profiles, stats: stats}
+type MeOption func(*GetMeUsecase)
+
+func WithMeNow(now func() time.Time) MeOption {
+	return func(u *GetMeUsecase) {
+		if now != nil {
+			u.now = now
+		}
+	}
+}
+
+func NewGetMeUsecase(profiles repository.ProfileRepository, stats repository.ActivityStatsRepository, options ...MeOption) *GetMeUsecase {
+	usecase := &GetMeUsecase{
+		profiles: profiles,
+		stats:    stats,
+		now:      func() time.Time { return time.Now().UTC() },
+	}
+	for _, option := range options {
+		option(usecase)
+	}
+	return usecase
 }
 
 func (u *GetMeUsecase) Execute(ctx context.Context, request dto.MeRequest) (dto.MeResponse, error) {
-	if request.UserID == "" {
-		return dto.MeResponse{}, ValidationError("user_id is required")
-	}
-	if u.profiles == nil {
-		return dto.MeResponse{}, errors.New("profile repository is required")
-	}
-	if u.stats == nil {
-		return dto.MeResponse{}, errors.New("activity stats repository is required")
+	if err := u.validate(request.UserID); err != nil {
+		return dto.MeResponse{}, err
 	}
 
-	profile, found, err := u.profiles.GetProfile(ctx, request.UserID)
+	profile, err := u.getOrRepairProfile(ctx, request.UserID)
 	if err != nil {
 		return dto.MeResponse{}, err
 	}
-	if !found {
-		profile, err = u.profiles.RepairProfile(ctx, request.UserID)
-		if err != nil {
-			return dto.MeResponse{}, err
-		}
-	}
-
-	if timezone, _, ok := validTimezone(request.ClientTimezone); ok {
-		if profile.Timezone == nil || *profile.Timezone != timezone {
-			if err := u.profiles.UpdateTimezone(ctx, request.UserID, timezone); err != nil {
-				return dto.MeResponse{}, err
-			}
-			profile.Timezone = &timezone
-		}
+	if err := u.updateTimezoneIfNeeded(ctx, request.UserID, request.ClientTimezone, &profile); err != nil {
+		return dto.MeResponse{}, err
 	}
 
 	if err := u.stats.EnsureActivityStats(ctx, request.UserID); err != nil {
@@ -59,6 +60,11 @@ func (u *GetMeUsecase) Execute(ctx context.Context, request dto.MeRequest) (dto.
 	}
 	if !found {
 		activityStats = model.ActivityStats{UserID: request.UserID}
+	}
+
+	calendar, err := u.buildActivityCalendar(ctx, request.UserID, profile, request.ClientTimezone)
+	if err != nil {
+		return dto.MeResponse{}, err
 	}
 
 	return dto.MeResponse{
@@ -75,52 +81,61 @@ func (u *GetMeUsecase) Execute(ctx context.Context, request dto.MeRequest) (dto.
 			QuizAttemptCount:  activityStats.QuizAttemptCount,
 			StartedUnitCount:  activityStats.StartedUnitCount,
 		},
+		ActivityCalendar: calendar,
 	}, nil
 }
 
-type GetActivityCalendarUsecase struct {
-	profiles repository.ProfileRepository
-	stats    repository.ActivityStatsRepository
-	now      func() time.Time
-}
-
-func NewGetActivityCalendarUsecase(profiles repository.ProfileRepository, stats repository.ActivityStatsRepository) *GetActivityCalendarUsecase {
-	return &GetActivityCalendarUsecase{
-		profiles: profiles,
-		stats:    stats,
-		now:      func() time.Time { return time.Now().UTC() },
-	}
-}
-
-func (u *GetActivityCalendarUsecase) Execute(ctx context.Context, request dto.ActivityCalendarRequest) (dto.ActivityCalendarResponse, error) {
-	if request.UserID == "" {
-		return dto.ActivityCalendarResponse{}, ValidationError("user_id is required")
+func (u *GetMeUsecase) validate(userID string) error {
+	if userID == "" {
+		return ValidationError("user_id is required")
 	}
 	if u.profiles == nil {
-		return dto.ActivityCalendarResponse{}, errors.New("profile repository is required")
+		return errors.New("profile repository is required")
 	}
 	if u.stats == nil {
-		return dto.ActivityCalendarResponse{}, errors.New("activity stats repository is required")
+		return errors.New("activity stats repository is required")
 	}
+	return nil
+}
 
-	profile, found, err := u.profiles.GetProfile(ctx, request.UserID)
+func (u *GetMeUsecase) getOrRepairProfile(ctx context.Context, userID string) (model.UserProfile, error) {
+	profile, found, err := u.profiles.GetProfile(ctx, userID)
 	if err != nil {
-		return dto.ActivityCalendarResponse{}, err
+		return model.UserProfile{}, err
 	}
 	if !found {
-		profile, err = u.profiles.RepairProfile(ctx, request.UserID)
+		profile, err = u.profiles.RepairProfile(ctx, userID)
 		if err != nil {
-			return dto.ActivityCalendarResponse{}, err
+			return model.UserProfile{}, err
 		}
 	}
+	return profile, nil
+}
 
-	timezone, location := resolveTimezone(request.ClientTimezone, profile.Timezone)
+func (u *GetMeUsecase) updateTimezoneIfNeeded(ctx context.Context, userID string, clientTimezone string, profile *model.UserProfile) error {
+	if timezone, _, ok := validTimezone(clientTimezone); ok {
+		if profile.Timezone == nil || *profile.Timezone != timezone {
+			if err := u.profiles.UpdateTimezone(ctx, userID, timezone); err != nil {
+				return err
+			}
+			profile.Timezone = &timezone
+		}
+	}
+	return nil
+}
+
+func (u *GetMeUsecase) buildActivityCalendar(ctx context.Context, userID string, profile model.UserProfile, clientTimezone string) (dto.ActivityCalendar, error) {
+	timezone, location := resolveTimezone(clientTimezone, profile.Timezone)
 	today := dateOnly(u.now().In(location))
 	from := today.AddDate(0, 0, -6)
 
-	rows, err := u.stats.ListDailyActivityStats(ctx, request.UserID, from, today)
+	rows, err := u.stats.ListDailyActivityStats(ctx, userID, from, today)
 	if err != nil {
-		return dto.ActivityCalendarResponse{}, err
+		return dto.ActivityCalendar{}, err
+	}
+	currentStreakDays, err := u.stats.GetCurrentActivityStreakDays(ctx, userID, today)
+	if err != nil {
+		return dto.ActivityCalendar{}, err
 	}
 	byDate := make(map[string]model.DailyActivityStats, len(rows))
 	for _, row := range rows {
@@ -132,20 +147,19 @@ func (u *GetActivityCalendarUsecase) Execute(ctx context.Context, request dto.Ac
 		key := dateString(day)
 		row := byDate[key]
 		watchSeconds := row.WatchMS / 1000
-		isActive := watchSeconds > 0 || row.QuizAttemptCount > 0 || row.LearningInteractionCount > 0
 		days = append(days, dto.ActivityDay{
 			LocalDate:                key,
 			WatchSeconds:             watchSeconds,
 			QuizAttemptCount:         row.QuizAttemptCount,
 			LearningInteractionCount: row.LearningInteractionCount,
-			IsActive:                 isActive,
 		})
 	}
 
-	return dto.ActivityCalendarResponse{
-		Timezone: timezone,
-		Today:    dateString(today),
-		Days:     days,
+	return dto.ActivityCalendar{
+		Timezone:          timezone,
+		Today:             dateString(today),
+		CurrentStreakDays: currentStreakDays,
+		Days:              days,
 	}, nil
 }
 

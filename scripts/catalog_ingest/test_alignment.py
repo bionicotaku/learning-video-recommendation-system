@@ -271,6 +271,8 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
 
         self.assertEqual(unit_index.sentence_indexes, (0, 1, 2, 3, 4, 5))
         self.assertEqual((unit_index.best_evidence_ref.sentence_index, unit_index.best_evidence_ref.span_index), (2, 3))
+        self.assertEqual(unit_index.best_evidence_start_ms, 230)
+        self.assertEqual(unit_index.best_evidence_end_ms, 240)
         self.assertEqual(unit_index.best_evidence_scores["visual_context"], 3)
         self.assertEqual(unit_index.best_evidence_selection_reason, "clear context")
         self.assertIsNone(unit_index.best_evidence_question_reject_reason)
@@ -534,10 +536,14 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertEqual(span_params[0][11], "default reason")
 
         unit_sql, unit_params = cursor.executemany_calls[2]
+        self.assertIn("best_evidence_start_ms", unit_sql)
+        self.assertIn("best_evidence_end_ms", unit_sql)
         self.assertIn("best_evidence_candidate_score", unit_sql)
         self.assertIn("best_evidence_target_text", unit_sql)
-        self.assertEqual(unit_params[0][12], 8.35)
-        self.assertEqual(unit_params[0][13], "token")
+        self.assertEqual(unit_params[0][9], 0)
+        self.assertEqual(unit_params[0][10], 50)
+        self.assertEqual(unit_params[0][14], 8.35)
+        self.assertEqual(unit_params[0][15], "token")
 
     def test_repository_upserts_video_sentence_indexes_and_engagement_score(self) -> None:
         clip_input = _build_clip_input()

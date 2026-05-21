@@ -300,5 +300,77 @@ func refreshRecommendation(ctx context.Context, conn *pgxpool.Pool) error {
 		}
 		fmt.Printf("refreshed %s\n", target)
 	}
+	var hasProjectionMetadata bool
+	if err := conn.QueryRow(ctx, `select to_regclass('recommendation.recall_projection_metadata') is not null`).Scan(&hasProjectionMetadata); err != nil {
+		return fmt.Errorf("check recall projection metadata: %w", err)
+	}
+	if !hasProjectionMetadata {
+		return nil
+	}
+	if _, err := conn.Exec(ctx, `
+		insert into recommendation.recall_projection_metadata (projection_name, projection_updated_at)
+		values ('video_unit_recall_index', now())
+		on conflict (projection_name) do update
+		set projection_updated_at = excluded.projection_updated_at
+	`); err != nil {
+		return fmt.Errorf("update recall projection metadata: %w", err)
+	}
+	fmt.Println("updated recommendation.recall_projection_metadata")
 	return nil
+}
+
+func resetBusinessData(ctx context.Context, conn *pgxpool.Pool) error {
+	tables := []string{
+		"app_user.user_daily_activity_stats",
+		"app_user.user_activity_stats",
+		"app_user.user_profiles",
+		"analytics.learning_interaction_events",
+		"analytics.video_watch_events",
+		"analytics.quiz_events",
+		"learning.unit_learning_events",
+		"learning.user_unit_states",
+		"learning.user_learning_profiles",
+		"recommendation.video_recommendation_items",
+		"recommendation.video_recommendation_runs",
+		"recommendation.user_unit_recall_queue_states",
+		"recommendation.user_unit_recall_queue",
+		"recommendation.user_unit_serving_states",
+		"recommendation.user_video_serving_states",
+		"catalog.video_user_states",
+		"catalog.video_engagement_stats",
+		"catalog.questions",
+		"catalog.video_ingestion_records",
+		"catalog.video_unit_index",
+		"catalog.video_semantic_spans",
+		"catalog.video_transcript_sentences",
+		"catalog.video_transcripts",
+		"catalog.videos",
+	}
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, table := range tables {
+		var exists bool
+		if err := tx.QueryRow(ctx, `select to_regclass($1) is not null`, table).Scan(&exists); err != nil {
+			return fmt.Errorf("check table %s: %w", table, err)
+		}
+		if !exists {
+			continue
+		}
+		query := fmt.Sprintf("truncate table %s restart identity cascade", table)
+		if _, err := tx.Exec(ctx, query); err != nil {
+			return fmt.Errorf("truncate %s: %w", table, err)
+		}
+		fmt.Printf("truncated %s\n", table)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	return refreshRecommendation(ctx, conn)
 }

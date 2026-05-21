@@ -21,6 +21,7 @@ type ActivityStatsRepository interface {
 	EnsureActivityStats(ctx context.Context, userID string) error
 	GetActivityStats(ctx context.Context, userID string) (model.ActivityStats, bool, error)
 	ListDailyActivityStats(ctx context.Context, userID string, fromDate time.Time, toDate time.Time) ([]model.DailyActivityStats, error)
+	GetCurrentActivityStreakDays(ctx context.Context, userID string, today time.Time) (int64, error)
 }
 
 type ActivityStatsRecorder interface {

@@ -6,20 +6,23 @@ type EvidenceRef struct {
 }
 
 type VideoUnitCandidate struct {
-	VideoID         string
-	CoarseUnitID    int64
-	Lane            string
-	Bucket          string
-	UnitWeight      float64
-	MentionCount    int32
-	SentenceCount   int32
-	CoverageMs      int32
-	CoverageRatio   float64
-	SentenceIndexes []int32
-	BestEvidenceRef *EvidenceRef
-	DurationMs      int32
-	MappedSpanRatio float64
-	CandidateScore  float64
+	VideoID             string
+	CoarseUnitID        int64
+	Lane                string
+	Bucket              string
+	UnitWeight          float64
+	MentionCount        int32
+	SentenceCount       int32
+	CoverageMs          int32
+	CoverageRatio       float64
+	SentenceIndexes     []int32
+	BestEvidenceRef     *EvidenceRef
+	BestEvidenceStartMs int32
+	BestEvidenceEndMs   int32
+	DurationMs          int32
+	MappedSpanRatio     float64
+	ContentQualityScore float64
+	CandidateScore      float64
 }
 
 type ResolvedEvidenceWindow struct {

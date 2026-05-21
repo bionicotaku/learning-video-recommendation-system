@@ -33,6 +33,8 @@ func TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(t *t
 		learningStates,
 		inventory,
 		unitServing,
+		nil,
+		nil,
 	)
 
 	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
@@ -71,10 +73,60 @@ func TestDefaultContextAssemblerAssembleReturnsErrors(t *testing.T) {
 		&stubLearningStateReader{err: expectedErr},
 		&stubUnitInventoryReader{},
 		&stubUnitServingStateRepository{},
+		nil,
+		nil,
 	)
 
 	if _, err := assembler.Assemble(context.Background(), model.RecommendationRequest{UserID: "user-1"}); !errors.Is(err, expectedErr) {
 		t.Fatalf("expected error %v, got %v", expectedErr, err)
+	}
+}
+
+func TestDefaultContextAssemblerSkipsNoSupplyUnitsWhenFetchingRecallRows(t *testing.T) {
+	now := time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC)
+	repo := &stubRecallQueueRepository{
+		stateExists: true,
+		state: model.RecallQueueState{
+			UserID:                     "user-1",
+			SourceLearningMaxUpdatedAt: timePtr(now.Add(-time.Hour)),
+			SourceProjectionUpdatedAt:  now.Add(-time.Minute),
+			ActiveTargetUnitCount:      2,
+			RebuiltAt:                  now.Add(-time.Minute),
+		},
+		learningVersion:     apprepo.LearningStateVersion{ActiveTargetUnitCount: 2, SourceLearningMaxUpdatedAt: timePtr(now.Add(-time.Hour))},
+		projectionUpdatedAt: now.Add(-time.Minute),
+		candidates: []model.RecallQueueCandidate{
+			{UserID: "user-1", CoarseUnitID: 101, Status: "learning", SupplyGrade: "ok", Bucket: "hard_review", DynamicPriority: 1, StateUpdatedAt: now.Add(-time.Hour)},
+			{UserID: "user-1", CoarseUnitID: 202, Status: "learning", SupplyGrade: "none", Bucket: "hard_review", DynamicPriority: 2, StateUpdatedAt: now.Add(-time.Hour)},
+		},
+	}
+	recommendable := &stubRecommendableVideoUnitReader{}
+	assembler := appservice.NewDefaultContextAssembler(
+		&stubLearningStateReader{},
+		&stubUnitInventoryReader{},
+		&stubUnitServingStateRepository{},
+		appservice.NewRecallQueueService(repo),
+		recommendable,
+	)
+
+	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
+		UserID:           "user-1",
+		TargetVideoCount: 8,
+	})
+	if err != nil {
+		t.Fatalf("assemble: %v", err)
+	}
+	if len(contextModel.ActiveUnitStates) != 2 {
+		t.Fatalf("planner context should keep both scoped units, got %d", len(contextModel.ActiveUnitStates))
+	}
+	if len(recommendable.lastUnitIDs) != 1 || recommendable.lastUnitIDs[0] != 101 {
+		t.Fatalf("recommendable rows should only fetch supplied units, got %#v", recommendable.lastUnitIDs)
+	}
+	if contextModel.RecallScope.PlannerScopeUnitCount != 2 {
+		t.Fatalf("planner scope count = %d, want 2", contextModel.RecallScope.PlannerScopeUnitCount)
+	}
+	if contextModel.RecallScope.RecallFetchUnitCount != 1 {
+		t.Fatalf("recall fetch unit count = %d, want 1", contextModel.RecallScope.RecallFetchUnitCount)
 	}
 }
 
@@ -112,9 +164,10 @@ func (s *stubUnitServingStateRepository) IncrementServedCounts(context.Context, 
 }
 
 var (
-	_ apprepo.LearningStateReader        = (*stubLearningStateReader)(nil)
-	_ apprepo.UnitInventoryReader        = (*stubUnitInventoryReader)(nil)
-	_ apprepo.UnitServingStateRepository = (*stubUnitServingStateRepository)(nil)
+	_ apprepo.LearningStateReader          = (*stubLearningStateReader)(nil)
+	_ apprepo.UnitInventoryReader          = (*stubUnitInventoryReader)(nil)
+	_ apprepo.UnitServingStateRepository   = (*stubUnitServingStateRepository)(nil)
+	_ apprepo.RecommendableVideoUnitReader = (*stubRecommendableVideoUnitReader)(nil)
 )
 
 func TestDefaultContextAssemblerSetsInternalPreferredDurationAndNow(t *testing.T) {
@@ -122,6 +175,8 @@ func TestDefaultContextAssemblerSetsInternalPreferredDurationAndNow(t *testing.T
 		&stubLearningStateReader{},
 		&stubUnitInventoryReader{},
 		&stubUnitServingStateRepository{},
+		nil,
+		nil,
 	)
 	contextModel, err := assembler.Assemble(context.Background(), model.RecommendationRequest{
 		UserID: "user-1",

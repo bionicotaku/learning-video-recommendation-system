@@ -47,8 +47,7 @@
 
 | Method | Path | 说明 |
 |---|---|---|
-| `GET` | `/api/me` | 读取当前用户基础 profile 和累计活动统计；可根据合法 `X-Client-Timezone` 顺手更新 timezone，并在 profile 缺失时 lazy repair。 |
-| `GET` | `/api/me/activity-calendar` | 读取今天和过去 6 天的活动日历统计；只读 daily stats，不更新 timezone。 |
+| `GET` | `/api/me` | 读取当前用户基础 profile、累计活动统计和内嵌 7 天 activity calendar；可根据合法 `X-Client-Timezone` 顺手更新 timezone，并在 profile 缺失时 lazy repair。 |
 
 ### Unit Collections / 词书目标
 
@@ -103,7 +102,7 @@
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；后者由 Learning Engine 事务性切换当前学习目标集合。 |
-| [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me` 与 `GET /api/me/activity-calendar`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 `/api/me` timezone。 |
+| [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
 
 ## 未开始范围
 

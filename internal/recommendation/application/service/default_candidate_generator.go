@@ -15,6 +15,11 @@ type DefaultCandidateGenerator struct {
 	recommendable apprepo.RecommendableVideoUnitReader
 }
 
+const (
+	minRecallRowsPerUnit = 20
+	maxRecallRowsPerUnit = 50
+)
+
 var _ domaincandidate.CandidateGenerator = (*DefaultCandidateGenerator)(nil)
 
 func NewDefaultCandidateGenerator(recommendable apprepo.RecommendableVideoUnitReader) *DefaultCandidateGenerator {
@@ -73,7 +78,7 @@ func (g *DefaultCandidateGenerator) loadRecommendableRows(ctx context.Context, r
 		return []model.RecommendableVideoUnit{}, nil
 	}
 
-	return g.recommendable.ListByUnitIDs(ctx, unitIDs)
+	return g.recommendable.ListByUnitIDs(ctx, unitIDs, recallRowsPerUnitLimit(demand))
 }
 
 func (g *DefaultCandidateGenerator) generateExactCore(rows []model.RecommendableVideoUnit, demand model.DemandBundle) []model.VideoUnitCandidate {
@@ -278,37 +283,47 @@ func (g *DefaultCandidateGenerator) generateQualityFallback(rows []model.Recomme
 
 func videoUnitCandidateFromRow(row model.RecommendableVideoUnit, demandUnit model.DemandUnit, lane string, candidateScore float64) model.VideoUnitCandidate {
 	return model.VideoUnitCandidate{
-		VideoID:         row.VideoID,
-		CoarseUnitID:    row.CoarseUnitID,
-		Lane:            lane,
-		Bucket:          demandUnit.Bucket,
-		UnitWeight:      demandUnit.Weight,
-		MentionCount:    row.MentionCount,
-		SentenceCount:   row.SentenceCount,
-		CoverageMs:      row.CoverageMs,
-		CoverageRatio:   row.CoverageRatio,
-		SentenceIndexes: row.SentenceIndexes,
-		BestEvidenceRef: &row.BestEvidenceRef,
-		DurationMs:      row.DurationMs,
-		MappedSpanRatio: row.MappedSpanRatio,
-		CandidateScore:  candidateScore,
+		VideoID:             row.VideoID,
+		CoarseUnitID:        row.CoarseUnitID,
+		Lane:                lane,
+		Bucket:              demandUnit.Bucket,
+		UnitWeight:          demandUnit.Weight,
+		MentionCount:        row.MentionCount,
+		SentenceCount:       row.SentenceCount,
+		CoverageMs:          row.CoverageMs,
+		CoverageRatio:       row.CoverageRatio,
+		SentenceIndexes:     row.SentenceIndexes,
+		BestEvidenceRef:     &row.BestEvidenceRef,
+		BestEvidenceStartMs: row.BestEvidenceStartMs,
+		BestEvidenceEndMs:   row.BestEvidenceEndMs,
+		DurationMs:          row.DurationMs,
+		MappedSpanRatio:     row.MappedSpanRatio,
+		ContentQualityScore: row.ContentQualityScore,
+		CandidateScore:      candidateScore,
 	}
 }
 
 func exactCoreScore(row model.RecommendableVideoUnit, demandUnit model.DemandUnit) float64 {
-	return round4(demandUnit.Weight*0.55 + coverageStrength(row)*0.45)
+	return round4(demandUnit.Weight*0.50 + contentQuality(row)*0.40 + coverageStrength(row)*0.10)
 }
 
 func bundleUnitScore(row model.RecommendableVideoUnit, demandUnit model.DemandUnit) float64 {
-	return round4(demandUnit.Weight*0.50 + coverageStrength(row)*0.35 + bundleBucketBonus(demandUnit.Bucket))
+	return round4(demandUnit.Weight*0.45 + contentQuality(row)*0.35 + coverageStrength(row)*0.10 + bundleBucketBonus(demandUnit.Bucket))
 }
 
 func softFutureScore(row model.RecommendableVideoUnit, demandUnit model.DemandUnit) float64 {
-	return round4(demandUnit.Weight*0.45 + coverageStrength(row)*0.35 + bundleBucketBonus(demandUnit.Bucket))
+	return round4(demandUnit.Weight*0.40 + contentQuality(row)*0.35 + coverageStrength(row)*0.10 + bundleBucketBonus(demandUnit.Bucket))
 }
 
 func fallbackScore(row model.RecommendableVideoUnit, demandUnit model.DemandUnit, preferredDurationSec [2]int) float64 {
-	return round4(durationFit(row.DurationMs, preferredDurationSec)*0.40 + coverageStrength(row)*0.35 + demandUnit.Weight*0.25)
+	return round4(durationFit(row.DurationMs, preferredDurationSec)*0.30 + contentQuality(row)*0.35 + coverageStrength(row)*0.15 + demandUnit.Weight*0.20)
+}
+
+func contentQuality(row model.RecommendableVideoUnit) float64 {
+	if row.ContentQualityScore > 0 {
+		return row.ContentQualityScore
+	}
+	return coverageStrength(row)
 }
 
 func coverageStrength(row model.RecommendableVideoUnit) float64 {
@@ -420,6 +435,19 @@ func demandUnitIDs(demand model.DemandBundle) []int64 {
 		}
 	}
 	return result
+}
+
+func recallRowsPerUnitLimit(demand model.DemandBundle) int32 {
+	return recallRowsPerUnitLimitForTarget(demand.TargetVideoCount)
+}
+
+func recallRowsPerUnitLimitForTarget(targetVideoCount int) int32 {
+	if targetVideoCount <= 0 {
+		targetVideoCount = defaultTargetVideoCount
+	}
+	limit := maxInt(minRecallRowsPerUnit, targetVideoCount*4)
+	limit = minInt(limit, maxRecallRowsPerUnit)
+	return int32(limit)
 }
 
 func demandUnitsByID(demand model.DemandBundle) map[int64]model.DemandUnit {

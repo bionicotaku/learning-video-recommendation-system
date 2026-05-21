@@ -9,7 +9,9 @@ import (
 )
 
 type AuthUser struct {
-	ID pgtype.UUID `json:"id"`
+	ID               pgtype.UUID        `json:"id"`
+	Email            pgtype.Text        `json:"email"`
+	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
 }
 
 type CatalogVideo struct {

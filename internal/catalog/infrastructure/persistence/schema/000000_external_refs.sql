@@ -3,7 +3,9 @@ create schema if not exists semantic;
 create schema if not exists analytics;
 
 create table if not exists auth.users (
-  id uuid primary key
+  id uuid primary key,
+  email text,
+  email_confirmed_at timestamptz
 );
 
 create sequence if not exists semantic.coarse_unit_id_seq;

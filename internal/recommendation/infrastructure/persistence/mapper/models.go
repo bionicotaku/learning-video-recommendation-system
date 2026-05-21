@@ -78,7 +78,7 @@ func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (mode
 	}, nil
 }
 
-func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnitsByUnitIDsRow) (model.RecommendableVideoUnit, error) {
+func ToRecommendableVideoUnit(row recommendationsqlc.ListVideoUnitRecallRowsByUnitIDsRow) (model.RecommendableVideoUnit, error) {
 	coarseUnitID := int64(0)
 	if row.CoarseUnitID.Valid {
 		coarseUnitID = row.CoarseUnitID.Int64
@@ -107,6 +107,10 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnits
 	if err != nil {
 		return model.RecommendableVideoUnit{}, err
 	}
+	contentQualityScore, err := NumericToFloat64(row.ContentQualityScore)
+	if err != nil {
+		return model.RecommendableVideoUnit{}, err
+	}
 	bestEvidenceCandidateScore, err := NumericPointerToFloat64(row.BestEvidenceCandidateScore)
 	if err != nil {
 		return model.RecommendableVideoUnit{}, err
@@ -124,10 +128,14 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListRecommendableVideoUnits
 			SentenceIndex: Int32FromPG(row.BestEvidenceSentenceIndex),
 			SpanIndex:     Int32FromPG(row.BestEvidenceSpanIndex),
 		},
+		BestEvidenceStartMs:        Int32FromPG(row.BestEvidenceStartMs),
+		BestEvidenceEndMs:          Int32FromPG(row.BestEvidenceEndMs),
 		BestEvidenceCandidateScore: bestEvidenceCandidateScore,
 		BestEvidenceTargetText:     TextPointerFromPG(row.BestEvidenceTargetText),
 		DurationMs:                 durationMs,
 		MappedSpanRatio:            mappedSpanRatio,
+		ContentQualityScore:        contentQualityScore,
+		RankWithinUnit:             Int32FromPG(row.RankWithinUnit),
 	}, nil
 }
 
@@ -230,34 +238,6 @@ func ToUnitVideoInventory(row recommendationsqlc.RecommendationVUnitVideoInvento
 		SupplyGrade:        TextToString(row.SupplyGrade),
 		UpdatedAt:          TimeFromPG(row.UpdatedAt),
 	}, nil
-}
-
-func ToSemanticSpan(row recommendationsqlc.CatalogVideoSemanticSpan) model.SemanticSpan {
-	return model.SemanticSpan{
-		VideoID:       UUIDToString(row.VideoID),
-		SentenceIndex: row.SentenceIndex,
-		SpanIndex:     row.SpanIndex,
-		CoarseUnitID:  Int64PointerFromPG(row.CoarseUnitID),
-		StartMs:       row.StartMs,
-		EndMs:         row.EndMs,
-		SurfaceText:   row.SurfaceText,
-		Explanation:   TextPointerFromPG(row.Explanation),
-		BaseForm:      TextPointerFromPG(row.BaseForm),
-		Translation:   TextPointerFromPG(row.Translation),
-		Dictionary:    TextPointerFromPG(row.Dictionary),
-		MappingReason: TextPointerFromPG(row.MappingReason),
-	}
-}
-
-func ToTranscriptSentence(row recommendationsqlc.CatalogVideoTranscriptSentence) model.TranscriptSentence {
-	return model.TranscriptSentence{
-		VideoID:       UUIDToString(row.VideoID),
-		SentenceIndex: row.SentenceIndex,
-		StartMs:       row.StartMs,
-		EndMs:         row.EndMs,
-		Text:          row.Text,
-		Translation:   TextPointerFromPG(row.Translation),
-	}
 }
 
 func ToVideoUserState(row recommendationsqlc.CatalogVideoUserState) (model.VideoUserState, error) {

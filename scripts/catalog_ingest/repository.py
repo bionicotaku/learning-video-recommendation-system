@@ -559,13 +559,15 @@ class CatalogRepository:
                   sentence_indexes,
                   best_evidence_sentence_index,
                   best_evidence_span_index,
+                  best_evidence_start_ms,
+                  best_evidence_end_ms,
                   best_evidence_scores,
                   best_evidence_question_reject_reason,
                   best_evidence_selection_reason,
                   best_evidence_candidate_score,
                   best_evidence_target_text
                 )
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 [
                     (
@@ -578,6 +580,8 @@ class CatalogRepository:
                         list(unit.sentence_indexes),
                         unit.best_evidence_ref.sentence_index,
                         unit.best_evidence_ref.span_index,
+                        unit.best_evidence_start_ms,
+                        unit.best_evidence_end_ms,
                         Jsonb(unit.best_evidence_scores),
                         unit.best_evidence_question_reject_reason,
                         unit.best_evidence_selection_reason,

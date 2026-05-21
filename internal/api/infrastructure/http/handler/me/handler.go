@@ -18,22 +18,16 @@ type GetMeUsecase interface {
 	Execute(ctx context.Context, request userdto.MeRequest) (userdto.MeResponse, error)
 }
 
-type GetActivityCalendarUsecase interface {
-	Execute(ctx context.Context, request userdto.ActivityCalendarRequest) (userdto.ActivityCalendarResponse, error)
-}
-
 type Handler struct {
-	getMe               GetMeUsecase
-	getActivityCalendar GetActivityCalendarUsecase
+	getMe GetMeUsecase
 }
 
-func NewHandler(getMe GetMeUsecase, getActivityCalendar GetActivityCalendarUsecase) *Handler {
-	return &Handler{getMe: getMe, getActivityCalendar: getActivityCalendar}
+func NewHandler(getMe GetMeUsecase) *Handler {
+	return &Handler{getMe: getMe}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/me", h.handleGetMe)
-	mux.HandleFunc("GET /api/me/activity-calendar", h.handleGetActivityCalendar)
 }
 
 func (h *Handler) handleGetMe(w http.ResponseWriter, r *http.Request) {
@@ -43,23 +37,6 @@ func (h *Handler) handleGetMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := h.getMe.Execute(r.Context(), userdto.MeRequest{
-		UserID:         principal.UserID,
-		ClientTimezone: r.Header.Get("X-Client-Timezone"),
-	})
-	if err != nil {
-		writeHandlerError(w, r, err)
-		return
-	}
-	response.WriteJSON(w, http.StatusOK, result)
-}
-
-func (h *Handler) handleGetActivityCalendar(w http.ResponseWriter, r *http.Request) {
-	principal, err := requiredPrincipal(r)
-	if err != nil {
-		writeHandlerError(w, r, err)
-		return
-	}
-	result, err := h.getActivityCalendar.Execute(r.Context(), userdto.ActivityCalendarRequest{
 		UserID:         principal.UserID,
 		ClientTimezone: r.Header.Get("X-Client-Timezone"),
 	})

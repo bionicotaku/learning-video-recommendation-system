@@ -186,6 +186,8 @@ func educationalFit(window model.ResolvedEvidenceWindow, preferredDurationSec [2
 	windowCompleteness := 0.5
 	if len(window.WindowSentenceIndexes) > 0 && len(window.ResolvedSentences) > 0 {
 		windowCompleteness = math.Min(1.0, float64(len(window.ResolvedSentences))/float64(len(window.WindowSentenceIndexes)))
+	} else if window.BestEvidenceStartMs != nil && window.BestEvidenceEndMs != nil {
+		windowCompleteness = 1.0
 	}
 	return round4(durationFit(window.Candidate.DurationMs, preferredDurationSec)*0.55 + windowCompleteness*0.45)
 }

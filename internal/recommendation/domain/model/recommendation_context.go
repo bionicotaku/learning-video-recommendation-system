@@ -12,4 +12,5 @@ type RecommendationContext struct {
 	VideoServingStates     []UserVideoServingState
 	VideoUserStates        []VideoUserState
 	RecommendableVideoUnit []RecommendableVideoUnit
+	RecallScope            RecallScopeSummary
 }

@@ -56,3 +56,46 @@ from app_user.user_daily_activity_stats
 where user_id = sqlc.arg(user_id)
   and local_date between sqlc.arg(from_date)::date and sqlc.arg(to_date)::date
 order by local_date asc;
+
+-- name: GetCurrentActivityStreakDays :one
+with recursive anchor as (
+  select candidate.local_date
+  from (
+    select sqlc.arg(today)::date as local_date
+    union all
+    select (sqlc.arg(today)::date - 1)::date as local_date
+  ) candidate
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = sqlc.arg(user_id)
+      and s.local_date = candidate.local_date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+  order by candidate.local_date desc
+  limit 1
+),
+streak(local_date) as (
+  select local_date
+  from anchor
+  union all
+  select (streak.local_date - 1)::date
+  from streak
+  where exists (
+    select 1
+    from app_user.user_daily_activity_stats s
+    where s.user_id = sqlc.arg(user_id)
+      and s.local_date = (streak.local_date - 1)::date
+      and (
+        s.watch_ms > 0
+        or s.quiz_attempt_count > 0
+        or s.learning_interaction_count > 0
+      )
+  )
+)
+select count(*)::bigint
+from streak;

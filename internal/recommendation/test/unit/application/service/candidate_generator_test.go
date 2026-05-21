@@ -17,15 +17,19 @@ import (
 )
 
 type stubRecommendableVideoUnitReader struct {
-	rows    []model.RecommendableVideoUnit
-	lastCtx context.Context
-	err     error
+	rows         []model.RecommendableVideoUnit
+	lastCtx      context.Context
+	lastUnitIDs  []int64
+	perUnitLimit int32
+	err          error
 }
 
 var _ apprepo.RecommendableVideoUnitReader = (*stubRecommendableVideoUnitReader)(nil)
 
-func (s *stubRecommendableVideoUnitReader) ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64) ([]model.RecommendableVideoUnit, error) {
+func (s *stubRecommendableVideoUnitReader) ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64, perUnitLimit int32) ([]model.RecommendableVideoUnit, error) {
 	s.lastCtx = ctx
+	s.lastUnitIDs = append([]int64(nil), coarseUnitIDs...)
+	s.perUnitLimit = perUnitLimit
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -355,16 +359,19 @@ func appendUnique(values []string, value string) []string {
 
 func recommendableRow(videoID string, unitID int64, mentions int32, sentences int32, coverageMs int32, coverageRatio float64, mappedSpanRatio float64, durationMs int32) model.RecommendableVideoUnit {
 	return model.RecommendableVideoUnit{
-		VideoID:         videoID,
-		CoarseUnitID:    unitID,
-		MentionCount:    mentions,
-		SentenceCount:   sentences,
-		CoverageMs:      coverageMs,
-		CoverageRatio:   coverageRatio,
-		SentenceIndexes: []int32{1, 2},
-		DurationMs:      durationMs,
-		MappedSpanRatio: mappedSpanRatio,
-		BestEvidenceRef: model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
+		VideoID:             videoID,
+		CoarseUnitID:        unitID,
+		MentionCount:        mentions,
+		SentenceCount:       sentences,
+		CoverageMs:          coverageMs,
+		CoverageRatio:       coverageRatio,
+		SentenceIndexes:     []int32{1, 2},
+		DurationMs:          durationMs,
+		MappedSpanRatio:     mappedSpanRatio,
+		BestEvidenceRef:     model.EvidenceRef{SentenceIndex: 1, SpanIndex: 1},
+		BestEvidenceStartMs: 1000,
+		BestEvidenceEndMs:   1500,
+		ContentQualityScore: coverageRatio,
 	}
 }
 

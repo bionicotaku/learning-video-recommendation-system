@@ -12,7 +12,6 @@ import (
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	semanticdto "learning-video-recommendation-system/internal/semantic/application/dto"
-	userdto "learning-video-recommendation-system/internal/user/application/dto"
 	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 	userservice "learning-video-recommendation-system/internal/user/application/service"
 )
@@ -25,30 +24,13 @@ type ActivateUnitCollectionTargetUsecase interface {
 	Execute(ctx context.Context, request learningdto.ActivateUnitCollectionTargetRequest) (learningdto.ActivateUnitCollectionTargetResponse, error)
 }
 
-type UpdateOnboardingStatusUsecase interface {
-	Execute(ctx context.Context, request userdto.UpdateOnboardingStatusRequest) (userdto.UpdateOnboardingStatusResponse, error)
-}
-
 type Handler struct {
-	listCollections  ListUnitCollectionsUsecase
-	activateTarget   ActivateUnitCollectionTargetUsecase
-	updateOnboarding UpdateOnboardingStatusUsecase
+	listCollections ListUnitCollectionsUsecase
+	activateTarget  ActivateUnitCollectionTargetUsecase
 }
 
-type Option func(*Handler)
-
-func WithOnboardingStatus(usecase UpdateOnboardingStatusUsecase) Option {
-	return func(h *Handler) {
-		h.updateOnboarding = usecase
-	}
-}
-
-func NewHandler(listCollections ListUnitCollectionsUsecase, activateTarget ActivateUnitCollectionTargetUsecase, options ...Option) *Handler {
-	handler := &Handler{listCollections: listCollections, activateTarget: activateTarget}
-	for _, option := range options {
-		option(handler)
-	}
-	return handler
+func NewHandler(listCollections ListUnitCollectionsUsecase, activateTarget ActivateUnitCollectionTargetUsecase) *Handler {
+	return &Handler{listCollections: listCollections, activateTarget: activateTarget}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {

@@ -3,7 +3,9 @@ create schema if not exists semantic;
 create schema if not exists catalog;
 
 create table if not exists auth.users (
-  id uuid primary key
+  id uuid primary key,
+  email text,
+  email_confirmed_at timestamptz
 );
 
 create table if not exists semantic.coarse_unit (

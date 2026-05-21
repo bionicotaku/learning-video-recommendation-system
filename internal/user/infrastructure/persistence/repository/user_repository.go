@@ -137,6 +137,17 @@ func (r *Repository) ListDailyActivityStats(ctx context.Context, userID string, 
 	return result, nil
 }
 
+func (r *Repository) GetCurrentActivityStreakDays(ctx context.Context, userID string, today time.Time) (int64, error) {
+	uuid, err := stringToUUID(userID)
+	if err != nil {
+		return 0, err
+	}
+	return r.queries.GetCurrentActivityStreakDays(ctx, usersqlc.GetCurrentActivityStreakDaysParams{
+		UserID: uuid,
+		Today:  dateValue(today),
+	})
+}
+
 func (r *Repository) AddWatchDuration(ctx context.Context, userID string, activityAt time.Time, deltaWatchMS int64) error {
 	if deltaWatchMS <= 0 {
 		return nil

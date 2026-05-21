@@ -16,6 +16,7 @@ func schemaPlan() pgtest.SchemaPlan {
 		)),
 		pgtest.SQLText("drop placeholder recommendation materialized views", `
 			drop materialized view if exists recommendation.v_unit_video_inventory;
+			drop materialized view if exists recommendation.v_video_unit_recall_index;
 			drop materialized view if exists recommendation.v_recommendable_video_units;
 		`),
 		pgtest.MigrationDir(pgtest.RepoPath(

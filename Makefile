@@ -1,4 +1,4 @@
-.PHONY: fmt lint test quick-check check sqlc-generate semantic-test-integration analytics-test-integration learningengine-test-integration normalizer-test-integration integration-test catalog-test-integration recommendation-test-integration user-test-integration e2e-test \
+.PHONY: fmt lint test quick-check check sqlc-generate api-test-integration semantic-test-integration analytics-test-integration learningengine-test-integration normalizer-test-integration integration-test catalog-test-integration recommendation-test-integration user-test-integration e2e-test \
 	analytics-migrate-up analytics-migrate-down analytics-migrate-version analytics-migrate-status \
 	semantic-migrate-up semantic-migrate-down semantic-migrate-version semantic-migrate-status \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
@@ -30,6 +30,9 @@ sqlc-generate:
 	sqlc generate -f internal/recommendation/infrastructure/persistence/sqlc.yaml
 	sqlc generate -f internal/user/infrastructure/persistence/sqlc.yaml
 
+api-test-integration:
+	go test -tags=integration ./internal/api/test/integration/...
+
 semantic-test-integration:
 	go test -tags=integration ./internal/semantic/test/integration/...
 
@@ -52,7 +55,7 @@ user-test-integration:
 	go test -tags=integration ./internal/user/test/integration/...
 
 integration-test:
-	go test -tags=integration ./internal/semantic/test/integration/... ./internal/analytics/test/integration/... ./internal/catalog/test/integration/... ./internal/learningengine/reducer/test/integration/... ./internal/learningengine/normalizer/test/integration/... ./internal/recommendation/test/integration/... ./internal/user/test/integration/...
+	go test -tags=integration ./internal/api/test/integration/... ./internal/semantic/test/integration/... ./internal/analytics/test/integration/... ./internal/catalog/test/integration/... ./internal/learningengine/reducer/test/integration/... ./internal/learningengine/normalizer/test/integration/... ./internal/recommendation/test/integration/... ./internal/user/test/integration/...
 
 e2e-test:
 	go test -tags=e2e ./internal/test/e2e/...

@@ -15,16 +15,17 @@ The current mobile MVP does not implement CORS middleware. If a browser-based
 client is introduced later, add a dedicated CORS middleware and allowlist
 configuration then.
 
-It does not own business tables, migrations, SQLC packages, repositories, or
-domain rules. Business rules remain in `catalog`, `analytics`,
-`learningengine`, `recommendation`, `semantic`, and `user`.
+It does not own business tables, migrations, SQLC packages, or domain rules.
+Business rules remain in `catalog`, `analytics`, `learningengine`,
+`recommendation`, `semantic`, and `user`. API may define small facade ports and
+transaction adapters when one HTTP endpoint must commit multiple module-owned
+repositories together.
 
 Current implemented endpoint group:
 
 ```text
 POST /api/feed
 GET /api/me
-GET /api/me/activity-calendar
 POST /api/videos/end-quiz
 GET /api/unit-collections
 PUT /api/learning-targets/active-collection
@@ -52,14 +53,12 @@ Missing display data, incomplete evidence, missing unit labels, or invalid media
 URLs are treated as backend consistency failures.
 
 `GET /api/me` reads the trusted principal as `user_id`, returns the User profile
-cache plus precomputed global activity stats, and may update the stored profile
-timezone when `X-Client-Timezone` contains a valid IANA timezone. It does not
-aggregate Catalog, Analytics, or Learning Engine tables at request time.
-
-`GET /api/me/activity-calendar` returns today plus the previous six days in
-ascending date order. It uses a valid `X-Client-Timezone` if provided, otherwise
-falls back to the stored profile timezone and then UTC. This endpoint never
-updates the stored profile timezone.
+cache plus precomputed global activity stats and an embedded seven-day activity
+calendar, and may update the stored profile timezone when `X-Client-Timezone`
+contains a valid IANA timezone. The activity calendar returns today plus the
+previous six days in ascending date order and includes `current_streak_days`;
+day rows do not include an `is_active` boolean. It does not aggregate Catalog,
+Analytics, or Learning Engine tables at request time.
 
 `POST /api/videos/end-quiz` is a read-only quiz lookup endpoint for the video
 ending experience. The handler validates `video_id`, de-duplicates up to eight
@@ -70,9 +69,13 @@ answers still go through `POST /api/quiz-attempts`.
 
 `GET /api/unit-collections` lists active Semantic unit collections for target
 selection. `PUT /api/learning-targets/active-collection` reads the trusted
-principal as `user_id`, validates `collection_slug`, and calls Learning Engine
-to switch the user's collection target projection in one transaction. API does
-not pull collection members into memory or write `learning.*` directly.
+principal as `user_id`, validates `collection_slug`, and opens one user-scoped
+transaction that switches the Learning Engine collection target projection and
+updates User onboarding to `collection_selected`. API does not pull collection
+members into memory or bypass the owning module repositories. The endpoint is
+synchronous: `200 OK` means the target projection and onboarding update are
+already committed; there is no activation job or background switching state in
+the MVP.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset

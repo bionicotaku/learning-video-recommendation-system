@@ -4,8 +4,8 @@
 
 文档状态：MVP 已实现，作为当前模块边界维护。
 目标读者：后端 API、User、Learning Engine、Supabase Auth 维护者。
-当前范围：定义 `internal/user` 的模块边界、`app_user.user_profiles` 表、Supabase Auth 注册 trigger、邮箱缓存同步、用户活动统计投影、`/api/me` 与 activity calendar 支撑能力。
-当前明确不做：不做完整账号系统、不做用户关系、不做权限系统、不做 streak 规则、不做多租户组织模型。
+当前范围：定义 `internal/user` 的模块边界、`app_user.user_profiles` 表、Supabase Auth 注册 trigger、邮箱缓存同步、用户活动统计投影、`/api/me` 内嵌 activity calendar 支撑能力。
+当前明确不做：不做完整账号系统、不做用户关系、不做权限系统、不做复杂 streak 规则、不做多租户组织模型。
 
 关联文档：
 
@@ -221,9 +221,9 @@ MVP 状态：
 | `collection_selected` | 用户已经选择学习目标合集。 |
 | `completed` | 用户已完成完整初始化流程。 |
 
-当前如果只要求用户选择一本词书，可以在 `PUT /api/learning-targets/active-collection` 成功后把状态更新为 `collection_selected` 或 `completed`。具体选择由产品流程决定。
+当前只要求用户选择一本词书。`PUT /api/learning-targets/active-collection` 成功时必须把状态更新为 `collection_selected`。
 
-User 模块只维护 onboarding 状态本身。词书激活的事务仍在 Learning Engine usecase 内完成。
+User 模块只维护 onboarding 状态本身。词书激活由 API facade 打开用户级事务，事务内同时调用 Learning Engine target repository 和 User profile repository；任一写入失败时，词书 target projection 与 onboarding 状态一起回滚。
 
 ## 6. Supabase Trigger
 
@@ -359,16 +359,18 @@ GetMe(ctx, user_id, client_timezone)
 2. 如果 profile 不存在，从 `auth.users` 读取 email 并补建 profile。
 3. 如果 `client_timezone` 合法且和库里不同，更新 `timezone`。
 4. 读取或默认补齐 `app_user.user_activity_stats`。
-5. 返回 profile 和累计统计。
+5. 读取 `app_user.user_daily_activity_stats`，补齐 7 天 activity calendar，并计算当前连续活跃天数。
+6. 返回 profile、累计统计和 activity calendar。
 
 `GetMe` 是 read + light write usecase。它可能创建缺失 profile，也可能更新 timezone。
 
-### 7.2 `GetActivityCalendar`
+### 7.2 `GetMe` 内嵌 Activity Calendar
 
 ```text
-GetActivityCalendar(ctx, user_id, client_timezone)
+GetMe(ctx, user_id, client_timezone).activity_calendar
   -> timezone
   -> today
+  -> current_streak_days
   -> 7 days
 ```
 
@@ -378,8 +380,9 @@ GetActivityCalendar(ctx, user_id, client_timezone)
 2. 按 timezone 计算今天和过去 6 天。
 3. 读取 `app_user.user_daily_activity_stats`。
 4. 后端补齐没有活动的日期，固定返回 7 天。
+5. 计算当前连续活跃天数：今天活跃则从今天往前数；今天未活跃但昨天活跃则从昨天往前数；今天和昨天都未活跃则为 0。
 
-`GetActivityCalendar` 只读 daily stats，不更新 profile timezone。
+activity calendar 是 `GetMe` response 的内嵌字段，不再暴露独立 HTTP endpoint。`GetMe` 会先处理合法 `X-Client-Timezone` 的 profile timezone 更新，再用最终 timezone 计算 calendar。
 
 ### 7.3 `UpdateProfile`
 
@@ -397,7 +400,9 @@ MVP 可以先不实现。实现时不允许修改 email。
 UpdateOnboardingStatus(ctx, user_id, status)
 ```
 
-可供 API facade 在词书激活成功后调用。该 usecase 只更新 `app_user.user_profiles.onboarding_status`，不参与 Learning Engine 事务。
+可供不需要跨模块事务的 API facade 调用。该 usecase 只更新 `app_user.user_profiles.onboarding_status`。
+
+`PUT /api/learning-targets/active-collection` 不使用“先激活词书、后单独调用 onboarding usecase”的两阶段流程。该接口使用 API facade 事务直接调用 User profile repository，使 `learning.*` target 投影和 `app_user.user_profiles.onboarding_status` 同事务提交。
 
 ### 7.5 `ActivityStatsRecorder`
 
@@ -475,10 +480,10 @@ response 不要求 API 层再读 auth.users 或聚合业务表
 2. 新增 `app_user` migration：schema、`user_profiles`、`user_activity_stats`、`user_daily_activity_stats`、index、trigger function、trigger。
 3. 新增 User repository：读取 profile、读取 auth user email、insert repair profile、update timezone、update onboarding status、读取/更新 activity stats。
 4. 新增 `GetMe` usecase。
-5. 新增 `GetActivityCalendar` usecase。
+5. 在 `GetMe` 内补齐 activity calendar 和 current streak。
 6. 新增 tx-aware `ActivityStatsRecorder`。
-7. 新增 API handler `GET /api/me` 和 `GET /api/me/activity-calendar`。
-8. 在 `PUT /api/learning-targets/active-collection` 成功后，可选调用 User usecase 更新 onboarding 状态。
+7. 新增 API handler `GET /api/me`。
+8. 在 `PUT /api/learning-targets/active-collection` 的 API facade 事务内更新 User onboarding 状态。
 9. 在 Catalog / Analytics / Learning Engine 的对应写入路径接入 User stats recorder。
 10. 补单元测试、repository integration、API integration。
 
@@ -504,8 +509,9 @@ make quick-check
 - `timezone` 不参与任何 `*_at` 字段解析。
 - `GET /api/me` 返回累计 `total_watch_seconds`、`quiz_attempt_count`、`started_unit_count`。
 - activity stats 缺失时按 0 返回或补建。
-- `GET /api/me/activity-calendar` 固定返回今天和过去 6 天，共 7 个日期。
+- `GET /api/me` 内嵌 activity calendar，固定返回今天和过去 6 天，共 7 个日期。
 - activity calendar 对没有数据的日期补 0。
+- activity calendar 返回 `current_streak_days`，但不在 `days[]` 中返回 `is_active`。
 - `AddWatchDuration` 同时累加全局和 daily watch。
 - `IncrementQuizAttempt` 只在 quiz inserted 时调用，duplicate 不重复增加。
 - `IncrementStartedUnit` 只在 progress 从 `0` 到 `>0` 时调用。

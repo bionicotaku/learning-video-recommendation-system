@@ -11,7 +11,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
 	"learning-video-recommendation-system/internal/recommendation/domain/model"
 	"learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/repository"
@@ -95,6 +94,217 @@ func TestLearningStateReaderListActiveByUserExcludesMasteredTargets(t *testing.T
 	want := []int64{322, 323, 324}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("unit ids = %v, want %v", got, want)
+	}
+}
+
+func TestRecallQueueRepositoryRebuildsAndRanksScopedCandidates(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000122"
+	db.SeedUser(t, userID)
+	for unitID := int64(331); unitID <= 334; unitID++ {
+		db.SeedCoarseUnit(t, unitID)
+	}
+	seedInventoryVideo(t, ctx, db, tx, "00000000-0000-0000-0000-000000000331", 331, 3, 0.12000, 0.70000)
+	seedInventoryVideo(t, ctx, db, tx, "00000000-0000-0000-0000-000000000332", 332, 3, 0.12000, 0.70000)
+	queries := recommendationsqlc.New(tx)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
+	}
+	if err := queries.RefreshUnitVideoInventory(ctx); err != nil {
+		t.Fatalf("refresh inventory: %v", err)
+	}
+
+	now := time.Now().UTC()
+	if _, err := tx.Exec(ctx, `
+		insert into learning.user_unit_states (
+			user_id, coarse_unit_id, is_target, target_priority, status, mastery_score, last_progress_quality, next_review_at, updated_at
+		) values
+			($1, 331, true, 0.90, 'reviewing', 0.7, 2, $2, $3),
+			($1, 332, true, 0.80, 'new', 0.0, null, null, $3),
+			($1, 333, true, 0.70, 'learning', 0.5, null, $4, $3),
+			($1, 334, true, 0.60, 'mastered', 1.0, null, null, $3)
+	`, userID, now.Add(-time.Minute), now.Add(-time.Hour), now.Add(24*time.Hour)); err != nil {
+		t.Fatalf("seed learning states: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		insert into recommendation.user_unit_serving_states (user_id, coarse_unit_id, last_served_at, served_count)
+		values ($1, 331, $2, 3)
+	`, userID, now.Add(-time.Hour)); err != nil {
+		t.Fatalf("seed serving state: %v", err)
+	}
+
+	repo := repository.NewRecallQueueRepository(tx)
+	projectionUpdatedAt, err := repo.GetProjectionUpdatedAt(ctx)
+	if err != nil {
+		t.Fatalf("get projection metadata: %v", err)
+	}
+	state, err := repo.RebuildUserQueue(ctx, userID, projectionUpdatedAt)
+	if err != nil {
+		t.Fatalf("rebuild queue: %v", err)
+	}
+	if state.ActiveTargetUnitCount != 3 {
+		t.Fatalf("active target count = %d, want 3", state.ActiveTargetUnitCount)
+	}
+
+	candidates, err := repo.ListCandidates(ctx, userID, now, 10, 4)
+	if err != nil {
+		t.Fatalf("list queue candidates: %v", err)
+	}
+	if len(candidates) != 3 {
+		t.Fatalf("candidate count = %d, want 3", len(candidates))
+	}
+	byUnit := make(map[int64]model.RecallQueueCandidate, len(candidates))
+	for _, candidate := range candidates {
+		byUnit[candidate.CoarseUnitID] = candidate
+	}
+	if byUnit[331].Bucket != "hard_review" {
+		t.Fatalf("unit 331 bucket = %q, want hard_review", byUnit[331].Bucket)
+	}
+	if byUnit[332].Bucket != "new_now" {
+		t.Fatalf("unit 332 bucket = %q, want new_now", byUnit[332].Bucket)
+	}
+	if byUnit[333].Bucket != "soft_review" {
+		t.Fatalf("unit 333 bucket = %q, want soft_review", byUnit[333].Bucket)
+	}
+	if byUnit[331].ServedCount != 3 || byUnit[331].LastServedAt == nil {
+		t.Fatalf("expected serving state joined into queue candidate: %+v", byUnit[331])
+	}
+}
+
+func TestRecallQueueRepositoryReturnsSuppliedCandidatesWhenNoSupplyHasHigherPriority(t *testing.T) {
+	db := testDB(t)
+	tx := fixture.BeginTestTx(t, db.Pool)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000124"
+	db.SeedUser(t, userID)
+	now := time.Now().UTC()
+
+	for unitID := int64(351); unitID <= 360; unitID++ {
+		db.SeedCoarseUnit(t, unitID)
+		if _, err := tx.Exec(ctx, `
+			insert into learning.user_unit_states (
+				user_id, coarse_unit_id, is_target, target_priority, status, mastery_score, last_progress_quality, updated_at
+			) values ($1, $2, true, 1.00, 'reviewing', 0.7, 2, $3)
+		`, userID, unitID, now.Add(-time.Hour)); err != nil {
+			t.Fatalf("seed no-supply learning state %d: %v", unitID, err)
+		}
+	}
+	for unitID := int64(361); unitID <= 363; unitID++ {
+		seedInventoryVideo(t, ctx, db, tx, videoIDFromIndex(int(unitID)), unitID, 3, 0.12000, 0.70000)
+		if _, err := tx.Exec(ctx, `
+			insert into learning.user_unit_states (
+				user_id, coarse_unit_id, is_target, target_priority, status, mastery_score, last_progress_quality, updated_at
+			) values ($1, $2, true, 0.20, 'reviewing', 0.7, 2, $3)
+		`, userID, unitID, now.Add(-time.Hour)); err != nil {
+			t.Fatalf("seed supplied learning state %d: %v", unitID, err)
+		}
+	}
+
+	queries := recommendationsqlc.New(tx)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
+	}
+	if err := queries.RefreshUnitVideoInventory(ctx); err != nil {
+		t.Fatalf("refresh inventory: %v", err)
+	}
+
+	repo := repository.NewRecallQueueRepository(tx)
+	projectionUpdatedAt, err := repo.GetProjectionUpdatedAt(ctx)
+	if err != nil {
+		t.Fatalf("get projection metadata: %v", err)
+	}
+	if _, err := repo.RebuildUserQueue(ctx, userID, projectionUpdatedAt); err != nil {
+		t.Fatalf("rebuild queue: %v", err)
+	}
+
+	candidates, err := repo.ListCandidates(ctx, userID, now, 3, 2)
+	if err != nil {
+		t.Fatalf("list queue candidates: %v", err)
+	}
+	suppliedCount := 0
+	noSupplyCount := 0
+	for _, candidate := range candidates {
+		switch candidate.SupplyGrade {
+		case "none":
+			noSupplyCount++
+		default:
+			suppliedCount++
+		}
+	}
+	if suppliedCount != 3 {
+		t.Fatalf("supplied candidates = %d, want 3; candidates=%#v", suppliedCount, candidates)
+	}
+	if noSupplyCount > 2 {
+		t.Fatalf("no-supply candidates = %d, want <=2; candidates=%#v", noSupplyCount, candidates)
+	}
+}
+
+func TestRecallQueueRepositorySerializesConcurrentUserRebuilds(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	userID := "00000000-0000-0000-0000-000000000123"
+	db.SeedUser(t, userID)
+	for unitID := int64(341); unitID <= 345; unitID++ {
+		seedInventoryVideo(t, ctx, db, db.Pool, videoIDFromIndex(int(unitID)), unitID, 3, 0.12000, 0.70000)
+	}
+	queries := recommendationsqlc.New(db.Pool)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
+	}
+	if err := queries.RefreshUnitVideoInventory(ctx); err != nil {
+		t.Fatalf("refresh inventory: %v", err)
+	}
+
+	now := time.Now().UTC()
+	for unitID := int64(341); unitID <= 345; unitID++ {
+		if _, err := db.Pool.Exec(ctx, `
+			insert into learning.user_unit_states (
+				user_id, coarse_unit_id, is_target, target_priority, status, mastery_score, updated_at
+			) values ($1, $2, true, 0.80, 'learning', 0.5, $3)
+		`, userID, unitID, now.Add(-time.Hour)); err != nil {
+			t.Fatalf("seed learning state %d: %v", unitID, err)
+		}
+	}
+
+	repo := repository.NewRecallQueueRepository(db.Pool)
+	projectionUpdatedAt, err := repo.GetProjectionUpdatedAt(ctx)
+	if err != nil {
+		t.Fatalf("get projection metadata: %v", err)
+	}
+	if _, err := repo.RebuildUserQueue(ctx, userID, projectionUpdatedAt); err != nil {
+		t.Fatalf("initial rebuild queue: %v", err)
+	}
+
+	const workers = 8
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := repo.RebuildUserQueue(ctx, userID, projectionUpdatedAt)
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent rebuild failed: %v", err)
+		}
+	}
+
+	var rowCount int
+	if err := db.Pool.QueryRow(ctx, `select count(*) from recommendation.user_unit_recall_queue where user_id = $1`, userID).Scan(&rowCount); err != nil {
+		t.Fatalf("count queue rows: %v", err)
+	}
+	if rowCount != 5 {
+		t.Fatalf("queue row count = %d, want 5", rowCount)
 	}
 }
 
@@ -258,56 +468,6 @@ func TestRecommendationAuditRepositoryInsertItems(t *testing.T) {
 	}
 }
 
-func TestEvidenceReadersBatchReadSpansAndSentences(t *testing.T) {
-	db := testDB(t)
-	tx := fixture.BeginTestTx(t, db.Pool)
-	ctx := context.Background()
-
-	userID := "00000000-0000-0000-0000-000000000113"
-	videoID1 := "00000000-0000-0000-0000-000000000213"
-	videoID2 := "00000000-0000-0000-0000-000000000214"
-	unitID1 := int64(313)
-	unitID2 := int64(314)
-	seedBaseRefs(t, ctx, db, tx, userID, videoID1, unitID1)
-	seedBaseRefs(t, ctx, db, tx, userID, videoID2, unitID2)
-	if _, err := tx.Exec(ctx, `insert into catalog.video_transcript_sentences (video_id, sentence_index, start_ms, end_ms, text, translation) values ($1, 2, 1900, 2500, 'sentence one', '句子一'), ($2, 3, 2900, 3500, 'sentence two', '句子二') on conflict do nothing`, videoID1, videoID2); err != nil {
-		t.Fatalf("seed extra transcript sentences: %v", err)
-	}
-	if _, err := tx.Exec(ctx, `insert into catalog.video_semantic_spans (video_id, sentence_index, span_index, coarse_unit_id, start_ms, end_ms, surface_text, explanation, base_form, translation, dictionary, mapping_reason) values ($1, 2, 1, $2, 2000, 2400, 'span one', 'explain one', 'span', '跨度', 'dict one', 'reason one'), ($3, 3, 1, $4, 3000, 3400, 'span two', 'explain two', 'span', '跨度', 'dict two', 'reason two') on conflict do nothing`, videoID1, unitID1, videoID2, unitID2); err != nil {
-		t.Fatalf("seed extra semantic spans: %v", err)
-	}
-
-	spanReader := repository.NewSemanticSpanReader(tx)
-	spans, err := spanReader.ListByVideoUnitRefs(ctx, []apprepo.SemanticSpanRef{
-		{VideoID: videoID1, CoarseUnitID: unitID1, Ref: model.EvidenceRef{SentenceIndex: 2, SpanIndex: 1}},
-		{VideoID: videoID2, CoarseUnitID: unitID2, Ref: model.EvidenceRef{SentenceIndex: 3, SpanIndex: 1}},
-	})
-	if err != nil {
-		t.Fatalf("list semantic spans by refs: %v", err)
-	}
-	if len(spans) != 2 {
-		t.Fatalf("spans = %d, want 2: %+v", len(spans), spans)
-	}
-	if spans[0].SurfaceText == "" || spans[0].Explanation == nil || spans[0].BaseForm == nil {
-		t.Fatalf("expected span display metadata, got %+v", spans[0])
-	}
-
-	sentenceReader := repository.NewTranscriptSentenceReader(tx)
-	sentences, err := sentenceReader.ListByVideoAndIndexesBatch(ctx, []apprepo.TranscriptSentenceRef{
-		{VideoID: videoID1, SentenceIndex: 2},
-		{VideoID: videoID2, SentenceIndex: 3},
-	})
-	if err != nil {
-		t.Fatalf("list transcript sentences by refs: %v", err)
-	}
-	if len(sentences) != 2 {
-		t.Fatalf("sentences = %d, want 2: %+v", len(sentences), sentences)
-	}
-	if sentences[0].Text == "" || sentences[0].Translation == nil {
-		t.Fatalf("expected sentence display text, got %+v", sentences[0])
-	}
-}
-
 func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 	db := testDB(t)
 	tx := fixture.BeginTestTx(t, db.Pool)
@@ -331,23 +491,24 @@ func TestReadModelRepositoriesUseRealMaterializedViews(t *testing.T) {
 			insert into catalog.video_unit_index (
 				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
 				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
+				best_evidence_start_ms, best_evidence_end_ms,
 				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason,
 				best_evidence_candidate_score, best_evidence_target_text
-			) values ($1, $2, 3, 2, 4000, 0.12000, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture', 8.3500, 'fixture span')
+			) values ($1, $2, 3, 2, 4000, 0.12000, '{1,2}', 1, 1, 1000, 1500, '{}'::jsonb, null, 'test fixture', 8.3500, 'fixture span')
 		`, videoID, unitID); err != nil {
 		t.Fatalf("seed unit index: %v", err)
 	}
 
 	queries := recommendationsqlc.New(tx)
-	if err := queries.RefreshRecommendableVideoUnits(ctx); err != nil {
-		t.Fatalf("refresh recommendable: %v", err)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
 	}
 	if err := queries.RefreshUnitVideoInventory(ctx); err != nil {
 		t.Fatalf("refresh inventory: %v", err)
 	}
 
 	recommendableReader := repository.NewRecommendableVideoUnitReader(tx)
-	rows, err := recommendableReader.ListByUnitIDs(ctx, []int64{unitID})
+	rows, err := recommendableReader.ListByUnitIDs(ctx, []int64{unitID}, 20)
 	if err != nil {
 		t.Fatalf("list recommendable rows: %v", err)
 	}
@@ -403,8 +564,8 @@ func TestUnitInventoryReadModelCoversSupplyGradesAndNone(t *testing.T) {
 	}
 
 	queries := recommendationsqlc.New(tx)
-	if err := queries.RefreshRecommendableVideoUnits(ctx); err != nil {
-		t.Fatalf("refresh recommendable: %v", err)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
 	}
 	if err := queries.RefreshUnitVideoInventory(ctx); err != nil {
 		t.Fatalf("refresh inventory: %v", err)
@@ -433,8 +594,8 @@ func TestUnitInventoryReadModelCoversSupplyGradesAndNone(t *testing.T) {
 	if byUnit[504].SupplyGrade != "strong" {
 		t.Fatalf("unit 504 supply grade = %q, want strong", byUnit[504].SupplyGrade)
 	}
-	if byUnit[505].SupplyGrade != "none" {
-		t.Fatalf("unit 505 supply grade = %q, want none", byUnit[505].SupplyGrade)
+	if _, ok := byUnit[505]; ok {
+		t.Fatalf("unit 505 should not have inventory row without recall supply")
 	}
 }
 
@@ -474,8 +635,8 @@ func TestVideoFillCandidateReaderListsMasteredTargetBeforePopularFill(t *testing
 	}
 
 	queries := recommendationsqlc.New(tx)
-	if err := queries.RefreshRecommendableVideoUnits(ctx); err != nil {
-		t.Fatalf("refresh recommendable: %v", err)
+	if err := queries.RefreshVideoUnitRecallIndex(ctx); err != nil {
+		t.Fatalf("refresh recall index: %v", err)
 	}
 
 	reader := repository.NewVideoFillCandidateReader(tx)
@@ -687,9 +848,10 @@ func seedInventoryVideo(t *testing.T, ctx context.Context, testDB *fixture.TestD
 			insert into catalog.video_unit_index (
 				video_id, coarse_unit_id, mention_count, sentence_count, coverage_ms, coverage_ratio,
 				sentence_indexes, best_evidence_sentence_index, best_evidence_span_index,
+				best_evidence_start_ms, best_evidence_end_ms,
 				best_evidence_scores, best_evidence_question_reject_reason, best_evidence_selection_reason,
 				best_evidence_candidate_score, best_evidence_target_text
-			) values ($1, $2, $3, 2, 4000, $4, '{1,2}', 1, 1, '{}'::jsonb, null, 'test fixture', 8.3500, 'inventory span')
+			) values ($1, $2, $3, 2, 4000, $4, '{1,2}', 1, 1, 1000, 1500, '{}'::jsonb, null, 'test fixture', 8.3500, 'inventory span')
 			on conflict do nothing
 		`, videoID, unitID, mentionCount, coverageRatio); err != nil {
 		t.Fatalf("seed inventory unit index: %v", err)

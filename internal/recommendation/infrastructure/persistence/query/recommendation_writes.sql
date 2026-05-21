@@ -120,8 +120,114 @@ from (
   from jsonb_array_elements(sqlc.arg(items)::jsonb) as items(item)
 ) input;
 
--- name: RefreshRecommendableVideoUnits :exec
-refresh materialized view recommendation.v_recommendable_video_units;
+-- name: RebuildUserUnitRecallQueue :one
+with source as (
+  select
+    states.user_id,
+    states.coarse_unit_id,
+    states.status,
+    states.target_priority,
+    states.mastery_score,
+    states.last_progress_quality,
+    states.next_review_at,
+    coalesce(inventory.supply_grade, 'none')::text as supply_grade,
+    states.updated_at as state_updated_at,
+    extract(epoch from states.updated_at)::text as source_version
+  from learning.user_unit_states as states
+  left join recommendation.v_unit_video_inventory as inventory
+    on inventory.coarse_unit_id = states.coarse_unit_id
+  where states.user_id = sqlc.arg(user_id)
+    and states.is_target = true
+    and states.status in ('new', 'learning', 'reviewing')
+),
+deleted as (
+  delete from recommendation.user_unit_recall_queue
+  where user_id = sqlc.arg(user_id)
+),
+inserted as (
+  insert into recommendation.user_unit_recall_queue (
+    user_id,
+    coarse_unit_id,
+    status,
+    target_priority,
+    mastery_score,
+    last_progress_quality,
+    next_review_at,
+    supply_grade,
+    state_updated_at,
+    source_version,
+    rebuilt_at
+  )
+  select
+    user_id,
+    coarse_unit_id,
+    status,
+    target_priority,
+    mastery_score,
+    last_progress_quality,
+    next_review_at,
+    supply_grade,
+    state_updated_at,
+    source_version,
+    now()
+  from source
+  on conflict (user_id, coarse_unit_id) do update
+  set
+    status = excluded.status,
+    target_priority = excluded.target_priority,
+    mastery_score = excluded.mastery_score,
+    last_progress_quality = excluded.last_progress_quality,
+    next_review_at = excluded.next_review_at,
+    supply_grade = excluded.supply_grade,
+    state_updated_at = excluded.state_updated_at,
+    source_version = excluded.source_version,
+    rebuilt_at = excluded.rebuilt_at
+  returning state_updated_at
+),
+summary as (
+  select
+    count(*)::integer as active_target_unit_count,
+    max(state_updated_at) as source_learning_max_updated_at
+  from source
+)
+insert into recommendation.user_unit_recall_queue_states (
+  user_id,
+  source_learning_max_updated_at,
+  source_projection_updated_at,
+  active_target_unit_count,
+  rebuilt_at
+)
+select
+  sqlc.arg(user_id),
+  summary.source_learning_max_updated_at,
+  sqlc.arg(source_projection_updated_at),
+  summary.active_target_unit_count,
+  now()
+from summary
+on conflict (user_id) do update
+set
+  source_learning_max_updated_at = excluded.source_learning_max_updated_at,
+  source_projection_updated_at = excluded.source_projection_updated_at,
+  active_target_unit_count = excluded.active_target_unit_count,
+  rebuilt_at = excluded.rebuilt_at
+returning
+  user_id,
+  source_learning_max_updated_at,
+  source_projection_updated_at,
+  active_target_unit_count,
+  rebuilt_at;
+
+-- name: UpsertRecallProjectionMetadata :exec
+insert into recommendation.recall_projection_metadata (
+  projection_name,
+  projection_updated_at
+)
+values ('video_unit_recall_index', sqlc.arg(projection_updated_at))
+on conflict (projection_name) do update
+set projection_updated_at = excluded.projection_updated_at;
+
+-- name: RefreshVideoUnitRecallIndex :exec
+refresh materialized view recommendation.v_video_unit_recall_index;
 
 -- name: RefreshUnitVideoInventory :exec
 refresh materialized view recommendation.v_unit_video_inventory;

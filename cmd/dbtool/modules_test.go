@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestModuleSpecsContainExpectedRegistry(t *testing.T) {
 	specs := moduleSpecs()
@@ -66,8 +71,8 @@ func TestRefreshTargetsOnlyRecommendationMaterializedViews(t *testing.T) {
 	}
 
 	expected := map[string]struct{}{
-		"recommendation.v_recommendable_video_units": {},
-		"recommendation.v_unit_video_inventory":      {},
+		"recommendation.v_video_unit_recall_index": {},
+		"recommendation.v_unit_video_inventory":    {},
 	}
 
 	for _, target := range targets {
@@ -86,4 +91,36 @@ func TestResolveModuleRejectsUnknownNames(t *testing.T) {
 	if _, err := resolveModule("unknown"); err == nil {
 		t.Fatalf("expected unknown module to be rejected")
 	}
+}
+
+func TestRecommendationMigrationSixOnlyDropsLegacyRecallView(t *testing.T) {
+	up := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000006_replace_recommendable_video_units_with_recall_index.up.sql")
+	down := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000006_replace_recommendable_video_units_with_recall_index.down.sql")
+
+	for _, unexpected := range []string{
+		"create materialized view if not exists recommendation.v_video_unit_recall_index",
+		"create materialized view if not exists recommendation.v_unit_video_inventory",
+		"drop materialized view if exists recommendation.v_video_unit_recall_index",
+		"drop materialized view if exists recommendation.v_unit_video_inventory",
+	} {
+		if strings.Contains(up, unexpected) {
+			t.Fatalf("migration 000006 up must not own current recall views, found %q", unexpected)
+		}
+		if strings.Contains(down, unexpected) {
+			t.Fatalf("migration 000006 down must not drop current recall views, found %q", unexpected)
+		}
+	}
+	if !strings.Contains(up, "drop materialized view if exists recommendation.v_recommendable_video_units") {
+		t.Fatalf("migration 000006 up should only remove the legacy recommendable view")
+	}
+}
+
+func readRepoFile(t *testing.T, pathParts ...string) string {
+	t.Helper()
+	parts := append([]string{"..", ".."}, pathParts...)
+	content, err := os.ReadFile(filepath.Join(parts...))
+	if err != nil {
+		t.Fatalf("read repo file: %v", err)
+	}
+	return string(content)
 }

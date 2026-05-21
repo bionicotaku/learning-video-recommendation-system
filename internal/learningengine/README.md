@@ -79,12 +79,15 @@ RecordLearningEvents
 
 ```text
 internal/api
-  -> internal/learningengine/reducer ActivateUnitCollectionTarget
+  -> API facade active collection transaction
+  -> internal/learningengine/reducer TargetStateCommandRepository
+  -> internal/user ProfileRepository
   -> learning.user_learning_profiles
   -> learning.user_unit_states
+  -> app_user.user_profiles.onboarding_status
 ```
 
-`ActivateUnitCollectionTarget` 在用户级事务内读取 active collection members，upsert 当前用户 profile，关闭旧 `target_source='unit_collection'` 且不属于新集合的 targets，并批量 upsert 新集合 members。它只更新 target control 字段，不重置 `status`、progress、mastery 或 schedule 字段。
+Active collection API 由 `internal/api` facade 打开用户级事务。事务内，Learning Engine repository 读取 active collection members，upsert 当前用户 learning profile，关闭旧 `target_source='unit_collection'` 且不属于新集合的 targets，并批量 upsert 新集合 members；User repository 同事务把 onboarding 状态更新为 `collection_selected`。Learning Engine 只更新 target control 字段，不重置 `status`、progress、mastery 或 schedule 字段。
 
 ## Local Checks
 

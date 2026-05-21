@@ -295,6 +295,8 @@ class VideoUnitIndexRow:
     coverage_ratio: Decimal
     sentence_indexes: tuple[int, ...]
     best_evidence_ref: BestEvidenceRef
+    best_evidence_start_ms: int
+    best_evidence_end_ms: int
     best_evidence_scores: dict[str, Any]
     best_evidence_question_reject_reason: str | None
     best_evidence_selection_reason: str

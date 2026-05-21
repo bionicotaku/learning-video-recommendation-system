@@ -21,8 +21,11 @@ func NewRecommendableVideoUnitReader(db recommendationsqlc.DBTX) *RecommendableV
 	}
 }
 
-func (r *RecommendableVideoUnitReader) ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64) ([]model.RecommendableVideoUnit, error) {
-	rows, err := r.queries.ListRecommendableVideoUnitsByUnitIDs(ctx, coarseUnitIDs)
+func (r *RecommendableVideoUnitReader) ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64, perUnitLimit int32) ([]model.RecommendableVideoUnit, error) {
+	rows, err := r.queries.ListVideoUnitRecallRowsByUnitIDs(ctx, recommendationsqlc.ListVideoUnitRecallRowsByUnitIDsParams{
+		CoarseUnitIds: coarseUnitIDs,
+		PerUnitLimit:  perUnitLimit,
+	})
 	if err != nil {
 		return nil, err
 	}

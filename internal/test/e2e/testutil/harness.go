@@ -182,17 +182,17 @@ func (h *Harness) recommendationUsecaseWithDependencies(resultWriter recommendat
 	videoServing := recommendationrepo.NewVideoServingStateRepository(h.Pool)
 	videoUserState := recommendationrepo.NewVideoUserStateReader(h.Pool)
 	recommendable := recommendationrepo.NewRecommendableVideoUnitReader(h.Pool)
-	semanticSpans := recommendationrepo.NewSemanticSpanReader(h.Pool)
-	transcriptSentences := recommendationrepo.NewTranscriptSentenceReader(h.Pool)
 	auditRepo := recommendationrepo.NewRecommendationAuditRepository(h.Pool)
 
 	assembler := recommendationservice.NewDefaultContextAssembler(
 		learningStates,
 		inventory,
 		unitServing,
+		recommendationservice.NewRecallQueueService(recommendationrepo.NewRecallQueueRepository(h.Pool)),
+		recommendable,
 	)
 	videoStateEnricher := recommendationservice.NewDefaultVideoStateEnricher(videoServing, videoUserState)
-	resolver := recommendationservice.NewDefaultEvidenceResolver(semanticSpans, transcriptSentences)
+	resolver := recommendationservice.NewDefaultEvidenceResolver()
 	if resultWriter == nil {
 		resultWriter = recommendationservice.NewDefaultRecommendationResultWriter(
 			recommendationtx.NewManager(h.Pool),
@@ -447,12 +447,14 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 					sentence_indexes,
 					best_evidence_sentence_index,
 					best_evidence_span_index,
+					best_evidence_start_ms,
+					best_evidence_end_ms,
 					best_evidence_scores,
 					best_evidence_question_reject_reason,
 					best_evidence_selection_reason,
 					best_evidence_candidate_score,
 					best_evidence_target_text
-				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, '{}'::jsonb, null, 'test fixture', 8.3500, 'test target')`,
+				) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 1000, 1500, '{}'::jsonb, null, 'test fixture', 8.3500, 'test target')`,
 			fixture.VideoID,
 			entry.CoarseUnitID,
 			entry.MentionCount,
@@ -495,8 +497,8 @@ func (h *Harness) RefreshRecommendationViews(t *testing.T) {
 		t.Helper()
 	}
 	ctx := context.Background()
-	if _, err := h.Pool.Exec(ctx, `refresh materialized view recommendation.v_recommendable_video_units`); err != nil {
-		failNow(t, "refresh recommendation.v_recommendable_video_units: %v", err)
+	if _, err := h.Pool.Exec(ctx, `refresh materialized view recommendation.v_video_unit_recall_index`); err != nil {
+		failNow(t, "refresh recommendation.v_video_unit_recall_index: %v", err)
 	}
 	if _, err := h.Pool.Exec(ctx, `refresh materialized view recommendation.v_unit_video_inventory`); err != nil {
 		failNow(t, "refresh recommendation.v_unit_video_inventory: %v", err)
@@ -820,6 +822,7 @@ create table if not exists catalog.video_engagement_stats (
 func supplementalDropPlaceholderRecommendationViewsSQL() string {
 	return `-- supplemental-sql --
 drop materialized view if exists recommendation.v_unit_video_inventory;
+drop materialized view if exists recommendation.v_video_unit_recall_index;
 drop materialized view if exists recommendation.v_recommendable_video_units;
 `
 }

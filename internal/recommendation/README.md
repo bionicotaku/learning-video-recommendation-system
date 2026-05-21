@@ -16,6 +16,7 @@
 - `GenerateVideoRecommendations` 的完整 orchestrator
 - Recommendation owner migration
 - 物化读视图与 SQL/query/sqlc 基础层
+- `v_video_unit_recall_index` 按 `coarse_unit_id -> top-N videos` 提供推荐反向索引
 - `video_recommendation_runs` / `video_recommendation_items` 审计写入
 - `user_unit_serving_states` / `user_video_serving_states` 短事务原子递增写入
 - 单测、scenario/golden 测试、Recommendation integration 测试
@@ -99,6 +100,28 @@ normal learning recommendations
 
 `mastered_target_fill` 从当前用户 `is_target=true AND status='mastered'` 的 unit 对应视频中补，保持和当前目标集合相关；`popular_fill` 从全局 active/public/published 视频中补，`catalog.video_engagement_stats` 缺失时按 0 热度处理，不会排除视频。两类补全都只查 video-level 小候选池与 freshness/watch 信号，不查 subtitle/span/sentence evidence，不生成 learning unit，也不触发 end quiz。
 
+## Recall Index
+
+学习候选的第一跳读取是 `recommendation.v_video_unit_recall_index`。该物化视图从 `catalog.video_unit_index`、`catalog.videos`、`catalog.video_transcripts` 派生，过滤 active/public/published 视频，并计算：
+
+- `content_quality_score`：由 `best_evidence_candidate_score`、coverage、mention/sentence count、mapped span ratio 合成的内容质量 prior
+- `rank_within_unit`：同一 `coarse_unit_id` 下按内容质量预排序的反向索引 rank
+
+`RecommendableVideoUnitReader` 在线只按 `coarse_unit_id + per_unit_limit` 读取 top-N rows。`learning_units[].evidence` 直接来自 recall row 中的 best evidence sentence/span/start/end，默认 `EvidenceResolver` 不再回查 `catalog.video_semantic_spans` 或 `catalog.video_transcript_sentences`。
+
+## User Recall Queue
+
+在线推荐不再对所有未 mastered target units 读取 recall rows。`DefaultContextAssembler` 先使用 Recommendation-owned `user_unit_recall_queue` projection：
+
+- queue 缺失、Learning state 版本变化、或 `dbtool refresh recommendation` 更新了 recall projection metadata 时，当前用户 queue 会 lazy rebuild。
+- 本轮 `planner_scope` 限制为 `min(max(target_video_count * 12, 64), 200)` 个 units。
+- active target 数量变化也会触发 queue rebuild；用户级 rebuild 通过事务锁和 upsert 保持并发幂等。
+- `RecallQueueService` 返回显式 `planner_scope` 和 `recall_fetch_scope`：前者进入 Demand Planner，后者读取 `v_video_unit_recall_index`。
+- `recall_fetch_scope` 只包含 `supply_grade <> 'none'` 的 units，并按 `min(max(target_video_count * 4, 20), 50)` 读取 top-N recall rows。
+- `supply_grade='none'` 的 units 最多少量保留在 `planner_scope` 中供 planner 感知低供给，不做无效 recall row 查询。
+- scope 默认 bucket 配额为 `hard_review 40% / new_now 30% / soft_review 20% / near_future 10%`；hard backlog 大时提升 hard_review 配额。
+- `candidate_summary` 记录 planner/fetch/no-supply scope 指标和 `pipeline_timing_ms`，用于后续定位推荐主链路瓶颈；`pipeline_timing_ms` 包含 `evidence_resolve`，但不统计 audit / serving state 写入耗时。
+
 补全 item 仍写入 Recommendation audit 和 `user_video_serving_states`，但 `learning_units=[]`，因此不会写 `user_unit_serving_states`。Feed facade 只继续补展示字段，不做补全决策。
 
 ## 维护约束
@@ -120,8 +143,8 @@ normal learning recommendations
   - `DefaultContextAssembler` 只装配 request-scope / unit-scope 输入：active learning states、unit inventory、unit serving states
   - `DefaultVideoStateEnricher` 负责 candidate-derived video-scope 输入：video serving states、catalog video user states
 - `DefaultVideoRanker` 仍计算 `RecentWatchedPenalty` 作为辅助观测值，但 MVP `BaseScore` 不再直接扣这一项，避免与 `FreshnessScore` 重复惩罚。
-- `learning_units[].evidence` 只允许从 `video_unit_index.best_evidence_*` 精确回查结果中派生；如果 best ref 无法命中同一 `(video_id, coarse_unit_id)` 下的 `catalog.video_semantic_spans`，当前实现会视为 Catalog 证据不一致并让该 unit 的 evidence 为空，不会再兜底选“最早 span”。
-- Evidence Resolver 批量读取候选集需要的 semantic spans 和 transcript sentences；推荐主链路不允许按 candidate 逐条访问数据库。
+- `learning_units[].evidence` 只允许从 recall row 的 `best_evidence_*` 派生；Catalog ingest 必须保证这些字段来自同一 `(video_id, coarse_unit_id)` 下的 selected best evidence span。
+- Evidence Resolver 不访问数据库；如果未来需要更大的 evidence window，应先扩展 Recommendation read model 或新增明确的非热路径 hydration。
 - Audit Writer 批量写入 `video_recommendation_items`；run 仍单条写入，items 不做逐条 roundtrip。
 - 当前 Recommendation 的真实验证分两层：
   - 模块内 integration：owner migration、物化视图、refresh、repository 契约

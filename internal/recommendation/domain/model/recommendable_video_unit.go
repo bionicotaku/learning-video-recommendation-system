@@ -9,8 +9,12 @@ type RecommendableVideoUnit struct {
 	CoverageRatio              float64
 	SentenceIndexes            []int32
 	BestEvidenceRef            EvidenceRef
+	BestEvidenceStartMs        int32
+	BestEvidenceEndMs          int32
 	BestEvidenceCandidateScore *float64
 	BestEvidenceTargetText     *string
 	DurationMs                 int32
 	MappedSpanRatio            float64
+	ContentQualityScore        float64
+	RankWithinUnit             int32
 }

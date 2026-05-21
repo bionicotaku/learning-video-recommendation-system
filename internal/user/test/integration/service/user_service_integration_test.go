@@ -122,20 +122,20 @@ func TestActivityStatsRecorderAndCalendar(t *testing.T) {
 		t.Fatalf("unexpected stats: %+v", stats)
 	}
 
-	calendar := userservice.NewGetActivityCalendarUsecase(repository, repository)
-	response, err := calendar.Execute(context.Background(), userdtoCalendarRequest(userID, "America/Los_Angeles"))
+	getMe := userservice.NewGetMeUsecase(repository, repository)
+	response, err := getMe.Execute(context.Background(), userdtoMeRequest(userID, "America/Los_Angeles"))
 	if err != nil {
-		t.Fatalf("calendar Execute: %v", err)
+		t.Fatalf("GetMe Execute: %v", err)
 	}
-	if len(response.Days) != 7 {
-		t.Fatalf("days len = %d, want 7", len(response.Days))
+	if len(response.ActivityCalendar.Days) != 7 {
+		t.Fatalf("days len = %d, want 7", len(response.ActivityCalendar.Days))
 	}
 	location, _ := time.LoadLocation("America/Los_Angeles")
 	activeLocalDate := at.In(location).Format("2006-01-02")
 	var activeDayFound bool
-	for _, day := range response.Days {
+	for _, day := range response.ActivityCalendar.Days {
 		if day.LocalDate == activeLocalDate {
-			activeDayFound = day.WatchSeconds == 1 && day.QuizAttemptCount == 1 && day.LearningInteractionCount == 1 && day.IsActive
+			activeDayFound = day.WatchSeconds == 1 && day.QuizAttemptCount == 1 && day.LearningInteractionCount == 1
 		}
 	}
 	if !activeDayFound {
@@ -143,10 +143,61 @@ func TestActivityStatsRecorderAndCalendar(t *testing.T) {
 	}
 }
 
-func userdtoMeRequest(userID string, timezone string) userdto.MeRequest {
-	return userdto.MeRequest{UserID: userID, ClientTimezone: timezone}
+func TestActivityCalendarReturnsCurrentStreakFromYesterdayWhenTodayInactive(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "44444444-4444-4444-8444-444444444444"
+	db.SeedAuthUser(t, userID, "dora@example.com")
+	repository := userrepo.NewRepository(db.Pool)
+	if err := repository.UpdateTimezone(context.Background(), userID, "UTC"); err != nil {
+		t.Fatalf("update timezone: %v", err)
+	}
+
+	today := time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC)
+	for _, offset := range []int{-1, -2, -3} {
+		if err := repository.IncrementLearningInteraction(context.Background(), userID, today.AddDate(0, 0, offset)); err != nil {
+			t.Fatalf("increment interaction day %d: %v", offset, err)
+		}
+	}
+
+	getMe := userservice.NewGetMeUsecase(
+		repository,
+		repository,
+		userservice.WithMeNow(func() time.Time { return today }),
+	)
+	response, err := getMe.Execute(context.Background(), userdtoMeRequest(userID, "UTC"))
+	if err != nil {
+		t.Fatalf("GetMe Execute: %v", err)
+	}
+	if response.ActivityCalendar.CurrentStreakDays != 3 {
+		t.Fatalf("current streak = %d, want 3: %+v", response.ActivityCalendar.CurrentStreakDays, response)
+	}
 }
 
-func userdtoCalendarRequest(userID string, timezone string) userdto.ActivityCalendarRequest {
-	return userdto.ActivityCalendarRequest{UserID: userID, ClientTimezone: timezone}
+func TestActivityCalendarReturnsZeroStreakWhenTodayAndYesterdayInactive(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "55555555-5555-4555-8555-555555555555"
+	db.SeedAuthUser(t, userID, "erin@example.com")
+	repository := userrepo.NewRepository(db.Pool)
+
+	today := time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC)
+	if err := repository.IncrementLearningInteraction(context.Background(), userID, today.AddDate(0, 0, -2)); err != nil {
+		t.Fatalf("increment interaction: %v", err)
+	}
+
+	getMe := userservice.NewGetMeUsecase(
+		repository,
+		repository,
+		userservice.WithMeNow(func() time.Time { return today }),
+	)
+	response, err := getMe.Execute(context.Background(), userdtoMeRequest(userID, "UTC"))
+	if err != nil {
+		t.Fatalf("GetMe Execute: %v", err)
+	}
+	if response.ActivityCalendar.CurrentStreakDays != 0 {
+		t.Fatalf("current streak = %d, want 0: %+v", response.ActivityCalendar.CurrentStreakDays, response)
+	}
+}
+
+func userdtoMeRequest(userID string, timezone string) userdto.MeRequest {
+	return userdto.MeRequest{UserID: userID, ClientTimezone: timezone}
 }

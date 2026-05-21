@@ -27,7 +27,9 @@ type AnalyticsVideoWatchEvent struct {
 }
 
 type AuthUser struct {
-	ID pgtype.UUID `json:"id"`
+	ID               pgtype.UUID        `json:"id"`
+	Email            pgtype.Text        `json:"email"`
+	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
 }
 
 type CatalogQuestion struct {
@@ -154,6 +156,8 @@ type CatalogVideoUnitIndex struct {
 	BestEvidenceTargetText           pgtype.Text        `json:"best_evidence_target_text"`
 	CreatedAt                        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                        pgtype.Timestamptz `json:"updated_at"`
+	BestEvidenceStartMs              pgtype.Int4        `json:"best_evidence_start_ms"`
+	BestEvidenceEndMs                pgtype.Int4        `json:"best_evidence_end_ms"`
 }
 
 type CatalogVideoUserState struct {

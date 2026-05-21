@@ -153,12 +153,12 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `recommendation.user_video_serving_states`
 - `recommendation.video_recommendation_runs`
 - `recommendation.video_recommendation_items`
-- `recommendation.v_recommendable_video_units`
+- `recommendation.v_video_unit_recall_index`
 - `recommendation.v_unit_video_inventory`
 
 其中两个物化视图已刷新：
 
-- `recommendation.v_recommendable_video_units`
+- `recommendation.v_video_unit_recall_index`
 - `recommendation.v_unit_video_inventory`
 
 ## 6. `video_recommendation_items`
@@ -196,8 +196,10 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `idx_video_recommendation_runs_user_created_at`
 - `idx_video_recommendation_items_video_id`
 - `idx_video_recommendation_items_dominant_unit`
-- `idx_v_recommendable_video_units_unit_video`
-- `idx_v_recommendable_video_units_video_id`
+- `idx_v_video_unit_recall_index_unit_video`
+- `idx_v_video_unit_recall_index_video_id`
+- `idx_v_video_unit_recall_index_unit_rank`
+- `idx_v_video_unit_recall_index_unit_quality`
 - `idx_v_unit_video_inventory_unit`
 - `idx_v_unit_video_inventory_supply_grade`
 

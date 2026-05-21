@@ -7,5 +7,5 @@ import (
 )
 
 type RecommendableVideoUnitReader interface {
-	ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64) ([]model.RecommendableVideoUnit, error)
+	ListByUnitIDs(ctx context.Context, coarseUnitIDs []int64, perUnitLimit int32) ([]model.RecommendableVideoUnit, error)
 }

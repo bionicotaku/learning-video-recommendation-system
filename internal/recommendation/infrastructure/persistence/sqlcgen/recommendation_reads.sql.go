@@ -11,6 +11,65 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getLearningStateVersionForRecommendation = `-- name: GetLearningStateVersionForRecommendation :one
+select
+  count(*)::integer as active_target_unit_count,
+  max(updated_at)::timestamptz as source_learning_max_updated_at
+from learning.user_unit_states
+where user_id = $1
+  and is_target = true
+  and status in ('new', 'learning', 'reviewing')
+`
+
+type GetLearningStateVersionForRecommendationRow struct {
+	ActiveTargetUnitCount      int32              `json:"active_target_unit_count"`
+	SourceLearningMaxUpdatedAt pgtype.Timestamptz `json:"source_learning_max_updated_at"`
+}
+
+func (q *Queries) GetLearningStateVersionForRecommendation(ctx context.Context, userID pgtype.UUID) (GetLearningStateVersionForRecommendationRow, error) {
+	row := q.db.QueryRow(ctx, getLearningStateVersionForRecommendation, userID)
+	var i GetLearningStateVersionForRecommendationRow
+	err := row.Scan(&i.ActiveTargetUnitCount, &i.SourceLearningMaxUpdatedAt)
+	return i, err
+}
+
+const getRecallProjectionMetadata = `-- name: GetRecallProjectionMetadata :one
+select projection_updated_at
+from recommendation.recall_projection_metadata
+where projection_name = 'video_unit_recall_index'
+`
+
+func (q *Queries) GetRecallProjectionMetadata(ctx context.Context) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getRecallProjectionMetadata)
+	var projection_updated_at pgtype.Timestamptz
+	err := row.Scan(&projection_updated_at)
+	return projection_updated_at, err
+}
+
+const getUserRecallQueueState = `-- name: GetUserRecallQueueState :one
+select
+  user_id,
+  source_learning_max_updated_at,
+  source_projection_updated_at,
+  active_target_unit_count,
+  rebuilt_at
+from recommendation.user_unit_recall_queue_states
+where user_id = $1
+`
+
+func (q *Queries) GetUserRecallQueueState(ctx context.Context, userID pgtype.UUID) (RecommendationUserUnitRecallQueueState, error) {
+	row := q.db.QueryRow(ctx, getUserRecallQueueState, userID)
+	var i RecommendationUserUnitRecallQueueState
+	err := row.Scan(
+		&i.UserID,
+		&i.SourceLearningMaxUpdatedAt,
+		&i.SourceProjectionUpdatedAt,
+		&i.ActiveTargetUnitCount,
+		&i.RebuiltAt,
+	)
+	return i, err
+}
+
 const listLearningStatesForRecommendation = `-- name: ListLearningStatesForRecommendation :many
 select
   user_id,
@@ -69,7 +128,7 @@ with matched as (
     coalesce(max(rvu.coverage_ratio), 0)::numeric(10,5) as max_coverage_ratio,
     coalesce(avg(rvu.mapped_span_ratio), 0)::numeric(10,5) as mapped_span_ratio
   from learning.user_unit_states as states
-  join recommendation.v_recommendable_video_units as rvu
+  join recommendation.v_video_unit_recall_index as rvu
     on rvu.coarse_unit_id = states.coarse_unit_id
   where states.user_id = $1
     and states.is_target = true
@@ -269,188 +328,6 @@ func (q *Queries) ListPopularFillVideoCandidates(ctx context.Context, arg ListPo
 	return items, nil
 }
 
-const listRecommendableVideoUnitsByUnitIDs = `-- name: ListRecommendableVideoUnitsByUnitIDs :many
-select
-  video_id,
-  coarse_unit_id,
-  mention_count,
-  sentence_count,
-  coverage_ms,
-  coverage_ratio,
-  sentence_indexes,
-  best_evidence_sentence_index,
-  best_evidence_span_index,
-  best_evidence_candidate_score,
-  best_evidence_target_text,
-  duration_ms,
-  mapped_span_ratio
-from recommendation.v_recommendable_video_units
-where coarse_unit_id = any($1::bigint[])
-order by coarse_unit_id asc, coverage_ratio desc, mention_count desc
-`
-
-type ListRecommendableVideoUnitsByUnitIDsRow struct {
-	VideoID                    pgtype.UUID    `json:"video_id"`
-	CoarseUnitID               pgtype.Int8    `json:"coarse_unit_id"`
-	MentionCount               pgtype.Int4    `json:"mention_count"`
-	SentenceCount              pgtype.Int4    `json:"sentence_count"`
-	CoverageMs                 pgtype.Int4    `json:"coverage_ms"`
-	CoverageRatio              pgtype.Numeric `json:"coverage_ratio"`
-	SentenceIndexes            []int32        `json:"sentence_indexes"`
-	BestEvidenceSentenceIndex  pgtype.Int4    `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex      pgtype.Int4    `json:"best_evidence_span_index"`
-	BestEvidenceCandidateScore pgtype.Numeric `json:"best_evidence_candidate_score"`
-	BestEvidenceTargetText     pgtype.Text    `json:"best_evidence_target_text"`
-	DurationMs                 pgtype.Int4    `json:"duration_ms"`
-	MappedSpanRatio            pgtype.Numeric `json:"mapped_span_ratio"`
-}
-
-func (q *Queries) ListRecommendableVideoUnitsByUnitIDs(ctx context.Context, coarseUnitIds []int64) ([]ListRecommendableVideoUnitsByUnitIDsRow, error) {
-	rows, err := q.db.Query(ctx, listRecommendableVideoUnitsByUnitIDs, coarseUnitIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListRecommendableVideoUnitsByUnitIDsRow{}
-	for rows.Next() {
-		var i ListRecommendableVideoUnitsByUnitIDsRow
-		if err := rows.Scan(
-			&i.VideoID,
-			&i.CoarseUnitID,
-			&i.MentionCount,
-			&i.SentenceCount,
-			&i.CoverageMs,
-			&i.CoverageRatio,
-			&i.SentenceIndexes,
-			&i.BestEvidenceSentenceIndex,
-			&i.BestEvidenceSpanIndex,
-			&i.BestEvidenceCandidateScore,
-			&i.BestEvidenceTargetText,
-			&i.DurationMs,
-			&i.MappedSpanRatio,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listSemanticSpansByRefs = `-- name: ListSemanticSpansByRefs :many
-with input as (
-  select distinct
-    (item->>'video_id')::uuid as video_id,
-    (item->>'coarse_unit_id')::bigint as coarse_unit_id,
-    (item->>'sentence_index')::integer as sentence_index,
-    (item->>'span_index')::integer as span_index
-  from jsonb_array_elements($1::jsonb) as refs(item)
-)
-select
-  spans.video_id,
-  spans.sentence_index,
-  spans.span_index,
-  spans.coarse_unit_id,
-  spans.start_ms,
-  spans.end_ms,
-  spans.surface_text,
-  spans.explanation,
-  spans.base_form,
-  spans.translation,
-  spans.dictionary,
-  spans.mapping_reason
-from catalog.video_semantic_spans spans
-join input
-  on input.video_id = spans.video_id
- and input.coarse_unit_id = spans.coarse_unit_id
- and input.sentence_index = spans.sentence_index
- and input.span_index = spans.span_index
-order by spans.video_id, spans.coarse_unit_id, spans.sentence_index, spans.span_index
-`
-
-func (q *Queries) ListSemanticSpansByRefs(ctx context.Context, refs []byte) ([]CatalogVideoSemanticSpan, error) {
-	rows, err := q.db.Query(ctx, listSemanticSpansByRefs, refs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogVideoSemanticSpan{}
-	for rows.Next() {
-		var i CatalogVideoSemanticSpan
-		if err := rows.Scan(
-			&i.VideoID,
-			&i.SentenceIndex,
-			&i.SpanIndex,
-			&i.CoarseUnitID,
-			&i.StartMs,
-			&i.EndMs,
-			&i.SurfaceText,
-			&i.Explanation,
-			&i.BaseForm,
-			&i.Translation,
-			&i.Dictionary,
-			&i.MappingReason,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTranscriptSentencesByRefs = `-- name: ListTranscriptSentencesByRefs :many
-with input as (
-  select distinct
-    (item->>'video_id')::uuid as video_id,
-    (item->>'sentence_index')::integer as sentence_index
-  from jsonb_array_elements($1::jsonb) as refs(item)
-)
-select
-  sentences.video_id,
-  sentences.sentence_index,
-  sentences.start_ms,
-  sentences.end_ms,
-  sentences.text,
-  sentences.translation
-from catalog.video_transcript_sentences sentences
-join input
-  on input.video_id = sentences.video_id
- and input.sentence_index = sentences.sentence_index
-order by sentences.video_id, sentences.sentence_index
-`
-
-func (q *Queries) ListTranscriptSentencesByRefs(ctx context.Context, refs []byte) ([]CatalogVideoTranscriptSentence, error) {
-	rows, err := q.db.Query(ctx, listTranscriptSentencesByRefs, refs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogVideoTranscriptSentence{}
-	for rows.Next() {
-		var i CatalogVideoTranscriptSentence
-		if err := rows.Scan(
-			&i.VideoID,
-			&i.SentenceIndex,
-			&i.StartMs,
-			&i.EndMs,
-			&i.Text,
-			&i.Translation,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listUnitVideoInventoryByUnitIDs = `-- name: ListUnitVideoInventoryByUnitIDs :many
 select
   coarse_unit_id,
@@ -486,6 +363,182 @@ func (q *Queries) ListUnitVideoInventoryByUnitIDs(ctx context.Context, coarseUni
 			&i.StrongVideoCount,
 			&i.SupplyGrade,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserRecallQueueCandidates = `-- name: ListUserRecallQueueCandidates :many
+with bucketed as (
+  select
+    queue.user_id,
+    queue.coarse_unit_id,
+    queue.status,
+    queue.target_priority,
+    queue.mastery_score,
+    queue.last_progress_quality,
+    queue.next_review_at,
+    queue.supply_grade,
+    queue.state_updated_at,
+    serving.last_served_at,
+    coalesce(serving.served_count, 0)::integer as served_count,
+    case
+      when queue.last_progress_quality is not null and queue.last_progress_quality < 3 then 'hard_review'
+      when queue.next_review_at is not null and queue.next_review_at <= $1::timestamptz then 'hard_review'
+      when queue.status = 'new' and queue.supply_grade <> 'none' then 'new_now'
+      when queue.next_review_at is not null and queue.next_review_at <= $1::timestamptz + interval '72 hours' then 'soft_review'
+      when queue.mastery_score < 0.6000 then 'soft_review'
+      when queue.last_progress_quality is not null and queue.last_progress_quality < 4 then 'soft_review'
+      else 'near_future'
+    end as bucket
+  from recommendation.user_unit_recall_queue as queue
+  left join recommendation.user_unit_serving_states as serving
+    on serving.user_id = queue.user_id
+   and serving.coarse_unit_id = queue.coarse_unit_id
+  where queue.user_id = $2
+),
+scored as (
+  select
+    bucketed.user_id, bucketed.coarse_unit_id, bucketed.status, bucketed.target_priority, bucketed.mastery_score, bucketed.last_progress_quality, bucketed.next_review_at, bucketed.supply_grade, bucketed.state_updated_at, bucketed.last_served_at, bucketed.served_count, bucketed.bucket,
+    (
+      case bucket
+        when 'hard_review' then 1.00
+        when 'new_now' then 0.85
+        when 'soft_review' then 0.65
+        else 0.45
+      end
+      + bucketed.target_priority
+      + case bucketed.supply_grade
+          when 'strong' then 0.08
+          when 'ok' then 0.04
+          when 'weak' then -0.03
+          else -0.08
+        end
+      + case
+          when bucketed.last_served_at is null then 0.12
+          when bucketed.last_served_at <= $1::timestamptz - interval '7 days' then 0.08
+          when bucketed.last_served_at <= $1::timestamptz - interval '24 hours' then 0.04
+          else -0.10
+        end
+      - least(bucketed.served_count::numeric / 10.0, 0.20)
+    )::numeric(10,6) as dynamic_priority
+  from bucketed
+),
+ranked as (
+  select user_id, coarse_unit_id, status, target_priority, mastery_score, last_progress_quality, next_review_at, supply_grade, state_updated_at, last_served_at, served_count, bucket, dynamic_priority, bucket_rank
+  from (
+    select
+      scored.user_id, scored.coarse_unit_id, scored.status, scored.target_priority, scored.mastery_score, scored.last_progress_quality, scored.next_review_at, scored.supply_grade, scored.state_updated_at, scored.last_served_at, scored.served_count, scored.bucket, scored.dynamic_priority,
+      row_number() over (
+        partition by bucket
+        order by dynamic_priority desc, last_served_at asc nulls first, coarse_unit_id asc
+      )::integer as bucket_rank
+    from scored
+    where supply_grade <> 'none'
+  ) as supplied_ranked
+  where bucket_rank <= $3::integer
+  union all
+  select user_id, coarse_unit_id, status, target_priority, mastery_score, last_progress_quality, next_review_at, supply_grade, state_updated_at, last_served_at, served_count, bucket, dynamic_priority, bucket_rank
+  from (
+    select
+      scored.user_id, scored.coarse_unit_id, scored.status, scored.target_priority, scored.mastery_score, scored.last_progress_quality, scored.next_review_at, scored.supply_grade, scored.state_updated_at, scored.last_served_at, scored.served_count, scored.bucket, scored.dynamic_priority,
+      row_number() over (
+        partition by bucket
+        order by dynamic_priority desc, last_served_at asc nulls first, coarse_unit_id asc
+      )::integer as bucket_rank
+    from scored
+    where supply_grade = 'none'
+  ) as no_supply_ranked
+  where bucket_rank <= $4::integer
+)
+select
+  user_id,
+  coarse_unit_id,
+  status,
+  target_priority,
+  mastery_score,
+  last_progress_quality,
+  next_review_at,
+  supply_grade,
+  state_updated_at,
+  last_served_at,
+  served_count,
+  bucket,
+  dynamic_priority,
+  bucket_rank
+from ranked
+order by
+  case bucket
+    when 'hard_review' then 0
+    when 'new_now' then 1
+    when 'soft_review' then 2
+    else 3
+  end,
+  case when supply_grade = 'none' then 1 else 0 end,
+  dynamic_priority desc,
+  last_served_at asc nulls first,
+  coarse_unit_id asc
+`
+
+type ListUserRecallQueueCandidatesParams struct {
+	NowAt                  pgtype.Timestamptz `json:"now_at"`
+	UserID                 pgtype.UUID        `json:"user_id"`
+	SuppliedPerBucketLimit int32              `json:"supplied_per_bucket_limit"`
+	NoSupplyPerBucketLimit int32              `json:"no_supply_per_bucket_limit"`
+}
+
+type ListUserRecallQueueCandidatesRow struct {
+	UserID              pgtype.UUID        `json:"user_id"`
+	CoarseUnitID        int64              `json:"coarse_unit_id"`
+	Status              string             `json:"status"`
+	TargetPriority      pgtype.Numeric     `json:"target_priority"`
+	MasteryScore        pgtype.Numeric     `json:"mastery_score"`
+	LastProgressQuality pgtype.Int2        `json:"last_progress_quality"`
+	NextReviewAt        pgtype.Timestamptz `json:"next_review_at"`
+	SupplyGrade         string             `json:"supply_grade"`
+	StateUpdatedAt      pgtype.Timestamptz `json:"state_updated_at"`
+	LastServedAt        pgtype.Timestamptz `json:"last_served_at"`
+	ServedCount         int32              `json:"served_count"`
+	Bucket              string             `json:"bucket"`
+	DynamicPriority     pgtype.Numeric     `json:"dynamic_priority"`
+	BucketRank          int32              `json:"bucket_rank"`
+}
+
+func (q *Queries) ListUserRecallQueueCandidates(ctx context.Context, arg ListUserRecallQueueCandidatesParams) ([]ListUserRecallQueueCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listUserRecallQueueCandidates,
+		arg.NowAt,
+		arg.UserID,
+		arg.SuppliedPerBucketLimit,
+		arg.NoSupplyPerBucketLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserRecallQueueCandidatesRow{}
+	for rows.Next() {
+		var i ListUserRecallQueueCandidatesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.Status,
+			&i.TargetPriority,
+			&i.MasteryScore,
+			&i.LastProgressQuality,
+			&i.NextReviewAt,
+			&i.SupplyGrade,
+			&i.StateUpdatedAt,
+			&i.LastServedAt,
+			&i.ServedCount,
+			&i.Bucket,
+			&i.DynamicPriority,
+			&i.BucketRank,
 		); err != nil {
 			return nil, err
 		}
@@ -568,6 +621,94 @@ func (q *Queries) ListUserVideoServingStatesByVideoIDs(ctx context.Context, arg 
 			&i.ServedCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listVideoUnitRecallRowsByUnitIDs = `-- name: ListVideoUnitRecallRowsByUnitIDs :many
+select
+  video_id,
+  coarse_unit_id,
+  mention_count,
+  sentence_count,
+  coverage_ms,
+  coverage_ratio,
+  sentence_indexes,
+  best_evidence_sentence_index,
+  best_evidence_span_index,
+  best_evidence_start_ms,
+  best_evidence_end_ms,
+  best_evidence_candidate_score,
+  best_evidence_target_text,
+  duration_ms,
+  mapped_span_ratio,
+  content_quality_score,
+  rank_within_unit
+from recommendation.v_video_unit_recall_index
+where coarse_unit_id = any($1::bigint[])
+  and rank_within_unit <= $2::integer
+order by coarse_unit_id asc, rank_within_unit asc
+`
+
+type ListVideoUnitRecallRowsByUnitIDsParams struct {
+	CoarseUnitIds []int64 `json:"coarse_unit_ids"`
+	PerUnitLimit  int32   `json:"per_unit_limit"`
+}
+
+type ListVideoUnitRecallRowsByUnitIDsRow struct {
+	VideoID                    pgtype.UUID    `json:"video_id"`
+	CoarseUnitID               pgtype.Int8    `json:"coarse_unit_id"`
+	MentionCount               pgtype.Int4    `json:"mention_count"`
+	SentenceCount              pgtype.Int4    `json:"sentence_count"`
+	CoverageMs                 pgtype.Int4    `json:"coverage_ms"`
+	CoverageRatio              pgtype.Numeric `json:"coverage_ratio"`
+	SentenceIndexes            []int32        `json:"sentence_indexes"`
+	BestEvidenceSentenceIndex  pgtype.Int4    `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex      pgtype.Int4    `json:"best_evidence_span_index"`
+	BestEvidenceStartMs        pgtype.Int4    `json:"best_evidence_start_ms"`
+	BestEvidenceEndMs          pgtype.Int4    `json:"best_evidence_end_ms"`
+	BestEvidenceCandidateScore pgtype.Numeric `json:"best_evidence_candidate_score"`
+	BestEvidenceTargetText     pgtype.Text    `json:"best_evidence_target_text"`
+	DurationMs                 pgtype.Int4    `json:"duration_ms"`
+	MappedSpanRatio            pgtype.Numeric `json:"mapped_span_ratio"`
+	ContentQualityScore        pgtype.Numeric `json:"content_quality_score"`
+	RankWithinUnit             pgtype.Int4    `json:"rank_within_unit"`
+}
+
+func (q *Queries) ListVideoUnitRecallRowsByUnitIDs(ctx context.Context, arg ListVideoUnitRecallRowsByUnitIDsParams) ([]ListVideoUnitRecallRowsByUnitIDsRow, error) {
+	rows, err := q.db.Query(ctx, listVideoUnitRecallRowsByUnitIDs, arg.CoarseUnitIds, arg.PerUnitLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListVideoUnitRecallRowsByUnitIDsRow{}
+	for rows.Next() {
+		var i ListVideoUnitRecallRowsByUnitIDsRow
+		if err := rows.Scan(
+			&i.VideoID,
+			&i.CoarseUnitID,
+			&i.MentionCount,
+			&i.SentenceCount,
+			&i.CoverageMs,
+			&i.CoverageRatio,
+			&i.SentenceIndexes,
+			&i.BestEvidenceSentenceIndex,
+			&i.BestEvidenceSpanIndex,
+			&i.BestEvidenceStartMs,
+			&i.BestEvidenceEndMs,
+			&i.BestEvidenceCandidateScore,
+			&i.BestEvidenceTargetText,
+			&i.DurationMs,
+			&i.MappedSpanRatio,
+			&i.ContentQualityScore,
+			&i.RankWithinUnit,
 		); err != nil {
 			return nil, err
 		}

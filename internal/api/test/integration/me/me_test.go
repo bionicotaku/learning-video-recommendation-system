@@ -31,8 +31,22 @@ func TestMeReturnsProfileStatsAndUpdatesTimezoneHeader(t *testing.T) {
 			QuizAttemptCount:  12,
 			StartedUnitCount:  48,
 		},
+		ActivityCalendar: userdto.ActivityCalendar{
+			Timezone:          "Asia/Shanghai",
+			Today:             "2026-05-21",
+			CurrentStreakDays: 3,
+			Days: []userdto.ActivityDay{
+				{LocalDate: "2026-05-15"},
+				{LocalDate: "2026-05-16", WatchSeconds: 30},
+				{LocalDate: "2026-05-17"},
+				{LocalDate: "2026-05-18"},
+				{LocalDate: "2026-05-19"},
+				{LocalDate: "2026-05-20"},
+				{LocalDate: "2026-05-21", QuizAttemptCount: 1, LearningInteractionCount: 2},
+			},
+		},
 	}}
-	server := newServer(service, &fakeCalendarService{}, true)
+	server := newServer(service, true)
 	t.Cleanup(server.Close)
 
 	response := get(t, server, "/api/me", true, "Asia/Shanghai")
@@ -43,48 +57,29 @@ func TestMeReturnsProfileStatsAndUpdatesTimezoneHeader(t *testing.T) {
 		t.Fatalf("request not mapped: %+v", service.request)
 	}
 
+	payload := readBody(t, response)
+	if bytes.Contains([]byte(payload), []byte("is_active")) {
+		t.Fatalf("response should not include is_active: %s", payload)
+	}
+
 	var body userdto.MeResponse
-	decodeJSON(t, response, &body)
+	if err := json.Unmarshal([]byte(payload), &body); err != nil {
+		t.Fatalf("decode json: %v", err)
+	}
 	if body.UserID != "user-1" || body.Email == nil || *body.Email != "alice@example.com" || body.Stats.StartedUnitCount != 48 {
 		t.Fatalf("unexpected body: %+v", body)
 	}
-}
-
-func TestActivityCalendarReturnsSevenDaysAndUsesTimezoneHeader(t *testing.T) {
-	service := &fakeCalendarService{response: userdto.ActivityCalendarResponse{
-		Timezone: "Asia/Shanghai",
-		Today:    "2026-05-21",
-		Days: []userdto.ActivityDay{
-			{LocalDate: "2026-05-15"},
-			{LocalDate: "2026-05-16", WatchSeconds: 30, IsActive: true},
-			{LocalDate: "2026-05-17"},
-			{LocalDate: "2026-05-18"},
-			{LocalDate: "2026-05-19"},
-			{LocalDate: "2026-05-20"},
-			{LocalDate: "2026-05-21", QuizAttemptCount: 1, LearningInteractionCount: 2, IsActive: true},
-		},
-	}}
-	server := newServer(&fakeMeService{}, service, true)
-	t.Cleanup(server.Close)
-
-	response := get(t, server, "/api/me/activity-calendar", true, "Asia/Shanghai")
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	if service.request.UserID != "user-1" || service.request.ClientTimezone != "Asia/Shanghai" {
-		t.Fatalf("request not mapped: %+v", service.request)
-	}
-
-	var body userdto.ActivityCalendarResponse
-	decodeJSON(t, response, &body)
-	if body.Timezone != "Asia/Shanghai" || len(body.Days) != 7 || body.Days[1].WatchSeconds != 30 || !body.Days[6].IsActive {
+	if body.ActivityCalendar.Timezone != "Asia/Shanghai" ||
+		body.ActivityCalendar.CurrentStreakDays != 3 ||
+		len(body.ActivityCalendar.Days) != 7 ||
+		body.ActivityCalendar.Days[1].WatchSeconds != 30 {
 		t.Fatalf("unexpected body: %+v", body)
 	}
 }
 
 func TestMeRequiresPrincipal(t *testing.T) {
 	service := &fakeMeService{}
-	server := newServer(service, &fakeCalendarService{}, true)
+	server := newServer(service, true)
 	t.Cleanup(server.Close)
 
 	response := get(t, server, "/api/me", false, "")
@@ -96,8 +91,18 @@ func TestMeRequiresPrincipal(t *testing.T) {
 	}
 }
 
-func newServer(meService *fakeMeService, calendarService *fakeCalendarService, withAuth bool) *httptest.Server {
-	group := mehandler.NewHandler(meService, calendarService)
+func TestActivityCalendarRouteIsNotRegistered(t *testing.T) {
+	server := newServer(&fakeMeService{}, true)
+	t.Cleanup(server.Close)
+
+	response := get(t, server, "/api/me/activity-calendar", true, "Asia/Shanghai")
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+}
+
+func newServer(meService *fakeMeService, withAuth bool) *httptest.Server {
+	group := mehandler.NewHandler(meService)
 	handler := router.New(router.Options{Me: group})
 	if withAuth {
 		handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
@@ -125,14 +130,6 @@ func get(t *testing.T, server *httptest.Server, path string, setPrincipal bool, 
 	return response
 }
 
-func decodeJSON(t *testing.T, response *http.Response, target any) {
-	t.Helper()
-	defer response.Body.Close()
-	if err := json.NewDecoder(response.Body).Decode(target); err != nil {
-		t.Fatalf("decode json: %v", err)
-	}
-}
-
 func readBody(t *testing.T, response *http.Response) string {
 	t.Helper()
 	defer response.Body.Close()
@@ -152,18 +149,6 @@ type fakeMeService struct {
 }
 
 func (f *fakeMeService) Execute(_ context.Context, request userdto.MeRequest) (userdto.MeResponse, error) {
-	f.called = true
-	f.request = request
-	return f.response, nil
-}
-
-type fakeCalendarService struct {
-	called   bool
-	request  userdto.ActivityCalendarRequest
-	response userdto.ActivityCalendarResponse
-}
-
-func (f *fakeCalendarService) Execute(_ context.Context, request userdto.ActivityCalendarRequest) (userdto.ActivityCalendarResponse, error) {
 	f.called = true
 	f.request = request
 	return f.response, nil

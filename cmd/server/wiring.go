@@ -20,6 +20,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
+	apitx "learning-video-recommendation-system/internal/api/infrastructure/persistence/tx"
 	catalogservice "learning-video-recommendation-system/internal/catalog/application/service"
 	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
@@ -124,17 +125,14 @@ func buildUnitProgressHandler(pool *pgxpool.Pool) *unitprogress.Handler {
 func buildUnitCollectionsHandler(pool *pgxpool.Pool) *unitcollections.Handler {
 	reader := semanticrepo.NewUnitCollectionReader(pool)
 	listCollections := semanticservice.NewListUnitCollectionsUsecase(reader)
-	activateTarget := learningservice.NewActivateUnitCollectionTargetUsecase(learningtx.NewManager(pool))
-	userRepository := userrepo.NewRepository(pool)
-	updateOnboarding := userservice.NewUpdateOnboardingStatusUsecase(userRepository)
-	return unitcollections.NewHandler(listCollections, activateTarget, unitcollections.WithOnboardingStatus(updateOnboarding))
+	activateTarget := apiservice.NewActivateLearningCollectionService(apitx.NewActivateCollectionManager(pool))
+	return unitcollections.NewHandler(listCollections, activateTarget)
 }
 
 func buildMeHandler(pool *pgxpool.Pool) *me.Handler {
 	repository := userrepo.NewRepository(pool)
 	getMe := userservice.NewGetMeUsecase(repository, repository)
-	getCalendar := userservice.NewGetActivityCalendarUsecase(repository, repository)
-	return me.NewHandler(getMe, getCalendar)
+	return me.NewHandler(getMe)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {
@@ -172,19 +170,19 @@ func buildFeedHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (*
 func buildRecommendationUsecase(pool *pgxpool.Pool) (*recommendationusecase.GenerateVideoRecommendationsService, error) {
 	unitServing := recommendationrepo.NewUnitServingStateRepository(pool)
 	videoServing := recommendationrepo.NewVideoServingStateRepository(pool)
+	recommendable := recommendationrepo.NewRecommendableVideoUnitReader(pool)
 
 	return recommendationusecase.NewGenerateVideoRecommendationsPipeline(
 		recommendationservice.NewDefaultContextAssembler(
 			recommendationrepo.NewLearningStateReader(pool),
 			recommendationrepo.NewUnitInventoryReader(pool),
 			unitServing,
+			recommendationservice.NewRecallQueueService(recommendationrepo.NewRecallQueueRepository(pool)),
+			recommendable,
 		),
 		recommendationplanner.NewDefaultDemandPlanner(),
-		recommendationservice.NewDefaultCandidateGenerator(recommendationrepo.NewRecommendableVideoUnitReader(pool)),
-		recommendationservice.NewDefaultEvidenceResolver(
-			recommendationrepo.NewSemanticSpanReader(pool),
-			recommendationrepo.NewTranscriptSentenceReader(pool),
-		),
+		recommendationservice.NewDefaultCandidateGenerator(recommendable),
+		recommendationservice.NewDefaultEvidenceResolver(),
 		recommendationaggregator.NewDefaultVideoEvidenceAggregator(),
 		recommendationranking.NewDefaultVideoRanker(),
 		recommendationselector.NewDefaultVideoSelector(),

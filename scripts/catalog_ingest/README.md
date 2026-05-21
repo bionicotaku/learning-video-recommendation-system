@@ -150,6 +150,7 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 - 计算 `coverage_ratio`
 - 生成 `sentence_indexes`
 - `best_evidence_sentence_index/span_index` 来自 `selected_coarse_unit_refs.refs[]`
+- `best_evidence_start_ms/end_ms` 来自 selected ref 精确命中的 transcript token/span
 - `best_evidence_scores` 来自 `selected_coarse_unit_refs.refs[].scores`
 - `best_evidence_question_reject_reason` 来自 `selected_coarse_unit_refs.refs[].question_reject_reason`
 - `best_evidence_selection_reason` 来自 `selected_coarse_unit_refs.refs[].selection_reason`

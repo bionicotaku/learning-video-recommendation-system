@@ -73,58 +73,99 @@ func NewGenerateVideoRecommendationsPipeline(
 }
 
 func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, request dto.GenerateVideoRecommendationsRequest) (dto.GenerateVideoRecommendationsResponse, error) {
-	contextModel, err := u.assembler.Assemble(ctx, model.RecommendationRequest{
-		UserID:           request.UserID,
-		TargetVideoCount: request.TargetVideoCount,
-		RequestContext:   request.RequestContext,
-	})
-	if err != nil {
+	timer := NewPipelineTimer()
+	var contextModel model.RecommendationContext
+	if err := timer.Observe("context_assemble", func() error {
+		var err error
+		contextModel, err = u.assembler.Assemble(ctx, model.RecommendationRequest{
+			UserID:           request.UserID,
+			TargetVideoCount: request.TargetVideoCount,
+			RequestContext:   request.RequestContext,
+		})
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	demandBundle, err := u.planner.Plan(contextModel)
-	if err != nil {
+	var demandBundle model.DemandBundle
+	if err := timer.Observe("plan", func() error {
+		var err error
+		demandBundle, err = u.planner.Plan(contextModel)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	candidates, err := u.candidateGenerator.Generate(ctx, contextModel, demandBundle)
-	if err != nil {
+	var candidates []model.VideoUnitCandidate
+	if err := timer.Observe("candidate_generate", func() error {
+		var err error
+		candidates, err = u.candidateGenerator.Generate(ctx, contextModel, demandBundle)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	resolvedEvidence, err := u.resolver.Resolve(ctx, contextModel, candidates, demandBundle)
-	if err != nil {
+	var resolvedEvidence []model.ResolvedEvidenceWindow
+	if err := timer.Observe("evidence_resolve", func() error {
+		var err error
+		resolvedEvidence, err = u.resolver.Resolve(ctx, contextModel, candidates, demandBundle)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	videoCandidates, err := u.aggregator.Aggregate(contextModel, resolvedEvidence, demandBundle)
-	if err != nil {
+	var videoCandidates []model.VideoCandidate
+	if err := timer.Observe("aggregate", func() error {
+		var err error
+		videoCandidates, err = u.aggregator.Aggregate(contextModel, resolvedEvidence, demandBundle)
+		return err
+	}); err != nil {
+		return dto.GenerateVideoRecommendationsResponse{}, err
+	}
+	contextModel.RecallScope.AggregatedVideoCandidateCount = len(videoCandidates)
+	contextModel.RecallScope.VideoStateLookupCount = len(uniqueCandidateVideoIDs(videoCandidates))
+
+	if err := timer.Observe("video_state_enrich", func() error {
+		var err error
+		contextModel, err = u.videoStateEnricher.Enrich(ctx, contextModel, videoCandidates)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	contextModel, err = u.videoStateEnricher.Enrich(ctx, contextModel, videoCandidates)
-	if err != nil {
+	var rankedVideos []model.VideoCandidate
+	if err := timer.Observe("rank", func() error {
+		var err error
+		rankedVideos, err = u.ranker.Rank(contextModel, videoCandidates, demandBundle)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	rankedVideos, err := u.ranker.Rank(contextModel, videoCandidates, demandBundle)
-	if err != nil {
-		return dto.GenerateVideoRecommendationsResponse{}, err
-	}
-
-	selectedVideos, err := u.selector.Select(contextModel, rankedVideos, demandBundle)
-	if err != nil {
+	var selectedVideos []model.VideoCandidate
+	if err := timer.Observe("select", func() error {
+		var err error
+		selectedVideos, err = u.selector.Select(contextModel, rankedVideos, demandBundle)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
 	targetCount := targetVideoCount(contextModel.Request, demandBundle)
-	selectedVideos, err = u.videoFillService.Fill(ctx, contextModel, selectedVideos, targetCount)
-	if err != nil {
+	if err := timer.Observe("fill", func() error {
+		var err error
+		selectedVideos, err = u.videoFillService.Fill(ctx, contextModel, selectedVideos, targetCount)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
-	finalItems, err := u.explainer.Build(contextModel, selectedVideos, demandBundle)
-	if err != nil {
+	var finalItems []model.FinalRecommendationItem
+	if err := timer.Observe("final_item_build", func() error {
+		var err error
+		finalItems, err = u.explainer.Build(contextModel, selectedVideos, demandBundle)
+		return err
+	}); err != nil {
 		return dto.GenerateVideoRecommendationsResponse{}, err
 	}
 
@@ -142,7 +183,7 @@ func (u *GenerateVideoRecommendationsService) Execute(ctx context.Context, reque
 	}
 
 	if u.resultWriter != nil {
-		run, items, err := buildAuditPayload(runID, contextModel.Request.UserID, contextModel.Request.RequestContext, selectorMode, demandBundle, candidates, selectedVideos, finalItems, underfilled)
+		run, items, err := buildAuditPayload(contextModel, runID, contextModel.Request.UserID, contextModel.Request.RequestContext, selectorMode, demandBundle, candidates, selectedVideos, finalItems, underfilled, timer.Snapshot())
 		if err != nil {
 			return dto.GenerateVideoRecommendationsResponse{}, err
 		}
@@ -232,6 +273,7 @@ func mapLearningUnits(units []model.ExpectedLearningUnit) []dto.ExpectedLearning
 }
 
 func buildAuditPayload(
+	contextModel model.RecommendationContext,
 	runID string,
 	userID string,
 	requestContext []byte,
@@ -241,6 +283,7 @@ func buildAuditPayload(
 	selectedVideos []model.VideoCandidate,
 	finalItems []model.FinalRecommendationItem,
 	underfilled bool,
+	pipelineTimingMs map[string]int64,
 ) (model.RecommendationRun, []model.RecommendationItem, error) {
 	plannerSnapshot, err := json.Marshal(demand)
 	if err != nil {
@@ -250,7 +293,7 @@ func buildAuditPayload(
 	if err != nil {
 		return model.RecommendationRun{}, nil, err
 	}
-	candidateSummary, err := json.Marshal(candidateSummary(candidates, selectedVideos))
+	candidateSummary, err := json.Marshal(candidateSummary(contextModel, candidates, selectedVideos, pipelineTimingMs))
 	if err != nil {
 		return model.RecommendationRun{}, nil, err
 	}
@@ -292,7 +335,7 @@ func buildAuditPayload(
 	return run, items, nil
 }
 
-func candidateSummary(candidates []model.VideoUnitCandidate, selectedVideos []model.VideoCandidate) map[string]any {
+func candidateSummary(contextModel model.RecommendationContext, candidates []model.VideoUnitCandidate, selectedVideos []model.VideoCandidate, pipelineTimingMs map[string]int64) map[string]any {
 	laneCounts := make(map[string]int)
 	distinctVideos := make(map[string]struct{})
 	laneDistinctVideos := make(map[string]map[string]struct{})
@@ -324,14 +367,40 @@ func candidateSummary(candidates []model.VideoUnitCandidate, selectedVideos []mo
 	}
 
 	return map[string]any{
-		"lane_counts":                laneCounts,
-		"lane_distinct_videos":       laneDistinctCounts,
-		"distinct_video_count":       len(distinctVideos),
-		"learning_selected_count":    learningSelectedCount,
-		"mastered_target_fill_count": masteredFillCount,
-		"popular_fill_count":         popularFillCount,
-		"fill_triggered":             masteredFillCount+popularFillCount > 0,
+		"lane_counts":                        laneCounts,
+		"lane_distinct_videos":               laneDistinctCounts,
+		"distinct_video_count":               len(distinctVideos),
+		"learning_selected_count":            learningSelectedCount,
+		"mastered_target_fill_count":         masteredFillCount,
+		"popular_fill_count":                 popularFillCount,
+		"fill_triggered":                     masteredFillCount+popularFillCount > 0,
+		"active_target_unit_count":           contextModel.RecallScope.ActiveTargetUnitCount,
+		"queue_rebuilt":                      contextModel.RecallScope.QueueRebuilt,
+		"queue_candidate_count":              contextModel.RecallScope.QueueCandidateCount,
+		"planner_scope_unit_count":           contextModel.RecallScope.PlannerScopeUnitCount,
+		"planner_scope_unit_count_by_bucket": contextModel.RecallScope.PlannerScopeUnitCountByBucket,
+		"no_supply_scope_unit_count":         contextModel.RecallScope.NoSupplyScopeUnitCount,
+		"recall_fetch_unit_count":            contextModel.RecallScope.RecallFetchUnitCount,
+		"per_unit_recall_limit":              contextModel.RecallScope.PerUnitRecallLimit,
+		"max_possible_recall_rows":           contextModel.RecallScope.MaxPossibleRecallRows,
+		"actual_recall_row_count":            contextModel.RecallScope.ActualRecallRowCount,
+		"aggregated_video_candidate_count":   contextModel.RecallScope.AggregatedVideoCandidateCount,
+		"video_state_lookup_count":           contextModel.RecallScope.VideoStateLookupCount,
+		"pipeline_timing_ms":                 pipelineTimingMs,
 	}
+}
+
+func uniqueCandidateVideoIDs(candidates []model.VideoCandidate) []string {
+	seen := make(map[string]struct{}, len(candidates))
+	result := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := seen[candidate.VideoID]; ok {
+			continue
+		}
+		seen[candidate.VideoID] = struct{}{}
+		result = append(result, candidate.VideoID)
+	}
+	return result
 }
 
 func primaryLane(laneSources []string) string {

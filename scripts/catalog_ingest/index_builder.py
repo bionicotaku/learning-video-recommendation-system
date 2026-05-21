@@ -140,6 +140,8 @@ def _build_unit_index_rows(
                 coverage_ratio=coverage_ratio,
                 sentence_indexes=sentence_indexes,
                 best_evidence_ref=best_evidence_ref,
+                best_evidence_start_ms=best_evidence_span.start_ms,
+                best_evidence_end_ms=best_evidence_span.end_ms,
                 best_evidence_scores=selected_ref.scores,
                 best_evidence_question_reject_reason=selected_ref.question_reject_reason,
                 best_evidence_selection_reason=selected_ref.selection_reason,

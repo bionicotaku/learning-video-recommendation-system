@@ -28,14 +28,15 @@ PUT /api/learning-targets/active-collection
 
 `GET /api/unit-collections` 是纯读接口，只读 `semantic.unit_collections`。
 
-`PUT /api/learning-targets/active-collection` 是 Learning Engine target control 写接口。它会在一个用户级事务内：
+`PUT /api/learning-targets/active-collection` 是 API facade 编排的 target activation 写接口。它会在一个用户级事务内：
 
 1. 校验目标 collection 存在且 active。
 2. 更新 `learning.user_learning_profiles` 当前激活集合。
 3. 把不属于新集合的旧词书 target 设为 `is_target = false`。
 4. 把新集合 members 批量 upsert 到 `learning.user_unit_states`，并设置 `is_target = true`。
+5. 把 `app_user.user_profiles.onboarding_status` 更新为 `collection_selected`。
 
-新注册用户不需要预先存在 `learning.user_learning_profiles` 或 `learning.user_unit_states` 行。首次激活 collection 时，本接口会在同一事务内创建 profile，并为 collection members 批量创建缺失的 unit state。
+新注册用户不需要预先存在 `learning.user_learning_profiles` 或 `learning.user_unit_states` 行。首次激活 collection 时，本接口会在同一事务内创建 Learning profile，并为 collection members 批量创建缺失的 unit state。`app_user.user_profiles` 缺失时，API facade 会在同一事务内通过 User repository lazy repair 后再更新 onboarding 状态。
 
 Recommendation 不直接读取词书表，也不接收 `collection_slug`。Recommendation 仍只读取：
 
@@ -51,12 +52,13 @@ where is_target = true
 
 | 模块 | 职责 | 不做什么 |
 |---|---|---|
-| `internal/api` | HTTP handler、principal 解析、request validation、调用 Semantic / Learning Engine usecase、错误映射。 | 不直接写 SQL，不拥有词书表或 learning target 表。 |
+| `internal/api` | HTTP handler、principal 解析、request validation、错误映射；在 active collection 写接口中编排 Learning Engine target projection 和 User onboarding 的同事务提交。 | 不拥有词书表、learning target 表或 user profile 表；不把 collection members 拉到内存逐条处理。 |
 | `internal/semantic` | 拥有词书定义和 membership 读取能力。 | 不写用户学习状态，不理解 Recommendation 排序。 |
 | `internal/learningengine/reducer` | 拥有用户当前 active collection 和 `user_unit_states` target 投影。 | 不拥有词书定义，不生成推荐列表。 |
+| `internal/user` | 拥有 user profile 和 onboarding 状态。 | 不切换词书、不写 learning target 投影。 |
 | `internal/recommendation` | 只读 `learning.user_unit_states` 生成推荐计划。 | 不接触 `unit_collections`，不处理 active collection。 |
 
-`PUT /api/learning-targets/active-collection` 的事务必须放在 Learning Engine usecase 内。API 层不能先把几千个 members 拉到内存后逐条调用 `EnsureTargetUnits`。
+`PUT /api/learning-targets/active-collection` 的事务由 API facade 打开，因为它需要同时更新 Learning Engine 和 User 两个模块资产。事务内仍调用各模块 repository port；API 层不能先把几千个 members 拉到内存后逐条调用 `EnsureTargetUnits`，也不能直接绕过模块 SQL owner 写表。
 
 ## 3. GET /api/unit-collections
 
@@ -204,6 +206,15 @@ type ActivateUnitCollectionResponse = {
 
 本接口是幂等 set，不是 toggle。
 
+本接口是同步提交接口，不是异步 job：
+
+- 成功响应使用 `200 OK`，表示 active collection、`learning.user_unit_states` target projection、以及 `app_user.user_profiles.onboarding_status = collection_selected` 已经在同一个事务内提交完成。
+- 前端收到 `200 OK` 后，可以立即刷新 `/api/me`、`/api/feed` 或 unit progress；这些接口不应再读到旧 collection 的最终 target projection。
+- 请求处理中前端应保持提交态或 loading 态，不要提前假设切换完成。
+- MVP 不返回 `202 Accepted`、`activation_id`、`processing` 状态，也不提供后台轮询接口。
+
+如果未来大规模词书导致同步接口持续超时，再单独设计 activation job 表、worker、状态查询 API 和 feed 在 switching 状态下的行为。MVP 阶段优先优化 set-based SQL、索引和 no-op 更新，保持成功语义简单明确。
+
 重复激活同一本词书：
 
 - 返回 `200 OK`。
@@ -259,11 +270,11 @@ MVP 中 `target_priority` 固定写 `0`。后续如果启用 collection-level pr
 - 不把全部 `coarse_unit_ids` 从 Semantic 拉到 API 层再传给 Learning Engine。
 - 不循环调用现有 `EnsureTargetUnits`。
 
-Learning Engine usecase 应使用现有 user-scoped transaction 机制，保证同一用户并发切换串行化。
+API facade 应使用现有 user-scoped transaction 机制，保证同一用户并发切换串行化，并把 Learning Engine target projection 与 User onboarding 状态作为一个提交单元。
 
 ### 5.2 推荐执行计划
 
-Learning Engine 新增 usecase：
+API facade 提供组合 usecase：
 
 ```text
 ActivateUnitCollectionTarget(user_id, collection_slug)
@@ -276,7 +287,9 @@ ActivateUnitCollectionTarget(user_id, collection_slug)
 3. `profile_upsert`：更新 `learning.user_learning_profiles`。
 4. `deactivated`：只关闭不属于新 collection 的旧 `unit_collection` targets。
 5. `upserted`：批量 upsert 新 collection members 到 `learning.user_unit_states`。
-6. 返回 collection id、slug、target count。
+6. `user_profile_repair`：如果 `app_user.user_profiles` 缺失，从 `auth.users` 补建 profile。
+7. `onboarding_update`：把 `app_user.user_profiles.onboarding_status` 设为 `collection_selected`。
+8. 返回 collection id、slug、target count。
 
 ### 5.3 推荐 SQL 形态
 
@@ -436,10 +449,12 @@ API integration：
 - unknown collection 返回 `404 not_found`。
 - invalid slug 返回 `400 invalid_request`。
 - missing principal 返回 `401 unauthorized`。
+- 激活成功时 `app_user.user_profiles.onboarding_status` 同事务更新为 `collection_selected`。
+- onboarding 更新失败时，`learning.user_learning_profiles` 和 `learning.user_unit_states` 写入一起回滚。
 
 Learning Engine integration：
 
-- 单个事务完成 profile upsert、old target deactivate、new target upsert。
+- Learning Engine repository 单次调用完成 profile upsert、old target deactivate、new target upsert。
 - 并发切换同一用户时最终状态一致。
 - members 数量较大时仍只使用批量 SQL，不出现 per-unit roundtrip。
 

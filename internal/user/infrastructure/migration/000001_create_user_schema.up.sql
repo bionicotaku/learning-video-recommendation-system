@@ -1,11 +1,5 @@
 create schema if not exists app_user;
 
-alter table auth.users
-add column if not exists email text;
-
-alter table auth.users
-add column if not exists email_confirmed_at timestamptz;
-
 create table if not exists app_user.user_profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
 

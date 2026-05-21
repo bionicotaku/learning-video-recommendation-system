@@ -56,7 +56,7 @@ func resolveModule(name string) (moduleSpec, error) {
 
 func refreshTargets() []string {
 	return []string{
-		"recommendation.v_recommendable_video_units",
+		"recommendation.v_video_unit_recall_index",
 		"recommendation.v_unit_video_inventory",
 	}
 }

@@ -15,6 +15,7 @@ type Querier interface {
 	EnsureActivityStats(ctx context.Context, userID pgtype.UUID) error
 	GetActivityStats(ctx context.Context, userID pgtype.UUID) (AppUserUserActivityStat, error)
 	GetAuthUser(ctx context.Context, id pgtype.UUID) (AuthUser, error)
+	GetCurrentActivityStreakDays(ctx context.Context, arg GetCurrentActivityStreakDaysParams) (int64, error)
 	GetUserProfile(ctx context.Context, userID pgtype.UUID) (AppUserUserProfile, error)
 	IncrementLearningInteraction(ctx context.Context, arg IncrementLearningInteractionParams) error
 	IncrementQuizAttempt(ctx context.Context, arg IncrementQuizAttemptParams) error

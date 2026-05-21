@@ -5,7 +5,9 @@ create schema if not exists learning;
 create schema if not exists recommendation;
 
 create table if not exists auth.users (
-  id uuid primary key
+  id uuid primary key,
+  email text,
+  email_confirmed_at timestamptz
 );
 
 create sequence if not exists semantic.coarse_unit_id_seq;
@@ -53,6 +55,8 @@ create table if not exists catalog.video_unit_index (
   sentence_indexes integer[] not null,
   best_evidence_sentence_index integer not null,
   best_evidence_span_index integer not null,
+  best_evidence_start_ms integer,
+  best_evidence_end_ms integer,
   best_evidence_scores jsonb not null,
   best_evidence_question_reject_reason text,
   best_evidence_selection_reason text,
@@ -117,7 +121,7 @@ create table if not exists learning.user_unit_states (
   updated_at timestamptz not null default now()
 );
 
-create materialized view if not exists recommendation.v_recommendable_video_units as
+create materialized view if not exists recommendation.v_video_unit_recall_index as
 select
   null::uuid as video_id,
   null::bigint as coarse_unit_id,
@@ -128,6 +132,8 @@ select
   '{}'::integer[] as sentence_indexes,
   null::integer as best_evidence_sentence_index,
   null::integer as best_evidence_span_index,
+  null::integer as best_evidence_start_ms,
+  null::integer as best_evidence_end_ms,
   '{}'::jsonb as best_evidence_scores,
   null::text as best_evidence_question_reject_reason,
   null::text as best_evidence_selection_reason,
@@ -137,7 +143,9 @@ select
   null::numeric(6,5) as mapped_span_ratio,
   null::text as status,
   null::text as visibility_status,
-  null::timestamptz as publish_at
+  null::timestamptz as publish_at,
+  null::numeric(10,6) as content_quality_score,
+  null::integer as rank_within_unit
 where false;
 
 create materialized view if not exists recommendation.v_unit_video_inventory as
@@ -152,3 +160,42 @@ select
   null::text as supply_grade,
   null::timestamptz as updated_at
 where false;
+
+create table if not exists recommendation.recall_projection_metadata (
+  projection_name text primary key,
+  projection_updated_at timestamptz not null default now()
+);
+
+create table if not exists recommendation.user_unit_recall_queue (
+  user_id uuid not null,
+  coarse_unit_id bigint not null,
+  status text not null,
+  target_priority numeric(8,4) not null default 0,
+  mastery_score numeric(5,4) not null default 0,
+  last_progress_quality smallint,
+  next_review_at timestamptz,
+  supply_grade text not null default 'none',
+  state_updated_at timestamptz not null,
+  source_version text not null,
+  rebuilt_at timestamptz not null default now(),
+  primary key (user_id, coarse_unit_id)
+);
+
+create table if not exists recommendation.user_unit_recall_queue_states (
+  user_id uuid primary key,
+  source_learning_max_updated_at timestamptz,
+  source_projection_updated_at timestamptz not null,
+  active_target_unit_count integer not null default 0,
+  rebuilt_at timestamptz not null default now()
+);
+
+create table if not exists recommendation.user_unit_serving_states (
+  user_id uuid not null,
+  coarse_unit_id bigint not null,
+  last_served_at timestamptz,
+  last_run_id uuid,
+  served_count integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, coarse_unit_id)
+);

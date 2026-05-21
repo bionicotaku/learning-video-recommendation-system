@@ -1,1 +1,1 @@
-drop materialized view if exists recommendation.v_recommendable_video_units;
+drop materialized view if exists recommendation.v_video_unit_recall_index;
