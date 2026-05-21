@@ -124,10 +124,12 @@ type UnitCollectionItem = {
 | `name` | `semantic.unit_collections.name` | 展示名。 |
 | `description` | `semantic.unit_collections.description` | 词书说明，可为空。 |
 | `category` | `semantic.unit_collections.category` | 集合类型。MVP 通常为 `wordbook`。 |
-| `coarse_unit_count` | `semantic.unit_collections.coarse_unit_count` | 该集合全部 coarse unit 数量。 |
-| `word_unit_count` | `semantic.unit_collections.word_unit_count` | 该集合中 `kind = 'word'` 的 coarse unit 数量。 |
+| `coarse_unit_count` | `semantic.unit_collections.coarse_unit_count` | 该 collection 在 `semantic.unit_collection_members` 中的实际 member 条目数。 |
+| `word_unit_count` | `semantic.unit_collections.word_unit_count` | 来源词书中去重后、且至少匹配到一个 `semantic.coarse_unit` 的 `headWord` 数量。 |
 
-`coarse_unit_count` 和 `word_unit_count` 是缓存字段，权威来源仍是 `semantic.unit_collection_members`。
+`word_unit_count` 只统计有实际 coarse unit 匹配的去重 `headWord`，未匹配词条不计入。
+`coarse_unit_count` 与成员表实际行数保持一致；由于 `semantic.unit_collection_members`
+的主键是 `(collection_id, coarse_unit_id)`，同一个 coarse unit 通过多个词条命中时只算一个 member。
 
 ### 3.4 查询策略
 

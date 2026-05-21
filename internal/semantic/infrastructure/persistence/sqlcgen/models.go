@@ -44,16 +44,18 @@ type SemanticFineUnit struct {
 }
 
 type SemanticUnitCollection struct {
-	CollectionID    pgtype.UUID        `json:"collection_id"`
-	Slug            string             `json:"slug"`
-	Name            string             `json:"name"`
-	Description     pgtype.Text        `json:"description"`
-	Category        string             `json:"category"`
-	Status          string             `json:"status"`
-	CoarseUnitCount int32              `json:"coarse_unit_count"`
-	WordUnitCount   int32              `json:"word_unit_count"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	CollectionID        pgtype.UUID        `json:"collection_id"`
+	Slug                string             `json:"slug"`
+	Name                string             `json:"name"`
+	Description         pgtype.Text        `json:"description"`
+	Category            string             `json:"category"`
+	Status              string             `json:"status"`
+	CoarseUnitCount     int32              `json:"coarse_unit_count"`
+	WordUnitCount       int32              `json:"word_unit_count"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	InternalDescription pgtype.Text        `json:"internal_description"`
+	SourcePayload       []byte             `json:"source_payload"`
 }
 
 type SemanticUnitCollectionMember struct {

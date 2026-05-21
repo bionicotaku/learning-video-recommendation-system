@@ -11,7 +11,9 @@ create table if not exists semantic.unit_collections (
   word_unit_count integer not null default 0
     check (word_unit_count >= 0),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  internal_description text,
+  source_payload jsonb
 );
 
 create table if not exists semantic.unit_collection_members (

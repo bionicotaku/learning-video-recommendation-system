@@ -1,0 +1,1 @@
+"""Wordbook ingest script package."""
