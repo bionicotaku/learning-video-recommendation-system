@@ -1,9 +1,10 @@
-.PHONY: fmt lint test quick-check check sqlc-generate semantic-test-integration learningengine-test-integration normalizer-test-integration integration-test catalog-test-integration recommendation-test-integration e2e-test \
+.PHONY: fmt lint test quick-check check sqlc-generate semantic-test-integration analytics-test-integration learningengine-test-integration normalizer-test-integration integration-test catalog-test-integration recommendation-test-integration user-test-integration e2e-test \
 	analytics-migrate-up analytics-migrate-down analytics-migrate-version analytics-migrate-status \
 	semantic-migrate-up semantic-migrate-down semantic-migrate-version semantic-migrate-status \
 	catalog-migrate-up catalog-migrate-down catalog-migrate-version catalog-migrate-status \
 	learningengine-migrate-up learningengine-migrate-down learningengine-migrate-version learningengine-migrate-status \
 	recommendation-migrate-up recommendation-migrate-down recommendation-migrate-version recommendation-migrate-status \
+	user-migrate-up user-migrate-down user-migrate-version user-migrate-status \
 	recommendation-refresh
 
 fmt:
@@ -27,9 +28,13 @@ sqlc-generate:
 	sqlc generate -f internal/learningengine/reducer/infrastructure/persistence/sqlc.yaml
 	sqlc generate -f internal/learningengine/normalizer/infrastructure/persistence/sqlc.yaml
 	sqlc generate -f internal/recommendation/infrastructure/persistence/sqlc.yaml
+	sqlc generate -f internal/user/infrastructure/persistence/sqlc.yaml
 
 semantic-test-integration:
 	go test -tags=integration ./internal/semantic/test/integration/...
+
+analytics-test-integration:
+	go test -tags=integration ./internal/analytics/test/integration/...
 
 learningengine-test-integration:
 	go test -tags=integration ./internal/learningengine/reducer/test/integration/...
@@ -43,8 +48,11 @@ recommendation-test-integration:
 catalog-test-integration:
 	go test -tags=integration ./internal/catalog/test/integration/...
 
+user-test-integration:
+	go test -tags=integration ./internal/user/test/integration/...
+
 integration-test:
-	go test -tags=integration ./internal/semantic/test/integration/... ./internal/catalog/test/integration/... ./internal/learningengine/reducer/test/integration/... ./internal/learningengine/normalizer/test/integration/... ./internal/recommendation/test/integration/...
+	go test -tags=integration ./internal/semantic/test/integration/... ./internal/analytics/test/integration/... ./internal/catalog/test/integration/... ./internal/learningengine/reducer/test/integration/... ./internal/learningengine/normalizer/test/integration/... ./internal/recommendation/test/integration/... ./internal/user/test/integration/...
 
 e2e-test:
 	go test -tags=e2e ./internal/test/e2e/...
@@ -112,6 +120,18 @@ recommendation-migrate-version:
 
 recommendation-migrate-status:
 	go run ./cmd/dbtool migrate status --module=recommendation
+
+user-migrate-up:
+	go run ./cmd/dbtool migrate up --module=user
+
+user-migrate-down:
+	go run ./cmd/dbtool migrate down --module=user
+
+user-migrate-version:
+	go run ./cmd/dbtool migrate version --module=user
+
+user-migrate-status:
+	go run ./cmd/dbtool migrate status --module=user
 
 recommendation-refresh:
 	go run ./cmd/dbtool refresh recommendation

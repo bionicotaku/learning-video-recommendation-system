@@ -17,12 +17,14 @@ configuration then.
 
 It does not own business tables, migrations, SQLC packages, repositories, or
 domain rules. Business rules remain in `catalog`, `analytics`,
-`learningengine`, `recommendation`, and `semantic`.
+`learningengine`, `recommendation`, `semantic`, and `user`.
 
 Current implemented endpoint group:
 
 ```text
 POST /api/feed
+GET /api/me
+GET /api/me/activity-calendar
 POST /api/videos/end-quiz
 GET /api/unit-collections
 PUT /api/learning-targets/active-collection
@@ -48,6 +50,16 @@ Feed materialization is all-or-error: the facade does not silently drop plan
 items or learning units after Recommendation has written audit/serving state.
 Missing display data, incomplete evidence, missing unit labels, or invalid media
 URLs are treated as backend consistency failures.
+
+`GET /api/me` reads the trusted principal as `user_id`, returns the User profile
+cache plus precomputed global activity stats, and may update the stored profile
+timezone when `X-Client-Timezone` contains a valid IANA timezone. It does not
+aggregate Catalog, Analytics, or Learning Engine tables at request time.
+
+`GET /api/me/activity-calendar` returns today plus the previous six days in
+ascending date order. It uses a valid `X-Client-Timezone` if provided, otherwise
+falls back to the stored profile timezone and then UTC. This endpoint never
+updates the stored profile timezone.
 
 `POST /api/videos/end-quiz` is a read-only quiz lookup endpoint for the video
 ending experience. The handler validates `video_id`, de-duplicates up to eight

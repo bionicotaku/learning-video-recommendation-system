@@ -81,8 +81,13 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 		}
 
 		nextStates := make([]*model.UserUnitState, 0, len(groupedInsertedEvents))
+		startedUnitCount := 0
 		for _, coarseUnitID := range coarseUnitIDs {
 			currentState := currentStates[coarseUnitID]
+			initialProgress := float64(0)
+			if currentState != nil {
+				initialProgress = currentState.ProgressPercent
+			}
 			unitEvents := groupedInsertedEvents[coarseUnitID]
 			for _, event := range unitEvents {
 				nextState, err := aggregate.Reduce(currentState, event)
@@ -96,12 +101,26 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 			}
 
 			if currentState != nil {
+				if initialProgress <= 0 && currentState.ProgressPercent > 0 {
+					startedUnitCount++
+				}
 				nextStates = append(nextStates, currentState)
 			}
 		}
 
 		if _, err := repos.UserUnitStates().BatchUpsert(ctx, nextStates); err != nil {
 			return err
+		}
+
+		if startedUnitCount > 0 {
+			stats := repos.ActivityStats()
+			if stats != nil {
+				for i := 0; i < startedUnitCount; i++ {
+					if err := stats.IncrementStartedUnit(ctx, request.UserID); err != nil {
+						return err
+					}
+				}
+			}
 		}
 
 		return nil

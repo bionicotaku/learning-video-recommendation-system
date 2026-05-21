@@ -62,6 +62,10 @@ Learning Engine normalizer 的 MVP 设计草案。它定义 `internal/learningen
 
 词书系统的 MVP 设计草案。它定义 `semantic.unit_collections` / `semantic.unit_collection_members` 的静态集合模型、`learning.user_learning_profiles` 的 active collection 控制状态，以及激活词书时如何用 set-based SQL 投影到 `learning.user_unit_states.is_target`。
 
+### [User模块设计.md](User模块设计.md)
+
+User 模块的 MVP 设计与当前实现边界。它定义 `internal/user`、`app_user.user_profiles`、`app_user.user_activity_stats`、`app_user.user_daily_activity_stats`、Supabase Auth 注册 trigger、邮箱缓存同步、`/api/me` 的 profile lazy repair、timezone 更新和 activity calendar 读取边界。
+
 ## 运行时现状参考
 
 ### [当前数据库Schema现状.md](当前数据库Schema现状.md)

@@ -14,6 +14,10 @@ import (
 	"learning-video-recommendation-system/internal/catalog/domain/model"
 	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/catalog/test/fixture"
+	userapprepo "learning-video-recommendation-system/internal/user/application/repository"
+	userrepo "learning-video-recommendation-system/internal/user/infrastructure/persistence/repository"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var suite *fixture.Suite
@@ -69,6 +73,43 @@ func TestVideoWatchProgressCreatesAndUpdatesProjections(t *testing.T) {
 	stats := readStats(t, db)
 	if stats.ViewCount != 1 || stats.CompletedCount != 1 || stats.TotalWatchMS != 12000 {
 		t.Fatalf("unexpected stats: %+v", stats)
+	}
+}
+
+func TestVideoWatchProgressUpdatesUserActivityStatsInSameTransaction(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoWatchProgressWriter(db.Pool, catalogrepo.WithWatchProgressActivityStats(func(tx pgx.Tx) userapprepo.ActivityStatsRecorder {
+		return userrepo.NewRepository(tx)
+	}))
+
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), progressRequest(watchSessionID, 10000, 8000, at(0))); err != nil {
+		t.Fatalf("first record: %v", err)
+	}
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), progressRequest(watchSessionID, 12000, 12000, at(1))); err != nil {
+		t.Fatalf("second record: %v", err)
+	}
+
+	var totalWatchMS int64
+	if err := db.Pool.QueryRow(context.Background(), `
+		select total_watch_ms
+		from app_user.user_activity_stats
+		where user_id = $1`, userID).Scan(&totalWatchMS); err != nil {
+		t.Fatalf("read user activity stats: %v", err)
+	}
+	if totalWatchMS != 12000 {
+		t.Fatalf("total_watch_ms = %d, want 12000", totalWatchMS)
+	}
+	var dailyWatchMS int64
+	if err := db.Pool.QueryRow(context.Background(), `
+		select watch_ms
+		from app_user.user_daily_activity_stats
+		where user_id = $1`, userID).Scan(&dailyWatchMS); err != nil {
+		t.Fatalf("read daily activity stats: %v", err)
+	}
+	if dailyWatchMS != 12000 {
+		t.Fatalf("daily watch_ms = %d, want 12000", dailyWatchMS)
 	}
 }
 

@@ -4,12 +4,14 @@ import (
 	"context"
 
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
+	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 )
 
 type TransactionalRepositories interface {
 	UserUnitStates() apprepo.UserUnitStateRepository
 	TargetCommands() apprepo.TargetStateCommandRepository
 	UnitLearningEvents() apprepo.UnitLearningEventRepository
+	ActivityStats() userrepo.ActivityStatsRecorder
 }
 
 type TxManager interface {

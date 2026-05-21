@@ -14,6 +14,7 @@ type Options struct {
 	LearningEvents    RouteGroup
 	WatchProgress     RouteGroup
 	UnitProgress      RouteGroup
+	Me                RouteGroup
 }
 
 func New(options Options) http.Handler {
@@ -38,6 +39,9 @@ func New(options Options) http.Handler {
 	}
 	if options.UnitProgress != nil {
 		options.UnitProgress.RegisterRoutes(mux)
+	}
+	if options.Me != nil {
+		options.Me.RegisterRoutes(mux)
 	}
 	return mux
 }

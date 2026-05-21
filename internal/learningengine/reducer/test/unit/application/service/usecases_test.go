@@ -11,6 +11,7 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
+	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 )
 
 func TestEnsureTargetUnitsExecute(t *testing.T) {
@@ -526,6 +527,48 @@ func TestRecordLearningEventsExecuteSkipsDuplicateAppendRows(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsExecuteIncrementsStartedUnitWhenProgressCrossesZero(t *testing.T) {
+	q4 := int16(4)
+	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+
+	stateRepo := &fakeUserUnitStateRepository{
+		statesByUnit: map[int64]*model.UserUnitState{
+			202: {
+				UserID:             "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:       202,
+				Status:             enum.StatusReviewing,
+				ProgressPercent:    50,
+				ScheduleEaseFactor: 2.5,
+			},
+		},
+	}
+	statsRecorder := &fakeActivityStatsRecorder{}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     &fakeUnitLearningEventRepository{},
+			activityStats:  statsRecorder,
+		},
+	}
+	usecase := service.NewRecordLearningEventsUsecase(txManager)
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "new-unit-1", ProgressQuality: &q4, OccurredAt: t1},
+			{CoarseUnitID: 101, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "new-unit-2", ProgressQuality: &q4, OccurredAt: t1.Add(time.Second)},
+			{CoarseUnitID: 202, EventType: enum.EventQuiz, ReducerEffect: enum.ReducerEffectAffectsProgress, SourceType: "quiz_event", SourceRefID: "existing-unit-1", ProgressQuality: &q4, OccurredAt: t1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if statsRecorder.startedUnitIncrements != 1 {
+		t.Fatalf("started unit increments = %d, want 1", statsRecorder.startedUnitIncrements)
+	}
+}
+
 func TestReplayUserStatesExecutePreservesSetMasteredInactiveTarget(t *testing.T) {
 	eventTime := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	eventsRepo := &fakeUnitLearningEventRepository{
@@ -715,6 +758,7 @@ type fakeTransactionalRepositories struct {
 	userUnitStates applearningrepo.UserUnitStateRepository
 	targetCommands applearningrepo.TargetStateCommandRepository
 	unitEvents     applearningrepo.UnitLearningEventRepository
+	activityStats  userrepo.ActivityStatsRecorder
 }
 
 func (f fakeTransactionalRepositories) UserUnitStates() applearningrepo.UserUnitStateRepository {
@@ -727,6 +771,31 @@ func (f fakeTransactionalRepositories) TargetCommands() applearningrepo.TargetSt
 
 func (f fakeTransactionalRepositories) UnitLearningEvents() applearningrepo.UnitLearningEventRepository {
 	return f.unitEvents
+}
+
+func (f fakeTransactionalRepositories) ActivityStats() userrepo.ActivityStatsRecorder {
+	return f.activityStats
+}
+
+type fakeActivityStatsRecorder struct {
+	startedUnitIncrements int
+}
+
+func (f *fakeActivityStatsRecorder) AddWatchDuration(_ context.Context, _ string, _ time.Time, _ int64) error {
+	return nil
+}
+
+func (f *fakeActivityStatsRecorder) IncrementQuizAttempt(_ context.Context, _ string, _ time.Time) error {
+	return nil
+}
+
+func (f *fakeActivityStatsRecorder) IncrementStartedUnit(_ context.Context, _ string) error {
+	f.startedUnitIncrements++
+	return nil
+}
+
+func (f *fakeActivityStatsRecorder) IncrementLearningInteraction(_ context.Context, _ string, _ time.Time) error {
+	return nil
 }
 
 type fakeTargetStateCommandRepository struct {

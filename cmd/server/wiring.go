@@ -13,6 +13,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/me"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
@@ -37,7 +38,11 @@ import (
 	recommendationtx "learning-video-recommendation-system/internal/recommendation/infrastructure/persistence/tx"
 	semanticservice "learning-video-recommendation-system/internal/semantic/application/service"
 	semanticrepo "learning-video-recommendation-system/internal/semantic/infrastructure/persistence/repository"
+	userapprepo "learning-video-recommendation-system/internal/user/application/repository"
+	userservice "learning-video-recommendation-system/internal/user/application/service"
+	userrepo "learning-video-recommendation-system/internal/user/infrastructure/persistence/repository"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -59,6 +64,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
+	meHandler := buildMeHandler(pool)
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
@@ -68,6 +74,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,
 		UnitProgress:      unitProgress,
+		Me:                meHandler,
 	})
 	handler = middleware.BodyLimit(1 << 20)(handler)
 	handler = middleware.Recover(handler)
@@ -82,12 +89,12 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 }
 
 func buildLearningEventsHandler(pool *pgxpool.Pool, logger *slog.Logger) (*learningevents.Handler, error) {
-	rawWriter := analyticsrepo.NewRawEventWriter(pool)
+	rawWriter := analyticsrepo.NewRawEventWriterWithActivityStats(pool)
 	recordInteractions := analyticsservice.NewRecordLearningInteractionsBatchUsecase(rawWriter)
 	recordQuiz := analyticsservice.NewRecordQuizAttemptUsecase(rawWriter)
-	recordSelfMark := analyticsservice.NewRecordSelfMarkMasteredUsecase(rawWriter)
+	recordSelfMark := analyticsservice.NewRecordSelfMarkMasteredUsecase(analyticsrepo.NewRawEventWriter(pool))
 
-	learningRecorder := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManager(pool))
+	learningRecorder := learningservice.NewRecordLearningEventsUsecase(learningtx.NewManagerWithActivityStats(pool))
 	interactionReader := normalizerrepo.NewRawLearningInteractionReader(pool)
 	quizReader := normalizerrepo.NewRawQuizEventReader(pool)
 	normalizeInteractions := normalizerservice.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, learningRecorder)
@@ -101,7 +108,9 @@ func buildLearningEventsHandler(pool *pgxpool.Pool, logger *slog.Logger) (*learn
 }
 
 func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {
-	writer := catalogrepo.NewVideoWatchProgressWriter(pool)
+	writer := catalogrepo.NewVideoWatchProgressWriter(pool, catalogrepo.WithWatchProgressActivityStats(func(tx pgx.Tx) userapprepo.ActivityStatsRecorder {
+		return userrepo.NewRepository(tx)
+	}))
 	recordWatchProgress := catalogservice.NewRecordVideoWatchProgressUsecase(writer)
 	return watchprogress.NewHandler(recordWatchProgress)
 }
@@ -116,7 +125,16 @@ func buildUnitCollectionsHandler(pool *pgxpool.Pool) *unitcollections.Handler {
 	reader := semanticrepo.NewUnitCollectionReader(pool)
 	listCollections := semanticservice.NewListUnitCollectionsUsecase(reader)
 	activateTarget := learningservice.NewActivateUnitCollectionTargetUsecase(learningtx.NewManager(pool))
-	return unitcollections.NewHandler(listCollections, activateTarget)
+	userRepository := userrepo.NewRepository(pool)
+	updateOnboarding := userservice.NewUpdateOnboardingStatusUsecase(userRepository)
+	return unitcollections.NewHandler(listCollections, activateTarget, unitcollections.WithOnboardingStatus(updateOnboarding))
+}
+
+func buildMeHandler(pool *pgxpool.Pool) *me.Handler {
+	repository := userrepo.NewRepository(pool)
+	getMe := userservice.NewGetMeUsecase(repository, repository)
+	getCalendar := userservice.NewGetActivityCalendarUsecase(repository, repository)
+	return me.NewHandler(getMe, getCalendar)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {

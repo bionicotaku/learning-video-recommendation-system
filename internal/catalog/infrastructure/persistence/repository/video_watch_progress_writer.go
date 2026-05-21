@@ -10,17 +10,31 @@ import (
 	"learning-video-recommendation-system/internal/catalog/domain/model"
 	"learning-video-recommendation-system/internal/catalog/infrastructure/persistence/mapper"
 	catalogsqlc "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/sqlcgen"
+	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type VideoWatchProgressWriter struct {
-	pool *pgxpool.Pool
+	pool                 *pgxpool.Pool
+	activityStatsFactory func(pgx.Tx) userrepo.ActivityStatsRecorder
 }
 
-func NewVideoWatchProgressWriter(pool *pgxpool.Pool) *VideoWatchProgressWriter {
-	return &VideoWatchProgressWriter{pool: pool}
+type VideoWatchProgressWriterOption func(*VideoWatchProgressWriter)
+
+func WithWatchProgressActivityStats(factory func(pgx.Tx) userrepo.ActivityStatsRecorder) VideoWatchProgressWriterOption {
+	return func(w *VideoWatchProgressWriter) {
+		w.activityStatsFactory = factory
+	}
+}
+
+func NewVideoWatchProgressWriter(pool *pgxpool.Pool, options ...VideoWatchProgressWriterOption) *VideoWatchProgressWriter {
+	writer := &VideoWatchProgressWriter{pool: pool}
+	for _, option := range options {
+		option(writer)
+	}
+	return writer
 }
 
 func (w *VideoWatchProgressWriter) RecordVideoWatchProgress(ctx context.Context, request model.VideoWatchProgress) (model.VideoWatchProgressResult, error) {
@@ -108,6 +122,15 @@ func (w *VideoWatchProgressWriter) RecordVideoWatchProgress(ctx context.Context,
 		DeltaActiveWatchMs: session.DeltaActiveWatchMs,
 	}); err != nil {
 		return model.VideoWatchProgressResult{}, err
+	}
+
+	if session.DeltaActiveWatchMs > 0 && w.activityStatsFactory != nil {
+		recorder := w.activityStatsFactory(tx)
+		if recorder != nil {
+			if err := recorder.AddWatchDuration(ctx, request.UserID, occurredAt, session.DeltaActiveWatchMs); err != nil {
+				return model.VideoWatchProgressResult{}, err
+			}
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

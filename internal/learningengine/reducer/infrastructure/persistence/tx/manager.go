@@ -10,14 +10,21 @@ import (
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	persistrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
+	userrepo "learning-video-recommendation-system/internal/user/application/repository"
+	userpersist "learning-video-recommendation-system/internal/user/infrastructure/persistence/repository"
 )
 
 type Manager struct {
-	pool *pgxpool.Pool
+	pool                *pgxpool.Pool
+	activityStatsWriter bool
 }
 
 func NewManager(pool *pgxpool.Pool) *Manager {
 	return &Manager{pool: pool}
+}
+
+func NewManagerWithActivityStats(pool *pgxpool.Pool) *Manager {
+	return &Manager{pool: pool, activityStatsWriter: true}
 }
 
 var _ service.TxManager = (*Manager)(nil)
@@ -45,7 +52,7 @@ func (m *Manager) withinTx(ctx context.Context, userID string, lockUser bool, fn
 		}
 	}
 
-	repositories := repositories{tx: tx}
+	repositories := repositories{tx: tx, activityStatsWriter: m.activityStatsWriter}
 	if err := fn(ctx, repositories); err != nil {
 		return err
 	}
@@ -54,7 +61,8 @@ func (m *Manager) withinTx(ctx context.Context, userID string, lockUser bool, fn
 }
 
 type repositories struct {
-	tx pgx.Tx
+	tx                  pgx.Tx
+	activityStatsWriter bool
 }
 
 func (r repositories) UserUnitStates() apprepo.UserUnitStateRepository {
@@ -67,4 +75,11 @@ func (r repositories) TargetCommands() apprepo.TargetStateCommandRepository {
 
 func (r repositories) UnitLearningEvents() apprepo.UnitLearningEventRepository {
 	return persistrepo.NewUnitLearningEventRepository(r.tx)
+}
+
+func (r repositories) ActivityStats() userrepo.ActivityStatsRecorder {
+	if !r.activityStatsWriter {
+		return nil
+	}
+	return userpersist.NewRepository(r.tx)
 }

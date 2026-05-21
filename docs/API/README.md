@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint。
+- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Me API 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -23,6 +23,7 @@
 - [Feed-API-MVP设计.md](Feed-API-MVP设计.md)：feed 页面获取推荐视频列表的前端展示契约。
 - [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取与激活当前学习目标集合。
+- [Me-API-MVP设计.md](Me-API-MVP设计.md)：当前用户 profile 读取、累计活动统计、activity calendar、profile lazy repair 和 timezone 顺手更新。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
@@ -41,6 +42,13 @@
 | Method | Path | 说明 |
 |---|---|---|
 | `POST` | `/api/videos/end-quiz` | 按 `video_id + coarse_unit_ids` 批量读取视频末尾 quiz 候选题；只读 Catalog，不写学习进度。 |
+
+### Me / 当前用户
+
+| Method | Path | 说明 |
+|---|---|---|
+| `GET` | `/api/me` | 读取当前用户基础 profile 和累计活动统计；可根据合法 `X-Client-Timezone` 顺手更新 timezone，并在 profile 缺失时 lazy repair。 |
+| `GET` | `/api/me/activity-calendar` | 读取今天和过去 6 天的活动日历统计；只读 daily stats，不更新 timezone。 |
 
 ### Unit Collections / 词书目标
 
@@ -79,6 +87,10 @@
 | `GET` | `/api/learning/unit-progress/mastered` | 分页读取当前用户已掌握学习单元；从 principal 取 `user_id`，Learning Engine reducer read usecase join `semantic.coarse_unit` 返回展示字段。 |
 | `GET` | `/api/learning/unit-progress/unmastered` | 分页读取当前用户尚未掌握的目标学习单元；使用 cursor keyset pagination。 |
 
+## 已设计未实现 Endpoint
+
+当前没有已写入设计但未落地的业务 endpoint。
+
 ## 当前 API 实现状态
 
 | 文档 | 设计文档状态 | API 实现状态 | 说明 |
@@ -91,6 +103,7 @@
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；后者由 Learning Engine 事务性切换当前学习目标集合。 |
+| [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me` 与 `GET /api/me/activity-calendar`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 `/api/me` timezone。 |
 
 ## 未开始范围
 

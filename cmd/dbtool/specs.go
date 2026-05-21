@@ -38,6 +38,11 @@ func moduleSpecs() map[string]moduleSpec {
 			MigrationDir:  filepath.FromSlash("internal/recommendation/infrastructure/migration"),
 			TrackingTable: "recommendation_schema_migrations",
 		},
+		"user": {
+			Name:          "user",
+			MigrationDir:  filepath.FromSlash("internal/user/infrastructure/migration"),
+			TrackingTable: "user_schema_migrations",
+		},
 	}
 }
 

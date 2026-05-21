@@ -135,6 +135,77 @@ func TestRawEventWriterUpsertsLearningInteractionBatchInInputOrder(t *testing.T)
 	}
 }
 
+func TestRawEventWriterWithActivityStatsIncrementsOnlyInsertedEvents(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111113"
+	questionID := "22222222-2222-2222-2222-222222222223"
+	unitID := int64(103)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, unitID)
+	db.SeedQuestion(t, questionID)
+
+	writer := analyticsrepo.NewRawEventWriterWithActivityStats(db.Pool)
+	quiz := model.RawQuizEvent{
+		ClientEventID:       "client-quiz-stats-1",
+		UserID:              userID,
+		ClientContext:       []byte(`{"platform":"ios"}`),
+		QuestionID:          questionID,
+		CoarseUnitID:        unitID,
+		TriggerType:         "manual",
+		SelectedOptionIDs:   []string{"correct"},
+		SelectionIntervalMS: []int32{1000},
+		IsFirstTryCorrect:   true,
+		TotalElapsedMS:      1000,
+		ShownAt:             now.Add(-time.Second),
+		CompletedAt:         now,
+	}
+	if _, err := writer.UpsertQuizEvent(context.Background(), quiz); err != nil {
+		t.Fatalf("first UpsertQuizEvent() error = %v", err)
+	}
+	if _, err := writer.UpsertQuizEvent(context.Background(), quiz); err != nil {
+		t.Fatalf("duplicate UpsertQuizEvent() error = %v", err)
+	}
+
+	interaction := []model.RawLearningInteractionEvent{
+		learningInteraction(userID, unitID, "client-interaction-stats-1", now),
+	}
+	if _, err := writer.UpsertLearningInteractions(context.Background(), interaction); err != nil {
+		t.Fatalf("first UpsertLearningInteractions() error = %v", err)
+	}
+	if _, err := writer.UpsertLearningInteractions(context.Background(), interaction); err != nil {
+		t.Fatalf("duplicate UpsertLearningInteractions() error = %v", err)
+	}
+
+	var quizAttemptCount int64
+	if err := db.Pool.QueryRow(context.Background(), `
+		select quiz_attempt_count
+		from app_user.user_activity_stats
+		where user_id = $1
+	`, userID).Scan(&quizAttemptCount); err != nil {
+		t.Fatalf("query user_activity_stats: %v", err)
+	}
+	if quizAttemptCount != 1 {
+		t.Fatalf("quiz_attempt_count = %d, want 1", quizAttemptCount)
+	}
+
+	var dailyQuizCount int64
+	var dailyInteractionCount int64
+	if err := db.Pool.QueryRow(context.Background(), `
+		select quiz_attempt_count, learning_interaction_count
+		from app_user.user_daily_activity_stats
+		where user_id = $1
+		  and local_date = date '2026-05-15'
+	`, userID).Scan(&dailyQuizCount, &dailyInteractionCount); err != nil {
+		t.Fatalf("query user_daily_activity_stats: %v", err)
+	}
+	if dailyQuizCount != 1 || dailyInteractionCount != 1 {
+		t.Fatalf("daily counts quiz=%d interaction=%d, want 1/1", dailyQuizCount, dailyInteractionCount)
+	}
+}
+
 func TestNormalizerPendingIndexesExist(t *testing.T) {
 	t.Parallel()
 

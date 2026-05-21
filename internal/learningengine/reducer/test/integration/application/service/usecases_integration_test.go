@@ -18,6 +18,7 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
 	persistrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	persisttx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
+	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 )
 
 func TestTargetControlUsecasesWithDatabase(t *testing.T) {
@@ -521,6 +522,10 @@ func (r failingBatchUpsertRepositories) TargetCommands() applearningrepo.TargetS
 
 func (r failingBatchUpsertRepositories) UnitLearningEvents() applearningrepo.UnitLearningEventRepository {
 	return r.unitLearningEvents
+}
+
+func (r failingBatchUpsertRepositories) ActivityStats() userrepo.ActivityStatsRecorder {
+	return nil
 }
 
 type failingBatchUpsertUserUnitStateRepository struct {

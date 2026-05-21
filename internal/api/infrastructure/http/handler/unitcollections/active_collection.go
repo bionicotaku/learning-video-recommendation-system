@@ -8,6 +8,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/request"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	userdto "learning-video-recommendation-system/internal/user/application/dto"
 )
 
 var collectionSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,80}$`)
@@ -41,6 +42,15 @@ func (h *Handler) activateUnitCollection(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		writeHandlerError(w, r, err)
 		return
+	}
+	if h.updateOnboarding != nil {
+		if _, err := h.updateOnboarding.Execute(r.Context(), userdto.UpdateOnboardingStatusRequest{
+			UserID: principal.UserID,
+			Status: "collection_selected",
+		}); err != nil {
+			writeHandlerError(w, r, err)
+			return
+		}
 	}
 	response.WriteJSON(w, http.StatusOK, result)
 }
