@@ -360,6 +360,13 @@ from selected_collection c
 left join upserted u on true
 group by c.collection_id, c.slug;
 
+-- name: GetActiveUnitCollection :one
+select
+  active_collection_id,
+  active_collection_slug
+from learning.user_learning_profiles
+where user_id = sqlc.arg(user_id);
+
 -- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
 where user_id = sqlc.arg(user_id);

@@ -4,7 +4,9 @@
 
 Current implementation:
 
-- `semantic.unit_collections` stores available system collections such as wordbooks.
+- `semantic.unit_collections` stores available system collections such as
+  wordbooks. `slug` is the API identifier and must be lowercase
+  `^[a-z0-9][a-z0-9-]{0,80}$`.
 - `semantic.unit_collection_members` stores collection membership by `coarse_unit_id`.
 - `ListUnitCollectionsUsecase` returns active collections for API display.
 - `scripts/unit_collection_ingest` imports local standard JSON wordbooks. It

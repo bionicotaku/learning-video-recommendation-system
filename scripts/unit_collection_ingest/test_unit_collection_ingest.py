@@ -42,6 +42,23 @@ class UnitCollectionIngestTest(unittest.TestCase):
         )
         self.assertEqual(parsed.source_payload[0]["content"], {"ignored": True})
 
+    def test_parse_wordbook_file_canonicalizes_slug_to_lowercase(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "new-oriental-GRE.json"
+            path.write_text(json.dumps([{"wordRank": 1, "headWord": "alpha"}]), encoding="utf-8")
+
+            parsed = parse_wordbook_file(path)
+
+        self.assertEqual(parsed.slug, "new-oriental-gre")
+
+    def test_parse_wordbook_file_rejects_invalid_slug_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "New Oriental GRE.json"
+            path.write_text(json.dumps([{"wordRank": 1, "headWord": "alpha"}]), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "filename stem must normalize to slug"):
+                parse_wordbook_file(path)
+
     def test_parse_wordbook_file_rejects_non_array_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "demo.json"

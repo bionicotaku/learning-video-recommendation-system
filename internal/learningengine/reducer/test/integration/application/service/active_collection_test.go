@@ -11,6 +11,7 @@ import (
 
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/service"
+	learningrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 	persisttx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 	"learning-video-recommendation-system/internal/learningengine/reducer/test/fixture"
 )
@@ -95,6 +96,46 @@ func TestActivateUnitCollectionTargetHandlesEmptyAndMissingCollections(t *testin
 	})
 	if !errors.Is(err, service.ErrUnitCollectionNotFound) {
 		t.Fatalf("missing collection err = %v, want ErrUnitCollectionNotFound", err)
+	}
+}
+
+func TestGetActiveUnitCollectionReturnsNilWhenProfileMissingAndSlugWhenPresent(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "33333333-3333-4333-8333-333333333333"
+	collectionID := "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 301)
+	db.SeedUnitCollection(t, collectionID, "toefl-core", "TOEFL Core", "active")
+	db.SeedUnitCollectionMember(t, collectionID, 301, 1)
+
+	usecase := service.NewGetActiveUnitCollectionUsecase(learningrepo.NewActiveUnitCollectionReader(db.Pool))
+	missing, err := usecase.Execute(context.Background(), dto.GetActiveUnitCollectionRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("Execute(missing) error = %v", err)
+	}
+	if missing.ActiveCollection != nil {
+		t.Fatalf("ActiveCollection = %+v, want nil", missing.ActiveCollection)
+	}
+
+	activate := service.NewActivateUnitCollectionTargetUsecase(persisttx.NewManager(db.Pool))
+	if _, err := activate.Execute(context.Background(), dto.ActivateUnitCollectionTargetRequest{
+		UserID:         userID,
+		CollectionSlug: "toefl-core",
+	}); err != nil {
+		t.Fatalf("activate collection: %v", err)
+	}
+
+	found, err := usecase.Execute(context.Background(), dto.GetActiveUnitCollectionRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("Execute(found) error = %v", err)
+	}
+	if found.ActiveCollection == nil {
+		t.Fatalf("ActiveCollection = nil, want value")
+	}
+	if found.ActiveCollection.CollectionID != collectionID || found.ActiveCollection.CollectionSlug != "toefl-core" {
+		t.Fatalf("ActiveCollection = %+v", found.ActiveCollection)
 	}
 }
 

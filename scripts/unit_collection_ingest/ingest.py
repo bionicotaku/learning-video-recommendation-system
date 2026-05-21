@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 
 OUTPUT_DIR_NAME = "_unit_collection_ingest"
+SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,13 +109,22 @@ def parse_wordbook_file(path: Path) -> ParsedWordbook:
         head_word = raw_head_word.strip()
         entries.append(WordbookEntry(word_rank=word_rank, head_word=head_word))
 
+    slug = normalize_slug(path.stem)
+
     return ParsedWordbook(
         source_path=path,
-        slug=path.stem,
+        slug=slug,
         source_sha256=hashlib.sha256(raw_bytes).hexdigest(),
         source_payload=payload,
         entries=tuple(entries),
     )
+
+
+def normalize_slug(raw_slug: str) -> str:
+    slug = raw_slug.lower()
+    if not SLUG_PATTERN.fullmatch(slug):
+        raise ValueError(f"{raw_slug}: filename stem must normalize to slug {SLUG_PATTERN.pattern}")
+    return slug
 
 
 def generated_root(input_dir: Path) -> Path:

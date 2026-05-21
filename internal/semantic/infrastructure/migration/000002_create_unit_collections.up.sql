@@ -1,6 +1,8 @@
 create table if not exists semantic.unit_collections (
   collection_id uuid primary key default gen_random_uuid(),
-  slug text not null unique,
+  slug text not null unique
+    constraint unit_collections_slug_canonical_check
+    check (slug = lower(slug) and slug ~ '^[a-z0-9][a-z0-9-]{0,80}$'),
   name text not null,
   description text,
   category text not null default 'wordbook',

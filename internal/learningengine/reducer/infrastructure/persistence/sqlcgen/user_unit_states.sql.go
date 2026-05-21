@@ -353,6 +353,26 @@ func (q *Queries) EnsureTargetUnits(ctx context.Context, arg EnsureTargetUnitsPa
 	return err
 }
 
+const getActiveUnitCollection = `-- name: GetActiveUnitCollection :one
+select
+  active_collection_id,
+  active_collection_slug
+from learning.user_learning_profiles
+where user_id = $1
+`
+
+type GetActiveUnitCollectionRow struct {
+	ActiveCollectionID   pgtype.UUID `json:"active_collection_id"`
+	ActiveCollectionSlug string      `json:"active_collection_slug"`
+}
+
+func (q *Queries) GetActiveUnitCollection(ctx context.Context, userID pgtype.UUID) (GetActiveUnitCollectionRow, error) {
+	row := q.db.QueryRow(ctx, getActiveUnitCollection, userID)
+	var i GetActiveUnitCollectionRow
+	err := row.Scan(&i.ActiveCollectionID, &i.ActiveCollectionSlug)
+	return i, err
+}
+
 const getUserUnitStateForUpdate = `-- name: GetUserUnitStateForUpdate :one
 select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
 from learning.user_unit_states

@@ -27,6 +27,19 @@ type ActivateUnitCollectionTargetResponse struct {
 	TargetCount    int    `json:"target_count"`
 }
 
+type ActiveUnitCollection struct {
+	CollectionID   string
+	CollectionSlug string
+}
+
+type GetActiveUnitCollectionRequest struct {
+	UserID string
+}
+
+type GetActiveUnitCollectionResponse struct {
+	ActiveCollection *ActiveUnitCollection
+}
+
 type SetTargetInactiveRequest struct {
 	UserID       string
 	CoarseUnitID int64

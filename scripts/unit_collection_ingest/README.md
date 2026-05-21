@@ -19,7 +19,9 @@ _unit_collection_ingest/
     <slug>.matches.json
 ```
 
-`slug` is the source filename without the `.json` suffix. The metadata file is
+`slug` is the lowercased source filename without the `.json` suffix, and it
+must match `^[a-z0-9][a-z0-9-]{0,80}$`. For example,
+`new-oriental-GRE.json` writes `new-oriental-gre`. The metadata file is
 generated with default `name`, `description`, and `internal_description` values;
 manual edits are preserved on later runs, and only missing slugs are added.
 

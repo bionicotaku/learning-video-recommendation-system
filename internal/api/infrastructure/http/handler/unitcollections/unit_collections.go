@@ -3,11 +3,19 @@ package unitcollections
 import (
 	"net/http"
 
+	apivdto "learning-video-recommendation-system/internal/api/application/dto"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
 )
 
 func (h *Handler) listUnitCollections(w http.ResponseWriter, r *http.Request) {
-	result, err := h.listCollections.Execute(r.Context())
+	principal, err := requiredPrincipal(r)
+	if err != nil {
+		writeHandlerError(w, r, err)
+		return
+	}
+	result, err := h.listCollections.Execute(r.Context(), apivdto.ListUnitCollectionsRequest{
+		UserID: principal.UserID,
+	})
 	if err != nil {
 		writeHandlerError(w, r, err)
 		return

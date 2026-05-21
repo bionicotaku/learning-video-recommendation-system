@@ -7,19 +7,19 @@ import (
 	"net/http"
 	"strings"
 
+	apivdto "learning-video-recommendation-system/internal/api/application/dto"
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
-	semanticdto "learning-video-recommendation-system/internal/semantic/application/dto"
 	userrepo "learning-video-recommendation-system/internal/user/application/repository"
 	userservice "learning-video-recommendation-system/internal/user/application/service"
 )
 
 type ListUnitCollectionsUsecase interface {
-	Execute(ctx context.Context) (semanticdto.ListUnitCollectionsResponse, error)
+	Execute(ctx context.Context, request apivdto.ListUnitCollectionsRequest) (apivdto.UnitCollectionsResponse, error)
 }
 
 type ActivateUnitCollectionTargetUsecase interface {

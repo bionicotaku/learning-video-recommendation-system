@@ -79,6 +79,43 @@ func TestActivateUnitCollectionTargetExecuteUsesUserScopedTransaction(t *testing
 	}
 }
 
+func TestGetActiveUnitCollectionExecuteReturnsActiveAndPropagatesReaderError(t *testing.T) {
+	t.Run("active profile", func(t *testing.T) {
+		reader := &fakeActiveUnitCollectionReader{
+			active: &model.ActiveUnitCollection{
+				CollectionID:   "11111111-1111-4111-8111-111111111111",
+				CollectionSlug: "toefl-core",
+			},
+		}
+		usecase := service.NewGetActiveUnitCollectionUsecase(reader)
+
+		response, err := usecase.Execute(context.Background(), dto.GetActiveUnitCollectionRequest{
+			UserID: "22222222-2222-4222-8222-222222222222",
+		})
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+		if reader.userID != "22222222-2222-4222-8222-222222222222" {
+			t.Fatalf("reader userID = %q", reader.userID)
+		}
+		if response.ActiveCollection == nil || response.ActiveCollection.CollectionSlug != "toefl-core" {
+			t.Fatalf("ActiveCollection = %+v", response.ActiveCollection)
+		}
+	})
+
+	t.Run("reader error", func(t *testing.T) {
+		wantErr := errors.New("database unavailable")
+		usecase := service.NewGetActiveUnitCollectionUsecase(&fakeActiveUnitCollectionReader{err: wantErr})
+
+		_, err := usecase.Execute(context.Background(), dto.GetActiveUnitCollectionRequest{
+			UserID: "22222222-2222-4222-8222-222222222222",
+		})
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("Execute() error = %v, want %v", err, wantErr)
+		}
+	})
+}
+
 func TestSetTargetInactiveExecute(t *testing.T) {
 	targetRepo := &fakeTargetStateCommandRepository{}
 	txManager := &fakeTxManager{
@@ -820,6 +857,17 @@ func (f *fakeTargetStateCommandRepository) ActivateUnitCollectionTarget(_ contex
 func (f *fakeTargetStateCommandRepository) SetTargetInactive(_ context.Context, _ string, coarseUnitID int64) error {
 	f.inactiveUnitID = coarseUnitID
 	return nil
+}
+
+type fakeActiveUnitCollectionReader struct {
+	userID string
+	active *model.ActiveUnitCollection
+	err    error
+}
+
+func (f *fakeActiveUnitCollectionReader) GetActiveUnitCollection(_ context.Context, userID string) (*model.ActiveUnitCollection, error) {
+	f.userID = userID
+	return f.active, f.err
 }
 
 type fakeUserUnitStateRepository struct {

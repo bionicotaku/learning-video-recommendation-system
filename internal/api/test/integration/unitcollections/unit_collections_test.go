@@ -4,24 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	apivdto "learning-video-recommendation-system/internal/api/application/dto"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
-	semanticdto "learning-video-recommendation-system/internal/semantic/application/dto"
 )
 
-func TestListUnitCollectionsReturnsSemanticResponse(t *testing.T) {
-	semantic := &fakeListCollectionsUsecase{response: semanticdto.ListUnitCollectionsResponse{
-		Items: []semanticdto.UnitCollectionItem{{
+func TestListUnitCollectionsReturnsItemsAndActiveCollectionSlug(t *testing.T) {
+	activeCollection := "toefl-core"
+	list := &fakeListCollectionsForUserUsecase{response: apivdto.UnitCollectionsResponse{
+		ActiveCollection: &activeCollection,
+		Items: []apivdto.UnitCollectionItem{{
 			CollectionID:    "11111111-1111-4111-8111-111111111111",
 			Slug:            "toefl-core",
 			Name:            "TOEFL Core",
@@ -30,10 +31,10 @@ func TestListUnitCollectionsReturnsSemanticResponse(t *testing.T) {
 			WordUnitCount:   1000,
 		}},
 	}}
-	server := newServer(semantic, &fakeActivateUsecase{}, true)
+	server := newServer(list, &fakeActivateUsecase{}, true)
 	t.Cleanup(server.Close)
 
-	response := request(t, server, http.MethodGet, "/api/unit-collections", "", false)
+	response := request(t, server, http.MethodGet, "/api/unit-collections", "", true)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
@@ -44,8 +45,51 @@ func TestListUnitCollectionsReturnsSemanticResponse(t *testing.T) {
 	if item["slug"] != "toefl-core" || item["coarse_unit_count"].(float64) != 1000 {
 		t.Fatalf("unexpected body: %+v", body)
 	}
-	if !semantic.called {
-		t.Fatalf("semantic usecase was not called")
+	if body["active_collection"] != "toefl-core" {
+		t.Fatalf("active_collection = %v, want toefl-core", body["active_collection"])
+	}
+	if !list.called || list.request.UserID != userID {
+		t.Fatalf("list request not mapped: called=%v request=%+v", list.called, list.request)
+	}
+}
+
+func TestListUnitCollectionsRequiresPrincipal(t *testing.T) {
+	list := &fakeListCollectionsForUserUsecase{}
+	server := newServer(list, &fakeActivateUsecase{}, true)
+	t.Cleanup(server.Close)
+
+	response := request(t, server, http.MethodGet, "/api/unit-collections", "", false)
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if list.called {
+		t.Fatalf("list usecase should not be called without principal")
+	}
+}
+
+func TestListUnitCollectionsAllowsNullActiveCollection(t *testing.T) {
+	list := &fakeListCollectionsForUserUsecase{response: apivdto.UnitCollectionsResponse{
+		Items: []apivdto.UnitCollectionItem{{
+			CollectionID: "11111111-1111-4111-8111-111111111111",
+			Slug:         "toefl-core",
+			Name:         "TOEFL Core",
+			Category:     "wordbook",
+		}},
+	}}
+	server := newServer(list, &fakeActivateUsecase{}, true)
+	t.Cleanup(server.Close)
+
+	response := request(t, server, http.MethodGet, "/api/unit-collections", "", true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	var body map[string]any
+	decodeJSON(t, response, &body)
+	if _, ok := body["active_collection"]; !ok {
+		t.Fatalf("active_collection field missing: %+v", body)
+	}
+	if body["active_collection"] != nil {
+		t.Fatalf("active_collection = %v, want null", body["active_collection"])
 	}
 }
 
@@ -55,7 +99,7 @@ func TestActivateUnitCollectionMapsPrincipalAndBody(t *testing.T) {
 		CollectionSlug: "toefl-core",
 		TargetCount:    1000,
 	}}
-	server := newServer(&fakeListCollectionsUsecase{}, activate, true)
+	server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", `{"collection_slug":"toefl-core"}`, true)
@@ -88,7 +132,7 @@ func TestActivateUnitCollectionRejectsInvalidRequests(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			activate := &fakeActivateUsecase{}
-			server := newServer(&fakeListCollectionsUsecase{}, activate, true)
+			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
 			t.Cleanup(server.Close)
 
 			response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", tt.body, tt.withPrincipal)
@@ -114,7 +158,7 @@ func TestActivateUnitCollectionRequiresJSONContentType(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			activate := &fakeActivateUsecase{}
-			server := newServer(&fakeListCollectionsUsecase{}, activate, true)
+			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
 			t.Cleanup(server.Close)
 
 			request, err := http.NewRequest(http.MethodPut, server.URL+"/api/learning-targets/active-collection", strings.NewReader(`{"collection_slug":"toefl-core"}`))
@@ -141,7 +185,7 @@ func TestActivateUnitCollectionRequiresJSONContentType(t *testing.T) {
 }
 
 func TestActivateUnitCollectionMapsNotFound(t *testing.T) {
-	server := newServer(&fakeListCollectionsUsecase{}, &fakeActivateUsecase{err: learningservice.ErrUnitCollectionNotFound}, true)
+	server := newServer(&fakeListCollectionsForUserUsecase{}, &fakeActivateUsecase{err: learningservice.ErrUnitCollectionNotFound}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", `{"collection_slug":"missing-book"}`, true)
@@ -159,7 +203,7 @@ func TestActivateUnitCollectionMapsNotFound(t *testing.T) {
 	}
 }
 
-func newServer(list *fakeListCollectionsUsecase, activate *fakeActivateUsecase, withAuth bool) *httptest.Server {
+func newServer(list *fakeListCollectionsForUserUsecase, activate *fakeActivateUsecase, withAuth bool) *httptest.Server {
 	group := unitcollections.NewHandler(list, activate)
 	handler := router.New(router.Options{UnitCollections: group})
 	if withAuth {
@@ -210,14 +254,16 @@ func readBody(t *testing.T, response *http.Response) string {
 	return buf.String()
 }
 
-type fakeListCollectionsUsecase struct {
+type fakeListCollectionsForUserUsecase struct {
 	called   bool
-	response semanticdto.ListUnitCollectionsResponse
+	request  apivdto.ListUnitCollectionsRequest
+	response apivdto.UnitCollectionsResponse
 	err      error
 }
 
-func (f *fakeListCollectionsUsecase) Execute(context.Context) (semanticdto.ListUnitCollectionsResponse, error) {
+func (f *fakeListCollectionsForUserUsecase) Execute(_ context.Context, request apivdto.ListUnitCollectionsRequest) (apivdto.UnitCollectionsResponse, error) {
 	f.called = true
+	f.request = request
 	return f.response, f.err
 }
 
@@ -235,5 +281,3 @@ func (f *fakeActivateUsecase) Execute(_ context.Context, request learningdto.Act
 }
 
 const userID = "11111111-1111-4111-8111-111111111111"
-
-var _ = errors.Is

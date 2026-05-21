@@ -69,15 +69,16 @@ ending experience. The handler validates `video_id`, de-duplicates up to eight
 state and does not participate in Learning Engine progress updates; completed
 answers still go through `POST /api/quiz-attempts`.
 
-`GET /api/unit-collections` lists active Semantic unit collections for target
-selection. `PUT /api/learning-targets/active-collection` reads the trusted
-principal as `user_id`, validates `collection_slug`, and opens one user-scoped
-transaction that switches the Learning Engine collection target projection and
-updates User onboarding to `collection_selected`. API does not pull collection
-members into memory or bypass the owning module repositories. The endpoint is
-synchronous: `200 OK` means the target projection and onboarding update are
-already committed; there is no activation job or background switching state in
-the MVP.
+`GET /api/unit-collections` reads the trusted principal as `user_id`, lists
+active Semantic unit collections for target selection, and returns the current
+user's `active_collection` slug or `null` from Learning Engine profile state.
+`PUT /api/learning-targets/active-collection` reads the trusted principal as
+`user_id`, validates `collection_slug`, and opens one user-scoped transaction
+that switches the Learning Engine collection target projection and updates User
+onboarding to `collection_selected`. API does not pull collection members into
+memory or bypass the owning module repositories. The endpoint is synchronous:
+`200 OK` means the target projection and onboarding update are already committed;
+there is no activation job or background switching state in the MVP.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset

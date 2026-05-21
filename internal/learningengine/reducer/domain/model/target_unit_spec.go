@@ -12,3 +12,8 @@ type ActivatedUnitCollectionTarget struct {
 	CollectionSlug string
 	TargetCount    int
 }
+
+type ActiveUnitCollection struct {
+	CollectionID   string
+	CollectionSlug string
+}

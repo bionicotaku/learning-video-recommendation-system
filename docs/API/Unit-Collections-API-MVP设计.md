@@ -20,13 +20,14 @@
 
 ```text
 GET /api/unit-collections
-  读取当前可选学习目标合集。
+  读取当前可选学习目标合集，以及当前用户已激活的词书 slug。
 
 PUT /api/learning-targets/active-collection
   把某个词书激活为当前用户的学习目标集合。
 ```
 
-`GET /api/unit-collections` 是纯读接口，只读 `semantic.unit_collections`。
+`GET /api/unit-collections` 是用户态纯读接口。列表来自 `semantic.unit_collections`，当前选择来自
+`learning.user_learning_profiles`，由 API facade 组合后返回。
 
 `PUT /api/learning-targets/active-collection` 是 API facade 编排的 target activation 写接口。它会在一个用户级事务内：
 
@@ -68,13 +69,16 @@ where is_target = true
 GET /api/unit-collections
 ```
 
-`user_id` 不参与本接口查询。MVP 返回所有 active collections。
+`user_id` 必须从 trusted principal 获取，不允许 body/query/path 传入。MVP 返回所有 active collections，
+并额外返回当前用户有效 active collection 的 `slug`；如果用户没有 learning profile，或 profile 指向的 collection
+已经 inactive / missing，则返回 `active_collection: null`。
 
 ### 3.2 Response
 
 ```ts
 type UnitCollectionsResponse = {
   items: UnitCollectionItem[];
+  active_collection: string | null;
 };
 
 type UnitCollectionItem = {
@@ -111,7 +115,8 @@ type UnitCollectionItem = {
       "coarse_unit_count": 1800,
       "word_unit_count": 1640
     }
-  ]
+  ],
+  "active_collection": "toefl-1000-essential"
 }
 ```
 
@@ -126,6 +131,7 @@ type UnitCollectionItem = {
 | `category` | `semantic.unit_collections.category` | 集合类型。MVP 通常为 `wordbook`。 |
 | `coarse_unit_count` | `semantic.unit_collections.coarse_unit_count` | 该 collection 在 `semantic.unit_collection_members` 中的实际 member 条目数。 |
 | `word_unit_count` | `semantic.unit_collections.word_unit_count` | 来源词书中去重后、且至少匹配到一个 `semantic.coarse_unit` 的 `headWord` 数量。 |
+| `active_collection` | `learning.user_learning_profiles.active_collection_slug` | 当前用户已激活词书的 slug。只有该 slug 对应的 collection 仍在本次 active `items` 中时返回；否则返回 `null`。 |
 
 `word_unit_count` 只统计有实际 coarse unit 匹配的去重 `headWord`，未匹配词条不计入。
 `coarse_unit_count` 与成员表实际行数保持一致；由于 `semantic.unit_collection_members`
@@ -148,6 +154,19 @@ order by category asc, name asc, slug asc;
 ```
 
 MVP 不分页。词书数量通常很小，直接返回全部 active collections。
+
+API facade 另外按 principal `user_id` 从 Learning Engine 读取当前 active collection：
+
+```sql
+select
+  active_collection_id,
+  active_collection_slug
+from learning.user_learning_profiles
+where user_id = $1;
+```
+
+没有 profile row 不是错误，映射为 `active_collection: null`。如果读取到的 `active_collection_id` /
+`active_collection_slug` 不在 active collection 列表中，也映射为 `null`，避免历史脏状态阻断词书列表读取。
 
 ## 4. PUT /api/learning-targets/active-collection
 
@@ -413,6 +432,9 @@ target_priority = 0
 | `404 Not Found` | `not_found` | collection 不存在或 inactive。 |
 | `500 Internal Server Error` | `internal_error` | 数据库或未知服务端错误。 |
 
+`GET /api/unit-collections` 有 principal 但没有 `learning.user_learning_profiles` row 时仍返回 `200 OK`，
+并返回 `active_collection: null`。
+
 ## 7. 与 Feed / Recommendation 的关系
 
 本 API 不控制 feed 是否可用。
@@ -440,7 +462,11 @@ Feed API 不需要 `target_required` guard。
 
 API integration：
 
-- `GET /api/unit-collections` 返回 active collections。
+- `GET /api/unit-collections` 需要 principal。
+- `GET /api/unit-collections` 返回 active collections 和 `active_collection` 字段。
+- 没有 `learning.user_learning_profiles` row 时返回 `active_collection: null`。
+- 已有有效 active collection 时返回对应 slug。
+- profile 指向 inactive / missing collection 时返回 `active_collection: null`。
 - inactive collection 不返回。
 - `PUT /api/learning-targets/active-collection` 首次激活成功。
 - 重复激活同一 collection 幂等。

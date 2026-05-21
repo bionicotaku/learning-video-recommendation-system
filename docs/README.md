@@ -66,6 +66,12 @@ Learning Engine normalizer 的 MVP 设计草案。它定义 `internal/learningen
 
 User 模块的 MVP 设计与当前实现边界。它定义 `internal/user`、`app_user.user_profiles`、`app_user.user_activity_stats`、`app_user.user_daily_activity_stats`、Supabase Auth 注册 trigger、邮箱缓存同步、`/api/me` 的 profile lazy repair、timezone 更新和 activity calendar 读取边界。
 
+## 部署与运行
+
+### [Cloud-Run-测试部署流程.md](Cloud-Run-测试部署流程.md)
+
+Cloud Run 测试部署 runbook。记录当前 `DEV_MODE=true`、Supabase `DATABASE_URL` secret、Dockerfile + Cloud Build + Artifact Registry + Cloud Run 的可重复部署流程、IAM 权限、验证命令和生产化前必须调整的边界。
+
 ## 运行时现状参考
 
 ### [当前数据库Schema现状.md](当前数据库Schema现状.md)

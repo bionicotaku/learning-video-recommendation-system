@@ -14,3 +14,7 @@ type TargetStateCommandRepository interface {
 	ActivateUnitCollectionTarget(ctx context.Context, userID string, collectionSlug string) (model.ActivatedUnitCollectionTarget, error)
 	SetTargetInactive(ctx context.Context, userID string, coarseUnitID int64) error
 }
+
+type ActiveUnitCollectionReader interface {
+	GetActiveUnitCollection(ctx context.Context, userID string) (*model.ActiveUnitCollection, error)
+}

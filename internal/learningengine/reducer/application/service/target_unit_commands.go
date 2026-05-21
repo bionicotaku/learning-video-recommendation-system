@@ -89,6 +89,39 @@ func (u *ActivateUnitCollectionTargetUsecase) Execute(ctx context.Context, reque
 	}, nil
 }
 
+type GetActiveUnitCollectionUsecase struct {
+	reader apprepo.ActiveUnitCollectionReader
+}
+
+var _ appusecase.GetActiveUnitCollectionUsecase = (*GetActiveUnitCollectionUsecase)(nil)
+
+func NewGetActiveUnitCollectionUsecase(reader apprepo.ActiveUnitCollectionReader) *GetActiveUnitCollectionUsecase {
+	return &GetActiveUnitCollectionUsecase{reader: reader}
+}
+
+func (u *GetActiveUnitCollectionUsecase) Execute(ctx context.Context, request dto.GetActiveUnitCollectionRequest) (dto.GetActiveUnitCollectionResponse, error) {
+	if request.UserID == "" {
+		return dto.GetActiveUnitCollectionResponse{}, fmt.Errorf("user_id is required")
+	}
+	if u.reader == nil {
+		return dto.GetActiveUnitCollectionResponse{}, fmt.Errorf("active collection reader is required")
+	}
+
+	active, err := u.reader.GetActiveUnitCollection(ctx, request.UserID)
+	if err != nil {
+		return dto.GetActiveUnitCollectionResponse{}, err
+	}
+	if active == nil {
+		return dto.GetActiveUnitCollectionResponse{}, nil
+	}
+	return dto.GetActiveUnitCollectionResponse{
+		ActiveCollection: &dto.ActiveUnitCollection{
+			CollectionID:   active.CollectionID,
+			CollectionSlug: active.CollectionSlug,
+		},
+	}, nil
+}
+
 type SetTargetInactiveUsecase struct {
 	txManager TxManager
 }

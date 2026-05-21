@@ -32,7 +32,9 @@ create table if not exists semantic.coarse_unit (
 
 create table if not exists semantic.unit_collections (
   collection_id uuid primary key,
-  slug text not null unique,
+  slug text not null unique
+    constraint unit_collections_slug_canonical_check
+    check (slug = lower(slug) and slug ~ '^[a-z0-9][a-z0-9-]{0,80}$'),
   name text not null default '',
   status text not null default 'active',
   coarse_unit_count integer not null default 0

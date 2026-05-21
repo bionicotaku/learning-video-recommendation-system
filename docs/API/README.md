@@ -36,7 +36,7 @@
 | `POST` | `/api/feed` | Feed / 推荐流 | API facade 编排 Recommendation、Catalog、Semantic | Recommendation 生成 plan 并写 audit / serving state，API facade 批量补齐视频展示字段、transcript URL、全局互动计数和当前用户点赞/收藏状态后返回 feed。 |
 | `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
-| `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | Semantic | 只读 active 词书集合列表和前端展示字段。 |
+| `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
 | `PUT` | `/api/learning-targets/active-collection` | Unit Collections / 词书目标 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
 | `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
 | `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户点赞，并返回点赞状态和 `like_count`。 |
@@ -73,7 +73,7 @@
 
 | Method | Path | 说明 |
 |---|---|---|
-| `GET` | `/api/unit-collections` | 读取当前 active 词书列表；只读 Semantic。 |
+| `GET` | `/api/unit-collections` | 读取当前 active 词书列表，并返回当前用户 `active_collection` slug / null；列表来自 Semantic，当前选择来自 Learning Engine。 |
 | `PUT` | `/api/learning-targets/active-collection` | 为当前用户激活一本词书；API facade 同事务维护 Learning Engine target projection 和 User onboarding 状态。 |
 
 ### Video Interactions / 视频互动
@@ -121,7 +121,7 @@
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段、transcript URL 和互动状态。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
-| [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；后者由 Learning Engine 事务性切换当前学习目标集合。 |
+| [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；前者返回 active 词书列表和当前用户 `active_collection` slug / null，后者由 Learning Engine 事务性切换当前学习目标集合。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
 
 ## 未开始范围

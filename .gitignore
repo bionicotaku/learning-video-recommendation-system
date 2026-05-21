@@ -30,3 +30,5 @@ graphify-out/cache/
 .codex/**/__pycache__/
 .codex/**/*.py[cod]
 .codex/.graphify_pretool_state.json
+
+server

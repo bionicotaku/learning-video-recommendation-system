@@ -125,8 +125,11 @@ func buildUnitProgressHandler(pool *pgxpool.Pool) *unitprogress.Handler {
 func buildUnitCollectionsHandler(pool *pgxpool.Pool) *unitcollections.Handler {
 	reader := semanticrepo.NewUnitCollectionReader(pool)
 	listCollections := semanticservice.NewListUnitCollectionsUsecase(reader)
+	activeCollectionReader := learningrepo.NewActiveUnitCollectionReader(pool)
+	activeCollection := learningservice.NewGetActiveUnitCollectionUsecase(activeCollectionReader)
+	listCollectionsForUser := apiservice.NewUnitCollectionsService(listCollections, activeCollection)
 	activateTarget := apiservice.NewActivateLearningCollectionService(apitx.NewActivateCollectionManager(pool))
-	return unitcollections.NewHandler(listCollections, activateTarget)
+	return unitcollections.NewHandler(listCollectionsForUser, activateTarget)
 }
 
 func buildMeHandler(pool *pgxpool.Pool) *me.Handler {
