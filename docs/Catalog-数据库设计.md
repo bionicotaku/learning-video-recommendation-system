@@ -153,13 +153,13 @@ catalog.videos
 
 这里的 `start_ms/end_ms` 同样是当前 clip 内的相对毫秒，用于前端定位当前 clip mp4 内的 evidence。
 
-必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及 Recommendation 证据回查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
+必要约束应包括：`primary key (video_id, sentence_index, span_index)`、`foreign key (video_id, sentence_index) references catalog.video_transcript_sentences(video_id, sentence_index) on delete cascade`、`foreign key (coarse_unit_id) references semantic.coarse_unit(id) on delete restrict`、`check (span_index >= 0)`、`check (start_ms >= 0)`、`check (end_ms > start_ms)`。应用层还应确保：span 时间落在所属 sentence 区间内；同一 `(video_id, sentence_index, span_index)` 唯一；非空 `coarse_unit_id` 必须真实存在。推荐索引包括：`(video_id, sentence_index)`、`(video_id, start_ms)`、`(coarse_unit_id, video_id) where coarse_unit_id is not null`、`(video_id, coarse_unit_id) where coarse_unit_id is not null`，以及字幕定位、lookup、detail 或离线排查需要的 `idx_video_semantic_spans_unit_video_start on (coarse_unit_id, video_id, start_ms) where coarse_unit_id is not null`。
 
 完整 transcript JSON 仍保留在对象存储中，作为审计和回源材料；数据库只保存当前后端读路径需要的轻量文本与映射解释字段，不把整份 JSON 复制进主表。
 
 ## 9. `catalog.video_unit_index`
 
-`catalog.video_unit_index` 是 Catalog 中最重要的 Recall-ready 索引表。它由 `catalog.video_semantic_spans` 聚合生成，表示“某个视频覆盖了哪些 coarse unit、覆盖强度是什么、以及该 unit 在该视频中应使用哪一条 best evidence”。Recall 当前的主入口就是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`。Recommendation 需要 explanation / jump-to / 精细证据时，直接基于 `best_evidence_sentence_index` 与 `best_evidence_span_index` 回查 `catalog.video_semantic_spans` 与 `catalog.video_transcript_sentences`。
+`catalog.video_unit_index` 是 Catalog 中最重要的 Recall-ready 索引表。它由 `catalog.video_semantic_spans` 聚合生成，表示“某个视频覆盖了哪些 coarse unit、覆盖强度是什么、以及该 unit 在该视频中应使用哪一条 best evidence”。Catalog 在该表中冗余保存 `best_evidence_sentence_index`、`best_evidence_span_index`、`best_evidence_start_ms` 与 `best_evidence_end_ms`，使 Recommendation 的在线热路径可以通过 `recommendation.v_video_unit_recall_index` 直接生成 Feed evidence，不需要再回查 `catalog.video_semantic_spans` 或 `catalog.video_transcript_sentences`。span / sentence 表仍是字幕展示、lookup、detail 和离线排查的权威事实层。
 
 建议字段如下：
 
@@ -277,7 +277,7 @@ Catalog 的幂等锚点是 `source_clip_key`。只要该值稳定，就能把一
 
 ## 17. 与 Recommendation / Recall 的数据契约
 
-当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。粗召回入口是：`target coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；需要 jump-to / 精细证据定位时，再通过 `best_evidence_sentence_index` 与 `best_evidence_span_index` 回查 `catalog.video_semantic_spans`，必要时 join `catalog.video_transcript_sentences`。Catalog 保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`best_evidence_*`、sentence/span 文本与轻量解释、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证 Recommendation 高层语义标签；Recommendation 只消费 Catalog 已选定的 unit-level best evidence，并把本轮使用结果保存在 `video_recommendation_items.learning_units` 中。
+当前这版 Catalog 直接决定了 Recommendation 与 Recall 的主读路径。Catalog 的粗召回事实入口是：`coarse_unit_ids -> catalog.video_unit_index -> candidate videos`；Recommendation 的在线入口则是由该表派生的 `recommendation.v_video_unit_recall_index`。Recommendation 需要的 jump-to / 精细证据定位已经由 `best_evidence_sentence_index`、`best_evidence_span_index`、`best_evidence_start_ms` 与 `best_evidence_end_ms` 提供，不在在线推荐链路回查 `catalog.video_semantic_spans` 或 join `catalog.video_transcript_sentences`。Catalog 保证：`mention_count`、`sentence_count`、`coverage_ms`、`coverage_ratio`、`sentence_indexes`、`best_evidence_*`、sentence/span 文本与轻量解释、`duration_ms`、`parent_video_slug` 这些稳定信号可用。Catalog 不保证 Recommendation 高层语义标签；Recommendation 只消费 Catalog 已选定的 unit-level best evidence，并把本轮使用结果保存在 `video_recommendation_items.learning_units` 中。
 
 同时要明确：Recommendation 需要的 `v_video_unit_recall_index`、`v_unit_video_inventory`、`user_video_serving_states`、`video_recommendation_runs`、`video_recommendation_items` 都属于 `recommendation` schema，而不是 Catalog 的一部分。Catalog 只提供内容事实与内容索引，不拥有 Recommendation serving/audit 对象。
 

@@ -3,7 +3,9 @@ package unitcollections
 import (
 	"context"
 	"errors"
+	"mime"
 	"net/http"
+	"strings"
 
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
@@ -65,4 +67,16 @@ func invalidRequest(err error) error {
 		return nil
 	}
 	return apiservice.InvalidRequestError(err.Error())
+}
+
+func validateContentType(r *http.Request) error {
+	contentType := r.Header.Get("Content-Type")
+	if strings.TrimSpace(contentType) == "" {
+		return apiservice.InvalidRequestError("content-type must be application/json")
+	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err == nil && mediaType == "application/json" {
+		return nil
+	}
+	return apiservice.InvalidRequestError("content-type must be application/json")
 }

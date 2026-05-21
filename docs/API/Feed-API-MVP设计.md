@@ -219,7 +219,9 @@ items[].learning_units
    - catalog.videos 的 `title`、`description`、`video_object_path`、`thumbnail_url`；
    - catalog.video_engagement_stats。
 6. 批量读取 unit 展示文本：
-   - semantic.coarse_unit.label。
+   - 只在存在非空 `learning_units` 时查询；
+   - 查询 `semantic.coarse_unit.label`；
+   - 全部 item 都是 video-level 补全视频时跳过本步骤。
 7. 按 Recommendation response 的 items[] 顺序组装 Feed items[]。
 8. 裁剪 Recommendation 内部字段，返回 FeedResponse。
 ```
@@ -278,7 +280,7 @@ learning_units[].text
 
 MVP 不把“推荐结果少于请求数量”作为错误。Recommendation 自己会记录 `underfilled` 到 audit；Feed API 返回 Recommendation plan 中实际生成的 items。
 
-但 Feed facade 对 Recommendation plan 采用完整补齐语义：缺少视频展示数据、`duration_ms <= 0`、非空 unit evidence 不完整、非空 unit label 缺失、URL 组装失败，都是后端数据一致性错误，返回 `500 internal_error`。这样 Recommendation audit / serving state 不会和前端实际收到的 feed item 静默分叉。
+但 Feed facade 对 Recommendation plan 采用完整补齐语义：缺少视频展示数据、`duration_ms <= 0`、非空 unit evidence 不完整、非空 unit label 缺失、URL 组装失败，都是后端数据一致性错误，返回 `500 internal_error`。`learning_units=[]` 不是错误；它表示该 item 是 Recommendation 的 video-level 补全视频，Feed facade 只补视频展示字段，不读取或要求 unit label。这样 Recommendation audit / serving state 不会和前端实际收到的 feed item 静默分叉。
 
 ## 9. 前端使用约定
 

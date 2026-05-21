@@ -5,7 +5,7 @@
 重要状态说明：
 
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
-- **学习事件上报 API 已实现基础 HTTP 入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
+- **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
 - **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Me API 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
@@ -27,21 +27,41 @@
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
-## 已实现 Endpoint 总览
+## 已实现 API 总表
 
-当前 `internal/api` 已实现以下 HTTP endpoint：
+当前 `internal/api` 已实现 15 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
+
+| Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
+|---|---|---|---|---|
+| `POST` | `/api/feed` | Feed / 推荐流 | API facade 编排 Recommendation、Catalog、Semantic | Recommendation 生成 plan 并写 audit / serving state，API facade 批量补齐展示字段后返回 feed。 |
+| `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
+| `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
+| `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | Semantic | 只读 active 词书集合列表和前端展示字段。 |
+| `PUT` | `/api/learning-targets/active-collection` | Unit Collections / 词书目标 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
+| `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
+| `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户点赞，并返回点赞状态和 `like_count`。 |
+| `PUT` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已收藏，并返回收藏状态和 `favorite_count`。 |
+| `DELETE` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户收藏，并返回收藏状态和 `favorite_count`。 |
+| `POST` | `/api/video-watch-progress` | Watch Progress / 观看进度 | Catalog，User stats projection | 同事务维护 watch session ledger、Catalog 视频消费投影和 User watch stats；返回 accepted。 |
+| `POST` | `/api/learning-interactions:batch` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User daily stats | 写入 exposure / lookup raw facts；HTTP success 只承诺 raw accepted，normalization 是同步 best-effort。 |
+| `POST` | `/api/quiz-attempts` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User stats projection | 写入 quiz attempt raw fact；duplicate 不重复增加 stats；HTTP success 只承诺 raw accepted。 |
+| `POST` | `/api/learning-units:mark-mastered` | Learning Events / 学习事件写入 | Analytics，Learning Engine self-mark normalizer | 写入 self-mark mastered raw fact，并走 dedicated normalizer path。 |
+| `GET` | `/api/learning/unit-progress/mastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户已掌握学习单元。 |
+| `GET` | `/api/learning/unit-progress/unmastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户尚未掌握的目标学习单元。 |
+
+## 已实现 API 分组说明
 
 ### Feed / 推荐流
 
 | Method | Path | 说明 |
 |---|---|---|
-| `POST` | `/api/feed` | 获取当前用户 feed 推荐视频列表；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 生成推荐计划，并补齐 Catalog / semantic 展示字段。 |
+| `POST` | `/api/feed` | 获取当前用户 feed 推荐视频列表；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 生成推荐计划，并补齐 Catalog / Semantic 展示字段。 |
 
 ### End Quiz / 视频末尾取题
 
 | Method | Path | 说明 |
 |---|---|---|
-| `POST` | `/api/videos/end-quiz` | 按 `video_id + coarse_unit_ids` 批量读取视频末尾 quiz 候选题；只读 Catalog，不写学习进度。 |
+| `POST` | `/api/videos/end-quiz` | 按 `video_id + coarse_unit_ids` 批量读取视频末尾 quiz 候选题；只读 Catalog，不写 delivery/session、学习进度或统计。 |
 
 ### Me / 当前用户
 
@@ -54,7 +74,7 @@
 | Method | Path | 说明 |
 |---|---|---|
 | `GET` | `/api/unit-collections` | 读取当前 active 词书列表；只读 Semantic。 |
-| `PUT` | `/api/learning-targets/active-collection` | 为当前用户激活一本词书；Learning Engine 同事务维护 active profile 与 target projection。 |
+| `PUT` | `/api/learning-targets/active-collection` | 为当前用户激活一本词书；API facade 同事务维护 Learning Engine target projection 和 User onboarding 状态。 |
 
 ### Video Interactions / 视频互动
 
@@ -69,14 +89,14 @@
 
 | Method | Path | 说明 |
 |---|---|---|
-| `POST` | `/api/video-watch-progress` | 上报视频观看进度；Catalog 同事务维护 watch session ledger 与视频消费投影。 |
+| `POST` | `/api/video-watch-progress` | 上报视频观看进度；Catalog 同事务维护 watch session ledger、视频消费投影和 User watch stats。 |
 
 ### Learning Events / 学习事件写入
 
 | Method | Path | 说明 |
 |---|---|---|
 | `POST` | `/api/learning-interactions:batch` | 批量写入 exposure / lookup raw learning interactions；HTTP success 只承诺 raw fact accepted。 |
-| `POST` | `/api/quiz-attempts` | 写入一次 quiz attempt raw fact；Learning Engine normalization 作为 best-effort 同步尝试。 |
+| `POST` | `/api/quiz-attempts` | 写入一次 quiz attempt raw fact；Learning Engine normalization 作为 best-effort 同步尝试；duplicate 不重复增加 User stats。 |
 | `POST` | `/api/learning-units:mark-mastered` | 写入 self-mark mastered raw fact；走 dedicated Analytics writer 和 self-mark normalizer path。 |
 
 ### Unit Progress / 学习单元进度读取

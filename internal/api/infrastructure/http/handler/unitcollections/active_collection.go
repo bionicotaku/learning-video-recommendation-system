@@ -22,6 +22,10 @@ func (h *Handler) activateUnitCollection(w http.ResponseWriter, r *http.Request)
 		writeHandlerError(w, r, err)
 		return
 	}
+	if err := validateContentType(r); err != nil {
+		writeHandlerError(w, r, err)
+		return
+	}
 
 	var payload activateUnitCollectionRequest
 	if err := request.DecodeJSONObject(r.Body, &payload); err != nil {

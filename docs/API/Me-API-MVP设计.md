@@ -429,7 +429,7 @@ from streak;
 | `total_watch_ms` / daily `watch_ms` | Catalog watch progress | 本次新增有效观看时长 `delta_watch_ms > 0` 时累加。 |
 | `quiz_attempt_count` | Analytics quiz writer | `analytics.quiz_events` 幂等插入成功且不是 duplicate 时累加。 |
 | `started_unit_count` | Learning Engine reducer | learning unit progress 从 `0` 到 `>0` 时累加，只增不减。 |
-| daily `learning_interaction_count` | Learning interaction normalizer / reducer | exposure / lookup 事件归一化成功时累加。 |
+| daily `learning_interaction_count` | Analytics learning interaction writer | exposure / lookup raw event 幂等插入成功且不是 duplicate 时累加；不等待 normalizer 成功。 |
 
 每日统计的 `local_date` 由事件时间点按用户 timezone 派生。MVP 对跨午夜观看不做精确拆分，watch delta 归到本次 watch progress 的 activity time 所在本地日期。
 

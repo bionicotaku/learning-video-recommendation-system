@@ -96,13 +96,16 @@ func (s *FeedService) Execute(ctx context.Context, request apvdto.GetFeedRequest
 		videosByID[video.VideoID] = video
 	}
 
-	labelLookup, err := s.labelLookup.Execute(ctx, catalogdto.UnitLabelLookupRequest{CoarseUnitIDs: planUnitIDs(plan.Items)})
-	if err != nil {
-		return apvdto.FeedResponse{}, err
-	}
-	labelsByID := make(map[int64]string, len(labelLookup.Labels))
-	for _, label := range labelLookup.Labels {
-		labelsByID[label.CoarseUnitID] = label.Text
+	unitIDs := planUnitIDs(plan.Items)
+	labelsByID := make(map[int64]string, len(unitIDs))
+	if len(unitIDs) > 0 {
+		labelLookup, err := s.labelLookup.Execute(ctx, catalogdto.UnitLabelLookupRequest{CoarseUnitIDs: unitIDs})
+		if err != nil {
+			return apvdto.FeedResponse{}, err
+		}
+		for _, label := range labelLookup.Labels {
+			labelsByID[label.CoarseUnitID] = label.Text
+		}
 	}
 
 	items := make([]apvdto.FeedItem, 0, len(plan.Items))
@@ -157,11 +160,6 @@ func (s *FeedService) buildFeedItem(
 			return apvdto.FeedItem{}, err
 		}
 		units = append(units, feedUnit)
-	}
-	if len(units) == 0 {
-		err := fmt.Errorf("missing learning units for recommendation feed item: run_id=%s video_id=%s", runID, planItem.VideoID)
-		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", err)
-		return apvdto.FeedItem{}, err
 	}
 
 	return apvdto.FeedItem{

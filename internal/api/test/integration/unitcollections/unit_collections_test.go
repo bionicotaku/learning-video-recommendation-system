@@ -102,6 +102,44 @@ func TestActivateUnitCollectionRejectsInvalidRequests(t *testing.T) {
 	}
 }
 
+func TestActivateUnitCollectionRequiresJSONContentType(t *testing.T) {
+	cases := []struct {
+		name        string
+		contentType string
+	}{
+		{name: "missing content type"},
+		{name: "text plain", contentType: "text/plain"},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			activate := &fakeActivateUsecase{}
+			server := newServer(&fakeListCollectionsUsecase{}, activate, true)
+			t.Cleanup(server.Close)
+
+			request, err := http.NewRequest(http.MethodPut, server.URL+"/api/learning-targets/active-collection", strings.NewReader(`{"collection_slug":"toefl-core"}`))
+			if err != nil {
+				t.Fatalf("new request: %v", err)
+			}
+			if tt.contentType != "" {
+				request.Header.Set("Content-Type", tt.contentType)
+			}
+			request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiIxMTExMTExMS0xMTExLTQxMTEtODExMS0xMTExMTExMTExMTEifQ")
+
+			response, err := http.DefaultClient.Do(request)
+			if err != nil {
+				t.Fatalf("request: %v", err)
+			}
+			if response.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+			}
+			if activate.called {
+				t.Fatalf("activate usecase should not be called")
+			}
+		})
+	}
+}
+
 func TestActivateUnitCollectionMapsNotFound(t *testing.T) {
 	server := newServer(&fakeListCollectionsUsecase{}, &fakeActivateUsecase{err: learningservice.ErrUnitCollectionNotFound}, true)
 	t.Cleanup(server.Close)

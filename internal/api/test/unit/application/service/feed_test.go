@@ -100,6 +100,51 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	}
 }
 
+func TestFeedServiceAllowsVideoLevelFillItemsWithoutLearningUnits(t *testing.T) {
+	recommender := &fakeFeedRecommender{
+		response: recommendationdto.GenerateVideoRecommendationsResponse{
+			RunID: "run-1",
+			Items: []recommendationdto.RecommendationPlanItem{
+				{
+					VideoID:       "22222222-2222-2222-2222-222222222222",
+					DurationMs:    61000,
+					LearningUnits: []recommendationdto.ExpectedLearningUnit{},
+				},
+			},
+		},
+	}
+	videoLookup := &fakeFeedVideoLookup{
+		response: catalogdto.FeedVideoLookupResponse{Videos: []catalogdto.FeedVideoDisplay{
+			{
+				VideoID:         "22222222-2222-2222-2222-222222222222",
+				Title:           "Popular fill",
+				Description:     "A video-level fill item",
+				VideoObjectPath: "hls/222/master.m3u8",
+			},
+		}},
+	}
+	labelLookup := &fakeUnitLabelLookup{}
+	service := apiservice.NewFeedService(recommender, videoLookup, labelLookup, apiservice.NewPublicAssetURLBuilder("https://cdn.example.com/assets"), discardLogger())
+
+	response, err := service.Execute(context.Background(), apvdto.GetFeedRequest{UserID: "user-1"})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if labelLookup.calls != 0 {
+		t.Fatalf("label lookup calls = %d, want 0 for fill item without learning units", labelLookup.calls)
+	}
+	if len(response.Items) != 1 {
+		t.Fatalf("items = %d, want 1", len(response.Items))
+	}
+	item := response.Items[0]
+	if item.VideoID != "22222222-2222-2222-2222-222222222222" || item.DurationSeconds != 61 {
+		t.Fatalf("unexpected fill item: %+v", item)
+	}
+	if item.LearningUnits == nil || len(item.LearningUnits) != 0 {
+		t.Fatalf("learning_units = %#v, want empty JSON array", item.LearningUnits)
+	}
+}
+
 func TestFeedServicePropagatesRecommendationError(t *testing.T) {
 	service := apiservice.NewFeedService(
 		&fakeFeedRecommender{err: errors.New("recommendation down")},
@@ -250,9 +295,11 @@ type fakeUnitLabelLookup struct {
 	request  catalogdto.UnitLabelLookupRequest
 	response catalogdto.UnitLabelLookupResponse
 	err      error
+	calls    int
 }
 
 func (f *fakeUnitLabelLookup) Execute(ctx context.Context, request catalogdto.UnitLabelLookupRequest) (catalogdto.UnitLabelLookupResponse, error) {
+	f.calls++
 	f.request = request
 	return f.response, f.err
 }
