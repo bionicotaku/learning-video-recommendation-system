@@ -27,7 +27,10 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 					Title:           "Title",
 					Description:     "Description",
 					VideoURL:        "https://cdn.example.com/hls/master.m3u8",
+					TranscriptURL:   stringPtr("https://cdn.example.com/transcripts/111.json"),
 					DurationSeconds: 91,
+					HasLiked:        true,
+					HasFavorited:    false,
 					LearningUnits: []apvdto.FeedLearningUnit{
 						{CoarseUnitID: 101, Text: "serendipity", Role: "hard_review", IsPrimary: true, EvidenceSentenceIndex: 2, EvidenceSpanIndex: 1, EvidenceStartMS: 2000, EvidenceEndMS: 2400},
 					},
@@ -50,6 +53,12 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 	decodeJSON(t, response, &body)
 	if body.RecommendationRunID != "run-1" || len(body.Items) != 1 {
 		t.Fatalf("unexpected response: %+v", body)
+	}
+	if !body.Items[0].HasLiked || body.Items[0].HasFavorited {
+		t.Fatalf("unexpected interaction state: %+v", body.Items[0])
+	}
+	if body.Items[0].TranscriptURL == nil || *body.Items[0].TranscriptURL != "https://cdn.example.com/transcripts/111.json" {
+		t.Fatalf("unexpected transcript url: %+v", body.Items[0].TranscriptURL)
 	}
 	if service.request.UserID != "user-1" || service.request.TargetVideoCount != 6 {
 		t.Fatalf("request not mapped: %+v", service.request)
@@ -218,6 +227,10 @@ func readBody(t *testing.T, response *http.Response) string {
 	buf := new(bytes.Buffer)
 	_, _ = buf.ReadFrom(response.Body)
 	return buf.String()
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 type fakeFeedService struct {

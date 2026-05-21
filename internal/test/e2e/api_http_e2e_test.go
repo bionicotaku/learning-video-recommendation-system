@@ -24,6 +24,11 @@ func TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(t *testing.T) {
 	h.SeedUser(t, userID)
 	h.SeedCoarseUnits(t, unitID)
 	h.SeedCatalogVideo(t, strongSupplyVideo(videoID, unitID, 1_000, 2_000, 0, "feed-devmode", 95_000))
+	if _, err := h.Pool.Exec(context.Background(), `
+		insert into catalog.video_user_states (user_id, video_id, has_liked, has_bookmarked)
+		values ($1, $2, true, true)`, userID, videoID); err != nil {
+		t.Fatalf("seed feed interaction state: %v", err)
+	}
 	testutil.MustEnsureTarget(t, h.LearningSuite(), userID, targetSpec(unitID, 0.9, "feed-devmode"))
 	h.RefreshRecommendationViews(t)
 
@@ -36,8 +41,11 @@ func TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(t *testing.T) {
 	var body struct {
 		RecommendationRunID string `json:"recommendation_run_id"`
 		Items               []struct {
-			VideoID       string `json:"video_id"`
-			VideoURL      string `json:"video_url"`
+			VideoID       string  `json:"video_id"`
+			VideoURL      string  `json:"video_url"`
+			TranscriptURL *string `json:"transcript_url"`
+			HasLiked      bool    `json:"has_liked"`
+			HasFavorited  bool    `json:"has_favorited"`
 			LearningUnits []struct {
 				CoarseUnitID int64  `json:"coarse_unit_id"`
 				Text         string `json:"text"`
@@ -50,6 +58,12 @@ func TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(t *testing.T) {
 	}
 	if body.Items[0].VideoID != videoID || body.Items[0].VideoURL == "" {
 		t.Fatalf("feed item = %+v, want seeded video with materialized URL", body.Items[0])
+	}
+	if body.Items[0].TranscriptURL == nil || *body.Items[0].TranscriptURL == "" {
+		t.Fatalf("feed transcript url = %+v, want materialized URL", body.Items[0].TranscriptURL)
+	}
+	if !body.Items[0].HasLiked || !body.Items[0].HasFavorited {
+		t.Fatalf("feed interaction state = %+v, want liked and favorited", body.Items[0])
 	}
 	if len(body.Items[0].LearningUnits) != 1 || body.Items[0].LearningUnits[0].CoarseUnitID != unitID {
 		t.Fatalf("learning units = %+v, want seeded unit", body.Items[0].LearningUnits)

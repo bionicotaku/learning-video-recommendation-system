@@ -1,18 +1,22 @@
 package dto
 
 type FeedVideoLookupRequest struct {
+	UserID   string
 	VideoIDs []string
 }
 
 type FeedVideoDisplay struct {
-	VideoID         string
-	Title           string
-	Description     string
-	VideoObjectPath string
-	CoverImageURL   *string
-	ViewCount       int64
-	LikeCount       int64
-	FavoriteCount   int64
+	VideoID              string
+	Title                string
+	Description          string
+	VideoObjectPath      string
+	CoverImageURL        *string
+	TranscriptObjectPath *string
+	ViewCount            int64
+	LikeCount            int64
+	FavoriteCount        int64
+	HasLiked             bool
+	HasFavorited         bool
 }
 
 type FeedVideoLookupResponse struct {

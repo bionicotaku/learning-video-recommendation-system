@@ -43,14 +43,16 @@ GET /api/learning/unit-progress/unmastered
 
 `POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
 feed plan and audit/serving state, then batch-fills Catalog video display
-fields, engagement stats, and `semantic.coarse_unit.label` text before returning
-the frontend `FeedResponse`. It does not expose recommendation rank, score,
-reason codes, selector mode, or underfilled status.
+fields, transcript URL, engagement stats, current user interaction state, and
+`semantic.coarse_unit.label` text before returning the frontend `FeedResponse`.
+It does not expose recommendation rank, score, reason codes, selector mode, or
+underfilled status.
 
 Feed materialization is all-or-error: the facade does not silently drop plan
 items or learning units after Recommendation has written audit/serving state.
 Missing display data, incomplete evidence, missing unit labels, or invalid media
-URLs are treated as backend consistency failures.
+URLs are treated as backend consistency failures. Missing transcript metadata is
+allowed and returns `transcript_url: null`.
 
 `GET /api/me` reads the trusted principal as `user_id`, returns the User profile
 cache plus precomputed global activity stats and an embedded seven-day activity
@@ -83,6 +85,11 @@ endpoints. The handler reads `video_id` from the path, validates the trusted
 principal, and calls Catalog. Like responses return only `video_id`,
 `has_liked`, and `like_count`; favorite responses return only `video_id`,
 `has_favorited`, and `favorite_count`.
+
+`POST /api/feed` initializes action rail display with both global counts and
+current user state: each item includes `like_count`, `favorite_count`,
+`has_liked`, and `has_favorited`. Click writes still use the single-purpose
+Video Interactions endpoints above.
 
 The learning-event endpoints return only raw Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is

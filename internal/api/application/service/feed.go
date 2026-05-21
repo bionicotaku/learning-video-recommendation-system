@@ -87,7 +87,10 @@ func (s *FeedService) Execute(ctx context.Context, request apvdto.GetFeedRequest
 		return apvdto.FeedResponse{}, err
 	}
 
-	videoLookup, err := s.videoLookup.Execute(ctx, catalogdto.FeedVideoLookupRequest{VideoIDs: planVideoIDs(plan.Items)})
+	videoLookup, err := s.videoLookup.Execute(ctx, catalogdto.FeedVideoLookupRequest{
+		UserID:   request.UserID,
+		VideoIDs: planVideoIDs(plan.Items),
+	})
 	if err != nil {
 		return apvdto.FeedResponse{}, err
 	}
@@ -152,6 +155,12 @@ func (s *FeedService) buildFeedItem(
 		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)
 		return apvdto.FeedItem{}, wrapped
 	}
+	transcriptURL, err := s.optionalAssetURL(video.TranscriptObjectPath)
+	if err != nil {
+		wrapped := fmt.Errorf("build transcript_url for recommendation feed item: run_id=%s video_id=%s: %w", runID, planItem.VideoID, err)
+		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)
+		return apvdto.FeedItem{}, wrapped
+	}
 
 	units := make([]apvdto.FeedLearningUnit, 0, len(planItem.LearningUnits))
 	for _, unit := range planItem.LearningUnits {
@@ -168,10 +177,13 @@ func (s *FeedService) buildFeedItem(
 		Description:     video.Description,
 		VideoURL:        videoURL,
 		CoverImageURL:   coverURL,
+		TranscriptURL:   transcriptURL,
 		DurationSeconds: durationSeconds(planItem.DurationMs),
 		ViewCount:       video.ViewCount,
 		LikeCount:       video.LikeCount,
 		FavoriteCount:   video.FavoriteCount,
+		HasLiked:        video.HasLiked,
+		HasFavorited:    video.HasFavorited,
 		LearningUnits:   units,
 	}, nil
 }

@@ -42,6 +42,13 @@ create table if not exists catalog.videos (
 
 create table if not exists catalog.video_transcripts (
   video_id uuid primary key,
+  transcript_object_path text,
+  transcript_checksum text not null default '',
+  transcript_format_version integer not null default 1,
+  sentence_count integer not null default 0,
+  semantic_span_count integer not null default 0,
+  mapped_span_count integer not null default 0,
+  unmapped_span_count integer not null default 0,
   mapped_span_ratio numeric(6,5) not null
 );
 

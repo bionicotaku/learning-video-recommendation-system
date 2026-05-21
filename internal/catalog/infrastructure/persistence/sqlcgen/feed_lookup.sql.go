@@ -18,31 +18,46 @@ select
   coalesce(v.description, '')::text as description,
   v.video_object_path,
   v.thumbnail_url,
+  transcript.transcript_object_path,
   coalesce(s.view_count, 0)::bigint as view_count,
   coalesce(s.like_count, 0)::bigint as like_count,
-  coalesce(s.favorite_count, 0)::bigint as favorite_count
+  coalesce(s.favorite_count, 0)::bigint as favorite_count,
+  coalesce(user_state.has_liked, false)::boolean as has_liked,
+  coalesce(user_state.has_bookmarked, false)::boolean as has_favorited
 from catalog.videos v
 left join catalog.video_engagement_stats s on s.video_id = v.video_id
-where v.video_id = any($1::uuid[])
+left join catalog.video_transcripts transcript on transcript.video_id = v.video_id
+left join catalog.video_user_states user_state
+  on user_state.user_id = $1::uuid
+ and user_state.video_id = v.video_id
+where v.video_id = any($2::uuid[])
   and v.status = 'active'
   and v.visibility_status = 'public'
   and (v.publish_at is null or v.publish_at <= now())
 order by v.video_id
 `
 
-type ListFeedVideosByIDsRow struct {
-	VideoID         pgtype.UUID `json:"video_id"`
-	Title           string      `json:"title"`
-	Description     string      `json:"description"`
-	VideoObjectPath string      `json:"video_object_path"`
-	ThumbnailUrl    pgtype.Text `json:"thumbnail_url"`
-	ViewCount       int64       `json:"view_count"`
-	LikeCount       int64       `json:"like_count"`
-	FavoriteCount   int64       `json:"favorite_count"`
+type ListFeedVideosByIDsParams struct {
+	UserID   pgtype.UUID   `json:"user_id"`
+	VideoIds []pgtype.UUID `json:"video_ids"`
 }
 
-func (q *Queries) ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error) {
-	rows, err := q.db.Query(ctx, listFeedVideosByIDs, videoIds)
+type ListFeedVideosByIDsRow struct {
+	VideoID              pgtype.UUID `json:"video_id"`
+	Title                string      `json:"title"`
+	Description          string      `json:"description"`
+	VideoObjectPath      string      `json:"video_object_path"`
+	ThumbnailUrl         pgtype.Text `json:"thumbnail_url"`
+	TranscriptObjectPath pgtype.Text `json:"transcript_object_path"`
+	ViewCount            int64       `json:"view_count"`
+	LikeCount            int64       `json:"like_count"`
+	FavoriteCount        int64       `json:"favorite_count"`
+	HasLiked             bool        `json:"has_liked"`
+	HasFavorited         bool        `json:"has_favorited"`
+}
+
+func (q *Queries) ListFeedVideosByIDs(ctx context.Context, arg ListFeedVideosByIDsParams) ([]ListFeedVideosByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listFeedVideosByIDs, arg.UserID, arg.VideoIds)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +71,12 @@ func (q *Queries) ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUI
 			&i.Description,
 			&i.VideoObjectPath,
 			&i.ThumbnailUrl,
+			&i.TranscriptObjectPath,
 			&i.ViewCount,
 			&i.LikeCount,
 			&i.FavoriteCount,
+			&i.HasLiked,
+			&i.HasFavorited,
 		); err != nil {
 			return nil, err
 		}

@@ -76,7 +76,7 @@ Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 internal/api FeedService
   -> catalog.FeedVideoLookupUsecase
   -> catalog.FeedLookupReader.ListFeedVideosByIDs
-  -> catalog.videos + catalog.video_engagement_stats
+  -> catalog.videos + catalog.video_transcripts + catalog.video_engagement_stats + catalog.video_user_states
 
 internal/api FeedService
   -> catalog.UnitLabelLookupUsecase
@@ -84,7 +84,7 @@ internal/api FeedService
   -> semantic.coarse_unit
 ```
 
-`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`。
+`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。Transcript 元数据缺行时 `transcript_object_path` 返回空；互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`；当前用户没有 `catalog.video_user_states` 行时 `has_liked`、`has_favorited` 返回 `false`。
 
 `ListUnitLabelsByIDs` 只补 `semantic.coarse_unit.status = active` 的 `label`。Catalog 在这里提供 lightweight read capability，是为了让 API facade 批量补齐展示文本；Catalog 不理解 Recommendation 的 role、rank、score，也不参与 quiz 选择。
 

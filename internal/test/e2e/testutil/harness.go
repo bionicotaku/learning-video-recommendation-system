@@ -375,9 +375,21 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 
 	if _, err := h.Pool.Exec(
 		context.Background(),
-		`insert into catalog.video_transcripts (video_id, mapped_span_ratio)
-		 values ($1, $2)
-		 on conflict (video_id) do update set mapped_span_ratio = excluded.mapped_span_ratio`,
+		`insert into catalog.video_transcripts (
+			video_id,
+			transcript_object_path,
+			transcript_checksum,
+			sentence_count,
+			semantic_span_count,
+			mapped_span_count,
+			unmapped_span_count,
+			mapped_span_ratio
+		)
+		 values ($1::uuid, 'transcripts/' || $1::uuid::text || '.json', 'e2e-checksum-' || $1::uuid::text, 0, 0, 0, 0, $2)
+		 on conflict (video_id) do update
+		 set transcript_object_path = excluded.transcript_object_path,
+		     transcript_checksum = excluded.transcript_checksum,
+		     mapped_span_ratio = excluded.mapped_span_ratio`,
 		fixture.VideoID,
 		fixture.MappedSpanRatio,
 	); err != nil {

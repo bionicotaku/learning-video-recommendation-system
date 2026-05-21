@@ -21,7 +21,7 @@ func NewFeedLookupReader(pool *pgxpool.Pool) *FeedLookupReader {
 	return &FeedLookupReader{pool: pool}
 }
 
-func (r *FeedLookupReader) ListFeedVideosByIDs(ctx context.Context, videoIDs []string) ([]model.FeedVideoDisplay, error) {
+func (r *FeedLookupReader) ListFeedVideosByIDs(ctx context.Context, userID string, videoIDs []string) ([]model.FeedVideoDisplay, error) {
 	if r.pool == nil {
 		return nil, errors.New("pg pool is required")
 	}
@@ -29,6 +29,10 @@ func (r *FeedLookupReader) ListFeedVideosByIDs(ctx context.Context, videoIDs []s
 		return nil, nil
 	}
 
+	userUUID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("map user_id: %w", err)
+	}
 	ids := make([]pgtype.UUID, 0, len(videoIDs))
 	for _, videoID := range videoIDs {
 		id, err := mapper.StringToUUID(videoID)
@@ -38,21 +42,27 @@ func (r *FeedLookupReader) ListFeedVideosByIDs(ctx context.Context, videoIDs []s
 		ids = append(ids, id)
 	}
 
-	rows, err := catalogsqlc.New(r.pool).ListFeedVideosByIDs(ctx, ids)
+	rows, err := catalogsqlc.New(r.pool).ListFeedVideosByIDs(ctx, catalogsqlc.ListFeedVideosByIDsParams{
+		UserID:   userUUID,
+		VideoIds: ids,
+	})
 	if err != nil {
 		return nil, err
 	}
 	result := make([]model.FeedVideoDisplay, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, model.FeedVideoDisplay{
-			VideoID:         mapper.UUIDToString(row.VideoID),
-			Title:           row.Title,
-			Description:     row.Description,
-			VideoObjectPath: row.VideoObjectPath,
-			CoverImageURL:   textPointer(row.ThumbnailUrl),
-			ViewCount:       row.ViewCount,
-			LikeCount:       row.LikeCount,
-			FavoriteCount:   row.FavoriteCount,
+			VideoID:              mapper.UUIDToString(row.VideoID),
+			Title:                row.Title,
+			Description:          row.Description,
+			VideoObjectPath:      row.VideoObjectPath,
+			CoverImageURL:        textPointer(row.ThumbnailUrl),
+			TranscriptObjectPath: textPointer(row.TranscriptObjectPath),
+			ViewCount:            row.ViewCount,
+			LikeCount:            row.LikeCount,
+			FavoriteCount:        row.FavoriteCount,
+			HasLiked:             row.HasLiked,
+			HasFavorited:         row.HasFavorited,
 		})
 	}
 	return result, nil

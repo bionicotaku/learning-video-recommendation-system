@@ -23,21 +23,24 @@ func (u *FeedVideoLookupUsecase) Execute(ctx context.Context, request dto.FeedVi
 	if len(request.VideoIDs) == 0 {
 		return dto.FeedVideoLookupResponse{}, nil
 	}
-	videos, err := u.reader.ListFeedVideosByIDs(ctx, request.VideoIDs)
+	videos, err := u.reader.ListFeedVideosByIDs(ctx, request.UserID, request.VideoIDs)
 	if err != nil {
 		return dto.FeedVideoLookupResponse{}, err
 	}
 	result := make([]dto.FeedVideoDisplay, 0, len(videos))
 	for _, video := range videos {
 		result = append(result, dto.FeedVideoDisplay{
-			VideoID:         video.VideoID,
-			Title:           video.Title,
-			Description:     video.Description,
-			VideoObjectPath: video.VideoObjectPath,
-			CoverImageURL:   video.CoverImageURL,
-			ViewCount:       video.ViewCount,
-			LikeCount:       video.LikeCount,
-			FavoriteCount:   video.FavoriteCount,
+			VideoID:              video.VideoID,
+			Title:                video.Title,
+			Description:          video.Description,
+			VideoObjectPath:      video.VideoObjectPath,
+			CoverImageURL:        video.CoverImageURL,
+			TranscriptObjectPath: video.TranscriptObjectPath,
+			ViewCount:            video.ViewCount,
+			LikeCount:            video.LikeCount,
+			FavoriteCount:        video.FavoriteCount,
+			HasLiked:             video.HasLiked,
+			HasFavorited:         video.HasFavorited,
 		})
 	}
 	return dto.FeedVideoLookupResponse{Videos: result}, nil

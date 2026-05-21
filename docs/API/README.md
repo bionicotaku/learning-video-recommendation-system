@@ -33,7 +33,7 @@
 
 | Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
 |---|---|---|---|---|
-| `POST` | `/api/feed` | Feed / 推荐流 | API facade 编排 Recommendation、Catalog、Semantic | Recommendation 生成 plan 并写 audit / serving state，API facade 批量补齐展示字段后返回 feed。 |
+| `POST` | `/api/feed` | Feed / 推荐流 | API facade 编排 Recommendation、Catalog、Semantic | Recommendation 生成 plan 并写 audit / serving state，API facade 批量补齐视频展示字段、transcript URL、全局互动计数和当前用户点赞/收藏状态后返回 feed。 |
 | `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
 | `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | Semantic | 只读 active 词书集合列表和前端展示字段。 |
@@ -55,7 +55,7 @@
 
 | Method | Path | 说明 |
 |---|---|---|
-| `POST` | `/api/feed` | 获取当前用户 feed 推荐视频列表；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 生成推荐计划，并补齐 Catalog / Semantic 展示字段。 |
+| `POST` | `/api/feed` | 获取当前用户 feed 推荐视频列表；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 生成推荐计划，并补齐 Catalog / Semantic 展示字段、transcript URL 和互动状态。 |
 
 ### End Quiz / 视频末尾取题
 
@@ -119,7 +119,7 @@
 | [Unit-Progress-API-MVP设计.md](Unit-Progress-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning/unit-progress/mastered`、`GET /api/learning/unit-progress/unmastered`；API handler 从 principal 取 `user_id`，Learning Engine reducer read usecase join `semantic.coarse_unit` 返回展示字段。 |
 | [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/video-watch-progress`；Catalog 同事务维护 watch session ledger 与视频消费投影。 |
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |
-| [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段。 |
+| [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐 Catalog / semantic 展示字段、transcript URL 和互动状态。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；后者由 Learning Engine 事务性切换当前学习目标集合。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |

@@ -40,14 +40,17 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	videoLookup := &fakeFeedVideoLookup{
 		response: catalogdto.FeedVideoLookupResponse{Videos: []catalogdto.FeedVideoDisplay{
 			{
-				VideoID:         "11111111-1111-1111-1111-111111111111",
-				Title:           "Title",
-				Description:     "Description",
-				VideoObjectPath: "hls/111/master.m3u8",
-				CoverImageURL:   stringPtr("covers/111.webp"),
-				ViewCount:       12,
-				LikeCount:       3,
-				FavoriteCount:   2,
+				VideoID:              "11111111-1111-1111-1111-111111111111",
+				Title:                "Title",
+				Description:          "Description",
+				VideoObjectPath:      "hls/111/master.m3u8",
+				CoverImageURL:        stringPtr("covers/111.webp"),
+				TranscriptObjectPath: stringPtr("transcripts/111.json"),
+				ViewCount:            12,
+				LikeCount:            3,
+				FavoriteCount:        2,
+				HasLiked:             true,
+				HasFavorited:         true,
 			},
 		}},
 	}
@@ -71,6 +74,9 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	if len(videoLookup.request.VideoIDs) != 1 || videoLookup.request.VideoIDs[0] != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("video lookup request = %+v", videoLookup.request)
 	}
+	if videoLookup.request.UserID != "user-1" {
+		t.Fatalf("video lookup user_id = %q, want user-1", videoLookup.request.UserID)
+	}
 	if len(labelLookup.request.CoarseUnitIDs) != 1 || labelLookup.request.CoarseUnitIDs[0] != 101 {
 		t.Fatalf("unit lookup request = %+v", labelLookup.request)
 	}
@@ -85,8 +91,14 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	if item.CoverImageURL == nil || *item.CoverImageURL != "https://cdn.example.com/assets/covers/111.webp" {
 		t.Fatalf("unexpected cover url: %+v", item.CoverImageURL)
 	}
+	if item.TranscriptURL == nil || *item.TranscriptURL != "https://cdn.example.com/assets/transcripts/111.json" {
+		t.Fatalf("unexpected transcript url: %+v", item.TranscriptURL)
+	}
 	if item.DurationSeconds != 91 || item.ViewCount != 12 || item.LikeCount != 3 || item.FavoriteCount != 2 {
 		t.Fatalf("unexpected counts/duration: %+v", item)
+	}
+	if !item.HasLiked || !item.HasFavorited {
+		t.Fatalf("unexpected interaction state: %+v", item)
 	}
 	if len(item.LearningUnits) != 1 {
 		t.Fatalf("expected 1 learning unit, got %+v", item.LearningUnits)

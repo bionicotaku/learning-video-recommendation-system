@@ -7,7 +7,7 @@ import (
 )
 
 type FeedVideoReader interface {
-	ListFeedVideosByIDs(ctx context.Context, videoIDs []string) ([]model.FeedVideoDisplay, error)
+	ListFeedVideosByIDs(ctx context.Context, userID string, videoIDs []string) ([]model.FeedVideoDisplay, error)
 }
 
 type UnitLabelReader interface {

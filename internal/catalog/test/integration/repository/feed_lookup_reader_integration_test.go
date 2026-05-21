@@ -17,6 +17,7 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	db := suite.CreateTestDatabase(t)
 	ctx := context.Background()
 
+	userID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 	visibleID := "11111111-1111-1111-1111-111111111111"
 	noStatsID := "22222222-2222-2222-2222-222222222222"
 	inactiveID := "33333333-3333-3333-3333-333333333333"
@@ -31,13 +32,37 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	seedFeedVideo(t, db.Pool, futureID, "Future", "", "hls/future/master.m3u8", "", "active", "public", &future)
 
 	if _, err := db.Pool.Exec(ctx, `
+		insert into auth.users (id, email)
+		values ($1, 'feed-user@example.com')`, userID); err != nil {
+		t.Fatalf("seed auth user: %v", err)
+	}
+	if _, err := db.Pool.Exec(ctx, `
 		insert into catalog.video_engagement_stats (video_id, view_count, like_count, favorite_count)
 		values ($1, 12, 3, 2)`, visibleID); err != nil {
 		t.Fatalf("seed stats: %v", err)
 	}
+	if _, err := db.Pool.Exec(ctx, `
+		insert into catalog.video_transcripts (
+			video_id,
+			transcript_object_path,
+			transcript_checksum,
+			sentence_count,
+			semantic_span_count,
+			mapped_span_count,
+			unmapped_span_count,
+			mapped_span_ratio
+		)
+		values ($1, 'transcripts/visible.json', 'checksum-visible', 1, 1, 1, 0, 1.0)`, visibleID); err != nil {
+		t.Fatalf("seed transcript: %v", err)
+	}
+	if _, err := db.Pool.Exec(ctx, `
+		insert into catalog.video_user_states (user_id, video_id, has_liked, has_bookmarked)
+		values ($1, $2, true, true)`, userID, visibleID); err != nil {
+		t.Fatalf("seed user state: %v", err)
+	}
 
 	reader := catalogrepo.NewFeedLookupReader(db.Pool)
-	videos, err := reader.ListFeedVideosByIDs(ctx, []string{visibleID, noStatsID, inactiveID, privateID, futureID})
+	videos, err := reader.ListFeedVideosByIDs(ctx, userID, []string{visibleID, noStatsID, inactiveID, privateID, futureID})
 	if err != nil {
 		t.Fatalf("list feed videos: %v", err)
 	}
@@ -61,8 +86,14 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	if visible.CoverImageURL == nil || *visible.CoverImageURL != "covers/visible.webp" {
 		t.Fatalf("unexpected cover image: %+v", visible.CoverImageURL)
 	}
+	if visible.TranscriptObjectPath == nil || *visible.TranscriptObjectPath != "transcripts/visible.json" {
+		t.Fatalf("unexpected transcript path: %+v", visible.TranscriptObjectPath)
+	}
 	if visible.ViewCount != 12 || visible.LikeCount != 3 || visible.FavoriteCount != 2 {
 		t.Fatalf("unexpected stats: %+v", visible)
+	}
+	if !visible.HasLiked || !visible.HasFavorited {
+		t.Fatalf("unexpected interaction state: %+v", visible)
 	}
 
 	noStats, ok := byID[noStatsID]
@@ -72,8 +103,14 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	if noStats.Description != "" || noStats.CoverImageURL != nil {
 		t.Fatalf("empty description/cover should be normalized: %+v", noStats)
 	}
+	if noStats.TranscriptObjectPath != nil {
+		t.Fatalf("missing transcript should return nil: %+v", noStats.TranscriptObjectPath)
+	}
 	if noStats.ViewCount != 0 || noStats.LikeCount != 0 || noStats.FavoriteCount != 0 {
 		t.Fatalf("missing stats should default to zero: %+v", noStats)
+	}
+	if noStats.HasLiked || noStats.HasFavorited {
+		t.Fatalf("missing user state should default to false: %+v", noStats)
 	}
 }
 
