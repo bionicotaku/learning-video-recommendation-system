@@ -108,6 +108,7 @@ func fillScore(candidate model.VideoFillCandidate, lane string, preferredDuratio
 	popularity := fillPopularityScore(candidate)
 	freshness := fillFreshnessScore(candidate, now)
 	durationFit := fillDurationFit(candidate.DurationMs, preferredDurationSec)
+	servedPenalty := fillRecentServedPenalty(candidate, now)
 	watchedPenalty := fillRecentWatchedPenalty(candidate, now)
 
 	if lane == string(policy.LaneMasteredTargetFill) {
@@ -116,14 +117,16 @@ func fillScore(candidate model.VideoFillCandidate, lane string, preferredDuratio
 				0.25*popularity +
 				0.20*freshness +
 				0.10*durationFit -
-				0.10*watchedPenalty,
+				0.08*servedPenalty -
+				0.12*watchedPenalty,
 		)
 	}
 	return round4(
 		0.60*popularity +
 			0.25*freshness +
 			0.15*durationFit -
-			0.10*watchedPenalty,
+			0.08*servedPenalty -
+			0.12*watchedPenalty,
 	)
 }
 

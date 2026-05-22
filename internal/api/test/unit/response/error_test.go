@@ -35,3 +35,30 @@ func TestWriteErrorIncludesStableEnvelopeAndRequestID(t *testing.T) {
 		t.Fatalf("unexpected request id: %s", body.Error.RequestID)
 	}
 }
+
+func TestPayloadTooLargeUsesStableCode(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	response.WriteError(recorder, "req_big", response.PayloadTooLarge("request body must not exceed 5 MiB"))
+
+	if recorder.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", recorder.Code)
+	}
+
+	var body struct {
+		Error struct {
+			Code      string `json:"code"`
+			Message   string `json:"message"`
+			RequestID string `json:"request_id"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Error.Code != "payload_too_large" {
+		t.Fatalf("unexpected error code: %s", body.Error.Code)
+	}
+	if body.Error.RequestID != "req_big" {
+		t.Fatalf("unexpected request id: %s", body.Error.RequestID)
+	}
+}

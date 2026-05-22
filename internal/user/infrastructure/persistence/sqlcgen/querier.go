@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	AddWatchDuration(ctx context.Context, arg AddWatchDurationParams) error
+	CountFeedbackImages(ctx context.Context, submissionID pgtype.UUID) (int32, error)
 	EnsureActivityStats(ctx context.Context, userID pgtype.UUID) error
 	GetActivityStats(ctx context.Context, userID pgtype.UUID) (AppUserUserActivityStat, error)
 	GetAuthUser(ctx context.Context, id pgtype.UUID) (AuthUser, error)
@@ -20,10 +21,12 @@ type Querier interface {
 	IncrementLearningInteraction(ctx context.Context, arg IncrementLearningInteractionParams) error
 	IncrementQuizAttempt(ctx context.Context, arg IncrementQuizAttemptParams) error
 	IncrementStartedUnit(ctx context.Context, userID pgtype.UUID) error
+	InsertFeedbackImage(ctx context.Context, arg InsertFeedbackImageParams) error
 	InsertRepairedUserProfile(ctx context.Context, arg InsertRepairedUserProfileParams) (AppUserUserProfile, error)
 	ListDailyActivityStats(ctx context.Context, arg ListDailyActivityStatsParams) ([]AppUserUserDailyActivityStat, error)
 	UpdateOnboardingStatus(ctx context.Context, arg UpdateOnboardingStatusParams) error
 	UpdateUserTimezone(ctx context.Context, arg UpdateUserTimezoneParams) error
+	UpsertFeedbackSubmission(ctx context.Context, arg UpsertFeedbackSubmissionParams) (UpsertFeedbackSubmissionRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

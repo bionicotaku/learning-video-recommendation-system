@@ -17,6 +17,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feedback"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
@@ -139,8 +140,11 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,
 		UnitProgress:      unitProgress,
+		Feedback: feedback.NewHandler(
+			userservice.NewSubmitFeedbackUsecase(userrepo.NewFeedbackWriter(h.Pool)),
+		),
 	})
-	handler = middleware.BodyLimit(1 << 20)(handler)
+	handler = middleware.BodyLimitByPath(1<<20, map[string]int64{"/api/feedback": feedback.MaxRequestBytes})(handler)
 	handler = middleware.Recover(handler)
 	handler = middleware.Timeout(15 * time.Second)(handler)
 	handler = principalMiddleware(handler)

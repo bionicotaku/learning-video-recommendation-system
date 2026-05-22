@@ -39,6 +39,7 @@ POST /api/learning-units:mark-mastered
 POST /api/video-watch-progress
 GET /api/learning/unit-progress/mastered
 GET /api/learning/unit-progress/unmastered
+POST /api/feedback
 ```
 
 `POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
@@ -111,6 +112,14 @@ read usecase. The handler reads only `limit` and `cursor` from query params,
 uses the trusted principal as `user_id`, and returns the frontend display
 contract defined in `docs/API/Unit-Progress-API-MVP设计.md`.
 
+`POST /api/feedback` reads the trusted principal as `user_id`, accepts
+`multipart/form-data` with one frontend-owned JSON object `payload` and up to
+five JPEG `images`, and calls User `SubmitFeedback`. The route has a dedicated
+5 MiB request body limit; other API routes keep the default 1 MiB body limit.
+The endpoint writes `app_user.feedback_submissions` and
+`app_user.feedback_images` atomically through the User module and stores image
+bytes as Postgres `bytea`, not base64 JSON.
+
 `cmd/server` reads principal configuration from environment variables. In normal
 mode it expects GCP API Gateway to validate the client JWT and forward
 `X-Apigateway-Api-Userinfo`; the API auth middleware decodes that userinfo
@@ -134,7 +143,8 @@ values pass through without using this prefix.
 
 Transport errors use the shared JSON error envelope. Decode, field validation,
 and known business validation failures map to `400 invalid_request`; missing
-principal maps to `401 unauthorized`; known owner errors can map to `404
-not_found`, `409 conflict`, or `422 unprocessable_entity`; timeouts or canceled
-contexts map to a request-id-bearing `503 service_unavailable`; unknown usecase
-failures map to `500 internal_error`.
+principal maps to `401 unauthorized`; feedback request body overflow maps to
+`413 payload_too_large`; known owner errors can map to `404 not_found`, `409
+conflict`, or `422 unprocessable_entity`; timeouts or canceled contexts map to a
+request-id-bearing `503 service_unavailable`; unknown usecase failures map to
+`500 internal_error`.

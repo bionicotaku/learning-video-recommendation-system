@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Me API 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar。
+- **Feed、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Me API、User Feedback API 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -24,12 +24,13 @@
 - [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取与激活当前学习目标集合。
 - [Me-API-MVP设计.md](Me-API-MVP设计.md)：当前用户 profile 读取、累计活动统计、activity calendar、profile lazy repair 和 timezone 顺手更新。
+- [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md)：当前用户反馈上传，支持一个自定义 JSON payload 和最多 5 张 JPEG 图片。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
 ## 已实现 API 总表
 
-当前 `internal/api` 已实现 15 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
+当前 `internal/api` 已实现 16 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
 
 | Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
 |---|---|---|---|---|
@@ -48,6 +49,7 @@
 | `POST` | `/api/learning-units:mark-mastered` | Learning Events / 学习事件写入 | Analytics，Learning Engine self-mark normalizer | 写入 self-mark mastered raw fact，并走 dedicated normalizer path。 |
 | `GET` | `/api/learning/unit-progress/mastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户已掌握学习单元。 |
 | `GET` | `/api/learning/unit-progress/unmastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户尚未掌握的目标学习单元。 |
+| `POST` | `/api/feedback` | User Feedback / 用户反馈上传 | User | 接收当前用户 multipart feedback，校验 JSON object payload 与最多 5 张 JPEG 图片，在 5 MiB 总请求限制内把 submission 与图片二进制原子写入 `app_user.feedback_*`。 |
 
 ## 已实现 API 分组说明
 
@@ -106,6 +108,12 @@
 | `GET` | `/api/learning/unit-progress/mastered` | 分页读取当前用户已掌握学习单元；从 principal 取 `user_id`，Learning Engine reducer read usecase join `semantic.coarse_unit` 返回展示字段。 |
 | `GET` | `/api/learning/unit-progress/unmastered` | 分页读取当前用户尚未掌握的目标学习单元；使用 cursor keyset pagination。 |
 
+### User Feedback / 用户反馈上传
+
+| Method | Path | 说明 |
+|---|---|---|
+| `POST` | `/api/feedback` | 上传当前用户反馈；接收一个自定义 JSON object payload 和最多 5 张 JPEG 图片，完整 multipart request body 限制为 5 MiB。 |
+
 ## 已设计未实现 Endpoint
 
 当前没有已写入设计但未落地的业务 endpoint。
@@ -123,6 +131,7 @@
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；前者返回 active 词书列表和当前用户 `active_collection` slug / null，后者由 Learning Engine 事务性切换当前学习目标集合。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
+| [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feedback`；由 User 模块写 `app_user.feedback_submissions` 与 `app_user.feedback_images`，总请求限制 5 MiB，图片以 `bytea` 存储。 |
 
 ## 未开始范围
 

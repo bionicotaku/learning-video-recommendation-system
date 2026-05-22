@@ -424,9 +424,9 @@ scored as (
           when bucketed.last_served_at is null then 0.12
           when bucketed.last_served_at <= $1::timestamptz - interval '7 days' then 0.08
           when bucketed.last_served_at <= $1::timestamptz - interval '24 hours' then 0.04
-          else -0.10
+          else -0.15
         end
-      - least(bucketed.served_count::numeric / 10.0, 0.20)
+      - least(bucketed.served_count::numeric / 10.0, 0.25)
     )::numeric(10,6) as dynamic_priority
   from bucketed
 ),

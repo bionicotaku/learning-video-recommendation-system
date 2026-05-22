@@ -48,7 +48,7 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 	}
 }
 
-func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *testing.T) {
+func TestDefaultVideoRankerSubtractsRecentWatchedPenaltyFromBaseScore(t *testing.T) {
 	now := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
 	recentWatchedAt := now.Add(-3 * time.Hour)
 
@@ -77,12 +77,13 @@ func TestDefaultVideoRankerDoesNotSubtractRecentWatchedPenaltyFromBaseScore(t *t
 			0.15*got.BundleValueScore +
 			0.15*got.EducationalFitScore +
 			0.05*got.FutureValueScore +
-			0.05*got.FreshnessScore -
-			0.03*got.RecentServedPenalty -
+			0.04*got.FreshnessScore -
+			0.06*got.RecentServedPenalty -
+			0.04*got.RecentWatchedPenalty -
 			0.02*got.OverloadPenalty,
 	)
 	if got.BaseScore != want {
-		t.Fatalf("expected base score without direct recent watched subtraction, got=%0.4f want=%0.4f candidate=%+v", got.BaseScore, want, got)
+		t.Fatalf("expected base score with direct recent watched subtraction, got=%0.4f want=%0.4f candidate=%+v", got.BaseScore, want, got)
 	}
 }
 

@@ -41,6 +41,10 @@ func UnprocessableEntity(message string) *Error {
 	return &Error{StatusCode: http.StatusUnprocessableEntity, Code: "unprocessable_entity", Message: message}
 }
 
+func PayloadTooLarge(message string) *Error {
+	return &Error{StatusCode: http.StatusRequestEntityTooLarge, Code: "payload_too_large", Message: message}
+}
+
 func ServiceUnavailable(message string) *Error {
 	return &Error{StatusCode: http.StatusServiceUnavailable, Code: "service_unavailable", Message: message}
 }

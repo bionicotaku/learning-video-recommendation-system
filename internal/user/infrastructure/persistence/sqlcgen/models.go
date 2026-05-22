@@ -8,6 +8,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppUserFeedbackImage struct {
+	ID           pgtype.UUID        `json:"id"`
+	SubmissionID pgtype.UUID        `json:"submission_id"`
+	SortOrder    int32              `json:"sort_order"`
+	ContentType  string             `json:"content_type"`
+	SizeBytes    int32              `json:"size_bytes"`
+	Sha256       string             `json:"sha256"`
+	Width        int32              `json:"width"`
+	Height       int32              `json:"height"`
+	ImageData    []byte             `json:"image_data"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type AppUserFeedbackSubmission struct {
+	ID               pgtype.UUID        `json:"id"`
+	UserID           pgtype.UUID        `json:"user_id"`
+	ClientFeedbackID pgtype.UUID        `json:"client_feedback_id"`
+	Payload          []byte             `json:"payload"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type AppUserUserActivityStat struct {
 	UserID           pgtype.UUID        `json:"user_id"`
 	TotalWatchMs     int64              `json:"total_watch_ms"`

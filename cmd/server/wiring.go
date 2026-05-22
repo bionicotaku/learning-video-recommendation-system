@@ -12,6 +12,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/endquiz"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feedback"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/me"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
@@ -66,6 +67,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
 	meHandler := buildMeHandler(pool)
+	feedbackHandler := buildFeedbackHandler(pool)
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
@@ -76,8 +78,9 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		WatchProgress:     watchProgress,
 		UnitProgress:      unitProgress,
 		Me:                meHandler,
+		Feedback:          feedbackHandler,
 	})
-	handler = middleware.BodyLimit(1 << 20)(handler)
+	handler = middleware.BodyLimitByPath(1<<20, map[string]int64{"/api/feedback": feedback.MaxRequestBytes})(handler)
 	handler = middleware.Recover(handler)
 	handler = middleware.Timeout(15 * time.Second)(handler)
 	handler = middleware.Logging(logger)(handler)
@@ -136,6 +139,12 @@ func buildMeHandler(pool *pgxpool.Pool) *me.Handler {
 	repository := userrepo.NewRepository(pool)
 	getMe := userservice.NewGetMeUsecase(repository, repository)
 	return me.NewHandler(getMe)
+}
+
+func buildFeedbackHandler(pool *pgxpool.Pool) *feedback.Handler {
+	writer := userrepo.NewFeedbackWriter(pool)
+	submitFeedback := userservice.NewSubmitFeedbackUsecase(writer)
+	return feedback.NewHandler(submitFeedback)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {

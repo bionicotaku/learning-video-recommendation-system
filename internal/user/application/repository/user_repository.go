@@ -30,3 +30,7 @@ type ActivityStatsRecorder interface {
 	IncrementStartedUnit(ctx context.Context, userID string) error
 	IncrementLearningInteraction(ctx context.Context, userID string, occurredAt time.Time) error
 }
+
+type FeedbackWriter interface {
+	SubmitFeedback(ctx context.Context, submission model.FeedbackSubmission) (model.FeedbackSubmissionResult, error)
+}

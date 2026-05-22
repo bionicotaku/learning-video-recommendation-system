@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	apprepo "learning-video-recommendation-system/internal/recommendation/application/repository"
 	appservice "learning-video-recommendation-system/internal/recommendation/application/service"
@@ -100,6 +101,43 @@ func TestDefaultVideoFillServiceFillsPopularCandidatesToTarget(t *testing.T) {
 	}
 	if len(filled) != 4 {
 		t.Fatalf("filled count = %d, want target count 4", len(filled))
+	}
+}
+
+func TestDefaultVideoFillServiceRanksRecentlyServedAndWatchedFillLower(t *testing.T) {
+	recent := time.Now().UTC().Add(-time.Hour)
+	penalized := fillCandidate("video-penalized", 100_000, 0, 0, 90, 30)
+	penalized.LastServedAt = &recent
+	penalized.ServedCount = 4
+	penalized.LastWatchedAt = &recent
+	penalized.WatchCount = 4
+	penalized.CompletedCount = 2
+	penalized.MaxPositionMs = 90_000
+	reader := &spyVideoFillCandidateReader{
+		popular: []model.VideoFillCandidate{
+			penalized,
+			fillCandidate("video-fresh", 100_000, 0, 0, 90, 30),
+		},
+	}
+	service := appservice.NewDefaultVideoFillService(reader)
+
+	filled, err := service.Fill(context.Background(), fillContext(3), []model.VideoCandidate{
+		fillTestVideo("video-learning", string(policy.LaneExactCore)),
+	}, 3)
+	if err != nil {
+		t.Fatalf("Fill() error = %v", err)
+	}
+
+	got := videoIDs(filled)
+	want := []string{"video-learning", "video-fresh", "video-penalized"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("video ids = %v, want %v", got, want)
+	}
+	if filled[2].RecentServedPenalty <= 0 || filled[2].RecentWatchedPenalty <= 0 {
+		t.Fatalf("expected served and watched penalties on penalized fill candidate: %#v", filled[2])
+	}
+	if filled[1].BaseScore <= filled[2].BaseScore {
+		t.Fatalf("expected fresh fill to score higher: fresh=%#v penalized=%#v", filled[1], filled[2])
 	}
 }
 

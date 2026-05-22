@@ -48,8 +48,15 @@ type CatalogVideoSemanticSpan struct {
 }
 
 type CatalogVideoTranscript struct {
-	VideoID         pgtype.UUID    `json:"video_id"`
-	MappedSpanRatio pgtype.Numeric `json:"mapped_span_ratio"`
+	VideoID                 pgtype.UUID    `json:"video_id"`
+	TranscriptObjectPath    pgtype.Text    `json:"transcript_object_path"`
+	TranscriptChecksum      string         `json:"transcript_checksum"`
+	TranscriptFormatVersion int32          `json:"transcript_format_version"`
+	SentenceCount           int32          `json:"sentence_count"`
+	SemanticSpanCount       int32          `json:"semantic_span_count"`
+	MappedSpanCount         int32          `json:"mapped_span_count"`
+	UnmappedSpanCount       int32          `json:"unmapped_span_count"`
+	MappedSpanRatio         pgtype.Numeric `json:"mapped_span_ratio"`
 }
 
 type CatalogVideoTranscriptSentence struct {
