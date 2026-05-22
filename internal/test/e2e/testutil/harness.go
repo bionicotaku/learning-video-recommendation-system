@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
@@ -515,6 +516,14 @@ func (h *Harness) RefreshRecommendationViews(t *testing.T) {
 	if _, err := h.Pool.Exec(ctx, `refresh materialized view recommendation.v_unit_video_inventory`); err != nil {
 		failNow(t, "refresh recommendation.v_unit_video_inventory: %v", err)
 	}
+	if _, err := h.Pool.Exec(ctx, `
+		insert into recommendation.recall_projection_metadata (projection_name, projection_updated_at)
+		values ('video_unit_recall_index', clock_timestamp())
+		on conflict (projection_name) do update
+		set projection_updated_at = excluded.projection_updated_at
+	`); err != nil {
+		failNow(t, "update recommendation.recall_projection_metadata: %v", err)
+	}
 }
 
 func (h *Harness) CountRecommendationRuns(t *testing.T, userID string) int {
@@ -650,6 +659,9 @@ func (h *Harness) LoadSupplyGrade(t *testing.T, unitID int64) string {
 		 where coarse_unit_id = $1`,
 		unitID,
 	).Scan(&supplyGrade); err != nil {
+		if err == pgx.ErrNoRows {
+			return "none"
+		}
 		t.Fatalf("load unit supply grade: %v", err)
 	}
 	return supplyGrade

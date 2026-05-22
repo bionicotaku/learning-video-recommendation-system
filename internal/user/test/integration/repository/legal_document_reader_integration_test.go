@@ -23,8 +23,8 @@ func TestRepositoryReadsSeededLegalDocuments(t *testing.T) {
 	if document.Type != "privacy-policy" || document.Title != "隐私政策" || document.Markdown == "" {
 		t.Fatalf("unexpected privacy-policy document: %+v", document)
 	}
-	if document.Version == nil || *document.Version != "2026-05-21" {
-		t.Fatalf("version = %v, want 2026-05-21", document.Version)
+	if document.Version == nil || *document.Version != "2026-05-22" {
+		t.Fatalf("version = %v, want 2026-05-22", document.Version)
 	}
 	if document.UpdatedAt == nil || !document.UpdatedAt.Equal(document.UpdatedAt.UTC()) {
 		t.Fatalf("updated_at should be non-nil UTC: %v", document.UpdatedAt)
