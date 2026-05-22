@@ -60,5 +60,10 @@ on catalog.video_ingestion_records (status, started_at desc);
 create index if not exists idx_video_user_states_video_id
 on catalog.video_user_states (video_id);
 
-create index if not exists idx_video_user_states_user_last_watched_at
-on catalog.video_user_states (user_id, last_watched_at desc);
+create index if not exists idx_video_user_states_favorites_page
+on catalog.video_user_states (user_id, bookmarked_at desc, video_id asc)
+where has_bookmarked = true and bookmarked_at is not null;
+
+create index if not exists idx_video_user_states_history_page
+on catalog.video_user_states (user_id, last_watched_at desc, video_id asc)
+where has_watched = true and last_watched_at is not null;

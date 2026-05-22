@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、Video Detail、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Active Learning Targets、Me API、User Feedback API 已落地。** Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
+- **Feed、Video Detail、Video Favorites、Video History、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Active Learning Targets、Me API、User Feedback API 已落地。** Video Favorites / Video History 提供 Catalog 只读 keyset 分页列表；Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -22,6 +22,8 @@
 - [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md)：视频点赞/取消点赞、收藏/取消收藏。
 - [Feed-API-MVP设计.md](Feed-API-MVP设计.md)：feed 页面获取推荐视频列表的前端展示契约。
 - [Video-Detail-API-MVP设计.md](Video-Detail-API-MVP设计.md)：fullscreen 播放页读取单个视频详情、播放资源、transcript URL、互动计数和当前用户状态。
+- [Video-Favorites-API-MVP设计.md](Video-Favorites-API-MVP设计.md)：当前用户视频收藏列表分页读取。
+- [Video-History-API-MVP设计.md](Video-History-API-MVP设计.md)：当前用户视频观看历史列表分页读取。
 - [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取与激活当前学习目标集合。
 - [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md)：当前用户 active learning target coarse unit id 列表读取。
@@ -32,12 +34,14 @@
 
 ## 已实现 API 总表
 
-当前 `internal/api` 已实现 18 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
+当前 `internal/api` 已实现 20 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
 
 | Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
 |---|---|---|---|---|
 | `POST` | `/api/feed` | Feed / 推荐流 | API facade 编排 Recommendation、Catalog、Semantic | Recommendation 生成 plan 并写 audit / serving state，API facade 批量补齐列表 preview 字段与 learning unit 展示文本后返回 feed。 |
 | `GET` | `/api/videos/{video_id}` | Video Detail / 视频详情 | Catalog | 读取单个可展示视频的播放资源、transcript URL、description、互动计数和当前用户 like / favorite 状态；不写任何状态。 |
+| `GET` | `/api/video-favorites` | Video Favorites / 视频收藏列表 | Catalog | Keyset 分页读取当前用户仍收藏且仍可展示的视频列表；只返回 preview 和 `favorited_at`。 |
+| `GET` | `/api/video-history` | Video History / 视频观看历史 | Catalog | Keyset 分页读取当前用户最近观看且仍可展示的视频列表；只返回 preview、`last_position_ms` 和 `last_watched_at`。 |
 | `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
 | `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
@@ -68,6 +72,13 @@
 | Method | Path | 说明 |
 |---|---|---|
 | `GET` | `/api/videos/{video_id}` | 读取单个可展示视频的播放资源、transcript URL、description、全局互动计数和当前用户 like / favorite 状态；只读 Catalog，不写状态。 |
+
+### Video Library / 视频列表
+
+| Method | Path | 说明 |
+|---|---|---|
+| `GET` | `/api/video-favorites` | 分页读取当前用户仍收藏且仍可展示的视频列表；返回列表 preview 和 `favorited_at`，不返回播放详情字段。 |
+| `GET` | `/api/video-history` | 分页读取当前用户最近观看且仍可展示的视频列表；返回列表 preview、`last_position_ms` 和 `last_watched_at`，不直接读取 Analytics watch event ledger。 |
 
 ### End Quiz / 视频末尾取题
 
@@ -125,10 +136,6 @@
 |---|---|---|
 | `POST` | `/api/feedback` | 上传当前用户反馈；接收一个自定义 JSON object payload 和最多 5 张 JPEG 图片，完整 multipart request body 限制为 5 MiB。 |
 
-## 已设计未实现 Endpoint
-
-当前没有已写入设计但未落地的业务 endpoint。
-
 ## 当前 API 实现状态
 
 | 文档 | 设计文档状态 | API 实现状态 | 说明 |
@@ -140,6 +147,8 @@
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |
 | [Feed-API-MVP设计.md](Feed-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feed`；请求只接受 `target_video_count` 和 `client_context`，API facade 调用 Recommendation 并批量补齐列表 preview 字段和 learning unit 展示文本。 |
 | [Video-Detail-API-MVP设计.md](Video-Detail-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/videos/{video_id}`；Catalog 只读返回播放资源、transcript URL、description、互动计数和当前用户 like / favorite 状态。 |
+| [Video-Favorites-API-MVP设计.md](Video-Favorites-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/video-favorites`；Catalog 只读 keyset 分页返回当前用户收藏视频 preview 和 `favorited_at`。 |
+| [Video-History-API-MVP设计.md](Video-History-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/video-history`；Catalog 只读 keyset 分页返回当前用户观看历史 preview、`last_position_ms` 和 `last_watched_at`。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；前者返回 active 词书列表和当前用户 `active_collection` slug / null，后者由 Learning Engine 事务性切换当前学习目标集合。 |
 | [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |

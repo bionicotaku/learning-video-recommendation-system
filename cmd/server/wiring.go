@@ -19,6 +19,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videodetail"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videolibrary"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
@@ -65,6 +66,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	endQuiz := buildEndQuizHandler(pool)
 	unitCollections := buildUnitCollectionsHandler(pool)
 	videoDetail := buildVideoDetailHandler(pool, config)
+	videoLibrary := buildVideoLibraryHandler(pool, config)
 	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
@@ -74,6 +76,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
 		VideoDetail:       videoDetail,
+		VideoLibrary:      videoLibrary,
 		EndQuiz:           endQuiz,
 		UnitCollections:   unitCollections,
 		VideoInteractions: videoInteractions,
@@ -164,6 +167,14 @@ func buildVideoDetailHandler(pool *pgxpool.Pool, config config) *videodetail.Han
 	lookup := catalogservice.NewGetVideoDetailUsecase(reader)
 	service := apiservice.NewVideoDetailService(lookup, apiservice.NewPublicAssetURLBuilder(config.PublicAssetBaseURL))
 	return videodetail.NewHandler(service)
+}
+
+func buildVideoLibraryHandler(pool *pgxpool.Pool, config config) *videolibrary.Handler {
+	reader := catalogrepo.NewVideoLibraryReader(pool)
+	listFavorites := catalogservice.NewListVideoFavoritesUsecase(reader)
+	listHistory := catalogservice.NewListVideoHistoryUsecase(reader)
+	service := apiservice.NewVideoLibraryService(listFavorites, listHistory, apiservice.NewPublicAssetURLBuilder(config.PublicAssetBaseURL))
+	return videolibrary.NewHandler(service)
 }
 
 func buildEndQuizHandler(pool *pgxpool.Pool) *endquiz.Handler {

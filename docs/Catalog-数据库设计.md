@@ -231,7 +231,7 @@ catalog.videos
 - `total_watch_ms bigint not null default 0`
 - `updated_at timestamptz not null default now()`
 
-必要约束应包括：`primary key (user_id, video_id)`、`foreign key (user_id) references auth.users(id) on delete cascade`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (watch_count >= 0)`、`check (completed_count >= 0)`、`check (last_position_ms >= 0)`、`check (max_position_ms >= 0)`、`check (total_watch_ms >= 0)`。推荐索引包括：`primary key (user_id, video_id)`、`(video_id)`、`(user_id, last_watched_at desc)`。这里明确不保留旧版 `occurred_at`，因为它无法清晰表示 like/bookmark/watch 三类行为中到底是哪一个事件时间。
+必要约束应包括：`primary key (user_id, video_id)`、`foreign key (user_id) references auth.users(id) on delete cascade`、`foreign key (video_id) references catalog.videos(video_id) on delete cascade`、`check (watch_count >= 0)`、`check (completed_count >= 0)`、`check (last_position_ms >= 0)`、`check (max_position_ms >= 0)`、`check (total_watch_ms >= 0)`。推荐索引包括：`primary key (user_id, video_id)`、`(video_id)`、收藏列表 partial index `(user_id, bookmarked_at desc, video_id asc) where has_bookmarked = true and bookmarked_at is not null`、观看历史 partial index `(user_id, last_watched_at desc, video_id asc) where has_watched = true and last_watched_at is not null`。这里明确不保留旧版 `occurred_at`，因为它无法清晰表示 like/bookmark/watch 三类行为中到底是哪一个事件时间。
 
 `last_position_ms` 表示用户最近一次观看 session 最后停留的位置，用于恢复播放；`max_position_ms` 表示用户历史到达过的最远播放位置，用于派生观看比例；`total_watch_ms` 表示用户对该视频累计有效播放时长。`last_watch_ratio` 与 `max_watch_ratio` 不再持久化，观看比例统一通过 `position_ms / catalog.videos.duration_ms` 派生。
 

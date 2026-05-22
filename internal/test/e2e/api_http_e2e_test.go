@@ -193,6 +193,134 @@ func TestE2E_VideoInteractionsHTTPUpdatesCatalogStateAndCounts(t *testing.T) {
 	}
 }
 
+func TestE2E_VideoFavoritesHTTPListsCurrentFavorites(t *testing.T) {
+	h := harness(t)
+
+	userID := h.NewUserID()
+	videoID := h.NewVideoID()
+	h.SeedUser(t, userID)
+	h.SeedCatalogVideo(t, testutil.CatalogVideoFixture{VideoID: videoID, DurationMs: 90_000, MappedSpanRatio: 0.8})
+
+	server := h.APIServer(t, userID)
+	t.Cleanup(server.Close)
+
+	favorite := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", "")
+	requireStatus(t, favorite, http.StatusOK)
+	decodeResponse(t, favorite, &struct {
+		HasFavorited bool `json:"has_favorited"`
+	}{})
+
+	list := getHTTP(t, server, "/api/video-favorites")
+	requireStatus(t, list, http.StatusOK)
+	var listBody struct {
+		Items []struct {
+			VideoID         string `json:"video_id"`
+			Title           string `json:"title"`
+			CoverImageURL   string `json:"cover_image_url"`
+			DurationSeconds int    `json:"duration_seconds"`
+			ViewCount       int64  `json:"view_count"`
+			FavoritedAt     string `json:"favorited_at"`
+		} `json:"items"`
+	}
+	decodeResponse(t, list, &listBody)
+	if len(listBody.Items) != 1 || listBody.Items[0].VideoID != videoID || listBody.Items[0].DurationSeconds != 90 || listBody.Items[0].FavoritedAt == "" {
+		t.Fatalf("favorites body = %+v, want current favorite video", listBody)
+	}
+
+	unfavorite := requestHTTP(t, server, http.MethodDelete, "/api/videos/"+videoID+"/favorite", "")
+	requireStatus(t, unfavorite, http.StatusOK)
+	decodeResponse(t, unfavorite, &struct {
+		HasFavorited bool `json:"has_favorited"`
+	}{})
+
+	refreshed := getHTTP(t, server, "/api/video-favorites")
+	requireStatus(t, refreshed, http.StatusOK)
+	decodeResponse(t, refreshed, &listBody)
+	if len(listBody.Items) != 0 {
+		t.Fatalf("favorites body = %+v, want empty after unfavorite", listBody)
+	}
+}
+
+func TestE2E_VideoHistoryHTTPListsLatestWatchProgress(t *testing.T) {
+	h := harness(t)
+
+	userID := h.NewUserID()
+	firstVideoID := h.NewVideoID()
+	secondVideoID := h.NewVideoID()
+	firstSessionID := h.NewVideoID()
+	secondSessionID := h.NewVideoID()
+	h.SeedUser(t, userID)
+	h.SeedCatalogVideo(t, testutil.CatalogVideoFixture{VideoID: firstVideoID, DurationMs: 100_000, MappedSpanRatio: 0.8})
+	h.SeedCatalogVideo(t, testutil.CatalogVideoFixture{VideoID: secondVideoID, DurationMs: 80_000, MappedSpanRatio: 0.8})
+
+	server := h.APIServer(t, userID)
+	t.Cleanup(server.Close)
+
+	first := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+firstVideoID+`",
+		"watch_session_id": "`+firstSessionID+`",
+		"position_ms": 10000,
+		"active_watch_ms": 8000,
+		"occurred_at": "2026-05-15T10:00:00-07:00",
+		"source_surface": "detail",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, first, http.StatusOK)
+	decodeResponse(t, first, &struct {
+		Accepted bool `json:"accepted"`
+	}{})
+
+	second := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+secondVideoID+`",
+		"watch_session_id": "`+secondSessionID+`",
+		"position_ms": 20000,
+		"active_watch_ms": 9000,
+		"occurred_at": "2026-05-15T10:05:00-07:00",
+		"source_surface": "detail",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, second, http.StatusOK)
+	decodeResponse(t, second, &struct {
+		Accepted bool `json:"accepted"`
+	}{})
+
+	history := getHTTP(t, server, "/api/video-history")
+	requireStatus(t, history, http.StatusOK)
+	var historyBody struct {
+		Items []struct {
+			VideoID         string `json:"video_id"`
+			DurationSeconds int    `json:"duration_seconds"`
+			LastPositionMS  int32  `json:"last_position_ms"`
+			LastWatchedAt   string `json:"last_watched_at"`
+		} `json:"items"`
+	}
+	decodeResponse(t, history, &historyBody)
+	if len(historyBody.Items) != 2 || historyBody.Items[0].VideoID != secondVideoID || historyBody.Items[0].LastPositionMS != 20000 {
+		t.Fatalf("history body = %+v, want second video first", historyBody)
+	}
+
+	updateFirst := postJSON(t, server, "/api/video-watch-progress", `{
+		"video_id": "`+firstVideoID+`",
+		"watch_session_id": "`+firstSessionID+`",
+		"position_ms": 30000,
+		"active_watch_ms": 7000,
+		"occurred_at": "2026-05-15T10:10:00-07:00",
+		"source_surface": "detail",
+		"client_context": {"platform": "ios"}
+	}`)
+	requireStatus(t, updateFirst, http.StatusOK)
+	decodeResponse(t, updateFirst, &struct {
+		Accepted bool `json:"accepted"`
+	}{})
+
+	refreshed := getHTTP(t, server, "/api/video-history")
+	requireStatus(t, refreshed, http.StatusOK)
+	decodeResponse(t, refreshed, &historyBody)
+	if len(historyBody.Items) != 2 || historyBody.Items[0].VideoID != firstVideoID || historyBody.Items[0].LastPositionMS != 30000 {
+		t.Fatalf("history body = %+v, want updated first video first", historyBody)
+	}
+}
+
 func TestE2E_EndQuizHTTPReturnsVideoContextQuestion(t *testing.T) {
 	h := harness(t)
 

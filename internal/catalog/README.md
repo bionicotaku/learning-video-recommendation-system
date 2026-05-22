@@ -13,6 +13,7 @@
 - 视频点赞/收藏 set-unset 命令 `SetVideoLike` / `SetVideoFavorite`
 - Feed facade 使用的批量读取能力：视频列表 preview 字段、unit label
 - Video Detail 使用的单视频详情读取能力：播放资源、transcript 元数据、互动统计、当前用户状态
+- Video Favorites / Video History 使用的只读分页列表能力：当前收藏、当前观看历史 preview
 - End Quiz 使用的批量取题能力：视频上下文题优先，通用 unit 题 fallback
 
 当前已落地结构：
@@ -97,6 +98,22 @@ internal/api VideoDetailService
 ```
 
 `GetVideoDetailByID` 使用同一套可展示视频 predicate。Transcript 元数据缺行时 `transcript_object_path` 返回空；互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`；当前用户没有 `catalog.video_user_states` 行时 `has_liked`、`has_favorited` 返回 `false`。
+
+Video Library lookup 是只读分页能力，服务 `GET /api/video-favorites` 与 `GET /api/video-history`：
+
+```text
+internal/api VideoLibraryService.ListFavorites
+  -> catalog.ListVideoFavoritesUsecase
+  -> catalog.VideoLibraryReader.ListVideoFavorites
+  -> catalog.video_user_states + catalog.videos + catalog.video_engagement_stats
+
+internal/api VideoLibraryService.ListHistory
+  -> catalog.ListVideoHistoryUsecase
+  -> catalog.VideoLibraryReader.ListVideoHistory
+  -> catalog.video_user_states + catalog.videos + catalog.video_engagement_stats
+```
+
+两个列表都使用 active/public/已发布 predicate，并使用 keyset cursor 分页。Favorites 读取 `has_bookmarked=true` 且 `bookmarked_at is not null` 的当前投影，按 `bookmarked_at desc, video_id asc` 排序；History 读取 `has_watched=true` 且 `last_watched_at is not null` 的当前投影，按 `last_watched_at desc, video_id asc` 排序。列表只返回 preview、`view_count` 和对应 metadata，不返回播放资源、transcript、description、like/favorite count 或当前用户互动状态。History 不直接读取 `analytics.video_watch_events` 热路径列表。
 
 `ListUnitLabelsByIDs` 只补 `semantic.coarse_unit.status = active` 的 `label`。Catalog 在这里提供 lightweight read capability，是为了让 API facade 批量补齐展示文本；Catalog 不理解 Recommendation 的 role、rank、score，也不参与 quiz 选择。
 

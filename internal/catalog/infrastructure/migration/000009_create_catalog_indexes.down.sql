@@ -1,4 +1,5 @@
-drop index if exists catalog.idx_video_user_states_user_last_watched_at;
+drop index if exists catalog.idx_video_user_states_history_page;
+drop index if exists catalog.idx_video_user_states_favorites_page;
 drop index if exists catalog.idx_video_user_states_video_id;
 drop index if exists catalog.idx_video_ingestion_records_status_started_at;
 drop index if exists catalog.idx_video_ingestion_records_video_id;

@@ -26,6 +26,8 @@ Current implemented endpoint group:
 ```text
 POST /api/feed
 GET /api/videos/{video_id}
+GET /api/video-favorites
+GET /api/video-history
 GET /api/me
 POST /api/videos/end-quiz
 GET /api/unit-collections
@@ -65,6 +67,14 @@ like / favorite counts, and current user like / favorite state. Missing
 transcript metadata returns `transcript_url: null`; missing stats or user state
 return zero counts and false flags. The endpoint is read-only and does not write
 Analytics, Learning Engine, Recommendation, or Catalog interaction state.
+
+`GET /api/video-favorites` and `GET /api/video-history` read the trusted
+principal as `user_id`, parse optional `limit` and `cursor`, and call Catalog
+read usecases for keyset-paginated video lists. Favorites return list preview
+fields plus `favorited_at`; history returns list preview fields plus
+`last_position_ms` and `last_watched_at`. Both endpoints filter to
+active/public/published videos and do not return playback URLs, transcript URLs,
+descriptions, like/favorite counts, or current user interaction flags.
 
 `GET /api/me` reads the trusted principal as `user_id`, returns the User profile
 cache plus precomputed global activity stats and an embedded seven-day activity
@@ -107,8 +117,9 @@ principal, and calls Catalog. Like responses return only `video_id`,
 `has_favorited`, and `favorite_count`.
 
 `GET /api/videos/{video_id}` initializes action rail display with both global
-counts and current user state. Click writes still use the single-purpose Video
-Interactions endpoints above.
+counts and current user state. Video Favorites / Video History list endpoints
+only provide navigation previews. Click writes still use the single-purpose
+Video Interactions endpoints above.
 
 The learning-event endpoints return only raw Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is

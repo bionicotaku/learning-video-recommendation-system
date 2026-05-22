@@ -17,6 +17,8 @@ type Querier interface {
 	ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error)
 	ListUnitLabelsByIDs(ctx context.Context, coarseUnitIds []int64) ([]ListUnitLabelsByIDsRow, error)
 	ListUnitQuizQuestionCandidates(ctx context.Context, coarseUnitIds []int64) ([]ListUnitQuizQuestionCandidatesRow, error)
+	ListVideoFavorites(ctx context.Context, arg ListVideoFavoritesParams) ([]ListVideoFavoritesRow, error)
+	ListVideoHistory(ctx context.Context, arg ListVideoHistoryParams) ([]ListVideoHistoryRow, error)
 	ListVideoUnitQuizQuestionCandidates(ctx context.Context, arg ListVideoUnitQuizQuestionCandidatesParams) ([]ListVideoUnitQuizQuestionCandidatesRow, error)
 	SetVideoFavorited(ctx context.Context, arg SetVideoFavoritedParams) (SetVideoFavoritedRow, error)
 	SetVideoLiked(ctx context.Context, arg SetVideoLikedParams) (SetVideoLikedRow, error)
