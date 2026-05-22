@@ -26,6 +26,30 @@ func NewUserUnitStateRepository(db learningenginesqlc.DBTX) *UserUnitStateReposi
 	}
 }
 
+func (r *UserUnitStateRepository) GetByUserAndUnit(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	row, err := r.queries.GetUserUnitState(ctx, learningenginesqlc.GetUserUnitStateParams{
+		UserID:       pgUserID,
+		CoarseUnitID: coarseUnitID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	state, err := mapper.ToUserUnitState(row)
+	if err != nil {
+		return nil, err
+	}
+	return &state, nil
+}
+
 func (r *UserUnitStateRepository) GetByUserAndUnitForUpdate(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error) {
 	pgUserID, err := mapper.StringToUUID(userID)
 	if err != nil {

@@ -5,6 +5,12 @@ where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id)
 for update;
 
+-- name: GetUserUnitState :one
+select *
+from learning.user_unit_states
+where user_id = sqlc.arg(user_id)
+  and coarse_unit_id = sqlc.arg(coarse_unit_id);
+
 -- name: ListUserUnitStatesForUpdateByUnitIDs :many
 select *
 from learning.user_unit_states

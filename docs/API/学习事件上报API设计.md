@@ -420,7 +420,7 @@ POST /api/learning-units:mark-mastered
 Content-Type: application/json
 ```
 
-`coarse_unit_id` 放在 body 中，表示用户明确声明已掌握的学习单元。它不是 quiz 作答事实，也不放入 interaction batch。
+`coarse_unit_id` 放在 body 中，表示用户明确声明已掌握的学习单元。它不是 quiz 作答事实，也不放入 interaction batch。后端只接受该用户已经存在 `learning.user_unit_states` 行的 unit；该行可以是 `is_target=false`，也可以已经是 `status=mastered`。
 
 ### 7.2 请求结构
 
@@ -455,7 +455,7 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
-| `coarse_unit_id` | integer | 是 | 要标记为已掌握的学习单元 ID，必须为正整数。 |
+| `coarse_unit_id` | integer | 是 | 要标记为已掌握的学习单元 ID，必须为正整数，且当前用户必须已经存在对应 `learning.user_unit_states` 行。 |
 | `source_surface` | string | 是 | 用户点击“已学会”的界面，例如 `word_detail`、`quiz_result`。 |
 | `video_id` | string UUID | 否 | 关联视频。 |
 | `watch_session_id` | string UUID | 否 | 关联观看 session。 |
@@ -485,7 +485,7 @@ Content-Type: application/json
 | `learning_interaction_event_id` | string UUID | `analytics.learning_interaction_events.event_id`。 |
 | `inserted` | boolean | `true` 表示新插入；`false` 表示幂等命中已有 row。 |
 
-Self mark 的 API 成功语义仍然只是 raw accepted。后端会同步尝试 `NormalizeSelfMarkMasteredByID`；即使同步归一化失败，也由 pending repair/backfill 最终补偿。
+Self mark 的 API 成功语义仍然只是 raw accepted。raw 写入前会先校验该用户已有对应 `learning.user_unit_states` 行；缺失时返回 `invalid_request`，且不写入 raw fact。后端会同步尝试 `NormalizeSelfMarkMasteredByID`；即使同步归一化失败，也由 pending repair/backfill 最终补偿。
 
 ## 8. Normalizer 语义
 
@@ -531,6 +531,8 @@ NormalizeSelfMarkMasteredByID(user_id, learning_interaction_event_id)
 ```
 
 raw row 必须满足 `event_type = self_mark_mastered`。如果传入 exposure / lookup 的 raw ID，该用例返回错误且不调用 reducer。
+
+API 层已经保证 self mark raw row 只来自已有 `learning.user_unit_states` 的 unit。normalizer 固定生成 `set_mastered`，reducer 不再检查该 state 是否仍是 target：已有 state 无论 `is_target=true/false` 或是否已经 mastered，最终都收敛为 terminal mastered 且 `is_target=false`。
 
 normalized event 固定为：
 

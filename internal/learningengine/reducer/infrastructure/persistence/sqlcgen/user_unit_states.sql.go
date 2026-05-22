@@ -405,6 +405,54 @@ func (q *Queries) GetActiveUnitCollection(ctx context.Context, userID pgtype.UUI
 	return i, err
 }
 
+const getUserUnitState = `-- name: GetUserUnitState :one
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
+from learning.user_unit_states
+where user_id = $1
+  and coarse_unit_id = $2
+`
+
+type GetUserUnitStateParams struct {
+	UserID       pgtype.UUID `json:"user_id"`
+	CoarseUnitID int64       `json:"coarse_unit_id"`
+}
+
+func (q *Queries) GetUserUnitState(ctx context.Context, arg GetUserUnitStateParams) (LearningUserUnitState, error) {
+	row := q.db.QueryRow(ctx, getUserUnitState, arg.UserID, arg.CoarseUnitID)
+	var i LearningUserUnitState
+	err := row.Scan(
+		&i.UserID,
+		&i.CoarseUnitID,
+		&i.IsTarget,
+		&i.TargetSource,
+		&i.TargetSourceRefID,
+		&i.TargetPriority,
+		&i.Status,
+		&i.ProgressPercent,
+		&i.MasteryScore,
+		&i.FirstObservedAt,
+		&i.LastObservedAt,
+		&i.ObservationCount,
+		&i.ProgressEventCount,
+		&i.LastProgressAt,
+		&i.LastProgressQuality,
+		&i.RecentProgressQualities,
+		&i.RecentProgressPasses,
+		&i.ProgressSuccessCount,
+		&i.ProgressFailureCount,
+		&i.ConsecutiveSuccessCount,
+		&i.ConsecutiveFailureCount,
+		&i.ScheduleRepetition,
+		&i.ScheduleIntervalDays,
+		&i.ScheduleEaseFactor,
+		&i.NextReviewAt,
+		&i.SuspendedReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserUnitStateForUpdate = `-- name: GetUserUnitStateForUpdate :one
 select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, suspended_reason, created_at, updated_at
 from learning.user_unit_states

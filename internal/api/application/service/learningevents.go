@@ -11,6 +11,8 @@ import (
 	apvdto "learning-video-recommendation-system/internal/api/application/dto"
 	normalizerdto "learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	normalizerusecase "learning-video-recommendation-system/internal/learningengine/normalizer/application/usecase"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -139,26 +141,42 @@ func (s *RecordQuizAttemptService) Execute(ctx context.Context, request apvdto.R
 }
 
 type RecordSelfMarkMasteredService struct {
-	rawWriter  analyticsusecase.RecordSelfMarkMasteredUsecase
-	normalizer normalizerusecase.NormalizeSelfMarkMasteredByIDUsecase
-	logger     *slog.Logger
+	rawWriter     analyticsusecase.RecordSelfMarkMasteredUsecase
+	normalizer    normalizerusecase.NormalizeSelfMarkMasteredByIDUsecase
+	userUnitState learningusecase.GetUserUnitStateUsecase
+	logger        *slog.Logger
 }
 
 func NewRecordSelfMarkMasteredService(
 	rawWriter analyticsusecase.RecordSelfMarkMasteredUsecase,
 	normalizer normalizerusecase.NormalizeSelfMarkMasteredByIDUsecase,
+	userUnitState learningusecase.GetUserUnitStateUsecase,
 	logger *slog.Logger,
 ) *RecordSelfMarkMasteredService {
 	return &RecordSelfMarkMasteredService{
-		rawWriter:  rawWriter,
-		normalizer: normalizer,
-		logger:     logger,
+		rawWriter:     rawWriter,
+		normalizer:    normalizer,
+		userUnitState: userUnitState,
+		logger:        logger,
 	}
 }
 
 func (s *RecordSelfMarkMasteredService) Execute(ctx context.Context, request apvdto.RecordSelfMarkMasteredRequest) (apvdto.RecordSelfMarkMasteredResponse, error) {
 	if s.rawWriter == nil {
 		return apvdto.RecordSelfMarkMasteredResponse{}, errors.New("self mark raw writer is required")
+	}
+	if s.userUnitState == nil {
+		return apvdto.RecordSelfMarkMasteredResponse{}, errors.New("user unit state reader is required")
+	}
+	stateResponse, err := s.userUnitState.Execute(ctx, learningdto.GetUserUnitStateRequest{
+		UserID:       request.UserID,
+		CoarseUnitID: request.CoarseUnitID,
+	})
+	if err != nil {
+		return apvdto.RecordSelfMarkMasteredResponse{}, classifyOwnerError(err)
+	}
+	if !stateResponse.Found {
+		return apvdto.RecordSelfMarkMasteredResponse{}, InvalidRequestError("user_unit_state is required for self mark mastered")
 	}
 
 	rawResponse, err := s.rawWriter.Execute(ctx, analyticsdto.RecordSelfMarkMasteredRequest{

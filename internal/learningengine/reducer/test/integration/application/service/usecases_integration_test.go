@@ -532,6 +532,10 @@ type failingBatchUpsertUserUnitStateRepository struct {
 	inner applearningrepo.UserUnitStateRepository
 }
 
+func (r *failingBatchUpsertUserUnitStateRepository) GetByUserAndUnit(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error) {
+	return r.inner.GetByUserAndUnit(ctx, userID, coarseUnitID)
+}
+
 func (r *failingBatchUpsertUserUnitStateRepository) GetByUserAndUnitForUpdate(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error) {
 	return r.inner.GetByUserAndUnitForUpdate(ctx, userID, coarseUnitID)
 }

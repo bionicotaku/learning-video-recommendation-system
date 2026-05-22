@@ -18,6 +18,7 @@ type Querier interface {
 	EnsureTargetUnits(ctx context.Context, arg EnsureTargetUnitsParams) error
 	GetActiveLearningTargetCoarseUnitIDs(ctx context.Context, userID pgtype.UUID) (GetActiveLearningTargetCoarseUnitIDsRow, error)
 	GetActiveUnitCollection(ctx context.Context, userID pgtype.UUID) (GetActiveUnitCollectionRow, error)
+	GetUserUnitState(ctx context.Context, arg GetUserUnitStateParams) (LearningUserUnitState, error)
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)

@@ -155,6 +155,7 @@ func TestE2E_SelfMarkMasteredHTTPWritesRawAndTerminalMasteredState(t *testing.T)
 	unitID := h.NewUnitID()
 	h.SeedUser(t, userID)
 	h.SeedCoarseUnits(t, unitID)
+	testutil.MustEnsureTarget(t, h.LearningSuite(), userID, targetSpec(unitID, 0.9, "self-mark"))
 
 	server := h.LearningEventsAPIServer(t, userID)
 	t.Cleanup(server.Close)
@@ -185,6 +186,33 @@ func TestE2E_SelfMarkMasteredHTTPWritesRawAndTerminalMasteredState(t *testing.T)
 	}
 	assertLearningEvent(t, h.Pool, userID, unitID, "learning_interaction_event", "self_mark_mastered", "set_mastered", nil)
 	assertTerminalMastered(t, loadLearningState(t, h.Pool, userID, unitID))
+}
+
+func TestE2E_SelfMarkMasteredRejectsMissingUserUnitState(t *testing.T) {
+	h := harness(t)
+
+	userID := h.NewUserID()
+	unitID := h.NewUnitID()
+	h.SeedUser(t, userID)
+	h.SeedCoarseUnits(t, unitID)
+
+	server := h.LearningEventsAPIServer(t, userID)
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/learning-units:mark-mastered", `{
+		"client_event_id": "e2e-self-mark-missing-state",
+		"coarse_unit_id": `+itoa64(unitID)+`,
+		"source_surface": "word_detail",
+		"occurred_at": "2026-05-15T10:02:00-07:00"
+	}`)
+	requireStatus(t, response, http.StatusBadRequest)
+
+	if got := countRows(t, h.Pool, `select count(*) from analytics.learning_interaction_events where user_id = $1 and client_event_id = 'e2e-self-mark-missing-state'`, userID); got != 0 {
+		t.Fatalf("self mark raw rows = %d, want 0", got)
+	}
+	if got := countRows(t, h.Pool, `select count(*) from learning.user_unit_states where user_id = $1 and coarse_unit_id = $2`, userID, unitID); got != 0 {
+		t.Fatalf("user unit state rows = %d, want 0", got)
+	}
 }
 
 func TestE2E_LearningEventsHTTPIdempotentRetryDoesNotDoubleReduce(t *testing.T) {
@@ -256,6 +284,7 @@ func TestE2E_TerminalSelfMarkIgnoresLaterQuizProgress(t *testing.T) {
 	h.SeedUser(t, userID)
 	h.SeedCoarseUnits(t, unitID)
 	h.SeedQuestion(t, questionID)
+	testutil.MustEnsureTarget(t, h.LearningSuite(), userID, targetSpec(unitID, 0.9, "terminal-self-mark"))
 
 	server := h.LearningEventsAPIServer(t, userID)
 	t.Cleanup(server.Close)

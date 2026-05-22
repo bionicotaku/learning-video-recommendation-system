@@ -7,6 +7,7 @@ import (
 )
 
 type UserUnitStateRepository interface {
+	GetByUserAndUnit(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error)
 	GetByUserAndUnitForUpdate(ctx context.Context, userID string, coarseUnitID int64) (*model.UserUnitState, error)
 	ListByUserAndUnitIDsForUpdate(ctx context.Context, userID string, coarseUnitIDs []int64) (map[int64]*model.UserUnitState, error)
 	Upsert(ctx context.Context, state *model.UserUnitState) (*model.UserUnitState, error)

@@ -15,9 +15,36 @@ type ListUserUnitStatesUsecase struct {
 }
 
 var _ appusecase.ListUserUnitStatesUsecase = (*ListUserUnitStatesUsecase)(nil)
+var _ appusecase.GetUserUnitStateUsecase = (*GetUserUnitStateUsecase)(nil)
+
+type GetUserUnitStateUsecase struct {
+	userUnitStates apprepo.UserUnitStateRepository
+}
 
 func NewListUserUnitStatesUsecase(userUnitStates apprepo.UserUnitStateRepository) *ListUserUnitStatesUsecase {
 	return &ListUserUnitStatesUsecase{userUnitStates: userUnitStates}
+}
+
+func NewGetUserUnitStateUsecase(userUnitStates apprepo.UserUnitStateRepository) *GetUserUnitStateUsecase {
+	return &GetUserUnitStateUsecase{userUnitStates: userUnitStates}
+}
+
+func (u *GetUserUnitStateUsecase) Execute(ctx context.Context, request dto.GetUserUnitStateRequest) (dto.GetUserUnitStateResponse, error) {
+	if request.UserID == "" {
+		return dto.GetUserUnitStateResponse{}, fmt.Errorf("user_id is required")
+	}
+	if request.CoarseUnitID <= 0 {
+		return dto.GetUserUnitStateResponse{}, fmt.Errorf("coarse_unit_id is required")
+	}
+
+	state, err := u.userUnitStates.GetByUserAndUnit(ctx, request.UserID, request.CoarseUnitID)
+	if err != nil {
+		return dto.GetUserUnitStateResponse{}, err
+	}
+	if state == nil {
+		return dto.GetUserUnitStateResponse{Found: false}, nil
+	}
+	return dto.GetUserUnitStateResponse{Found: true, State: state}, nil
 }
 
 func (u *ListUserUnitStatesUsecase) Execute(ctx context.Context, request dto.ListUserUnitStatesRequest) (dto.ListUserUnitStatesResponse, error) {

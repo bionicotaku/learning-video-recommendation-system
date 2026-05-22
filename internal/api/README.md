@@ -109,7 +109,10 @@ not exposed as the HTTP success boundary.
 `POST /api/learning-interactions:batch` accepts only exposure and lookup raw
 interactions. Self-mark mastered is intentionally a separate endpoint so it can
 use the dedicated Analytics writer and `NormalizeSelfMarkMasteredByID`
-normalizer path.
+normalizer path. Before writing the raw fact, self-mark mastered requires an
+existing `learning.user_unit_states` row for the current user and
+`coarse_unit_id`; existing inactive or already mastered states are still
+accepted and reduced to terminal mastered with `is_target=false`.
 
 `POST /api/video-watch-progress` calls the Catalog `RecordVideoWatchProgress`
 usecase. It returns only `{ "accepted": true }` after the watch session ledger

@@ -13,6 +13,7 @@ import (
 	apvdto "learning-video-recommendation-system/internal/api/application/dto"
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	normalizerdto "learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
+	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 )
 
 func TestRecordLearningInteractionsBatchReturnsRawAcceptedWhenNormalizerFails(t *testing.T) {
@@ -92,7 +93,8 @@ func TestRecordSelfMarkMasteredPassesRawIDToNormalizer(t *testing.T) {
 		},
 	}
 	normalizer := &fakeSelfMarkNormalizer{}
-	service := apiservice.NewRecordSelfMarkMasteredService(rawWriter, normalizer, discardLogger())
+	stateReader := &fakeUserUnitStateReader{response: learningdto.GetUserUnitStateResponse{Found: true}}
+	service := apiservice.NewRecordSelfMarkMasteredService(rawWriter, normalizer, stateReader, discardLogger())
 
 	response, err := service.Execute(context.Background(), apvdto.RecordSelfMarkMasteredRequest{
 		UserID:        "user-1",
@@ -112,6 +114,35 @@ func TestRecordSelfMarkMasteredPassesRawIDToNormalizer(t *testing.T) {
 	}
 }
 
+func TestRecordSelfMarkMasteredRejectsMissingUserUnitStateBeforeRawWrite(t *testing.T) {
+	rawWriter := &fakeSelfMarkRawWriter{
+		response: analyticsdto.RecordSelfMarkMasteredResponse{
+			Accepted:                   true,
+			LearningInteractionEventID: "55555555-5555-5555-5555-555555555555",
+			Inserted:                   true,
+		},
+	}
+	stateReader := &fakeUserUnitStateReader{response: learningdto.GetUserUnitStateResponse{Found: false}}
+	service := apiservice.NewRecordSelfMarkMasteredService(rawWriter, &fakeSelfMarkNormalizer{}, stateReader, discardLogger())
+
+	_, err := service.Execute(context.Background(), apvdto.RecordSelfMarkMasteredRequest{
+		UserID:        "user-1",
+		ClientEventID: "self-mark-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+	})
+	if !apiservice.IsInvalidRequest(err) {
+		t.Fatalf("Execute() error = %v, want invalid request", err)
+	}
+	if rawWriter.called {
+		t.Fatalf("raw writer was called for missing user unit state")
+	}
+	if stateReader.request.UserID != "user-1" || stateReader.request.CoarseUnitID != 101 {
+		t.Fatalf("state reader request = %+v, want user/unit lookup", stateReader.request)
+	}
+}
+
 func TestRecordQuizAttemptMapsAnalyticsValidationErrorToInvalidRequest(t *testing.T) {
 	rawWriter := &fakeQuizRawWriter{err: &analyticsservice.ValidationError{Message: "trigger_type is unsupported"}}
 	service := apiservice.NewRecordQuizAttemptService(rawWriter, nil, discardLogger())
@@ -124,7 +155,8 @@ func TestRecordQuizAttemptMapsAnalyticsValidationErrorToInvalidRequest(t *testin
 
 func TestRecordSelfMarkMasteredKeepsRawWriterInternalErrorInternal(t *testing.T) {
 	rawWriter := &fakeSelfMarkRawWriter{err: errors.New("db down")}
-	service := apiservice.NewRecordSelfMarkMasteredService(rawWriter, nil, discardLogger())
+	stateReader := &fakeUserUnitStateReader{response: learningdto.GetUserUnitStateResponse{Found: true}}
+	service := apiservice.NewRecordSelfMarkMasteredService(rawWriter, nil, stateReader, discardLogger())
 
 	_, err := service.Execute(context.Background(), apvdto.RecordSelfMarkMasteredRequest{UserID: "user-1"})
 	if err == nil {
@@ -165,9 +197,22 @@ type fakeSelfMarkRawWriter struct {
 	request  analyticsdto.RecordSelfMarkMasteredRequest
 	response analyticsdto.RecordSelfMarkMasteredResponse
 	err      error
+	called   bool
 }
 
 func (f *fakeSelfMarkRawWriter) Execute(ctx context.Context, request analyticsdto.RecordSelfMarkMasteredRequest) (analyticsdto.RecordSelfMarkMasteredResponse, error) {
+	f.called = true
+	f.request = request
+	return f.response, f.err
+}
+
+type fakeUserUnitStateReader struct {
+	request  learningdto.GetUserUnitStateRequest
+	response learningdto.GetUserUnitStateResponse
+	err      error
+}
+
+func (f *fakeUserUnitStateReader) Execute(ctx context.Context, request learningdto.GetUserUnitStateRequest) (learningdto.GetUserUnitStateResponse, error) {
 	f.request = request
 	return f.response, f.err
 }

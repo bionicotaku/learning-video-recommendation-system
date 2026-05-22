@@ -940,6 +940,16 @@ type fakeUserUnitStateRepository struct {
 	getForUpdateCalls int
 }
 
+func (f *fakeUserUnitStateRepository) GetByUserAndUnit(_ context.Context, _ string, coarseUnitID int64) (*model.UserUnitState, error) {
+	if f.statesByUnit != nil {
+		return f.statesByUnit[coarseUnitID], nil
+	}
+	if f.state != nil && f.state.CoarseUnitID == coarseUnitID {
+		return f.state, nil
+	}
+	return nil, nil
+}
+
 func (f *fakeUserUnitStateRepository) GetByUserAndUnitForUpdate(_ context.Context, _ string, coarseUnitID int64) (*model.UserUnitState, error) {
 	f.getForUpdateCalls++
 	if f.statesByUnit != nil {
