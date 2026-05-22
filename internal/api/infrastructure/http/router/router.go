@@ -17,7 +17,6 @@ type Options struct {
 	UnitProgress      RouteGroup
 	Me                RouteGroup
 	Feedback          RouteGroup
-	LegalDocuments    RouteGroup
 }
 
 func New(options Options) http.Handler {
@@ -51,9 +50,6 @@ func New(options Options) http.Handler {
 	}
 	if options.Feedback != nil {
 		options.Feedback.RegisterRoutes(mux)
-	}
-	if options.LegalDocuments != nil {
-		options.LegalDocuments.RegisterRoutes(mux)
 	}
 	return mux
 }

@@ -14,7 +14,6 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feedback"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
-	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/legaldocuments"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/me"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
@@ -71,7 +70,6 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	unitProgress := buildUnitProgressHandler(pool)
 	meHandler := buildMeHandler(pool)
 	feedbackHandler := buildFeedbackHandler(pool)
-	legalDocumentsHandler := buildLegalDocumentsHandler(pool)
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
@@ -84,7 +82,6 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		UnitProgress:      unitProgress,
 		Me:                meHandler,
 		Feedback:          feedbackHandler,
-		LegalDocuments:    legalDocumentsHandler,
 	})
 	handler = middleware.BodyLimitByPath(1<<20, map[string]int64{"/api/feedback": feedback.MaxRequestBytes})(handler)
 	handler = middleware.Recover(handler)
@@ -153,12 +150,6 @@ func buildFeedbackHandler(pool *pgxpool.Pool) *feedback.Handler {
 	writer := userrepo.NewFeedbackWriter(pool)
 	submitFeedback := userservice.NewSubmitFeedbackUsecase(writer)
 	return feedback.NewHandler(submitFeedback)
-}
-
-func buildLegalDocumentsHandler(pool *pgxpool.Pool) *legaldocuments.Handler {
-	repository := userrepo.NewRepository(pool)
-	getLegalDocument := userservice.NewGetLegalDocumentUsecase(repository)
-	return legaldocuments.NewHandler(getLegalDocument)
 }
 
 func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handler {

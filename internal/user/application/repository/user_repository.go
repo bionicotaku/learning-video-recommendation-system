@@ -9,7 +9,6 @@ import (
 )
 
 var ErrAuthUserNotFound = errors.New("auth user not found")
-var ErrLegalDocumentNotFound = errors.New("legal document not found")
 
 type ProfileRepository interface {
 	GetProfile(ctx context.Context, userID string) (model.UserProfile, bool, error)
@@ -34,8 +33,4 @@ type ActivityStatsRecorder interface {
 
 type FeedbackWriter interface {
 	SubmitFeedback(ctx context.Context, submission model.FeedbackSubmission) (model.FeedbackSubmissionResult, error)
-}
-
-type LegalDocumentReader interface {
-	GetLegalDocument(ctx context.Context, documentType string) (model.LegalDocument, bool, error)
 }
