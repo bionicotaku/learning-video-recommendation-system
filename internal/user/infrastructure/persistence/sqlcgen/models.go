@@ -29,6 +29,14 @@ type AppUserFeedbackSubmission struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type AppUserLegalDocument struct {
+	DocumentType string             `json:"document_type"`
+	Title        string             `json:"title"`
+	Markdown     string             `json:"markdown"`
+	Version      pgtype.Text        `json:"version"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AppUserUserActivityStat struct {
 	UserID           pgtype.UUID        `json:"user_id"`
 	TotalWatchMs     int64              `json:"total_watch_ms"`

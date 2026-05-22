@@ -41,6 +41,7 @@ POST /api/video-watch-progress
 GET /api/learning/unit-progress/mastered
 GET /api/learning/unit-progress/unmastered
 POST /api/feedback
+GET /api/legal-documents/{type}
 ```
 
 `POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
@@ -127,6 +128,12 @@ five JPEG `images`, and calls User `SubmitFeedback`. The route has a dedicated
 The endpoint writes `app_user.feedback_submissions` and
 `app_user.feedback_images` atomically through the User module and stores image
 bytes as Postgres `bytea`, not base64 JSON.
+
+`GET /api/legal-documents/{type}` is a public read endpoint for current legal
+document Markdown. It supports only `privacy-policy` and `user-agreement`, calls
+User `GetLegalDocument`, and does not require or read a trusted principal.
+Production API Gateway config must override JWT security for this operation with
+`security: []`; service-to-service Gateway-to-Cloud-Run auth can remain enabled.
 
 `cmd/server` reads principal configuration from environment variables. In normal
 mode it expects GCP API Gateway to validate the client JWT and forward

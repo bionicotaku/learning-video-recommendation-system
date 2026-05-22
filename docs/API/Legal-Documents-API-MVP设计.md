@@ -2,7 +2,7 @@
 
 ## 0. 文档信息
 
-文档状态：MVP 待实现，作为后端实现和前端联调契约。
+文档状态：MVP 已实现，作为当前后端实现和前端联调契约。
 目标读者：前端、后端 API、User 模块、数据库维护者、GCP API Gateway 配置维护者。
 当前范围：定义法律文档公开读取 API、无用户 JWT 鉴权的 Gateway 配置语义、`app_user.legal_documents` 存储模型、错误语义和测试要求。
 当前明确不做：不做用户同意记录写入，不做 `POST /api/legal-documents:accept`，不做法律文档版本历史，不做后台编辑系统，不做 Markdown 转 HTML，不把法律文档内容塞进 `/api/me`。
@@ -241,20 +241,18 @@ app_user.user_legal_document_acceptances
 }
 ```
 
-## 8. Implementation Plan
+## 8. Implementation Status
 
-实现时按以下顺序落地：
+当前后端实现已落地：
 
-1. 在 User module 增加 migration：`internal/user/infrastructure/migration/000003_create_legal_documents.up.sql` / `.down.sql`。
-2. 在 User persistence query 增加按 `document_type` 读取 legal document 的 SQLC query。
-3. 在 User application 增加 DTO、repository port 和 `GetLegalDocument` usecase。
-4. 在 API handler 增加 `legaldocuments` endpoint group。
-5. 在 `cmd/server/wiring.go` 装配 User repository/usecase 和 handler。
-6. 在 `internal/api/infrastructure/http/router/router.go` 注册 endpoint group。
-7. 更新 `internal/user/README.md`、`internal/api/README.md` 和本 API 索引。
-8. 部署侧 OpenAPI config 为 `GET /api/legal-documents/{type}` 设置 operation-level `security: []`。
+1. User module migration：`internal/user/infrastructure/migration/000003_create_legal_documents.up.sql` / `.down.sql`。
+2. User persistence query：按 `document_type` 读取 legal document。
+3. User application：DTO、repository port 和 `GetLegalDocument` usecase。
+4. API handler：`legaldocuments` endpoint group。
+5. Server wiring：`cmd/server/wiring.go` 装配 User repository/usecase 和 handler。
+6. Router：`internal/api/infrastructure/http/router/router.go` 注册 endpoint group。
 
-如果 implementation 只改后端仓库，不改部署仓库，则必须在交付说明中明确 Gateway 配置仍需同步，否则生产无 token 请求会被 Gateway 拦截，后端 handler 不会收到请求。
+部署侧 OpenAPI config 仍必须为 `GET /api/legal-documents/{type}` 设置 operation-level `security: []`。如果部署配置不在本仓库，发布时必须同步对应部署仓库，否则生产无 token 请求会被 Gateway 拦截，后端 handler 不会收到请求。
 
 ## 9. Test Requirements
 

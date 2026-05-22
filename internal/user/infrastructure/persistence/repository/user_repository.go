@@ -20,6 +20,7 @@ type Repository struct {
 var _ apprepo.ProfileRepository = (*Repository)(nil)
 var _ apprepo.ActivityStatsRepository = (*Repository)(nil)
 var _ apprepo.ActivityStatsRecorder = (*Repository)(nil)
+var _ apprepo.LegalDocumentReader = (*Repository)(nil)
 
 func NewRepository(db usersqlc.DBTX) *Repository {
 	return &Repository{queries: usersqlc.New(db)}
@@ -148,6 +149,17 @@ func (r *Repository) GetCurrentActivityStreakDays(ctx context.Context, userID st
 	})
 }
 
+func (r *Repository) GetLegalDocument(ctx context.Context, documentType string) (model.LegalDocument, bool, error) {
+	row, err := r.queries.GetLegalDocument(ctx, documentType)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return model.LegalDocument{}, false, nil
+		}
+		return model.LegalDocument{}, false, err
+	}
+	return toLegalDocument(row), true, nil
+}
+
 func (r *Repository) AddWatchDuration(ctx context.Context, userID string, activityAt time.Time, deltaWatchMS int64) error {
 	if deltaWatchMS <= 0 {
 		return nil
@@ -265,6 +277,16 @@ func toDailyActivityStats(row usersqlc.AppUserUserDailyActivityStat) model.Daily
 		FirstActivityAt:          timestamptzPointer(row.FirstActivityAt),
 		LastActivityAt:           timestamptzPointer(row.LastActivityAt),
 		UpdatedAt:                timeOrZero(row.UpdatedAt),
+	}
+}
+
+func toLegalDocument(row usersqlc.AppUserLegalDocument) model.LegalDocument {
+	return model.LegalDocument{
+		Type:      row.DocumentType,
+		Title:     row.Title,
+		Markdown:  row.Markdown,
+		Version:   textPointer(row.Version),
+		UpdatedAt: timestamptzPointer(row.UpdatedAt),
 	}
 }
 

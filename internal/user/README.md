@@ -3,7 +3,8 @@
 `internal/user` owns application-level user profile data and activity
 projections. Supabase Auth remains the identity source; this module stores a
 profile cache and precomputed counters used by API responses.
-It also owns low-volume user support feedback submissions for the current MVP.
+It also owns low-volume user support feedback submissions and legal document
+content for the current MVP.
 
 ## Owned Tables
 
@@ -14,6 +15,7 @@ The module owns the `app_user` schema:
 - `app_user.user_daily_activity_stats`
 - `app_user.feedback_submissions`
 - `app_user.feedback_images`
+- `app_user.legal_documents`
 
 `auth.users.email` is the authoritative email source. `user_profiles.email` is
 only a cache kept in sync by Supabase Auth triggers. Business modules must not
@@ -33,6 +35,9 @@ need to update projections inside an existing transaction.
 - `SubmitFeedback`: stores one current-user feedback submission, an arbitrary
   JSON object payload, and up to five validated JPEG images in one transaction.
   It supports `client_feedback_id` idempotency for frontend retries.
+- `GetLegalDocument`: reads the current public legal document Markdown for
+  `privacy-policy` or `user-agreement`. Legal documents are not part of
+  `/api/me`, profile, onboarding, or activity stats.
 
 ## Cross-Module Boundary
 
@@ -57,3 +62,4 @@ API endpoints:
 
 - `GET /api/me`
 - `POST /api/feedback`
+- `GET /api/legal-documents/{type}`
