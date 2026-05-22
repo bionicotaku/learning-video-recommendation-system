@@ -163,9 +163,11 @@ type ActivityDay = {
 | `activity_calendar.days[].local_date` | 日期窗口补齐 | 本地日期，格式 `YYYY-MM-DD`。 |
 | `activity_calendar.days[].watch_seconds` | `app_user.user_daily_activity_stats.watch_ms` | 当日有效观看时长，向下取整为秒。 |
 | `activity_calendar.days[].quiz_attempt_count` | `app_user.user_daily_activity_stats.quiz_attempt_count` | 当日完成 quiz 次数。 |
-| `activity_calendar.days[].learning_interaction_count` | `app_user.user_daily_activity_stats.learning_interaction_count` | 当日 exposure / lookup 学习互动次数。 |
+| `activity_calendar.days[].learning_interaction_count` | `app_user.user_daily_activity_stats.learning_interaction_count` | 当日 exposure / lookup / quiz attempt 学习互动次数。 |
 
 `started_unit_count` 不是 learned word 数，也不是每日学习次数。它表示“有过学习进度的 learning unit 数量”，只增不减。
+
+`learning_interaction_count` 是较宽口径的 learning unit 互动次数，包含 quiz attempt；`quiz_attempt_count` 是 quiz 专项统计。前端不能把二者相加作为总学习次数，否则 quiz 会被重复计算。
 
 `activity_calendar.days` 固定 7 个元素，按 `local_date` 升序返回。没有 activity stats 行的日期必须补 0。活跃日判断是后端内部规则，不作为 `days[]` 字段返回：`watch_ms > 0`、`quiz_attempt_count > 0` 或 `learning_interaction_count > 0` 任一成立即为活跃。
 
@@ -429,7 +431,7 @@ from streak;
 | `total_watch_ms` / daily `watch_ms` | Catalog watch progress | 本次新增有效观看时长 `delta_watch_ms > 0` 时累加。 |
 | `quiz_attempt_count` | Analytics quiz writer | `analytics.quiz_events` 幂等插入成功且不是 duplicate 时累加。 |
 | `started_unit_count` | Learning Engine reducer | learning unit progress 从 `0` 到 `>0` 时累加，只增不减。 |
-| daily `learning_interaction_count` | Analytics learning interaction writer | exposure / lookup raw event 幂等插入成功且不是 duplicate 时累加；不等待 normalizer 成功。 |
+| daily `learning_interaction_count` | Analytics quiz / learning interaction writer | exposure / lookup / quiz attempt raw event 幂等插入成功且不是 duplicate 时累加；不等待 normalizer 成功。 |
 
 每日统计的 `local_date` 由事件时间点按用户 timezone 派生。MVP 对跨午夜观看不做精确拆分，watch delta 归到本次 watch progress 的 activity time 所在本地日期。
 

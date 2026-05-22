@@ -201,8 +201,8 @@ func TestRawEventWriterWithActivityStatsIncrementsOnlyInsertedEvents(t *testing.
 	`, userID).Scan(&dailyQuizCount, &dailyInteractionCount); err != nil {
 		t.Fatalf("query user_daily_activity_stats: %v", err)
 	}
-	if dailyQuizCount != 1 || dailyInteractionCount != 1 {
-		t.Fatalf("daily counts quiz=%d interaction=%d, want 1/1", dailyQuizCount, dailyInteractionCount)
+	if dailyQuizCount != 1 || dailyInteractionCount != 2 {
+		t.Fatalf("daily counts quiz=%d interaction=%d, want 1/2", dailyQuizCount, dailyInteractionCount)
 	}
 }
 

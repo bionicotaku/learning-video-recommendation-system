@@ -174,11 +174,11 @@ on app_user.user_daily_activity_stats (user_id, local_date desc);
 | `timezone` | 本行统计写入时使用的 timezone 快照。 |
 | `watch_ms` | 当日本地日期内累计有效观看时长，单位毫秒。 |
 | `quiz_attempt_count` | 当日本地日期内完成 quiz 次数。 |
-| `learning_interaction_count` | 当日本地日期内 exposure / lookup 学习互动次数。 |
+| `learning_interaction_count` | 当日本地日期内 exposure / lookup / quiz attempt 学习互动次数。 |
 | `first_activity_at` | 当日第一条活动对应的 UTC 时间点。 |
 | `last_activity_at` | 当日最后一条活动对应的 UTC 时间点。 |
 
-`learning_interaction_count` 是次数统计，不是 distinct word 数，也不是 `started_unit_count` 的每日版本。
+`learning_interaction_count` 是次数统计，不是 distinct word 数，也不是 `started_unit_count` 的每日版本。它包含 quiz attempt；`quiz_attempt_count` 是 quiz 专项统计，前端不能把二者相加作为总学习次数。
 
 ## 4. 时间和 Timezone
 
@@ -424,7 +424,7 @@ type ActivityStatsRecorder interface {
 | `AddWatchDuration` | Catalog watch progress | 本次新增有效观看时长 `deltaWatchMs > 0` 时调用；累加 `total_watch_ms` 和 daily `watch_ms`。 |
 | `IncrementQuizAttempt` | Analytics quiz writer | `analytics.quiz_events` 幂等插入成功且不是 duplicate 时调用；累加全局和 daily quiz count。 |
 | `IncrementStartedUnit` | Learning Engine reducer | `progress_percent` 从 `0` 变成 `> 0` 时调用；只累加全局 `started_unit_count`。 |
-| `IncrementLearningInteraction` | Learning interaction normalizer / reducer | exposure / lookup 事件归一化成功时调用；只累加 daily `learning_interaction_count`。 |
+| `IncrementLearningInteraction` | Analytics quiz / learning interaction writer | exposure / lookup / quiz attempt raw event 幂等插入成功且不是 duplicate 时调用；只累加 daily `learning_interaction_count`。 |
 
 User recorder 不判断 Catalog / Analytics / Learning 的业务事实是否成立，只接收调用方已经确认的增量。
 
@@ -455,7 +455,7 @@ type DBTX interface {
 | `started_unit_count` | 与 Learning Engine reducer 状态更新同事务。 |
 | `quiz_attempt_count` | 与 Analytics quiz insert 同事务。 |
 | `total_watch_ms` | 与 Catalog watch progress 同事务；如果现有链路成本较高，可先 best-effort 并保留 rebuild。 |
-| `learning_interaction_count` | 与 learning interaction normalization 同事务。 |
+| `learning_interaction_count` | 与 Analytics quiz / learning interaction raw write 同事务。 |
 
 ## 8. `/api/me` 与 Activity Calendar 支撑策略
 
@@ -515,4 +515,4 @@ make quick-check
 - `AddWatchDuration` 同时累加全局和 daily watch。
 - `IncrementQuizAttempt` 只在 quiz inserted 时调用，duplicate 不重复增加。
 - `IncrementStartedUnit` 只在 progress 从 `0` 到 `>0` 时调用。
-- `IncrementLearningInteraction` 按 exposure / lookup 有效事件次数累加 daily count。
+- `IncrementLearningInteraction` 按 exposure / lookup / quiz attempt 有效事件次数累加 daily count。

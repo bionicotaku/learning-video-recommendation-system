@@ -61,6 +61,9 @@ func (w *RawEventWriterWithActivityStats) UpsertQuizEvent(ctx context.Context, e
 			if err := stats.IncrementQuizAttempt(ctx, event.UserID, event.CompletedAt); err != nil {
 				return model.RawEventWriteResult{}, err
 			}
+			if err := stats.IncrementLearningInteraction(ctx, event.UserID, event.CompletedAt); err != nil {
+				return model.RawEventWriteResult{}, err
+			}
 		}
 		return result, nil
 	})
