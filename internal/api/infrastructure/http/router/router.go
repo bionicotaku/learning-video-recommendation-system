@@ -12,6 +12,7 @@ type Options struct {
 	VideoLibrary      RouteGroup
 	EndQuiz           RouteGroup
 	UnitCollections   RouteGroup
+	LearningTargets   RouteGroup
 	VideoInteractions RouteGroup
 	LearningEvents    RouteGroup
 	WatchProgress     RouteGroup
@@ -36,6 +37,9 @@ func New(options Options) http.Handler {
 	}
 	if options.UnitCollections != nil {
 		options.UnitCollections.RegisterRoutes(mux)
+	}
+	if options.LearningTargets != nil {
+		options.LearningTargets.RegisterRoutes(mux)
 	}
 	if options.VideoInteractions != nil {
 		options.VideoInteractions.RegisterRoutes(mux)

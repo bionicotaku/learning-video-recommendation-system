@@ -24,8 +24,8 @@ func (h *Handler) getEndQuiz(w http.ResponseWriter, r *http.Request) {
 		writeHandlerError(w, r, err)
 		return
 	}
-	if err := validateContentType(r); err != nil {
-		writeHandlerError(w, r, err)
+	if err := request.RequireJSONContentType(r); err != nil {
+		writeHandlerError(w, r, invalidRequest(err))
 		return
 	}
 

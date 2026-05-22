@@ -3,9 +3,7 @@ package learningevents
 import (
 	"context"
 	"errors"
-	"mime"
 	"net/http"
-	"strings"
 
 	apvdto "learning-video-recommendation-system/internal/api/application/dto"
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
@@ -67,18 +65,6 @@ func writeHandlerError(w http.ResponseWriter, r *http.Request, err error) {
 
 func requiredPrincipal(r *http.Request) (auth.Principal, error) {
 	return auth.RequirePrincipal(r.Context())
-}
-
-func validateContentType(r *http.Request) error {
-	contentType := r.Header.Get("Content-Type")
-	if strings.TrimSpace(contentType) == "" {
-		return apiservice.InvalidRequestError("content-type must be application/json")
-	}
-	mediaType, _, err := mime.ParseMediaType(contentType)
-	if err == nil && mediaType == "application/json" {
-		return nil
-	}
-	return apiservice.InvalidRequestError("content-type must be application/json")
 }
 
 func invalidRequest(err error) error {

@@ -77,12 +77,12 @@ Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 ```text
 internal/api FeedService
   -> catalog.FeedVideoLookupUsecase
-  -> catalog.FeedLookupReader.ListFeedVideosByIDs
+  -> catalog.VideoPresentationReader.ListFeedVideosByIDs
   -> catalog.videos + catalog.video_engagement_stats
 
 internal/api FeedService
   -> catalog.UnitLabelLookupUsecase
-  -> catalog.FeedLookupReader.ListUnitLabelsByIDs
+  -> catalog.UnitLabelReader.ListUnitLabelsByIDs
   -> semantic.coarse_unit
 ```
 
@@ -93,7 +93,7 @@ Video Detail lookup 是只读能力，服务 `GET /api/videos/{video_id}`：
 ```text
 internal/api VideoDetailService
   -> catalog.GetVideoDetailUsecase
-  -> catalog.FeedLookupReader.GetVideoDetailByID
+  -> catalog.VideoPresentationReader.GetVideoDetailByID
   -> catalog.videos + catalog.video_transcripts + catalog.video_engagement_stats + catalog.video_user_states
 ```
 

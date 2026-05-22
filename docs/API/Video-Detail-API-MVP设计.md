@@ -71,7 +71,7 @@ GET /api/videos/{video_id}
   -> internal/api videodetail.Handler
   -> internal/api VideoDetailService
   -> catalog.GetVideoDetailUsecase
-  -> catalog.FeedLookupReader.GetVideoDetailByID
+  -> catalog.VideoPresentationReader.GetVideoDetailByID
   -> catalog.videos
   -> catalog.video_transcripts
   -> catalog.video_engagement_stats

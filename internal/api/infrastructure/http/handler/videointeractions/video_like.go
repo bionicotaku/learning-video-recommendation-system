@@ -41,8 +41,8 @@ func (h *Handler) handleVideoLike(w http.ResponseWriter, r *http.Request, enable
 }
 
 func pathVideoID(r *http.Request) (string, error) {
-	videoID := r.PathValue("video_id")
-	if err := request.ValidateRequiredUUID("video_id", videoID); err != nil {
+	videoID, err := request.PathRequiredUUID(r, "video_id")
+	if err != nil {
 		return "", invalidRequest(err)
 	}
 	return videoID, nil

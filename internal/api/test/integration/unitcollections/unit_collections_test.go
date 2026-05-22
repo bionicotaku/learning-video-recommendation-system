@@ -11,6 +11,7 @@ import (
 
 	apivdto "learning-video-recommendation-system/internal/api/application/dto"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningtargets"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
@@ -246,8 +247,10 @@ func TestActiveCoarseUnitIDsRequiresPrincipal(t *testing.T) {
 }
 
 func newServer(list *fakeListCollectionsForUserUsecase, activate *fakeActivateUsecase, activeTargets *fakeActiveTargetsUsecase, withAuth bool) *httptest.Server {
-	group := unitcollections.NewHandler(list, activate, activeTargets)
-	handler := router.New(router.Options{UnitCollections: group})
+	handler := router.New(router.Options{
+		UnitCollections: unitcollections.NewHandler(list),
+		LearningTargets: learningtargets.NewHandler(activate, activeTargets),
+	})
 	if withAuth {
 		handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	}

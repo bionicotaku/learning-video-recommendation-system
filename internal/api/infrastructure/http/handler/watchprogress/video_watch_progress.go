@@ -27,8 +27,8 @@ func (h *Handler) recordVideoWatchProgress(w http.ResponseWriter, r *http.Reques
 		writeHandlerError(w, r, err)
 		return
 	}
-	if err := validateContentType(r); err != nil {
-		writeHandlerError(w, r, err)
+	if err := request.RequireJSONContentType(r); err != nil {
+		writeHandlerError(w, r, invalidRequest(err))
 		return
 	}
 

@@ -1,12 +1,12 @@
 # Graph Report - .  (2026-05-22)
 
 ## Corpus Check
-- 461 files · ~233,046 words
+- 470 files · ~233,430 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3272 nodes · 8711 edges · 277 communities detected
-- Extraction: 48% EXTRACTED · 52% INFERRED · 0% AMBIGUOUS · INFERRED: 4546 edges (avg confidence: 0.74)
+- 3291 nodes · 8734 edges · 277 communities detected
+- Extraction: 48% EXTRACTED · 52% INFERRED · 0% AMBIGUOUS · INFERRED: 4573 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -302,15 +302,15 @@
 
 ## Surprising Connections (you probably didn't know these)
 - `buildLearningEventsHandler()` --calls--> `NewManagerWithActivityStats()`  [INFERRED]
-  cmd/server/wiring.go → internal/learningengine/reducer/infrastructure/persistence/tx/manager.go
-- `buildUnitCollectionsHandler()` --calls--> `NewUpdateOnboardingStatusUsecase()`  [INFERRED]
-  cmd/server/wiring.go → internal/user/application/service/onboarding.go
+  cmd/server/wiring_learning.go → internal/learningengine/reducer/infrastructure/persistence/tx/manager.go
 - `TestRecommendationMigrationSixOnlyDropsLegacyRecallView()` --calls--> `contains()`  [INFERRED]
   cmd/dbtool/modules_test.go → internal/recommendation/test/unit/domain/explain/explanation_builder_test.go
 - `main()` --calls--> `get()`  [INFERRED]
   scripts/catalog_ingest/main.py → internal/api/test/integration/me/me_test.go
 - `main()` --calls--> `get()`  [INFERRED]
   scripts/catalog_ingest/main.py → internal/api/test/integration/unitprogress/unit_progress_test.go
+- `run()` --calls--> `New()`  [INFERRED]
+  cmd/server/main.go → internal/analytics/infrastructure/persistence/sqlcgen/db.go
 
 ## Hyperedges (group relationships)
 - **Authoritative Design Set** — zongsheji_overall_design_doc, learningdesign_learning_engine_doc, recommenddesign_recommendation_doc, catalogdesign_catalog_doc [EXTRACTED 1.00]
@@ -344,67 +344,67 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.01
-Nodes (174): uniqueUnitIDs(), New(), insertItemsWithQueries(), insertRunWithQueries(), demandUnitIDs(), buildReasonCodes(), hasLaneSource(), uniqueStrings() (+166 more)
+Nodes (156): insertItemsWithQueries(), insertRunWithQueries(), firstValidEndQuizItem(), groupEndQuizCandidates(), mapEndQuizCandidate(), nonBlankStringPointer(), normalizeEndQuizUnitIDs(), newUUID() (+148 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.03
-Nodes (272): Exception, build_normalized_clip_data(), _build_question_rows(), _build_transcript_row(), _build_unit_index_rows(), _deterministic_question_id(), _merge_intervals_and_measure(), 按当前 deterministic 规则选出稳定的 best evidence span。 (+264 more)
+Nodes (267): Exception, build_normalized_clip_data(), _build_question_rows(), _build_transcript_row(), _build_unit_index_rows(), _deterministic_question_id(), _merge_intervals_and_measure(), 按当前 deterministic 规则选出稳定的 best evidence span。 (+259 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.02
-Nodes (144): assertState(), TestActivateUnitCollectionTargetCreatesProfileAndPreservesLearningState(), TestActivateUnitCollectionTargetHandlesEmptyAndMissingCollections(), TestGetActiveLearningTargetCoarseUnitIDsReadsCurrentUnmasteredTargets(), TestGetActiveUnitCollectionReturnsNilWhenProfileMissingAndSlugWhenPresent(), NewActiveUnitCollectionReader(), stateRow, inventoryFromRecallScope() (+136 more)
+Nodes (180): NewActivateLearningCollectionService(), TestActivateLearningCollectionMapsMissingCollection(), TestActivateLearningCollectionRollsBackWhenOnboardingFails(), TestActivateLearningCollectionUpdatesTargetAndOnboardingInOneTx(), assertState(), TestActivateUnitCollectionTargetCreatesProfileAndPreservesLearningState(), TestActivateUnitCollectionTargetHandlesEmptyAndMissingCollections(), TestGetActiveLearningTargetCoarseUnitIDsReadsCurrentUnmasteredTargets() (+172 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.02
-Nodes (141): invalidRequestText(), Options, Principal, principalContextKey, TestPrincipalMiddlewareDoesNotFallbackWhenGatewayHeaderIsMalformed(), TestPrincipalMiddlewareFallsBackToAuthorizationInDevMode(), TestPrincipalMiddlewareIgnoresAuthorizationOutsideDevMode(), TestPrincipalMiddlewareInjectsGatewayUserinfoPrincipal() (+133 more)
+Nodes (148): invalidRequestText(), Options, Principal, principalContextKey, TestPrincipalMiddlewareDoesNotFallbackWhenGatewayHeaderIsMalformed(), TestPrincipalMiddlewareFallsBackToAuthorizationInDevMode(), TestPrincipalMiddlewareIgnoresAuthorizationOutsideDevMode(), TestPrincipalMiddlewareInjectsGatewayUserinfoPrincipal() (+140 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.02
-Nodes (127): NewEndQuizQuestionLookupUsecase(), candidate(), TestEndQuizQuestionLookupPrefersVideoContextAndFallsBackToGeneric(), TestEndQuizQuestionLookupPropagatesReaderError(), TestEndQuizQuestionLookupRejectsInvalidRequestAndMissingVideo(), validPayload(), ConflictError(), hasCode() (+119 more)
+Cohesion: 0.03
+Nodes (117): BodyLimit(), BodyLimitByPath(), TestBodyLimitByPathUsesFeedbackOverride(), NewEndQuizQuestionLookupUsecase(), int32Pointer(), seedQuizQuestion(), seedQuizUnit(), TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates() (+109 more)
 
 ### Community 5 - "Community 5"
-Cohesion: 0.07
-Nodes (108): devBearerToken(), getHTTP(), getHTTPWithBearer(), loadVideoInteractionState(), postJSONWithBearer(), requestHTTP(), TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(), TestE2E_EndQuizHTTPReturnsVideoContextQuestion() (+100 more)
+Cohesion: 0.03
+Nodes (98): inventoryFromRecallScope(), learningStatesFromRecallScope(), NewDefaultContextAssembler(), normalizeRequest(), recallFetchScopeUnitIDs(), servingStatesFromRecallScope(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors() (+90 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.03
-Nodes (91): IsInvalidRequest(), contains(), futureUnit(), hardUnit(), int64Ptr(), learningUnitsWithEvidence(), newUnit(), recommendationDemand() (+83 more)
+Cohesion: 0.07
+Nodes (103): devBearerToken(), getHTTP(), getHTTPWithBearer(), loadVideoInteractionState(), postJSONWithBearer(), requestHTTP(), TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(), TestE2E_EndQuizHTTPReturnsVideoContextQuestion() (+95 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.04
-Nodes (87): BodyLimit(), BodyLimitByPath(), TestBodyLimitByPathUsesFeedbackOverride(), seedQuizQuestion(), seedQuizUnit(), TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates(), NewEndQuizQuestionReader(), NewFeedVideoLookupUsecase() (+79 more)
+Cohesion: 0.03
+Nodes (90): IsInvalidRequest(), contains(), futureUnit(), hardUnit(), int64Ptr(), learningUnitsWithEvidence(), newUnit(), recommendationDemand() (+82 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.05
-Nodes (90): aggregatedLearningUnit, DefaultVideoEvidenceAggregator, bestSentenceIndex(), bestSpanIndex(), bestStart(), bucketDemandCounts(), bundleValueScore(), coverageRatio() (+82 more)
+Cohesion: 0.04
+Nodes (106): loadConfig(), loadConfigFromEnv(), TestLoadConfigFromEnvDefaultsAuthConfig(), TestLoadConfigFromEnvReadsOptionalAuthConfig(), TestLoadConfigFromEnvRejectsInvalidDevMode(), decodeJSON(), newServer(), postJSON() (+98 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.04
-Nodes (55): NewActivateCollectionManager(), NewActivateLearningCollectionService(), TestActivateLearningCollectionMapsMissingCollection(), TestActivateLearningCollectionRollsBackWhenOnboardingFails(), TestActivateLearningCollectionUpdatesTargetAndOnboardingInOneTx(), failProfileUpdate(), openActivationTestDatabase(), seedActivationCollection() (+47 more)
+Cohesion: 0.05
+Nodes (90): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+82 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.06
-Nodes (76): fakeFeedService, decodeJSON(), newServer(), newServerWithAuth(), postJSON(), readBody(), setGatewayPrincipal(), TestFeedAppliesRequestDefaults() (+68 more)
+Cohesion: 0.04
+Nodes (62): freshnessScore(), overloadPenalty(), recencyPenalty(), recentServedPenalty(), recentWatchedPenalty(), rolePriority(), round4(), watchedRatio() (+54 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.04
-Nodes (50): resolveCandidateBounds(), resolveCandidateWindowSentenceIndexes(), freshnessScore(), overloadPenalty(), recencyPenalty(), recentServedPenalty(), recentWatchedPenalty(), rolePriority() (+42 more)
+Cohesion: 0.05
+Nodes (47): NewActivateCollectionManager(), failProfileUpdate(), openActivationTestDatabase(), seedActivationCollection(), seedActivationUser(), TestActivateLearningCollectionCommitsTargetAndOnboardingTogether(), TestActivateLearningCollectionRollsBackTargetWhenOnboardingCannotUpdate(), Suite (+39 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.06
-Nodes (69): bucketBaseWeight(), ceilFraction(), classifyDemandUnit(), floorFraction(), isHardReview(), isSoftReview(), NewDefaultDemandPlanner(), plannerFlags() (+61 more)
+Cohesion: 0.05
+Nodes (44): validationError(), normalizeJSONObject(), validateNonNegativePointer(), isValidUnitProgressBucket(), normalizeUnitProgressLimit(), dateOnly(), dateString(), validOnboardingStatus() (+36 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.05
-Nodes (52): validationError(), normalizeJSONObject(), validateNonNegativePointer(), isValidUnitProgressBucket(), normalizeUnitProgressLimit(), learningInteractionEventRequiresSubtitleIndexes(), mapLearningInteractionInput(), isValidQuizTriggerType() (+44 more)
+Cohesion: 0.08
+Nodes (59): aggregatedLearningUnit, DefaultVideoEvidenceAggregator, bestSentenceIndex(), bestSpanIndex(), bestStart(), bucketDemandCounts(), bundleValueScore(), coverageRatio() (+51 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.06
-Nodes (21): dateValue(), textValue(), timestamptzPointer(), timestamptzValue(), dateOnly(), dateString(), NewUpdateOnboardingStatusUsecase(), validOnboardingStatus() (+13 more)
+Cohesion: 0.09
+Nodes (50): IsAffectsProgressEffect(), isJSONObject(), IsObserveOnlyEffect(), IsPassingQuality(), IsSetMasteredEffect(), IsSupportedEventType(), IsSupportedReducerEffect(), ValidateEvent() (+42 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.13
-Nodes (44): appendUnique(), containsVideo(), filterCandidatesByLane(), orderedDistinctVideos(), recommendableRow(), recommendationContext(), recommendationDemand(), summarizeCandidates() (+36 more)
+Cohesion: 0.08
+Nodes (31): build_member_rows(), CollectionCounts, CollectionMetadata, compute_collection_counts(), discover_wordbook_files(), generated_root(), load_match_payload(), load_or_create_metadata() (+23 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.08
@@ -412,431 +412,431 @@ Nodes (34): AnalyticsLearningInteractionEvent, AnalyticsQuizEvent, AnalyticsVide
 
 ### Community 17 - "Community 17"
 Cohesion: 0.11
-Nodes (26): build_member_rows(), CollectionCounts, CollectionMetadata, compute_collection_counts(), discover_wordbook_files(), generated_root(), load_match_payload(), load_or_create_metadata() (+18 more)
-
-### Community 18 - "Community 18"
-Cohesion: 0.11
 Nodes (29): dbConn, migrationFile, migrationStatus, moduleSpec, openConn(), runMigrate(), runRefresh(), runReset() (+21 more)
 
-### Community 19 - "Community 19"
+### Community 18 - "Community 18"
 Cohesion: 0.13
 Nodes (34): Agent Rules, Module Boundary Rules, Catalog Delta Migration Doc, Deprecated Catalog Design Doc, Deprecated Learning Engine Doc, Deprecated Overall MVP Doc, Historical Docs Index, Deprecated Recommendation Scheduler Doc (+26 more)
 
-### Community 20 - "Community 20"
-Cohesion: 0.18
-Nodes (27): appendFillCandidates(), clamp01(), fillCoverageScore(), fillDurationFit(), fillFreshnessScore(), fillPopularityScore(), fillRecencyPenalty(), fillRecentServedPenalty() (+19 more)
-
-### Community 21 - "Community 21"
+### Community 19 - "Community 19"
 Cohesion: 0.12
 Nodes (21): buildInteractionMetadata(), MapLearningInteraction(), int32Ptr(), TestMapLearningInteractionMapsSupportedEvents(), TestMapLearningInteractionSkipsInvalidEventPayload(), TestMapLearningInteractionSkipsValidationFailures(), validLearningInteraction(), isJSONObject() (+13 more)
 
-### Community 22 - "Community 22"
+### Community 20 - "Community 20"
 Cohesion: 0.09
 Nodes (26): Catalog Clean Baseline Migration Policy, Catalog Module, Finding F-REC-001, Finding F-REC-002, Finding F-REC-003, Finding F-REC-004, docs/全新设计-推荐模块设计.md, docs/全新设计-总设计.md (+18 more)
 
-### Community 23 - "Community 23"
+### Community 21 - "Community 21"
+Cohesion: 0.17
+Nodes (20): bucketBaseWeight(), ceilFraction(), classifyDemandUnit(), floorFraction(), isHardReview(), isSoftReview(), NewDefaultDemandPlanner(), plannerFlags() (+12 more)
+
+### Community 22 - "Community 22"
 Cohesion: 0.2
 Nodes (15): TestDefaultAuditWriterSkipsItemInsertForEmptyItems(), TestDefaultAuditWriterWritesItemsInOneRepositoryCall(), failingAuditWriter, fakeSubmitFeedbackUsecase, createJPEGPart(), jpegBytes(), multipartBody(), newServer() (+7 more)
 
-### Community 24 - "Community 24"
+### Community 23 - "Community 23"
 Cohesion: 0.26
 Nodes (16): decodeJSON(), newServer(), readBody(), request(), TestActivateUnitCollectionMapsNotFound(), TestActivateUnitCollectionMapsPrincipalAndBody(), TestActivateUnitCollectionRejectsInvalidRequests(), TestActivateUnitCollectionRequiresJSONContentType() (+8 more)
 
-### Community 25 - "Community 25"
+### Community 24 - "Community 24"
 Cohesion: 0.19
 Nodes (12): assertDetailFieldsAbsent(), decodeJSON(), get(), newServer(), stringPtr(), TestVideoFavoritesReturnsListAndPassesPrincipal(), TestVideoHistoryReturnsEmptyList(), TestVideoHistoryReturnsListAndPassesPrincipal() (+4 more)
 
-### Community 26 - "Community 26"
+### Community 25 - "Community 25"
 Cohesion: 0.12
 Nodes (16): ActivateUnitCollectionTargetRequest, ActivateUnitCollectionTargetResponse, ActiveUnitCollection, EnsureTargetUnitsRequest, EnsureTargetUnitsResponse, GetActiveLearningTargetCoarseUnitIDsRequest, GetActiveLearningTargetCoarseUnitIDsResponse, GetActiveUnitCollectionRequest (+8 more)
 
-### Community 27 - "Community 27"
+### Community 26 - "Community 26"
 Cohesion: 0.13
 Nodes (15): Demand Bundle, Demand Unit, Lane Budget, Mix Quota, Planner Flags, Demand Planner Interface, Demand Planning Logic, Bucket (+7 more)
 
-### Community 28 - "Community 28"
+### Community 27 - "Community 27"
 Cohesion: 0.21
 Nodes (13): TestFromStringMapsEmptyToInvalidText(), TestFromStringMapsStringToValidText(), TestToStringMapsInvalidToEmpty(), TestToStringMapsValidTextToString(), FromString(), SliceFromStrings(), TestFromStringMapsEmptyToInvalidUUID(), TestFromStringParsesUUID() (+5 more)
 
-### Community 29 - "Community 29"
+### Community 28 - "Community 28"
 Cohesion: 0.15
 Nodes (12): GetLearningStateVersionForRecommendationRow, ListMasteredTargetFillVideoCandidatesParams, ListMasteredTargetFillVideoCandidatesRow, ListPopularFillVideoCandidatesParams, ListPopularFillVideoCandidatesRow, ListUserRecallQueueCandidatesParams, ListUserRecallQueueCandidatesRow, ListUserUnitServingStatesByUnitIDsParams (+4 more)
 
-### Community 30 - "Community 30"
+### Community 29 - "Community 29"
 Cohesion: 0.22
 Nodes (8): fakeActiveCollection, fakeSemanticCollections, UnitCollectionsService, activeCollectionSlug(), convertUnitCollectionItems(), NewUnitCollectionsService(), TestUnitCollectionsServiceReturnsActiveCollectionSlugWhenItIsInActiveItems(), TestUnitCollectionsServiceReturnsNullActiveCollectionWhenProfileMissingOrNotActive()
 
-### Community 31 - "Community 31"
+### Community 30 - "Community 30"
 Cohesion: 0.21
 Nodes (9): AcceptedLearningInteractionEvent, LearningInteractionEvent, LearningInteractionEventInput, RecordLearningInteractionsBatchRequest, RecordLearningInteractionsBatchResponse, RecordQuizAttemptRequest, RecordQuizAttemptResponse, RecordSelfMarkMasteredRequest (+1 more)
 
-### Community 32 - "Community 32"
-Cohesion: 0.26
-Nodes (10): ListVideoFavoritesQuery, ListVideoFavoritesRequest, ListVideoFavoritesResponse, ListVideoHistoryQuery, ListVideoHistoryRequest, ListVideoHistoryResponse, VideoFavoriteItem, VideoHistoryItem (+2 more)
-
-### Community 33 - "Community 33"
-Cohesion: 0.17
-Nodes (11): ActivateUnitCollectionTargetParams, ActivateUnitCollectionTargetRow, EnsureTargetUnitsParams, GetActiveLearningTargetCoarseUnitIDsRow, GetActiveUnitCollectionRow, GetUserUnitStateForUpdateParams, GetUserUnitStateParams, ListUserUnitStatesForUpdateByUnitIDsParams (+3 more)
-
-### Community 34 - "Community 34"
+### Community 31 - "Community 31"
 Cohesion: 0.26
 Nodes (10): FromTimestamptz(), PtrFromTimestamptz(), TestFromTimestamptzMapsInvalidToZeroTime(), TestFromTimestamptzNormalizesToUTC(), TestPtrFromTimestamptzMapsInvalidToNil(), TestPtrFromTimestamptzNormalizesToUTC(), TestToTimestamptzMapsNilToInvalid(), TestToTimestamptzMapsZeroTimeToInvalid() (+2 more)
 
-### Community 35 - "Community 35"
+### Community 32 - "Community 32"
+Cohesion: 0.17
+Nodes (11): ActivateUnitCollectionTargetParams, ActivateUnitCollectionTargetRow, EnsureTargetUnitsParams, GetActiveLearningTargetCoarseUnitIDsRow, GetActiveUnitCollectionRow, GetUserUnitStateForUpdateParams, GetUserUnitStateParams, ListUserUnitStatesForUpdateByUnitIDsParams (+3 more)
+
+### Community 33 - "Community 33"
+Cohesion: 0.26
+Nodes (10): ListVideoFavoritesQuery, ListVideoFavoritesRequest, ListVideoFavoritesResponse, ListVideoHistoryQuery, ListVideoHistoryRequest, ListVideoHistoryResponse, VideoFavoriteItem, VideoHistoryItem (+2 more)
+
+### Community 34 - "Community 34"
 Cohesion: 0.2
 Nodes (9): FeedVideoDisplay, FeedVideoLookupRequest, FeedVideoLookupResponse, GetVideoDetailRequest, UnitLabel, UnitLabelLookupRequest, UnitLabelLookupResponse, VideoDetailResponse (+1 more)
 
-### Community 36 - "Community 36"
+### Community 35 - "Community 35"
 Cohesion: 0.22
 Nodes (8): SetVideoFavoritedParams, SetVideoFavoritedRow, SetVideoLikedParams, SetVideoLikedRow, SetVideoUnfavoritedParams, SetVideoUnfavoritedRow, SetVideoUnlikedParams, SetVideoUnlikedRow
 
-### Community 37 - "Community 37"
+### Community 36 - "Community 36"
 Cohesion: 0.22
 Nodes (8): NormalizeLearningInteractionsByIDsRequest, NormalizeLearningInteractionsByIDsResponse, NormalizePendingEventsRequest, NormalizePendingEventsResponse, NormalizeQuizAttemptByIDRequest, NormalizeQuizAttemptByIDResponse, NormalizeSelfMarkMasteredByIDRequest, NormalizeSelfMarkMasteredByIDResponse
 
-### Community 38 - "Community 38"
-Cohesion: 0.36
-Nodes (6): loadConfig(), loadConfigFromEnv(), TestLoadConfigFromEnvDefaultsAuthConfig(), TestLoadConfigFromEnvReadsOptionalAuthConfig(), TestLoadConfigFromEnvRejectsInvalidDevMode(), config
-
-### Community 39 - "Community 39"
+### Community 37 - "Community 37"
 Cohesion: 0.25
 Nodes (1): Querier
 
-### Community 40 - "Community 40"
+### Community 38 - "Community 38"
 Cohesion: 0.25
 Nodes (7): ActivateUnitCollectionTargetUsecase, EnsureTargetUnitsUsecase, GetActiveLearningTargetCoarseUnitIDsUsecase, GetActiveUnitCollectionUsecase, ResumeTargetUnitUsecase, SetTargetInactiveUsecase, SuspendTargetUnitUsecase
 
-### Community 41 - "Community 41"
+### Community 39 - "Community 39"
 Cohesion: 0.25
 Nodes (7): ActivityCalendar, ActivityDay, MeRequest, MeResponse, MeStats, UpdateOnboardingStatusRequest, UpdateOnboardingStatusResponse
 
-### Community 42 - "Community 42"
+### Community 40 - "Community 40"
 Cohesion: 0.29
 Nodes (6): ListUserUnitProgressQuery, ListUserUnitProgressRequest, ListUserUnitProgressResponse, UnitProgressCursor, UnitProgressItem, UnitProgressPage
 
-### Community 43 - "Community 43"
+### Community 41 - "Community 41"
 Cohesion: 0.33
 Nodes (5): ExpectedLearningUnit, GenerateVideoRecommendationsRequest, GenerateVideoRecommendationsResponse, LearningUnitEvidence, RecommendationPlanItem
 
-### Community 44 - "Community 44"
+### Community 42 - "Community 42"
 Cohesion: 0.33
 Nodes (5): AuditWriter, RecommendationResultWriter, ServingStateManager, VideoFillService, VideoStateEnricher
 
-### Community 45 - "Community 45"
-Cohesion: 0.33
-Nodes (5): GetCurrentActivityStreakDaysParams, InsertRepairedUserProfileParams, ListDailyActivityStatsParams, UpdateOnboardingStatusParams, UpdateUserTimezoneParams
-
-### Community 46 - "Community 46"
-Cohesion: 0.33
-Nodes (4): ListUnitCollectionsRequest, ListUnitCollectionsResponse, UnitCollectionItem, UnitCollectionsResponse
-
-### Community 47 - "Community 47"
-Cohesion: 0.33
-Nodes (5): InsertLearningInteractionEventParams, InsertLearningInteractionEventRow, InsertLearningInteractionEventsRow, InsertQuizEventParams, InsertQuizEventRow
-
-### Community 48 - "Community 48"
+### Community 43 - "Community 43"
 Cohesion: 0.33
 Nodes (4): RawEventWriteResult, RawLearningInteraction, RawLearningInteractionEvent, RawQuizEvent
 
-### Community 49 - "Community 49"
+### Community 44 - "Community 44"
+Cohesion: 0.33
+Nodes (5): GetCurrentActivityStreakDaysParams, InsertRepairedUserProfileParams, ListDailyActivityStatsParams, UpdateOnboardingStatusParams, UpdateUserTimezoneParams
+
+### Community 45 - "Community 45"
+Cohesion: 0.33
+Nodes (4): ListUnitCollectionsRequest, ListUnitCollectionsResponse, UnitCollectionItem, UnitCollectionsResponse
+
+### Community 46 - "Community 46"
+Cohesion: 0.33
+Nodes (5): InsertLearningInteractionEventParams, InsertLearningInteractionEventRow, InsertLearningInteractionEventsRow, InsertQuizEventParams, InsertQuizEventRow
+
+### Community 47 - "Community 47"
 Cohesion: 0.4
 Nodes (4): IncrementUserUnitServingStatesParams, IncrementUserVideoServingStatesParams, InsertVideoRecommendationRunParams, RebuildUserUnitRecallQueueParams
 
-### Community 50 - "Community 50"
+### Community 48 - "Community 48"
 Cohesion: 0.4
 Nodes (4): RecallQueueCandidate, RecallQueueState, RecallScopeSelection, RecallScopeSummary
 
-### Community 51 - "Community 51"
+### Community 49 - "Community 49"
 Cohesion: 0.4
 Nodes (4): EvidenceRef, ResolvedEvidenceWindow, VideoCandidate, VideoUnitCandidate
 
-### Community 52 - "Community 52"
+### Community 50 - "Community 50"
 Cohesion: 0.4
 Nodes (4): SetVideoFavoriteRequest, SetVideoLikeRequest, VideoFavoriteResponse, VideoLikeResponse
 
-### Community 53 - "Community 53"
+### Community 51 - "Community 51"
 Cohesion: 0.4
 Nodes (4): EndQuizItem, EndQuizOption, EndQuizQuestionLookupRequest, EndQuizQuestionLookupResponse
 
-### Community 54 - "Community 54"
+### Community 52 - "Community 52"
 Cohesion: 0.4
 Nodes (4): UpsertVideoEngagementStatsFromWatchProgressParams, UpsertVideoUserStateFromWatchProgressParams, UpsertVideoWatchSessionParams, UpsertVideoWatchSessionRow
 
-### Community 55 - "Community 55"
+### Community 53 - "Community 53"
 Cohesion: 0.4
 Nodes (4): ListVideoFavoritesParams, ListVideoFavoritesRow, ListVideoHistoryParams, ListVideoHistoryRow
 
-### Community 56 - "Community 56"
+### Community 54 - "Community 54"
 Cohesion: 0.4
 Nodes (4): GetVideoDetailByIDParams, GetVideoDetailByIDRow, ListFeedVideosByIDsRow, ListUnitLabelsByIDsRow
 
-### Community 57 - "Community 57"
+### Community 55 - "Community 55"
 Cohesion: 0.4
 Nodes (4): VideoFavoriteCommand, VideoFavoriteResult, VideoLikeCommand, VideoLikeResult
 
-### Community 58 - "Community 58"
+### Community 56 - "Community 56"
 Cohesion: 0.4
 Nodes (4): ListMasteredUnitProgressParams, ListMasteredUnitProgressRow, ListUnmasteredUnitProgressParams, ListUnmasteredUnitProgressRow
 
-### Community 59 - "Community 59"
+### Community 57 - "Community 57"
 Cohesion: 0.4
 Nodes (4): ActivatedUnitCollectionTarget, ActiveLearningTargetCoarseUnitIDs, ActiveUnitCollection, TargetUnitSpec
 
-### Community 60 - "Community 60"
+### Community 58 - "Community 58"
 Cohesion: 0.4
 Nodes (4): NormalizeLearningInteractionsByIDsUsecase, NormalizePendingEventsUsecase, NormalizeQuizAttemptByIDUsecase, NormalizeSelfMarkMasteredByIDUsecase
 
-### Community 61 - "Community 61"
+### Community 59 - "Community 59"
 Cohesion: 0.4
 Nodes (4): ListLearningInteractionsByIDsParams, ListLearningInteractionsByIDsRow, ListPendingLearningInteractionsParams, ListPendingLearningInteractionsRow
 
-### Community 62 - "Community 62"
+### Community 60 - "Community 60"
 Cohesion: 0.4
 Nodes (4): ListPendingQuizEventsParams, ListPendingQuizEventsRow, ListQuizEventsByIDsParams, ListQuizEventsByIDsRow
 
-### Community 63 - "Community 63"
+### Community 61 - "Community 61"
 Cohesion: 0.4
 Nodes (4): FeedItem, FeedLearningUnit, FeedResponse, GetFeedRequest
 
-### Community 64 - "Community 64"
+### Community 62 - "Community 62"
 Cohesion: 0.4
 Nodes (5): Recommendation Materialized Read Models, Recommendation Owner Boundary, Recommendation Migrations, recommendation_schema_migrations Tracking Table, Learning State Reader
 
-### Community 65 - "Community 65"
-Cohesion: 0.5
-Nodes (3): FeedVideoReader, UnitLabelReader, VideoDetailReader
-
-### Community 66 - "Community 66"
+### Community 63 - "Community 63"
 Cohesion: 0.5
 Nodes (3): FeedVideoLookupUsecase, GetVideoDetailUsecase, UnitLabelLookupUsecase
 
-### Community 67 - "Community 67"
+### Community 64 - "Community 64"
 Cohesion: 0.5
 Nodes (3): ListUnitQuizQuestionCandidatesRow, ListVideoUnitQuizQuestionCandidatesParams, ListVideoUnitQuizQuestionCandidatesRow
 
-### Community 68 - "Community 68"
+### Community 65 - "Community 65"
 Cohesion: 0.5
 Nodes (3): FeedVideoDisplay, UnitLabel, VideoDetail
 
-### Community 69 - "Community 69"
+### Community 66 - "Community 66"
 Cohesion: 0.5
 Nodes (3): LearningEventInput, RecordLearningEventsRequest, RecordLearningEventsResponse
 
-### Community 70 - "Community 70"
+### Community 67 - "Community 67"
 Cohesion: 0.5
 Nodes (3): FeedbackImageInput, SubmitFeedbackRequest, SubmitFeedbackResponse
 
-### Community 71 - "Community 71"
+### Community 68 - "Community 68"
 Cohesion: 0.5
 Nodes (3): AddWatchDurationParams, IncrementLearningInteractionParams, IncrementQuizAttemptParams
 
-### Community 72 - "Community 72"
+### Community 69 - "Community 69"
 Cohesion: 0.5
 Nodes (3): InsertFeedbackImageParams, UpsertFeedbackSubmissionParams, UpsertFeedbackSubmissionRow
 
-### Community 73 - "Community 73"
+### Community 70 - "Community 70"
 Cohesion: 0.5
 Nodes (3): FeedbackImage, FeedbackSubmission, FeedbackSubmissionResult
 
-### Community 74 - "Community 74"
+### Community 71 - "Community 71"
 Cohesion: 0.5
 Nodes (4): Current Final Baseline Only, Learning Engine Migrations, Learning Engine Owner Boundary, learningengine_schema_migrations Tracking Table
 
-### Community 75 - "Community 75"
+### Community 72 - "Community 72"
 Cohesion: 0.5
 Nodes (4): catalog.video_user_states, Recommendation Boundary, Recommendation Module, Video Recommendation Pipeline
 
-### Community 76 - "Community 76"
+### Community 73 - "Community 73"
 Cohesion: 0.67
 Nodes (3): Atomic Recommendation Persistence, Default Recommendation Result Writer, SQLC Queries Context
 
-### Community 77 - "Community 77"
+### Community 74 - "Community 74"
 Cohesion: 0.67
 Nodes (2): SemanticSpan, TranscriptSentence
 
-### Community 78 - "Community 78"
+### Community 75 - "Community 75"
 Cohesion: 0.67
 Nodes (2): RecommendationItem, RecommendationRun
 
-### Community 79 - "Community 79"
+### Community 76 - "Community 76"
 Cohesion: 0.67
 Nodes (2): RecordVideoWatchProgressRequest, RecordVideoWatchProgressResponse
 
-### Community 80 - "Community 80"
+### Community 77 - "Community 77"
+Cohesion: 0.67
+Nodes (2): FeedVideoReader, VideoDetailReader
+
+### Community 78 - "Community 78"
 Cohesion: 0.67
 Nodes (2): ListVideoFavoritesUsecase, ListVideoHistoryUsecase
 
-### Community 81 - "Community 81"
+### Community 79 - "Community 79"
 Cohesion: 0.67
 Nodes (2): SetVideoFavoriteUsecase, SetVideoLikeUsecase
 
-### Community 82 - "Community 82"
+### Community 80 - "Community 80"
 Cohesion: 0.67
 Nodes (2): VideoFavoriteListItem, VideoHistoryListItem
 
-### Community 83 - "Community 83"
+### Community 81 - "Community 81"
 Cohesion: 0.67
 Nodes (2): VideoWatchProgress, VideoWatchProgressResult
 
-### Community 84 - "Community 84"
+### Community 82 - "Community 82"
 Cohesion: 0.67
 Nodes (0):
 
-### Community 85 - "Community 85"
+### Community 83 - "Community 83"
 Cohesion: 0.67
 Nodes (2): ListUserUnitStatesRequest, ListUserUnitStatesResponse
 
-### Community 86 - "Community 86"
+### Community 84 - "Community 84"
 Cohesion: 0.67
 Nodes (2): GetUserUnitStateRequest, GetUserUnitStateResponse
 
-### Community 87 - "Community 87"
+### Community 85 - "Community 85"
 Cohesion: 0.67
 Nodes (2): ReplayUserStatesRequest, ReplayUserStatesResponse
 
-### Community 88 - "Community 88"
+### Community 86 - "Community 86"
 Cohesion: 0.67
 Nodes (2): TransactionalRepositories, TxManager
 
-### Community 89 - "Community 89"
+### Community 87 - "Community 87"
 Cohesion: 0.67
 Nodes (2): AppendLearningEventsRow, ListLearningEventsByUserUnitOrderedParams
 
-### Community 90 - "Community 90"
+### Community 88 - "Community 88"
 Cohesion: 0.67
 Nodes (2): GetMeUsecase, UpdateOnboardingStatusUsecase
 
-### Community 91 - "Community 91"
+### Community 89 - "Community 89"
 Cohesion: 0.67
 Nodes (2): ActivateCollectionRepositories, ActivateCollectionTxManager
 
-### Community 92 - "Community 92"
+### Community 90 - "Community 90"
 Cohesion: 0.67
 Nodes (3): Finding F-LE-001, docs/全新设计-学习引擎设计.md, User-level Replay/Write Mutex
 
-### Community 93 - "Community 93"
+### Community 91 - "Community 91"
 Cohesion: 1.0
 Nodes (2): Recommendation Transaction Manager, WithinTx Flow
 
-### Community 94 - "Community 94"
+### Community 92 - "Community 92"
 Cohesion: 1.0
 Nodes (1): CandidateGenerator
 
-### Community 95 - "Community 95"
+### Community 93 - "Community 93"
 Cohesion: 1.0
 Nodes (2): Recommendation Selection Logic, Video Selector Interface
 
-### Community 96 - "Community 96"
+### Community 94 - "Community 94"
 Cohesion: 1.0
 Nodes (1): VideoFillCandidate
 
-### Community 97 - "Community 97"
+### Community 95 - "Community 95"
 Cohesion: 1.0
 Nodes (1): RecommendationContext
 
-### Community 98 - "Community 98"
+### Community 96 - "Community 96"
 Cohesion: 1.0
 Nodes (1): FinalRecommendationItem
 
-### Community 99 - "Community 99"
+### Community 97 - "Community 97"
 Cohesion: 1.0
 Nodes (1): RecommendationRequest
 
-### Community 100 - "Community 100"
+### Community 98 - "Community 98"
 Cohesion: 1.0
 Nodes (1): LearningStateSnapshot
 
-### Community 101 - "Community 101"
+### Community 99 - "Community 99"
 Cohesion: 1.0
 Nodes (1): VideoUserState
 
-### Community 102 - "Community 102"
+### Community 100 - "Community 100"
 Cohesion: 1.0
 Nodes (1): RecommendableVideoUnit
 
-### Community 103 - "Community 103"
+### Community 101 - "Community 101"
 Cohesion: 1.0
 Nodes (1): EvidenceResolver
 
-### Community 104 - "Community 104"
+### Community 102 - "Community 102"
 Cohesion: 1.0
 Nodes (1): RecordVideoWatchProgressUsecase
 
-### Community 105 - "Community 105"
+### Community 103 - "Community 103"
+Cohesion: 1.0
+Nodes (0):
+
+### Community 104 - "Community 104"
 Cohesion: 1.0
 Nodes (1): EndQuizQuestionCandidate
 
-### Community 106 - "Community 106"
+### Community 105 - "Community 105"
 Cohesion: 1.0
 Nodes (1): ListUserUnitStatesUsecase
 
-### Community 107 - "Community 107"
+### Community 106 - "Community 106"
 Cohesion: 1.0
 Nodes (1): GetUserUnitStateUsecase
 
-### Community 108 - "Community 108"
+### Community 107 - "Community 107"
 Cohesion: 1.0
 Nodes (1): RecordLearningEventsUsecase
 
-### Community 109 - "Community 109"
+### Community 108 - "Community 108"
 Cohesion: 1.0
 Nodes (1): ReplayUserStatesUsecase
 
-### Community 110 - "Community 110"
+### Community 109 - "Community 109"
 Cohesion: 1.0
 Nodes (1): ListUserUnitProgressUsecase
 
-### Community 111 - "Community 111"
+### Community 110 - "Community 110"
 Cohesion: 1.0
 Nodes (1): UserUnitStateFilter
 
-### Community 112 - "Community 112"
+### Community 111 - "Community 111"
 Cohesion: 1.0
 Nodes (1): LearningEvent
 
-### Community 113 - "Community 113"
+### Community 112 - "Community 112"
 Cohesion: 1.0
 Nodes (1): UserUnitState
 
-### Community 114 - "Community 114"
+### Community 113 - "Community 113"
 Cohesion: 1.0
 Nodes (1): UnitCollectionSeed
 
-### Community 115 - "Community 115"
+### Community 114 - "Community 114"
 Cohesion: 1.0
 Nodes (1): ListUnitCollectionsUsecase
 
-### Community 116 - "Community 116"
+### Community 115 - "Community 115"
 Cohesion: 1.0
 Nodes (1): ListActiveUnitCollectionsRow
 
-### Community 117 - "Community 117"
+### Community 116 - "Community 116"
 Cohesion: 1.0
 Nodes (1): UnitCollection
 
-### Community 118 - "Community 118"
+### Community 117 - "Community 117"
 Cohesion: 1.0
 Nodes (1): RecordSelfMarkMasteredUsecase
 
-### Community 119 - "Community 119"
+### Community 118 - "Community 118"
 Cohesion: 1.0
 Nodes (1): RecordQuizAttemptUsecase
 
-### Community 120 - "Community 120"
+### Community 119 - "Community 119"
 Cohesion: 1.0
 Nodes (1): RecordLearningInteractionsBatchUsecase
 
-### Community 121 - "Community 121"
+### Community 120 - "Community 120"
 Cohesion: 1.0
 Nodes (1): Wordbook ingest script package.
 
-### Community 122 - "Community 122"
+### Community 121 - "Community 121"
 Cohesion: 1.0
 Nodes (2): Embedded Postgres Test Deviation, Real Postgres Test Layout
 
-### Community 123 - "Community 123"
+### Community 122 - "Community 122"
 Cohesion: 1.0
 Nodes (1): DATABASE_URL Loader
+
+### Community 123 - "Community 123"
+Cohesion: 1.0
+Nodes (0):
 
 ### Community 124 - "Community 124"
 Cohesion: 1.0
@@ -844,35 +844,35 @@ Nodes (0):
 
 ### Community 125 - "Community 125"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): UnitInventoryReader
 
 ### Community 126 - "Community 126"
 Cohesion: 1.0
-Nodes (1): UnitInventoryReader
+Nodes (1): VideoUserStateReader
 
 ### Community 127 - "Community 127"
 Cohesion: 1.0
-Nodes (1): VideoUserStateReader
+Nodes (1): LearningStateReader
 
 ### Community 128 - "Community 128"
 Cohesion: 1.0
-Nodes (1): LearningStateReader
+Nodes (1): Generate Video Recommendations Usecase
 
 ### Community 129 - "Community 129"
 Cohesion: 1.0
-Nodes (1): Generate Video Recommendations Usecase
+Nodes (1): Unit Inventory Reader
 
 ### Community 130 - "Community 130"
 Cohesion: 1.0
-Nodes (1): Unit Inventory Reader
+Nodes (1): Video User State Reader
 
 ### Community 131 - "Community 131"
 Cohesion: 1.0
-Nodes (1): Video User State Reader
+Nodes (1): SQLC Queries Wrapper
 
 ### Community 132 - "Community 132"
 Cohesion: 1.0
-Nodes (1): SQLC Queries Wrapper
+Nodes (0):
 
 ### Community 133 - "Community 133"
 Cohesion: 1.0
@@ -880,55 +880,55 @@ Nodes (0):
 
 ### Community 134 - "Community 134"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): Explanation Builder Interface
 
 ### Community 135 - "Community 135"
 Cohesion: 1.0
-Nodes (1): Explanation Builder Interface
+Nodes (0):
 
 ### Community 136 - "Community 136"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): Context Assembler Interface
 
 ### Community 137 - "Community 137"
 Cohesion: 1.0
-Nodes (1): Context Assembler Interface
+Nodes (0):
 
 ### Community 138 - "Community 138"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): Video Evidence Aggregator Interface
 
 ### Community 139 - "Community 139"
 Cohesion: 1.0
-Nodes (1): Video Evidence Aggregator Interface
+Nodes (0):
 
 ### Community 140 - "Community 140"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): Unit Video Inventory
 
 ### Community 141 - "Community 141"
 Cohesion: 1.0
-Nodes (1): Unit Video Inventory
+Nodes (1): User Unit Serving State
 
 ### Community 142 - "Community 142"
 Cohesion: 1.0
-Nodes (1): User Unit Serving State
+Nodes (1): User Video Serving State
 
 ### Community 143 - "Community 143"
 Cohesion: 1.0
-Nodes (1): User Video Serving State
+Nodes (1): Evidence Resolution Scope
 
 ### Community 144 - "Community 144"
 Cohesion: 1.0
-Nodes (1): Evidence Resolution Scope
+Nodes (0):
 
 ### Community 145 - "Community 145"
 Cohesion: 1.0
-Nodes (0):
+Nodes (1): Content Facts and Recall-ready Indexes
 
 ### Community 146 - "Community 146"
 Cohesion: 1.0
-Nodes (1): Content Facts and Recall-ready Indexes
+Nodes (0):
 
 ### Community 147 - "Community 147"
 Cohesion: 1.0
@@ -1451,117 +1451,121 @@ Cohesion: 1.0
 Nodes (1): Cross-Module E2E Test Scope
 
 ## Knowledge Gaps
-- **538 isolated node(s):** `DATABASE_URL Loader`, `moduleSpec`, `migrationFile`, `migrationStatus`, `config` (+533 more)
+- **537 isolated node(s):** `DATABASE_URL Loader`, `moduleSpec`, `migrationFile`, `migrationStatus`, `config` (+532 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `Community 93`** (2 nodes): `Recommendation Transaction Manager`, `WithinTx Flow`
+- **Thin community `Community 91`** (2 nodes): `Recommendation Transaction Manager`, `WithinTx Flow`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 94`** (2 nodes): `CandidateGenerator`, `candidate_generator.go`
+- **Thin community `Community 92`** (2 nodes): `CandidateGenerator`, `candidate_generator.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 95`** (2 nodes): `Recommendation Selection Logic`, `Video Selector Interface`
+- **Thin community `Community 93`** (2 nodes): `Recommendation Selection Logic`, `Video Selector Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 96`** (2 nodes): `video_fill_candidate.go`, `VideoFillCandidate`
+- **Thin community `Community 94`** (2 nodes): `video_fill_candidate.go`, `VideoFillCandidate`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 97`** (2 nodes): `recommendation_context.go`, `RecommendationContext`
+- **Thin community `Community 95`** (2 nodes): `recommendation_context.go`, `RecommendationContext`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 98`** (2 nodes): `final_recommendation_item.go`, `FinalRecommendationItem`
+- **Thin community `Community 96`** (2 nodes): `final_recommendation_item.go`, `FinalRecommendationItem`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 99`** (2 nodes): `request.go`, `RecommendationRequest`
+- **Thin community `Community 97`** (2 nodes): `request.go`, `RecommendationRequest`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 100`** (2 nodes): `learning_state_snapshot.go`, `LearningStateSnapshot`
+- **Thin community `Community 98`** (2 nodes): `learning_state_snapshot.go`, `LearningStateSnapshot`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 101`** (2 nodes): `video_user_state.go`, `VideoUserState`
+- **Thin community `Community 99`** (2 nodes): `video_user_state.go`, `VideoUserState`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 102`** (2 nodes): `recommendable_video_unit.go`, `RecommendableVideoUnit`
+- **Thin community `Community 100`** (2 nodes): `recommendable_video_unit.go`, `RecommendableVideoUnit`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 103`** (2 nodes): `evidence_resolver.go`, `EvidenceResolver`
+- **Thin community `Community 101`** (2 nodes): `evidence_resolver.go`, `EvidenceResolver`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 104`** (2 nodes): `record_video_watch_progress.go`, `RecordVideoWatchProgressUsecase`
+- **Thin community `Community 102`** (2 nodes): `record_video_watch_progress.go`, `RecordVideoWatchProgressUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 105`** (2 nodes): `end_quiz.go`, `EndQuizQuestionCandidate`
+- **Thin community `Community 103`** (2 nodes): `pg_text.go`, `textPointer()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 106`** (2 nodes): `list_user_unit_states.go`, `ListUserUnitStatesUsecase`
+- **Thin community `Community 104`** (2 nodes): `end_quiz.go`, `EndQuizQuestionCandidate`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 107`** (2 nodes): `get_user_unit_state.go`, `GetUserUnitStateUsecase`
+- **Thin community `Community 105`** (2 nodes): `list_user_unit_states.go`, `ListUserUnitStatesUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 108`** (2 nodes): `record_learning_events.go`, `RecordLearningEventsUsecase`
+- **Thin community `Community 106`** (2 nodes): `get_user_unit_state.go`, `GetUserUnitStateUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 109`** (2 nodes): `replay_user_states.go`, `ReplayUserStatesUsecase`
+- **Thin community `Community 107`** (2 nodes): `record_learning_events.go`, `RecordLearningEventsUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 110`** (2 nodes): `list_user_unit_progress.go`, `ListUserUnitProgressUsecase`
+- **Thin community `Community 108`** (2 nodes): `replay_user_states.go`, `ReplayUserStatesUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 111`** (2 nodes): `user_unit_state_filter.go`, `UserUnitStateFilter`
+- **Thin community `Community 109`** (2 nodes): `list_user_unit_progress.go`, `ListUserUnitProgressUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 112`** (2 nodes): `learning_event.go`, `LearningEvent`
+- **Thin community `Community 110`** (2 nodes): `user_unit_state_filter.go`, `UserUnitStateFilter`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 113`** (2 nodes): `user_unit_state.go`, `UserUnitState`
+- **Thin community `Community 111`** (2 nodes): `learning_event.go`, `LearningEvent`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 114`** (2 nodes): `UnitCollectionSeed`, `seed.go`
+- **Thin community `Community 112`** (2 nodes): `user_unit_state.go`, `UserUnitState`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 115`** (2 nodes): `unit_collections.go`, `ListUnitCollectionsUsecase`
+- **Thin community `Community 113`** (2 nodes): `UnitCollectionSeed`, `seed.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 116`** (2 nodes): `unit_collections.sql.go`, `ListActiveUnitCollectionsRow`
+- **Thin community `Community 114`** (2 nodes): `unit_collections.go`, `ListUnitCollectionsUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 117`** (2 nodes): `unit_collection.go`, `UnitCollection`
+- **Thin community `Community 115`** (2 nodes): `unit_collections.sql.go`, `ListActiveUnitCollectionsRow`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 118`** (2 nodes): `record_self_mark_mastered.go`, `RecordSelfMarkMasteredUsecase`
+- **Thin community `Community 116`** (2 nodes): `unit_collection.go`, `UnitCollection`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 119`** (2 nodes): `record_quiz_attempt.go`, `RecordQuizAttemptUsecase`
+- **Thin community `Community 117`** (2 nodes): `record_self_mark_mastered.go`, `RecordSelfMarkMasteredUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 120`** (2 nodes): `record_learning_interactions_batch.go`, `RecordLearningInteractionsBatchUsecase`
+- **Thin community `Community 118`** (2 nodes): `record_quiz_attempt.go`, `RecordQuizAttemptUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 121`** (2 nodes): `Wordbook ingest script package.`, `__init__.py`
+- **Thin community `Community 119`** (2 nodes): `record_learning_interactions_batch.go`, `RecordLearningInteractionsBatchUsecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 122`** (2 nodes): `Embedded Postgres Test Deviation`, `Real Postgres Test Layout`
+- **Thin community `Community 120`** (2 nodes): `Wordbook ingest script package.`, `__init__.py`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 123`** (1 nodes): `DATABASE_URL Loader`
+- **Thin community `Community 121`** (2 nodes): `Embedded Postgres Test Deviation`, `Real Postgres Test Layout`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 124`** (1 nodes): `doc.go`
+- **Thin community `Community 122`** (1 nodes): `DATABASE_URL Loader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 125`** (1 nodes): `seed.go`
+- **Thin community `Community 123`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 126`** (1 nodes): `UnitInventoryReader`
+- **Thin community `Community 124`** (1 nodes): `seed.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 127`** (1 nodes): `VideoUserStateReader`
+- **Thin community `Community 125`** (1 nodes): `UnitInventoryReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 128`** (1 nodes): `LearningStateReader`
+- **Thin community `Community 126`** (1 nodes): `VideoUserStateReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 129`** (1 nodes): `Generate Video Recommendations Usecase`
+- **Thin community `Community 127`** (1 nodes): `LearningStateReader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 130`** (1 nodes): `Unit Inventory Reader`
+- **Thin community `Community 128`** (1 nodes): `Generate Video Recommendations Usecase`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 131`** (1 nodes): `Video User State Reader`
+- **Thin community `Community 129`** (1 nodes): `Unit Inventory Reader`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 132`** (1 nodes): `SQLC Queries Wrapper`
+- **Thin community `Community 130`** (1 nodes): `Video User State Reader`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 131`** (1 nodes): `SQLC Queries Wrapper`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 132`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 133`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 134`** (1 nodes): `doc.go`
+- **Thin community `Community 134`** (1 nodes): `Explanation Builder Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 135`** (1 nodes): `Explanation Builder Interface`
+- **Thin community `Community 135`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 136`** (1 nodes): `doc.go`
+- **Thin community `Community 136`** (1 nodes): `Context Assembler Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 137`** (1 nodes): `Context Assembler Interface`
+- **Thin community `Community 137`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 138`** (1 nodes): `doc.go`
+- **Thin community `Community 138`** (1 nodes): `Video Evidence Aggregator Interface`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 139`** (1 nodes): `Video Evidence Aggregator Interface`
+- **Thin community `Community 139`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 140`** (1 nodes): `doc.go`
+- **Thin community `Community 140`** (1 nodes): `Unit Video Inventory`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 141`** (1 nodes): `Unit Video Inventory`
+- **Thin community `Community 141`** (1 nodes): `User Unit Serving State`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 142`** (1 nodes): `User Unit Serving State`
+- **Thin community `Community 142`** (1 nodes): `User Video Serving State`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 143`** (1 nodes): `User Video Serving State`
+- **Thin community `Community 143`** (1 nodes): `Evidence Resolution Scope`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 144`** (1 nodes): `Evidence Resolution Scope`
+- **Thin community `Community 144`** (1 nodes): `learning_events_api.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 145`** (1 nodes): `learning_events_api.go`
+- **Thin community `Community 145`** (1 nodes): `Content Facts and Recall-ready Indexes`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 146`** (1 nodes): `Content Facts and Recall-ready Indexes`
+- **Thin community `Community 146`** (1 nodes): `seed.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 147`** (1 nodes): `seed.go`
+- **Thin community `Community 147`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 148`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1577,39 +1581,39 @@ Nodes (1): Cross-Module E2E Test Scope
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 154`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 155`** (1 nodes): `doc.go`
+- **Thin community `Community 155`** (1 nodes): `seed.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 156`** (1 nodes): `seed.go`
+- **Thin community `Community 156`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 157`** (1 nodes): `doc.go`
+- **Thin community `Community 157`** (1 nodes): `event_type.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 158`** (1 nodes): `event_type.go`
+- **Thin community `Community 158`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 159`** (1 nodes): `doc.go`
+- **Thin community `Community 159`** (1 nodes): `status.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 160`** (1 nodes): `status.go`
+- **Thin community `Community 160`** (1 nodes): `reducer_effect.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 161`** (1 nodes): `reducer_effect.go`
+- **Thin community `Community 161`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 162`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 163`** (1 nodes): `doc.go`
+- **Thin community `Community 163`** (1 nodes): `seed.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 164`** (1 nodes): `seed.go`
+- **Thin community `Community 164`** (1 nodes): `errors.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 165`** (1 nodes): `errors.go`
+- **Thin community `Community 165`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 166`** (1 nodes): `doc.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 167`** (1 nodes): `doc.go`
+- **Thin community `Community 167`** (1 nodes): `video_history.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 168`** (1 nodes): `video_history.go`
+- **Thin community `Community 168`** (1 nodes): `video_favorites.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 169`** (1 nodes): `video_favorites.go`
+- **Thin community `Community 169`** (1 nodes): `unit_collections.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 170`** (1 nodes): `active_target_coarse_unit_ids.go`
+- **Thin community `Community 170`** (1 nodes): `unit_progress.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 171`** (1 nodes): `unit_collections.go`
+- **Thin community `Community 171`** (1 nodes): `active_target_coarse_unit_ids.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 172`** (1 nodes): `video_favorite.go`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -1825,10 +1829,10 @@ Nodes (1): Cross-Module E2E Test Scope
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `New()` connect `Community 0` to `Community 2`, `Community 3`, `Community 4`, `Community 6`, `Community 7`, `Community 9`, `Community 10`, `Community 11`, `Community 13`, `Community 14`, `Community 23`, `Community 24`, `Community 25`?**
-  _High betweenness centrality (0.090) - this node is a cross-community bridge._
-- **Why does `run()` connect `Community 4` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 38`, `Community 7`, `Community 6`, `Community 9`, `Community 10`, `Community 18`, `Community 21`, `Community 23`, `Community 24`, `Community 25`, `Community 30`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `New()` connect `Community 5` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 6`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 22`, `Community 23`, `Community 24`?**
+  _High betweenness centrality (0.103) - this node is a cross-community bridge._
+- **Why does `Queries` connect `Community 0` to `Community 2`, `Community 4`, `Community 5`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Are the 175 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
   _`CatalogIngestError` has 175 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 137 inferred relationships involving `LoadedClipInput` (e.g. with `ValidationWarning` and `表示校验阶段发现的非阻断性告警。      这类问题不会阻止当前 clip 入库，但需要：     - 在命令行结果里暴露     - 在审计表 warning`) actually correct?**
@@ -1838,4 +1842,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 37 inferred relationships involving `Harness` (e.g. with `TestE2E_RecommendationWritesAuditAndServingStateWithEvidence()` and `TestE2E_RecommendationSecondRunAppliesServingAndWatchedPenalty()`) actually correct?**
   _`Harness` has 37 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `DATABASE_URL Loader`, `moduleSpec`, `migrationFile` to the rest of the system?**
-  _538 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _537 weakly-connected nodes found - possible documentation gaps or missing edges._

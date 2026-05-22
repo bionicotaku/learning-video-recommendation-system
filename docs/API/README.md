@@ -25,7 +25,7 @@
 - [Video-Favorites-API-MVP设计.md](Video-Favorites-API-MVP设计.md)：当前用户视频收藏列表分页读取。
 - [Video-History-API-MVP设计.md](Video-History-API-MVP设计.md)：当前用户视频观看历史列表分页读取。
 - [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md)：视频末尾按 `video_id + coarse_unit_ids` 批量取 quiz 题。
-- [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取与激活当前学习目标集合。
+- [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取，以及学习目标激活接口的业务语义说明。
 - [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md)：当前用户 active learning target coarse unit id 列表读取。
 - [Me-API-MVP设计.md](Me-API-MVP设计.md)：当前用户 profile 读取、累计活动统计、activity calendar、profile lazy repair 和 timezone 顺手更新。
 - [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md)：当前用户反馈上传，支持一个自定义 JSON payload 和最多 5 张 JPEG 图片。
@@ -44,9 +44,9 @@
 | `GET` | `/api/video-history` | Video History / 视频观看历史 | Catalog | Keyset 分页读取当前用户最近观看且仍可展示的视频列表；只返回 preview、`last_position_ms` 和 `last_watched_at`。 |
 | `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
-| `GET` | `/api/unit-collections` | Unit Collections / 词书目标 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
+| `GET` | `/api/unit-collections` | Unit Collections / 词书列表 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
 | `GET` | `/api/learning-targets/active-coarse-unit-ids` | Active Learning Targets / 学习目标读取 | Learning Engine reducer read model | 读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
-| `PUT` | `/api/learning-targets/active-collection` | Unit Collections / 词书目标 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
+| `PUT` | `/api/learning-targets/active-collection` | Learning Targets / 学习目标写入 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
 | `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
 | `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户点赞，并返回点赞状态和 `like_count`。 |
 | `PUT` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已收藏，并返回收藏状态和 `favorite_count`。 |
@@ -92,11 +92,16 @@
 |---|---|---|
 | `GET` | `/api/me` | 读取当前用户基础 profile、累计活动统计和内嵌 7 天 activity calendar；可根据合法 `X-Client-Timezone` 顺手更新 timezone，并在 profile 缺失时 lazy repair。 |
 
-### Unit Collections / 词书目标
+### Unit Collections / 词书列表
 
 | Method | Path | 说明 |
 |---|---|---|
 | `GET` | `/api/unit-collections` | 读取当前 active 词书列表，并返回当前用户 `active_collection` slug / null；列表来自 Semantic，当前选择来自 Learning Engine。 |
+
+### Learning Targets / 学习目标
+
+| Method | Path | 说明 |
+|---|---|---|
 | `GET` | `/api/learning-targets/active-coarse-unit-ids` | 读取当前用户仍可用于 exposure 上报过滤的 active target coarse unit ids；没有 active profile 时返回空列表。 |
 | `PUT` | `/api/learning-targets/active-collection` | 为当前用户激活一本词书；API facade 同事务维护 Learning Engine target projection 和 User onboarding 状态。 |
 
@@ -150,7 +155,7 @@
 | [Video-Favorites-API-MVP设计.md](Video-Favorites-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/video-favorites`；Catalog 只读 keyset 分页返回当前用户收藏视频 preview 和 `favorited_at`。 |
 | [Video-History-API-MVP设计.md](Video-History-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/video-history`；Catalog 只读 keyset 分页返回当前用户观看历史 preview、`last_position_ms` 和 `last_watched_at`。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
-| [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 与 `PUT /api/learning-targets/active-collection`；前者返回 active 词书列表和当前用户 `active_collection` slug / null，后者由 Learning Engine 事务性切换当前学习目标集合。 |
+| [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 的词书列表契约，并记录 `PUT /api/learning-targets/active-collection` 的业务语义；代码层前者由 `unitcollections` handler 负责，后者由 `learningtargets` handler 负责。 |
 | [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
 | [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feedback`；由 User 模块写 `app_user.feedback_submissions` 与 `app_user.feedback_images`，总请求限制 5 MiB，图片以 `bytea` 存储。 |

@@ -96,8 +96,9 @@ POST /api/feed
   -> internal/api FeedService
   -> recommendation.GenerateVideoRecommendations
   -> catalog.FeedVideoLookupUsecase
-  -> catalog.FeedLookupReader.ListFeedVideosByIDs
+  -> catalog.VideoPresentationReader.ListFeedVideosByIDs
   -> catalog.UnitLabelLookupUsecase
+  -> catalog.UnitLabelReader.ListUnitLabelsByIDs
 ```
 
 模块边界：

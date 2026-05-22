@@ -19,6 +19,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feedback"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningtargets"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videodetail"
@@ -129,22 +130,25 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 			semanticservice.NewListUnitCollectionsUsecase(semanticrepo.NewUnitCollectionReader(h.Pool)),
 			learningservice.NewGetActiveUnitCollectionUsecase(activeCollectionReader),
 		),
+	)
+	learningTargets := learningtargets.NewHandler(
 		apiservice.NewActivateLearningCollectionService(apitx.NewActivateCollectionManager(h.Pool)),
 		learningservice.NewGetActiveLearningTargetCoarseUnitIDsUsecase(activeCollectionReader),
 	)
 
-	lookupReader := catalogrepo.NewFeedLookupReader(h.Pool)
+	videoPresentationReader := catalogrepo.NewVideoPresentationReader(h.Pool)
+	unitLabelReader := catalogrepo.NewUnitLabelReader(h.Pool)
 	feedService := apiservice.NewFeedService(
 		h.RecommendationUsecase(),
-		catalogservice.NewFeedVideoLookupUsecase(lookupReader),
-		catalogservice.NewUnitLabelLookupUsecase(lookupReader),
+		catalogservice.NewFeedVideoLookupUsecase(videoPresentationReader),
+		catalogservice.NewUnitLabelLookupUsecase(unitLabelReader),
 		apiservice.NewPublicAssetURLBuilder("https://cdn.example.com/assets"),
 		logger,
 	)
 	feedHandler := feed.NewHandler(feedService)
 	videoDetailHandler := videodetail.NewHandler(
 		apiservice.NewVideoDetailService(
-			catalogservice.NewGetVideoDetailUsecase(lookupReader),
+			catalogservice.NewGetVideoDetailUsecase(videoPresentationReader),
 			apiservice.NewPublicAssetURLBuilder("https://cdn.example.com/assets"),
 		),
 	)
@@ -163,6 +167,7 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 		VideoLibrary:      videoLibraryHandler,
 		EndQuiz:           endQuiz,
 		UnitCollections:   unitCollections,
+		LearningTargets:   learningTargets,
 		VideoInteractions: videoInteractions,
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,

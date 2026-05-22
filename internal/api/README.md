@@ -91,23 +91,26 @@ ending experience. The handler validates `video_id`, de-duplicates up to eight
 state and does not participate in Learning Engine progress updates; completed
 answers still go through `POST /api/quiz-attempts`.
 
-`GET /api/unit-collections` reads the trusted principal as `user_id`, lists
-active Semantic unit collections for target selection, and returns the current
-user's `active_collection` slug or `null` from Learning Engine profile state.
-`PUT /api/learning-targets/active-collection` reads the trusted principal as
-`user_id`, validates `collection_slug`, and opens one user-scoped transaction
-that switches the Learning Engine collection target projection and updates User
-onboarding to `collection_selected`. API does not pull collection members into
-memory or bypass the owning module repositories. The endpoint is synchronous:
-`200 OK` means the target projection and onboarding update are already committed;
-there is no activation job or background switching state in the MVP.
+`GET /api/unit-collections` is owned by the `unitcollections` HTTP handler. It
+reads the trusted principal as `user_id`, lists active Semantic unit collections
+for target selection, and returns the current user's `active_collection` slug or
+`null` from Learning Engine profile state.
 
-`GET /api/learning-targets/active-coarse-unit-ids` reads the trusted principal
-as `user_id` and returns the current Learning Engine target projection for
-fullscreen exposure filtering. It returns `active_collection` from
-`learning.user_learning_profiles` and `coarse_unit_ids` from
-`learning.user_unit_states` where `is_target=true` and `status!='mastered'`.
-Missing active profile is a successful empty response.
+`PUT /api/learning-targets/active-collection` is owned by the `learningtargets`
+HTTP handler. It reads the trusted principal as `user_id`, validates
+`collection_slug`, and opens one user-scoped transaction that switches the
+Learning Engine collection target projection and updates User onboarding to
+`collection_selected`. API does not pull collection members into memory or
+bypass the owning module repositories. The endpoint is synchronous: `200 OK`
+means the target projection and onboarding update are already committed; there
+is no activation job or background switching state in the MVP.
+
+`GET /api/learning-targets/active-coarse-unit-ids` is also owned by the
+`learningtargets` HTTP handler. It reads the trusted principal as `user_id` and
+returns the current Learning Engine target projection for fullscreen exposure
+filtering. It returns `active_collection` from `learning.user_learning_profiles`
+and `coarse_unit_ids` from `learning.user_unit_states` where `is_target=true`
+and `status!='mastered'`. Missing active profile is a successful empty response.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset
