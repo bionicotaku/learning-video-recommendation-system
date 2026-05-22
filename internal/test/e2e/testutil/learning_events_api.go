@@ -25,6 +25,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/router"
+	apitx "learning-video-recommendation-system/internal/api/infrastructure/persistence/tx"
 	catalogservice "learning-video-recommendation-system/internal/catalog/application/service"
 	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 	normalizerservice "learning-video-recommendation-system/internal/learningengine/normalizer/application/service"
@@ -34,6 +35,8 @@ import (
 	learningtx "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/tx"
 	semanticservice "learning-video-recommendation-system/internal/semantic/application/service"
 	semanticrepo "learning-video-recommendation-system/internal/semantic/infrastructure/persistence/repository"
+	userservice "learning-video-recommendation-system/internal/user/application/service"
+	userrepo "learning-video-recommendation-system/internal/user/infrastructure/persistence/repository"
 )
 
 // LearningEventsAPIServer returns a real HTTP server wired to real analytics,
@@ -117,9 +120,14 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 	)
 	endQuiz := endquiz.NewHandler(catalogservice.NewEndQuizQuestionLookupUsecase(catalogrepo.NewEndQuizQuestionReader(h.Pool)))
 	unitProgress := unitprogress.NewHandler(learningservice.NewListUserUnitProgressUsecase(learningrepo.NewUserUnitProgressReader(h.Pool)))
+	activeCollectionReader := learningrepo.NewActiveUnitCollectionReader(h.Pool)
 	unitCollections := unitcollections.NewHandler(
-		semanticservice.NewListUnitCollectionsUsecase(semanticrepo.NewUnitCollectionReader(h.Pool)),
-		learningservice.NewActivateUnitCollectionTargetUsecase(learningtx.NewManager(h.Pool)),
+		apiservice.NewUnitCollectionsService(
+			semanticservice.NewListUnitCollectionsUsecase(semanticrepo.NewUnitCollectionReader(h.Pool)),
+			learningservice.NewGetActiveUnitCollectionUsecase(activeCollectionReader),
+		),
+		apiservice.NewActivateLearningCollectionService(apitx.NewActivateCollectionManager(h.Pool)),
+		learningservice.NewGetActiveLearningTargetCoarseUnitIDsUsecase(activeCollectionReader),
 	)
 
 	lookupReader := catalogrepo.NewFeedLookupReader(h.Pool)

@@ -31,7 +31,7 @@ func TestListUnitCollectionsReturnsItemsAndActiveCollectionSlug(t *testing.T) {
 			WordUnitCount:   1000,
 		}},
 	}}
-	server := newServer(list, &fakeActivateUsecase{}, true)
+	server := newServer(list, &fakeActivateUsecase{}, &fakeActiveTargetsUsecase{}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodGet, "/api/unit-collections", "", true)
@@ -55,7 +55,7 @@ func TestListUnitCollectionsReturnsItemsAndActiveCollectionSlug(t *testing.T) {
 
 func TestListUnitCollectionsRequiresPrincipal(t *testing.T) {
 	list := &fakeListCollectionsForUserUsecase{}
-	server := newServer(list, &fakeActivateUsecase{}, true)
+	server := newServer(list, &fakeActivateUsecase{}, &fakeActiveTargetsUsecase{}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodGet, "/api/unit-collections", "", false)
@@ -76,7 +76,7 @@ func TestListUnitCollectionsAllowsNullActiveCollection(t *testing.T) {
 			Category:     "wordbook",
 		}},
 	}}
-	server := newServer(list, &fakeActivateUsecase{}, true)
+	server := newServer(list, &fakeActivateUsecase{}, &fakeActiveTargetsUsecase{}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodGet, "/api/unit-collections", "", true)
@@ -99,7 +99,7 @@ func TestActivateUnitCollectionMapsPrincipalAndBody(t *testing.T) {
 		CollectionSlug: "toefl-core",
 		TargetCount:    1000,
 	}}
-	server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
+	server := newServer(&fakeListCollectionsForUserUsecase{}, activate, &fakeActiveTargetsUsecase{}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", `{"collection_slug":"toefl-core"}`, true)
@@ -132,7 +132,7 @@ func TestActivateUnitCollectionRejectsInvalidRequests(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			activate := &fakeActivateUsecase{}
-			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
+			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, &fakeActiveTargetsUsecase{}, true)
 			t.Cleanup(server.Close)
 
 			response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", tt.body, tt.withPrincipal)
@@ -158,7 +158,7 @@ func TestActivateUnitCollectionRequiresJSONContentType(t *testing.T) {
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			activate := &fakeActivateUsecase{}
-			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, true)
+			server := newServer(&fakeListCollectionsForUserUsecase{}, activate, &fakeActiveTargetsUsecase{}, true)
 			t.Cleanup(server.Close)
 
 			request, err := http.NewRequest(http.MethodPut, server.URL+"/api/learning-targets/active-collection", strings.NewReader(`{"collection_slug":"toefl-core"}`))
@@ -185,7 +185,7 @@ func TestActivateUnitCollectionRequiresJSONContentType(t *testing.T) {
 }
 
 func TestActivateUnitCollectionMapsNotFound(t *testing.T) {
-	server := newServer(&fakeListCollectionsForUserUsecase{}, &fakeActivateUsecase{err: learningservice.ErrUnitCollectionNotFound}, true)
+	server := newServer(&fakeListCollectionsForUserUsecase{}, &fakeActivateUsecase{err: learningservice.ErrUnitCollectionNotFound}, &fakeActiveTargetsUsecase{}, true)
 	t.Cleanup(server.Close)
 
 	response := request(t, server, http.MethodPut, "/api/learning-targets/active-collection", `{"collection_slug":"missing-book"}`, true)
@@ -203,8 +203,50 @@ func TestActivateUnitCollectionMapsNotFound(t *testing.T) {
 	}
 }
 
-func newServer(list *fakeListCollectionsForUserUsecase, activate *fakeActivateUsecase, withAuth bool) *httptest.Server {
-	group := unitcollections.NewHandler(list, activate)
+func TestActiveCoarseUnitIDsMapsPrincipalAndResponse(t *testing.T) {
+	activeCollection := "toefl-core"
+	activeTargets := &fakeActiveTargetsUsecase{response: learningdto.GetActiveLearningTargetCoarseUnitIDsResponse{
+		ActiveCollection: &activeCollection,
+		TargetCount:      3,
+		CoarseUnitIDs:    []int64{101, 205, 309},
+	}}
+	server := newServer(&fakeListCollectionsForUserUsecase{}, &fakeActivateUsecase{}, activeTargets, true)
+	t.Cleanup(server.Close)
+
+	response := request(t, server, http.MethodGet, "/api/learning-targets/active-coarse-unit-ids", "", true)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if !activeTargets.called || activeTargets.request.UserID != userID {
+		t.Fatalf("request not mapped: %+v", activeTargets.request)
+	}
+	var body map[string]any
+	decodeJSON(t, response, &body)
+	if body["active_collection"] != "toefl-core" || body["target_count"].(float64) != 3 {
+		t.Fatalf("unexpected body: %+v", body)
+	}
+	ids := body["coarse_unit_ids"].([]any)
+	if len(ids) != 3 || ids[0].(float64) != 101 || ids[1].(float64) != 205 || ids[2].(float64) != 309 {
+		t.Fatalf("coarse_unit_ids = %+v", ids)
+	}
+}
+
+func TestActiveCoarseUnitIDsRequiresPrincipal(t *testing.T) {
+	activeTargets := &fakeActiveTargetsUsecase{}
+	server := newServer(&fakeListCollectionsForUserUsecase{}, &fakeActivateUsecase{}, activeTargets, true)
+	t.Cleanup(server.Close)
+
+	response := request(t, server, http.MethodGet, "/api/learning-targets/active-coarse-unit-ids", "", false)
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if activeTargets.called {
+		t.Fatalf("active target usecase should not be called without principal")
+	}
+}
+
+func newServer(list *fakeListCollectionsForUserUsecase, activate *fakeActivateUsecase, activeTargets *fakeActiveTargetsUsecase, withAuth bool) *httptest.Server {
+	group := unitcollections.NewHandler(list, activate, activeTargets)
 	handler := router.New(router.Options{UnitCollections: group})
 	if withAuth {
 		handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
@@ -275,6 +317,19 @@ type fakeActivateUsecase struct {
 }
 
 func (f *fakeActivateUsecase) Execute(_ context.Context, request learningdto.ActivateUnitCollectionTargetRequest) (learningdto.ActivateUnitCollectionTargetResponse, error) {
+	f.called = true
+	f.request = request
+	return f.response, f.err
+}
+
+type fakeActiveTargetsUsecase struct {
+	called   bool
+	request  learningdto.GetActiveLearningTargetCoarseUnitIDsRequest
+	response learningdto.GetActiveLearningTargetCoarseUnitIDsResponse
+	err      error
+}
+
+func (f *fakeActiveTargetsUsecase) Execute(_ context.Context, request learningdto.GetActiveLearningTargetCoarseUnitIDsRequest) (learningdto.GetActiveLearningTargetCoarseUnitIDsResponse, error) {
 	f.called = true
 	f.request = request
 	return f.response, f.err

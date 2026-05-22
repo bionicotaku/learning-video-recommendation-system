@@ -24,6 +24,9 @@ GET /api/unit-collections
 
 PUT /api/learning-targets/active-collection
   把某个词书激活为当前用户的学习目标集合。
+
+GET /api/learning-targets/active-coarse-unit-ids
+  读取当前用户仍可用于 exposure 上报过滤的 active target coarse unit ids。
 ```
 
 `GET /api/unit-collections` 是用户态纯读接口。列表来自 `semantic.unit_collections`，当前选择来自
@@ -48,6 +51,16 @@ where is_target = true
 ```
 
 没有 active collection 时，feed 不返回 `target_required`。Recommendation 可以按无 target 逻辑返回视频。
+
+`GET /api/learning-targets/active-coarse-unit-ids` 不读取完整 `semantic.unit_collection_members`。它读取 Learning Engine 当前 target projection：
+
+```sql
+learning.user_unit_states
+where is_target = true
+  and status <> 'mastered'
+```
+
+该接口服务 fullscreen exposure 过滤，`target_count` 是当前 exposure target set 数量，不是词书总词数。
 
 ## 2. 模块边界
 

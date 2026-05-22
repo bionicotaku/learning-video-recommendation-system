@@ -353,6 +353,38 @@ func (q *Queries) EnsureTargetUnits(ctx context.Context, arg EnsureTargetUnitsPa
 	return err
 }
 
+const getActiveLearningTargetCoarseUnitIDs = `-- name: GetActiveLearningTargetCoarseUnitIDs :one
+with profile as (
+  select p.active_collection_slug
+  from learning.user_learning_profiles p
+  where p.user_id = $1
+),
+targets as (
+  select coalesce(array_agg(s.coarse_unit_id order by s.coarse_unit_id), '{}'::bigint[]) as coarse_unit_ids
+  from learning.user_unit_states s
+  where s.user_id = $1
+    and s.is_target = true
+    and s.status <> 'mastered'
+)
+select
+  coalesce((select active_collection_slug from profile), '')::text as active_collection_slug,
+  coalesce((select coarse_unit_ids from targets), '{}'::bigint[])::bigint[] as coarse_unit_ids,
+  exists(select 1 from profile) as has_active_profile
+`
+
+type GetActiveLearningTargetCoarseUnitIDsRow struct {
+	ActiveCollectionSlug string  `json:"active_collection_slug"`
+	CoarseUnitIds        []int64 `json:"coarse_unit_ids"`
+	HasActiveProfile     bool    `json:"has_active_profile"`
+}
+
+func (q *Queries) GetActiveLearningTargetCoarseUnitIDs(ctx context.Context, userID pgtype.UUID) (GetActiveLearningTargetCoarseUnitIDsRow, error) {
+	row := q.db.QueryRow(ctx, getActiveLearningTargetCoarseUnitIDs, userID)
+	var i GetActiveLearningTargetCoarseUnitIDsRow
+	err := row.Scan(&i.ActiveCollectionSlug, &i.CoarseUnitIds, &i.HasActiveProfile)
+	return i, err
+}
+
 const getActiveUnitCollection = `-- name: GetActiveUnitCollection :one
 select
   active_collection_id,

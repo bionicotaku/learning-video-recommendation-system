@@ -139,6 +139,59 @@ func TestGetActiveUnitCollectionReturnsNilWhenProfileMissingAndSlugWhenPresent(t
 	}
 }
 
+func TestGetActiveLearningTargetCoarseUnitIDsReadsCurrentUnmasteredTargets(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "44444444-4444-4444-8444-444444444444"
+	collectionID := "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 401)
+	db.SeedCoarseUnit(t, 402)
+	db.SeedCoarseUnit(t, 403)
+	db.SeedCoarseUnit(t, 404)
+	db.SeedUnitCollection(t, collectionID, "toefl-core", "TOEFL Core", "active")
+	db.SeedUnitCollectionMember(t, collectionID, 401, 1)
+	db.SeedUnitCollectionMember(t, collectionID, 402, 2)
+	db.SeedUnitCollectionMember(t, collectionID, 403, 3)
+
+	usecase := service.NewGetActiveLearningTargetCoarseUnitIDsUsecase(learningrepo.NewActiveUnitCollectionReader(db.Pool))
+	missing, err := usecase.Execute(context.Background(), dto.GetActiveLearningTargetCoarseUnitIDsRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("Execute(missing) error = %v", err)
+	}
+	if missing.ActiveCollection != nil || missing.TargetCount != 0 || len(missing.CoarseUnitIDs) != 0 {
+		t.Fatalf("missing profile response = %+v, want null active collection and empty ids", missing)
+	}
+
+	activate := service.NewActivateUnitCollectionTargetUsecase(persisttx.NewManager(db.Pool))
+	if _, err := activate.Execute(context.Background(), dto.ActivateUnitCollectionTargetRequest{
+		UserID:         userID,
+		CollectionSlug: "toefl-core",
+	}); err != nil {
+		t.Fatalf("activate collection: %v", err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `
+		update learning.user_unit_states
+		set status = 'mastered'
+		where user_id = $1 and coarse_unit_id = 402
+	`, userID); err != nil {
+		t.Fatalf("set mastered: %v", err)
+	}
+	db.SeedUserUnitState(t, userID, 404, "manual", "manual-list", false, "reviewing", 60)
+
+	found, err := usecase.Execute(context.Background(), dto.GetActiveLearningTargetCoarseUnitIDsRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("Execute(found) error = %v", err)
+	}
+	if found.ActiveCollection == nil || *found.ActiveCollection != "toefl-core" {
+		t.Fatalf("ActiveCollection = %v, want toefl-core", found.ActiveCollection)
+	}
+	if found.TargetCount != 2 || len(found.CoarseUnitIDs) != 2 || found.CoarseUnitIDs[0] != 401 || found.CoarseUnitIDs[1] != 403 {
+		t.Fatalf("response = %+v, want ids 401/403", found)
+	}
+}
+
 func assertState(t *testing.T, db *fixture.TestDatabase, userID string, unitID int64, wantTarget bool, wantSource string, wantRef string, wantStatus string, wantProgress float64) {
 	t.Helper()
 

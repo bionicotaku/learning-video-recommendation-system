@@ -367,6 +367,24 @@ select
 from learning.user_learning_profiles
 where user_id = sqlc.arg(user_id);
 
+-- name: GetActiveLearningTargetCoarseUnitIDs :one
+with profile as (
+  select p.active_collection_slug
+  from learning.user_learning_profiles p
+  where p.user_id = sqlc.arg(user_id)
+),
+targets as (
+  select coalesce(array_agg(s.coarse_unit_id order by s.coarse_unit_id), '{}'::bigint[]) as coarse_unit_ids
+  from learning.user_unit_states s
+  where s.user_id = sqlc.arg(user_id)
+    and s.is_target = true
+    and s.status <> 'mastered'
+)
+select
+  coalesce((select active_collection_slug from profile), '')::text as active_collection_slug,
+  coalesce((select coarse_unit_ids from targets), '{}'::bigint[])::bigint[] as coarse_unit_ids,
+  exists(select 1 from profile) as has_active_profile;
+
 -- name: DeleteUserUnitStatesByUser :exec
 delete from learning.user_unit_states
 where user_id = sqlc.arg(user_id);

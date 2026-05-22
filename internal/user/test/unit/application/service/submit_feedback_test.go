@@ -2,6 +2,8 @@ package service_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -29,6 +31,42 @@ func TestSubmitFeedbackRejectsNonObjectPayload(t *testing.T) {
 	}
 }
 
+func TestSubmitFeedbackRejectsInvalidUserID(t *testing.T) {
+	writer := &fakeFeedbackWriter{}
+	usecase := userservice.NewSubmitFeedbackUsecase(writer)
+
+	_, err := usecase.Execute(context.Background(), userdto.SubmitFeedbackRequest{
+		UserID:  "not-a-uuid",
+		Payload: json.RawMessage(`{"message":"bug"}`),
+	})
+
+	if !userservice.IsValidationError(err) {
+		t.Fatalf("err = %v, want validation error", err)
+	}
+	if writer.called {
+		t.Fatalf("writer should not be called")
+	}
+}
+
+func TestSubmitFeedbackRejectsInvalidClientFeedbackID(t *testing.T) {
+	writer := &fakeFeedbackWriter{}
+	usecase := userservice.NewSubmitFeedbackUsecase(writer)
+	clientID := "not-a-uuid"
+
+	_, err := usecase.Execute(context.Background(), userdto.SubmitFeedbackRequest{
+		UserID:           "11111111-1111-4111-8111-111111111111",
+		ClientFeedbackID: &clientID,
+		Payload:          json.RawMessage(`{"message":"bug"}`),
+	})
+
+	if !userservice.IsValidationError(err) {
+		t.Fatalf("err = %v, want validation error", err)
+	}
+	if writer.called {
+		t.Fatalf("writer should not be called")
+	}
+}
+
 func TestSubmitFeedbackRejectsMoreThanFiveImages(t *testing.T) {
 	writer := &fakeFeedbackWriter{}
 	usecase := userservice.NewSubmitFeedbackUsecase(writer)
@@ -38,15 +76,9 @@ func TestSubmitFeedbackRejectsMoreThanFiveImages(t *testing.T) {
 		Payload: json.RawMessage(`{"message":"bug"}`),
 	}
 	for i := 0; i < 6; i++ {
-		request.Images = append(request.Images, userdto.FeedbackImageInput{
-			SortOrder:   int32(i + 1),
-			ContentType: "image/jpeg",
-			SizeBytes:   3,
-			SHA256:      "sha",
-			Width:       1,
-			Height:      1,
-			Data:        []byte{0xff, 0xd8, 0xff},
-		})
+		image := validFeedbackImage()
+		image.SortOrder = int32(i + 1)
+		request.Images = append(request.Images, image)
 	}
 
 	_, err := usecase.Execute(context.Background(), request)
@@ -56,6 +88,48 @@ func TestSubmitFeedbackRejectsMoreThanFiveImages(t *testing.T) {
 	}
 	if writer.called {
 		t.Fatalf("writer should not be called")
+	}
+}
+
+func TestSubmitFeedbackRejectsMismatchedImageMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*userdto.FeedbackImageInput)
+	}{
+		{
+			name: "size_bytes",
+			mutate: func(image *userdto.FeedbackImageInput) {
+				image.SizeBytes++
+			},
+		},
+		{
+			name: "sha256",
+			mutate: func(image *userdto.FeedbackImageInput) {
+				image.SHA256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer := &fakeFeedbackWriter{}
+			usecase := userservice.NewSubmitFeedbackUsecase(writer)
+			image := validFeedbackImage()
+			tt.mutate(&image)
+
+			_, err := usecase.Execute(context.Background(), userdto.SubmitFeedbackRequest{
+				UserID:  "11111111-1111-4111-8111-111111111111",
+				Payload: json.RawMessage(`{"message":"bug"}`),
+				Images:  []userdto.FeedbackImageInput{image},
+			})
+
+			if !userservice.IsValidationError(err) {
+				t.Fatalf("err = %v, want validation error", err)
+			}
+			if writer.called {
+				t.Fatalf("writer should not be called")
+			}
+		})
 	}
 }
 
@@ -75,15 +149,7 @@ func TestSubmitFeedbackPassesValidatedSubmissionToWriter(t *testing.T) {
 		UserID:           "11111111-1111-4111-8111-111111111111",
 		ClientFeedbackID: &clientID,
 		Payload:          json.RawMessage(`{"message":"bug"}`),
-		Images: []userdto.FeedbackImageInput{{
-			SortOrder:   1,
-			ContentType: "image/jpeg",
-			SizeBytes:   3,
-			SHA256:      "sha",
-			Width:       1,
-			Height:      1,
-			Data:        []byte{0xff, 0xd8, 0xff},
-		}},
+		Images:           []userdto.FeedbackImageInput{validFeedbackImage()},
 	})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
@@ -110,4 +176,18 @@ func (f *fakeFeedbackWriter) SubmitFeedback(ctx context.Context, submission mode
 	f.called = true
 	f.submission = submission
 	return f.result, f.err
+}
+
+func validFeedbackImage() userdto.FeedbackImageInput {
+	data := []byte{0xff, 0xd8, 0xff}
+	hash := sha256.Sum256(data)
+	return userdto.FeedbackImageInput{
+		SortOrder:   1,
+		ContentType: "image/jpeg",
+		SizeBytes:   int32(len(data)),
+		SHA256:      hex.EncodeToString(hash[:]),
+		Width:       1,
+		Height:      1,
+		Data:        data,
+	}
 }

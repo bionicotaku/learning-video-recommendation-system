@@ -116,6 +116,58 @@ func TestGetActiveUnitCollectionExecuteReturnsActiveAndPropagatesReaderError(t *
 	})
 }
 
+func TestGetActiveLearningTargetCoarseUnitIDsExecute(t *testing.T) {
+	t.Run("active targets", func(t *testing.T) {
+		active := "toefl-core"
+		reader := &fakeActiveUnitCollectionReader{
+			activeTargets: model.ActiveLearningTargetCoarseUnitIDs{
+				ActiveCollection: &active,
+				CoarseUnitIDs:    []int64{101, 205},
+			},
+		}
+		usecase := service.NewGetActiveLearningTargetCoarseUnitIDsUsecase(reader)
+
+		response, err := usecase.Execute(context.Background(), dto.GetActiveLearningTargetCoarseUnitIDsRequest{
+			UserID: "22222222-2222-4222-8222-222222222222",
+		})
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+		if reader.activeTargetUserID != "22222222-2222-4222-8222-222222222222" {
+			t.Fatalf("reader userID = %q", reader.activeTargetUserID)
+		}
+		if response.ActiveCollection == nil || *response.ActiveCollection != active {
+			t.Fatalf("ActiveCollection = %v, want %q", response.ActiveCollection, active)
+		}
+		if response.TargetCount != 2 || len(response.CoarseUnitIDs) != 2 || response.CoarseUnitIDs[0] != 101 || response.CoarseUnitIDs[1] != 205 {
+			t.Fatalf("response = %+v", response)
+		}
+	})
+
+	t.Run("no profile returns empty response", func(t *testing.T) {
+		usecase := service.NewGetActiveLearningTargetCoarseUnitIDsUsecase(&fakeActiveUnitCollectionReader{})
+
+		response, err := usecase.Execute(context.Background(), dto.GetActiveLearningTargetCoarseUnitIDsRequest{
+			UserID: "22222222-2222-4222-8222-222222222222",
+		})
+		if err != nil {
+			t.Fatalf("Execute() error = %v", err)
+		}
+		if response.ActiveCollection != nil || response.TargetCount != 0 || len(response.CoarseUnitIDs) != 0 {
+			t.Fatalf("response = %+v, want null active collection and empty ids", response)
+		}
+	})
+
+	t.Run("missing user id", func(t *testing.T) {
+		usecase := service.NewGetActiveLearningTargetCoarseUnitIDsUsecase(&fakeActiveUnitCollectionReader{})
+
+		_, err := usecase.Execute(context.Background(), dto.GetActiveLearningTargetCoarseUnitIDsRequest{})
+		if err == nil {
+			t.Fatalf("Execute() error = nil, want error")
+		}
+	})
+}
+
 func TestSetTargetInactiveExecute(t *testing.T) {
 	targetRepo := &fakeTargetStateCommandRepository{}
 	txManager := &fakeTxManager{
@@ -860,14 +912,21 @@ func (f *fakeTargetStateCommandRepository) SetTargetInactive(_ context.Context, 
 }
 
 type fakeActiveUnitCollectionReader struct {
-	userID string
-	active *model.ActiveUnitCollection
-	err    error
+	userID             string
+	active             *model.ActiveUnitCollection
+	activeTargetUserID string
+	activeTargets      model.ActiveLearningTargetCoarseUnitIDs
+	err                error
 }
 
 func (f *fakeActiveUnitCollectionReader) GetActiveUnitCollection(_ context.Context, userID string) (*model.ActiveUnitCollection, error) {
 	f.userID = userID
 	return f.active, f.err
+}
+
+func (f *fakeActiveUnitCollectionReader) GetActiveLearningTargetCoarseUnitIDs(_ context.Context, userID string) (model.ActiveLearningTargetCoarseUnitIDs, error) {
+	f.activeTargetUserID = userID
+	return f.activeTargets, f.err
 }
 
 type fakeUserUnitStateRepository struct {

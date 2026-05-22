@@ -18,3 +18,7 @@ type TargetStateCommandRepository interface {
 type ActiveUnitCollectionReader interface {
 	GetActiveUnitCollection(ctx context.Context, userID string) (*model.ActiveUnitCollection, error)
 }
+
+type ActiveLearningTargetReader interface {
+	GetActiveLearningTargetCoarseUnitIDs(ctx context.Context, userID string) (model.ActiveLearningTargetCoarseUnitIDs, error)
+}

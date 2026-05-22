@@ -28,6 +28,7 @@ POST /api/feed
 GET /api/me
 POST /api/videos/end-quiz
 GET /api/unit-collections
+GET /api/learning-targets/active-coarse-unit-ids
 PUT /api/learning-targets/active-collection
 PUT /api/videos/{video_id}/like
 DELETE /api/videos/{video_id}/like
@@ -80,6 +81,13 @@ onboarding to `collection_selected`. API does not pull collection members into
 memory or bypass the owning module repositories. The endpoint is synchronous:
 `200 OK` means the target projection and onboarding update are already committed;
 there is no activation job or background switching state in the MVP.
+
+`GET /api/learning-targets/active-coarse-unit-ids` reads the trusted principal
+as `user_id` and returns the current Learning Engine target projection for
+fullscreen exposure filtering. It returns `active_collection` from
+`learning.user_learning_profiles` and `coarse_unit_ids` from
+`learning.user_unit_states` where `is_target=true` and `status!='mastered'`.
+Missing active profile is a successful empty response.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset

@@ -17,3 +17,8 @@ type ActiveUnitCollection struct {
 	CollectionID   string
 	CollectionSlug string
 }
+
+type ActiveLearningTargetCoarseUnitIDs struct {
+	ActiveCollection *string
+	CoarseUnitIDs    []int64
+}

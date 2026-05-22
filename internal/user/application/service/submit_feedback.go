@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"strings"
 
@@ -26,6 +28,12 @@ func (u *SubmitFeedbackUsecase) Execute(ctx context.Context, request dto.SubmitF
 	}
 	if strings.TrimSpace(request.UserID) == "" {
 		return dto.SubmitFeedbackResponse{}, ValidationError("user_id is required")
+	}
+	if !isUUID(request.UserID) {
+		return dto.SubmitFeedbackResponse{}, ValidationError("user_id must be a UUID")
+	}
+	if request.ClientFeedbackID != nil && !isUUID(*request.ClientFeedbackID) {
+		return dto.SubmitFeedbackResponse{}, ValidationError("client_feedback_id must be a UUID")
 	}
 	if err := validateFeedbackPayload(request.Payload); err != nil {
 		return dto.SubmitFeedbackResponse{}, err
@@ -90,14 +98,43 @@ func validateFeedbackImage(index int, image dto.FeedbackImageInput) error {
 	if image.SizeBytes <= 0 {
 		return ValidationError("images size_bytes must be positive")
 	}
-	if strings.TrimSpace(image.SHA256) == "" {
-		return ValidationError("images sha256 is required")
-	}
 	if image.Width <= 0 || image.Height <= 0 {
 		return ValidationError("images dimensions must be positive")
 	}
 	if len(image.Data) == 0 {
 		return ValidationError("images data is required")
 	}
+	if image.SizeBytes != int32(len(image.Data)) {
+		return ValidationError("images size_bytes must match image data")
+	}
+	hash := sha256.Sum256(image.Data)
+	if image.SHA256 != hex.EncodeToString(hash[:]) {
+		return ValidationError("images sha256 must match image data")
+	}
 	return nil
+}
+
+func isUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	for index, char := range value {
+		switch index {
+		case 8, 13, 18, 23:
+			if char != '-' {
+				return false
+			}
+		default:
+			if !isHex(char) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isHex(char rune) bool {
+	return ('0' <= char && char <= '9') ||
+		('a' <= char && char <= 'f') ||
+		('A' <= char && char <= 'F')
 }

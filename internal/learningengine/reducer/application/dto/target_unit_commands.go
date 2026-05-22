@@ -40,6 +40,16 @@ type GetActiveUnitCollectionResponse struct {
 	ActiveCollection *ActiveUnitCollection
 }
 
+type GetActiveLearningTargetCoarseUnitIDsRequest struct {
+	UserID string
+}
+
+type GetActiveLearningTargetCoarseUnitIDsResponse struct {
+	ActiveCollection *string `json:"active_collection"`
+	TargetCount      int     `json:"target_count"`
+	CoarseUnitIDs    []int64 `json:"coarse_unit_ids"`
+}
+
 type SetTargetInactiveRequest struct {
 	UserID       string
 	CoarseUnitID int64

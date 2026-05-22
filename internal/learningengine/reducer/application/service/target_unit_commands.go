@@ -122,6 +122,39 @@ func (u *GetActiveUnitCollectionUsecase) Execute(ctx context.Context, request dt
 	}, nil
 }
 
+type GetActiveLearningTargetCoarseUnitIDsUsecase struct {
+	reader apprepo.ActiveLearningTargetReader
+}
+
+var _ appusecase.GetActiveLearningTargetCoarseUnitIDsUsecase = (*GetActiveLearningTargetCoarseUnitIDsUsecase)(nil)
+
+func NewGetActiveLearningTargetCoarseUnitIDsUsecase(reader apprepo.ActiveLearningTargetReader) *GetActiveLearningTargetCoarseUnitIDsUsecase {
+	return &GetActiveLearningTargetCoarseUnitIDsUsecase{reader: reader}
+}
+
+func (u *GetActiveLearningTargetCoarseUnitIDsUsecase) Execute(ctx context.Context, request dto.GetActiveLearningTargetCoarseUnitIDsRequest) (dto.GetActiveLearningTargetCoarseUnitIDsResponse, error) {
+	if request.UserID == "" {
+		return dto.GetActiveLearningTargetCoarseUnitIDsResponse{}, fmt.Errorf("user_id is required")
+	}
+	if u.reader == nil {
+		return dto.GetActiveLearningTargetCoarseUnitIDsResponse{}, fmt.Errorf("active learning target reader is required")
+	}
+
+	targets, err := u.reader.GetActiveLearningTargetCoarseUnitIDs(ctx, request.UserID)
+	if err != nil {
+		return dto.GetActiveLearningTargetCoarseUnitIDsResponse{}, err
+	}
+	coarseUnitIDs := targets.CoarseUnitIDs
+	if coarseUnitIDs == nil {
+		coarseUnitIDs = []int64{}
+	}
+	return dto.GetActiveLearningTargetCoarseUnitIDsResponse{
+		ActiveCollection: targets.ActiveCollection,
+		TargetCount:      len(coarseUnitIDs),
+		CoarseUnitIDs:    coarseUnitIDs,
+	}, nil
+}
+
 type SetTargetInactiveUsecase struct {
 	txManager TxManager
 }

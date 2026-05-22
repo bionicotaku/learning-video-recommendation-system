@@ -26,17 +26,31 @@ type ActivateUnitCollectionTargetUsecase interface {
 	Execute(ctx context.Context, request learningdto.ActivateUnitCollectionTargetRequest) (learningdto.ActivateUnitCollectionTargetResponse, error)
 }
 
-type Handler struct {
-	listCollections ListUnitCollectionsUsecase
-	activateTarget  ActivateUnitCollectionTargetUsecase
+type GetActiveLearningTargetCoarseUnitIDsUsecase interface {
+	Execute(ctx context.Context, request learningdto.GetActiveLearningTargetCoarseUnitIDsRequest) (learningdto.GetActiveLearningTargetCoarseUnitIDsResponse, error)
 }
 
-func NewHandler(listCollections ListUnitCollectionsUsecase, activateTarget ActivateUnitCollectionTargetUsecase) *Handler {
-	return &Handler{listCollections: listCollections, activateTarget: activateTarget}
+type Handler struct {
+	listCollections     ListUnitCollectionsUsecase
+	activateTarget      ActivateUnitCollectionTargetUsecase
+	activeTargetUnitIDs GetActiveLearningTargetCoarseUnitIDsUsecase
+}
+
+func NewHandler(
+	listCollections ListUnitCollectionsUsecase,
+	activateTarget ActivateUnitCollectionTargetUsecase,
+	activeTargetUnitIDs GetActiveLearningTargetCoarseUnitIDsUsecase,
+) *Handler {
+	return &Handler{
+		listCollections:     listCollections,
+		activateTarget:      activateTarget,
+		activeTargetUnitIDs: activeTargetUnitIDs,
+	}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/unit-collections", h.listUnitCollections)
+	mux.HandleFunc("GET /api/learning-targets/active-coarse-unit-ids", h.getActiveLearningTargetCoarseUnitIDs)
 	mux.HandleFunc("PUT /api/learning-targets/active-collection", h.activateUnitCollection)
 }
 
