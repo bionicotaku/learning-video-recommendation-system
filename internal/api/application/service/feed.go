@@ -143,21 +143,9 @@ func (s *FeedService) buildFeedItem(
 		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", err)
 		return apvdto.FeedItem{}, err
 	}
-	videoURL, err := s.urlBuilder.Build(video.VideoObjectPath)
-	if err != nil {
-		wrapped := fmt.Errorf("build video_url for recommendation feed item: run_id=%s video_id=%s: %w", runID, planItem.VideoID, err)
-		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)
-		return apvdto.FeedItem{}, wrapped
-	}
 	coverURL, err := s.optionalAssetURL(video.CoverImageURL)
 	if err != nil {
 		wrapped := fmt.Errorf("build cover_image_url for recommendation feed item: run_id=%s video_id=%s: %w", runID, planItem.VideoID, err)
-		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)
-		return apvdto.FeedItem{}, wrapped
-	}
-	transcriptURL, err := s.optionalAssetURL(video.TranscriptObjectPath)
-	if err != nil {
-		wrapped := fmt.Errorf("build transcript_url for recommendation feed item: run_id=%s video_id=%s: %w", runID, planItem.VideoID, err)
 		s.logger.Error("failed to materialize feed item", "run_id", runID, "video_id", planItem.VideoID, "error", wrapped)
 		return apvdto.FeedItem{}, wrapped
 	}
@@ -174,16 +162,9 @@ func (s *FeedService) buildFeedItem(
 	return apvdto.FeedItem{
 		VideoID:         planItem.VideoID,
 		Title:           video.Title,
-		Description:     video.Description,
-		VideoURL:        videoURL,
 		CoverImageURL:   coverURL,
-		TranscriptURL:   transcriptURL,
 		DurationSeconds: durationSeconds(planItem.DurationMs),
 		ViewCount:       video.ViewCount,
-		LikeCount:       video.LikeCount,
-		FavoriteCount:   video.FavoriteCount,
-		HasLiked:        video.HasLiked,
-		HasFavorited:    video.HasFavorited,
 		LearningUnits:   units,
 	}, nil
 }

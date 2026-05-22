@@ -11,7 +11,8 @@
 - 用户对视频的互动状态投影
 - 观看进度上报命令 `RecordVideoWatchProgress`
 - 视频点赞/收藏 set-unset 命令 `SetVideoLike` / `SetVideoFavorite`
-- Feed facade 使用的批量读取能力：视频展示字段、互动统计、unit label
+- Feed facade 使用的批量读取能力：视频列表 preview 字段、unit label
+- Video Detail 使用的单视频详情读取能力：播放资源、transcript 元数据、互动统计、当前用户状态
 - End Quiz 使用的批量取题能力：视频上下文题优先，通用 unit 题 fallback
 
 当前已落地结构：
@@ -76,7 +77,7 @@ Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 internal/api FeedService
   -> catalog.FeedVideoLookupUsecase
   -> catalog.FeedLookupReader.ListFeedVideosByIDs
-  -> catalog.videos + catalog.video_transcripts + catalog.video_engagement_stats + catalog.video_user_states
+  -> catalog.videos + catalog.video_engagement_stats
 
 internal/api FeedService
   -> catalog.UnitLabelLookupUsecase
@@ -84,7 +85,18 @@ internal/api FeedService
   -> semantic.coarse_unit
 ```
 
-`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。Transcript 元数据缺行时 `transcript_object_path` 返回空；互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`；当前用户没有 `catalog.video_user_states` 行时 `has_liked`、`has_favorited` 返回 `false`。
+`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。它只返回 Feed preview 需要的 `title`、`thumbnail_url` 和 `view_count`；互动统计缺行时 `view_count` 返回 `0`。
+
+Video Detail lookup 是只读能力，服务 `GET /api/videos/{video_id}`：
+
+```text
+internal/api VideoDetailService
+  -> catalog.GetVideoDetailUsecase
+  -> catalog.FeedLookupReader.GetVideoDetailByID
+  -> catalog.videos + catalog.video_transcripts + catalog.video_engagement_stats + catalog.video_user_states
+```
+
+`GetVideoDetailByID` 使用同一套可展示视频 predicate。Transcript 元数据缺行时 `transcript_object_path` 返回空；互动统计缺行时 `view_count`、`like_count`、`favorite_count` 返回 `0`；当前用户没有 `catalog.video_user_states` 行时 `has_liked`、`has_favorited` 返回 `false`。
 
 `ListUnitLabelsByIDs` 只补 `semantic.coarse_unit.status = active` 的 `label`。Catalog 在这里提供 lightweight read capability，是为了让 API facade 批量补齐展示文本；Catalog 不理解 Recommendation 的 role、rank、score，也不参与 quiz 选择。
 

@@ -40,17 +40,10 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 	videoLookup := &fakeFeedVideoLookup{
 		response: catalogdto.FeedVideoLookupResponse{Videos: []catalogdto.FeedVideoDisplay{
 			{
-				VideoID:              "11111111-1111-1111-1111-111111111111",
-				Title:                "Title",
-				Description:          "Description",
-				VideoObjectPath:      "hls/111/master.m3u8",
-				CoverImageURL:        stringPtr("covers/111.webp"),
-				TranscriptObjectPath: stringPtr("transcripts/111.json"),
-				ViewCount:            12,
-				LikeCount:            3,
-				FavoriteCount:        2,
-				HasLiked:             true,
-				HasFavorited:         true,
+				VideoID:       "11111111-1111-1111-1111-111111111111",
+				Title:         "Title",
+				CoverImageURL: stringPtr("covers/111.webp"),
+				ViewCount:     12,
 			},
 		}},
 	}
@@ -85,20 +78,14 @@ func TestFeedServiceBuildsDisplayResponseFromRecommendationPlan(t *testing.T) {
 		t.Fatalf("unexpected response shell: %+v", response)
 	}
 	item := response.Items[0]
-	if item.VideoID != "11111111-1111-1111-1111-111111111111" || item.VideoURL != "https://cdn.example.com/assets/hls/111/master.m3u8" {
-		t.Fatalf("unexpected item identity/url: %+v", item)
+	if item.VideoID != "11111111-1111-1111-1111-111111111111" || item.Title != "Title" {
+		t.Fatalf("unexpected item identity/title: %+v", item)
 	}
 	if item.CoverImageURL == nil || *item.CoverImageURL != "https://cdn.example.com/assets/covers/111.webp" {
 		t.Fatalf("unexpected cover url: %+v", item.CoverImageURL)
 	}
-	if item.TranscriptURL == nil || *item.TranscriptURL != "https://cdn.example.com/assets/transcripts/111.json" {
-		t.Fatalf("unexpected transcript url: %+v", item.TranscriptURL)
-	}
-	if item.DurationSeconds != 91 || item.ViewCount != 12 || item.LikeCount != 3 || item.FavoriteCount != 2 {
+	if item.DurationSeconds != 91 || item.ViewCount != 12 {
 		t.Fatalf("unexpected counts/duration: %+v", item)
-	}
-	if !item.HasLiked || !item.HasFavorited {
-		t.Fatalf("unexpected interaction state: %+v", item)
 	}
 	if len(item.LearningUnits) != 1 {
 		t.Fatalf("expected 1 learning unit, got %+v", item.LearningUnits)
@@ -128,10 +115,8 @@ func TestFeedServiceAllowsVideoLevelFillItemsWithoutLearningUnits(t *testing.T) 
 	videoLookup := &fakeFeedVideoLookup{
 		response: catalogdto.FeedVideoLookupResponse{Videos: []catalogdto.FeedVideoDisplay{
 			{
-				VideoID:         "22222222-2222-2222-2222-222222222222",
-				Title:           "Popular fill",
-				Description:     "A video-level fill item",
-				VideoObjectPath: "hls/222/master.m3u8",
+				VideoID: "22222222-2222-2222-2222-222222222222",
+				Title:   "Popular fill",
 			},
 		}},
 	}
@@ -212,13 +197,6 @@ func TestFeedServiceFailsWhenPlanCannotBeFullyMaterialized(t *testing.T) {
 			labels:      nil,
 			errContains: "missing unit label",
 		},
-		{
-			name:        "invalid url",
-			planItem:    validPlanItem("11111111-1111-1111-1111-111111111111", 101),
-			videos:      []catalogdto.FeedVideoDisplay{{VideoID: "11111111-1111-1111-1111-111111111111", Title: "Title"}},
-			labels:      []catalogdto.UnitLabel{{CoarseUnitID: 101, Text: "kept"}},
-			errContains: "build video_url",
-		},
 	}
 
 	for _, tt := range cases {
@@ -267,9 +245,8 @@ func invalidDurationPlanItem(videoID string, unitID int64) recommendationdto.Rec
 
 func validVideoDisplay(videoID string) catalogdto.FeedVideoDisplay {
 	return catalogdto.FeedVideoDisplay{
-		VideoID:         videoID,
-		Title:           "Title",
-		VideoObjectPath: "https://cdn.example.com/hls/master.m3u8",
+		VideoID: videoID,
+		Title:   "Title",
 	}
 }
 

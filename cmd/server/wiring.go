@@ -18,6 +18,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/me"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videodetail"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
@@ -64,6 +65,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	}
 	endQuiz := buildEndQuizHandler(pool)
 	unitCollections := buildUnitCollectionsHandler(pool)
+	videoDetail := buildVideoDetailHandler(pool, config)
 	videoInteractions := buildVideoInteractionsHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
@@ -73,6 +75,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
+		VideoDetail:       videoDetail,
 		EndQuiz:           endQuiz,
 		UnitCollections:   unitCollections,
 		VideoInteractions: videoInteractions,
@@ -163,6 +166,13 @@ func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handle
 	setLike := catalogservice.NewSetVideoLikeUsecase(writer)
 	setFavorite := catalogservice.NewSetVideoFavoriteUsecase(writer)
 	return videointeractions.NewHandler(setLike, setFavorite)
+}
+
+func buildVideoDetailHandler(pool *pgxpool.Pool, config config) *videodetail.Handler {
+	reader := catalogrepo.NewFeedLookupReader(pool)
+	lookup := catalogservice.NewGetVideoDetailUsecase(reader)
+	service := apiservice.NewVideoDetailService(lookup, apiservice.NewPublicAssetURLBuilder(config.PublicAssetBaseURL))
+	return videodetail.NewHandler(service)
 }
 
 func buildEndQuizHandler(pool *pgxpool.Pool) *endquiz.Handler {

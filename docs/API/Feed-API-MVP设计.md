@@ -1,338 +1,128 @@
 # Feed API MVP 设计
 
-## 0. 文档信息
+## 1. 文档目标
 
-文档状态：MVP 已实现，HTTP endpoint 已接入 `cmd/server`
-目标读者：前端、后端、Recommendation / Catalog / API 维护者
-当前范围：定义 feed 页面获取视频列表的前端契约、后端编排边界、字段来源、Recommendation audit 关系和成功语义。
-当前明确不做：不把 Recommendation DTO 直接暴露给前端，不在 feed 响应里返回 quiz 题目，不在 `internal/recommendation` 中补前端展示字段。
+本文定义后端 `POST /api/feed` 的当前前端契约。Feed API 只负责推荐列表 preview 和本轮 learning context；播放资源、transcript URL、description、互动计数和当前用户 like / favorite 状态不属于 Feed。
 
-关联文档：
+相关文档：
 
+- [Video-Detail-API-MVP设计.md](Video-Detail-API-MVP设计.md)
+- [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md)
 - [API模块总体设计规范.md](API模块总体设计规范.md)
-- [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md)
-- [学习事件上报API设计.md](学习事件上报API设计.md)
-- [../推荐模块设计.md](../推荐模块设计.md)
-- [../题目入库文档.md](../题目入库文档.md)
 
-## 1. 一句话结论
-
-Feed API 是一个前端展示 facade：
-
-```text
-POST /api/feed
-  -> Recommendation.GenerateVideoRecommendations
-  -> 批量补 Catalog 视频展示信息
-  -> 批量补视频互动统计
-  -> 批量补 semantic.coarse_unit 展示文本
-  -> 返回前端 FeedResponse
-```
-
-Recommendation 仍只负责生成推荐计划：
-
-```text
-run_id + items[].video_id + items[].duration_ms + items[].learning_units
-```
-
-Feed API 负责把这份推荐计划转换成前端 feed 页面可直接展示和后续上报可直接使用的结构：
-
-```text
-recommendation_run_id + items[]
-```
-
-## 2. API 定位
-
-### 2.1 为什么用 POST
-
-Feed 请求会触发 Recommendation run，并写入 Recommendation audit 与 serving state。因此它不是纯读取接口，不应使用 `GET`。
-
-### 2.2 endpoint
+## 2. 核心结论
 
 ```http
 POST /api/feed
 Content-Type: application/json
+Authorization: Bearer <token>
 ```
 
-`user_id` 不由前端传入。HTTP 层必须从认证 principal 中解析当前用户，并传给内部 usecase。
+Feed API 当前固定语义：
 
-### 2.3 模块边界
+- 请求体只接受 `target_video_count` 和 `client_context`。
+- response 顶层返回 `recommendation_run_id` 和 `items[]`。
+- `items[]` 只返回列表 preview 字段、`view_count` 和 `learning_units[]`。
+- 不返回 item-level recommendation id；前端用 `recommendation_run_id + item index` 派生本地 feed occurrence identity。
+- 不暴露 Recommendation 内部字段：`rank / score / reason_codes / explanation / selector_mode / underfilled`。
+- 不暴露播放详情字段：`description / video_url / transcript_url`。
+- 不暴露 fullscreen 互动字段：`like_count / favorite_count / has_liked / has_favorited`。
 
-| 模块 | 职责 | 不做什么 |
-| --- | --- | --- |
-| `internal/api` | HTTP handler、请求 validation、调用 Recommendation 和 Catalog unit label 读取能力、组装 FeedResponse。 | 不写 SQL，不拥有业务表，不实现推荐排序规则。 |
-| `internal/recommendation` | 生成 `run_id + items[].video_id + items[].duration_ms + items[].learning_units`，写 Recommendation audit / serving state。 | 不返回 `title`、`cover_image_url`、`like_count` 等 feed 展示字段。 |
-| `internal/catalog` | 提供按 `video_id[]` 批量读取视频展示信息和互动统计的能力。 | 不理解 Recommendation 的 `role`、`is_primary`、`rank`、`score`。 |
-| Catalog unit label 读取能力 | 在 Catalog feed lookup reader 中提供按 `coarse_unit_id[]` 批量读取 `semantic.coarse_unit.label`。 | 不参与推荐排序或题目选择。 |
+播放详情由 `GET /api/videos/{video_id}` 提供。
 
-MVP 不新增独立 `internal/feed` 模块。当前 Feed API 只是 API 层组合编排，不是新的业务 owner。只有未来 Feed 开始拥有独立状态或规则，例如 feed session、cursor、运营插入、实验分流、跨推荐源混排，才考虑拆出 feed 模块。
+## 3. 请求契约
 
-## 3. 请求结构
-
-### 3.1 Request
-
-```json
-{
-  "target_video_count": 8,
-  "client_context": {
-    "platform": "ios",
-    "app_version": "1.3.0",
-    "os_version": "18.5",
-    "device_model": "iPhone16,2"
-  }
-}
+```ts
+type FeedRequest = {
+  target_video_count?: number;
+  client_context?: Record<string, unknown>;
+};
 ```
 
-### 3.2 请求字段
+字段语义：
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `target_video_count` | integer | 否 | `8` | 希望返回的视频数量。MVP 建议限制为 `1..20`。 |
-| `client_context` | object | 否 | `{}` | 客户端环境上下文，写入 Recommendation request context，用于排障和后续分析。 |
+| 字段 | 类型 | 必填 | 语义 |
+|---|---:|---:|---|
+| `target_video_count` | integer | 否 | 希望返回的视频数量。省略时后端默认 `8`；合法范围 `1..20`。 |
+| `client_context` | object | 否 | 前端环境上下文。省略时按空 object 处理。 |
 
-`client_context` 只要求是 JSON object，不固定字段集合。推荐继续使用 `platform`、`app_version`、`os_version`、`device_model` 四个基础字段。
-Feed API 不接受 `preferred_duration_sec` 或 `session_hint`。请求 JSON 使用严格字段解析，传入未定义字段会返回 `400 invalid_request`。
+Feed API 不接受 `preferred_duration_sec` 或 `session_hint`。请求 JSON 中出现未定义字段时返回 `400 invalid_request`。
 
-## 4. 返回结构
+## 4. 响应契约
 
-### 4.1 Response
+```ts
+type FeedLearningUnit = {
+  coarse_unit_id: number;
+  text: string;
+  role: 'hard_review' | 'new_now' | 'soft_review' | 'near_future';
+  is_primary: boolean;
+  evidence_sentence_index: number;
+  evidence_span_index: number;
+  evidence_start_ms: number;
+  evidence_end_ms: number;
+};
 
-```json
-{
-  "recommendation_run_id": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
-  "items": [
-    {
-      "video_id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      "title": "How to stay focused while learning",
-      "description": "A short clip about staying focused during practice.",
-      "video_url": "https://storage.googleapis.com/videos2077/test-video/portrait_videos/clip-001.mp4",
-      "cover_image_url": "https://storage.googleapis.com/videos2077/test-video/cover/clip-001.webp",
-      "transcript_url": "https://storage.googleapis.com/videos2077/test-video/transcript/clip-001.json",
-      "duration_seconds": 92,
-      "view_count": 1204,
-      "like_count": 85,
-      "favorite_count": 17,
-      "has_liked": true,
-      "has_favorited": false,
-      "learning_units": [
-        {
-          "coarse_unit_id": 101,
-          "text": "focus",
-          "role": "hard_review",
-          "is_primary": true,
-          "evidence_sentence_index": 12,
-          "evidence_span_index": 4,
-          "evidence_start_ms": 42310,
-          "evidence_end_ms": 42880
-        }
-      ]
-    }
-  ]
-}
+type FeedItem = {
+  video_id: string;
+  title: string;
+  cover_image_url: string | null;
+  duration_seconds: number;
+  view_count: number;
+  learning_units: FeedLearningUnit[];
+};
+
+type FeedResponse = {
+  recommendation_run_id: string;
+  items: FeedItem[];
+};
 ```
 
-### 4.2 顶层字段
+字段语义：
 
-| 字段 | 类型 | 来源 | 说明 |
-| --- | --- | --- | --- |
-| `recommendation_run_id` | string UUID | `GenerateVideoRecommendationsResponse.run_id` | 本次 feed 请求对应的推荐运行 ID。前端不解析，只在 exposure / lookup / quiz attempt / feedback 上报时原样带回。 |
-| `items` | array | Recommendation 返回顺序 + Catalog/semantic 补齐 | Feed 视频列表。数组顺序就是展示顺序，不额外暴露 `rank`。 |
+| 字段 | 来源 | 语义 |
+|---|---|---|
+| `recommendation_run_id` | Recommendation run | 本次推荐运行 ID，用于前端后续 exposure / lookup / quiz 等上报关联审计。 |
+| `video_id` | Recommendation item | 视频稳定标识。 |
+| `title` | `catalog.videos.title` | 列表 preview 标题。 |
+| `cover_image_url` | `catalog.videos.thumbnail_url` 经 API URL 组装 | 列表 preview 封面；空路径或缺值返回 `null`。 |
+| `duration_seconds` | Recommendation item `duration_ms` 向上取整 | 列表 preview 时长。 |
+| `view_count` | `catalog.video_engagement_stats.view_count` | 全局观看数；缺统计行返回 `0`。 |
+| `learning_units` | Recommendation item + `semantic.coarse_unit.label` | 本轮 feed 的 learning context；不是视频永久元数据。 |
 
-### 4.3 `FeedItem`
-
-| 字段 | 类型 | 来源 | 说明 |
-| --- | --- | --- | --- |
-| `video_id` | string UUID | Recommendation item | 视频稳定 ID，用于列表 key、路由、fullscreen 定位和互动上报。 |
-| `title` | string | `catalog.videos.title` | 视频标题，用于 feed 卡片、fullscreen、详情页展示。 |
-| `description` | string | `catalog.videos.description` | 视频描述。数据库可空；API 缺省返回空字符串，保持前端字段稳定。 |
-| `video_url` | string | `catalog.videos.video_object_path` + URL 组装规则 | 视频播放地址。当前 ingest 写入 GCS mp4 绝对 URL，API 原样返回。 |
-| `cover_image_url` | string \| null | `catalog.videos.thumbnail_url` + URL 组装规则 | 视频封面地址；为空时前端显示 fallback。 |
-| `transcript_url` | string \| null | `catalog.video_transcripts.transcript_object_path` + URL 组装规则 | 字幕 / transcript JSON 地址。Feed 只返回 URL，不内联 transcript 内容；无 transcript 行或空路径时返回 `null`。 |
-| `duration_seconds` | integer | Recommendation `items[].duration_ms` | 视频总时长，单位秒。Feed facade 由毫秒向上取整，保证非 0 视频不会显示为 0 秒。Recommendation 已为推荐决策读取 `duration_ms`，这里不重复从 Catalog 读取。 |
-| `view_count` | integer | `catalog.video_engagement_stats.view_count` | 全局观看数，只用于展示。无统计行时返回 `0`。 |
-| `like_count` | integer | `catalog.video_engagement_stats.like_count` | 全局点赞数，作为 action rail 基础 count。无统计行时返回 `0`。 |
-| `favorite_count` | integer | `catalog.video_engagement_stats.favorite_count` | 全局收藏数，作为 action rail 基础 count。无统计行时返回 `0`。 |
-| `has_liked` | boolean | `catalog.video_user_states.has_liked` | 当前用户是否已点赞该视频。无用户状态行时返回 `false`。 |
-| `has_favorited` | boolean | `catalog.video_user_states.has_bookmarked` | 当前用户是否已收藏该视频。API 使用产品语义 `favorite`，数据库继续使用 `bookmarked` 字段。无用户状态行时返回 `false`。 |
-| `learning_units` | array | Recommendation item + semantic label 补齐 | 本视频在本次推荐中预期承载的学习单元。学习推荐视频最多约 `1..8` 个；Recommendation video-level 补全视频返回空数组。 |
-
-### 4.4 `FeedLearningUnit`
-
-| 字段 | 类型 | 来源 | 说明 |
-| --- | --- | --- | --- |
-| `coarse_unit_id` | integer | Recommendation `learning_units[].coarse_unit_id` | 学习单元 ID，对应 `semantic.coarse_unit.id`。用于 exposure / lookup / quiz attempt 绑定学习对象。 |
-| `text` | string | `semantic.coarse_unit.label` | 学习单元文本，例如单词、短语或表达本身。 |
-| `role` | string | Recommendation `learning_units[].role` | 本轮推荐中的学习角色：`hard_review` / `new_now` / `soft_review` / `near_future`。 |
-| `is_primary` | boolean | Recommendation `learning_units[].is_primary` | 是否是这个视频的主学习目标。 |
-| `evidence_sentence_index` | integer | Recommendation `learning_units[].evidence.sentence_index` | 最佳证据命中的字幕句子序号。 |
-| `evidence_span_index` | integer | Recommendation `learning_units[].evidence.span_index` | 最佳证据命中的句内 span 序号。 |
-| `evidence_start_ms` | integer | Recommendation `learning_units[].evidence.start_ms` | 最佳证据开始时间，单位毫秒。用于字幕高亮、跳转、exposure 候选定位。 |
-| `evidence_end_ms` | integer | Recommendation `learning_units[].evidence.end_ms` | 最佳证据结束时间，单位毫秒。 |
-
-MVP Feed API 对前端返回的非空 `FeedLearningUnit` 要求 evidence 字段完整。若 Recommendation 返回某个 unit 但 evidence 缺失，说明 Catalog evidence 链路存在数据质量问题。Feed facade 不做静默裁剪，必须返回 `500 internal_error` 并记录服务端 error。
-
-`learning_units: []` 是稳定业务语义：该视频是 Recommendation 为避免 feed 空返回或数量不足而追加的 video-level 补全视频，不代表本轮学习目标。前端仍可展示和播放该视频，但不应为它发起 exposure 候选判断或视频末尾 end quiz 请求。
-
-## 5. 字段裁剪规则
-
-Recommendation plan response 只包含以下字段：
+## 5. 后端调用链
 
 ```text
-run_id
-items[].video_id
-items[].duration_ms
-items[].learning_units
+POST /api/feed
+  -> internal/api FeedService
+  -> recommendation.GenerateVideoRecommendations
+  -> catalog.FeedVideoLookupUsecase
+  -> catalog.FeedLookupReader.ListFeedVideosByIDs
+  -> catalog.UnitLabelLookupUsecase
 ```
 
-Feed API 只暴露：
+模块边界：
 
-```text
-recommendation_run_id
-items[] order
-items[].video_id
-items[].duration_ms -> duration_seconds
-items[].has_liked
-items[].has_favorited
-items[].learning_units
-```
+| 模块 | 职责 | 不负责 |
+|---|---|---|
+| `internal/api` | HTTP 解析、principal、调用 Recommendation 和 Catalog、组装前端 response。 | 不直接读写数据库，不拥有业务规则。 |
+| `internal/recommendation` | 生成 `run_id + items[].video_id + duration_ms + learning_units`，写 audit / serving state。 | 不返回前端展示字段。 |
+| `internal/catalog` | 批量读取 active/public/published 视频 preview 字段和 `view_count`。 | 不理解 Recommendation rank/role，不写状态。 |
+| `internal/semantic` | 提供 active coarse unit label。 | 不参与推荐选择。 |
 
-以下字段不返回前端：
+`ListFeedVideosByIDs` 只返回可展示视频：`catalog.videos.status = active`、`visibility_status = public`、且 `publish_at` 为空或已发布。
 
-| 字段 | 不返回原因 |
-| --- | --- |
-| `selector_mode` | 推荐供给状态和选择策略，属于后端调试 / audit 信息。 |
-| `underfilled` | feed 页面只关心实际拿到的 items；供给不足由后端监控和 audit 处理。 |
-| `rank` | 数组顺序已经表达展示顺序，不需要让前端消费 rank。 |
-| `score` | 排序分是后端内部信号，前端不应展示或分支依赖。 |
-| `reason_codes` | 当前 feed 页面不展示推荐解释；保留在 audit 中即可。 |
-| `explanation` | 当前 feed 页面不展示推荐解释；如未来需要解释卡片，再设计独立展示契约。 |
+## 6. 错误与一致性边界
 
-## 6. 后端编排流程
+- 缺少 principal：`401 unauthorized`。
+- 非 JSON object、非法字段、`target_video_count` 越界：`400 invalid_request`。
+- Recommendation 或下游超时 / 取消：`503 service_unavailable`。
+- Recommendation 已写 audit / serving state 后，API facade 不静默丢弃 item。
+- 缺少视频 preview 数据、`duration_ms <= 0`、非空 learning unit evidence 不完整、非空 unit label 缺失，都是后端一致性错误，返回 `500 internal_error`。
+- `learning_units=[]` 合法，表示该 item 是 video-level 补全视频。
 
-```text
-1. HTTP handler 从 principal 解析 user_id。
-2. 校验请求 body：
-   - target_video_count 在允许范围内；
-   - client_context 是 JSON object。
-3. 调用 Recommendation.GenerateVideoRecommendations。
-   - Recommendation 生成 run_id；
-   - 写 recommendation.video_recommendation_runs；
-   - 写 recommendation.video_recommendation_items；
-   - 更新 Recommendation serving state。
-4. 从 Recommendation response 收集：
-   - video_ids；
-   - duration_ms；
-   - 非空 learning_units 的 coarse_unit_ids；
-   - 非空 learning_units 的 evidence。
-5. 批量读取视频展示信息：
-   - catalog.videos 的 `title`、`description`、`video_object_path`、`thumbnail_url`；
-   - catalog.video_transcripts 的 `transcript_object_path`；
-   - catalog.video_engagement_stats；
-   - catalog.video_user_states 中当前用户对这些视频的 `has_liked` / `has_bookmarked`。
-6. 批量读取 unit 展示文本：
-   - 只在存在非空 `learning_units` 时查询；
-   - 查询 `semantic.coarse_unit.label`；
-   - 全部 item 都是 video-level 补全视频时跳过本步骤。
-7. 按 Recommendation response 的 items[] 顺序组装 Feed items[]。
-8. 裁剪 Recommendation 内部字段，返回 FeedResponse。
-```
+## 7. 成功标准
 
-URL 组装规则：
-
-- `video_object_path`、`thumbnail_url` 或 `transcript_object_path` 已是 `http://` / `https://` 绝对 URL 时原样返回。
-- 相对路径使用 `PUBLIC_ASSET_BASE_URL` 作为前缀，并清理重复 `/`。当前 ingest 生成的是 GCS 绝对 URL，因此不依赖该前缀。
-- `PUBLIC_ASSET_BASE_URL` 是 `cmd/server` 必填配置，必须是绝对 http(s) URL。
-
-## 7. 数据来源
-
-| Feed 字段 | 数据来源 |
-| --- | --- |
-| `recommendation_run_id` | `recommendation.video_recommendation_runs.run_id` / usecase response `run_id` |
-| `items[].video_id` | `recommendation.video_recommendation_items.video_id` / usecase response |
-| `title` | `catalog.videos.title` |
-| `description` | `catalog.videos.description` |
-| `video_url` | `catalog.videos.video_object_path` 经 API 层 URL 组装 |
-| `cover_image_url` | `catalog.videos.thumbnail_url` 经 API 层 URL 组装 |
-| `transcript_url` | `catalog.video_transcripts.transcript_object_path` 经 API 层 URL 组装；缺行返回 `null` |
-| `duration_seconds` | `ceil(RecommendationPlanItem.duration_ms / 1000)` |
-| `view_count` | `catalog.video_engagement_stats.view_count` |
-| `like_count` | `catalog.video_engagement_stats.like_count` |
-| `favorite_count` | `catalog.video_engagement_stats.favorite_count` |
-| `has_liked` | `catalog.video_user_states.has_liked`，缺行返回 `false` |
-| `has_favorited` | `catalog.video_user_states.has_bookmarked`，缺行返回 `false` |
-| `learning_units[].coarse_unit_id` | Recommendation `learning_units` |
-| `learning_units[].text` | `semantic.coarse_unit.label`；`learning_units=[]` 时不查询 |
-| `learning_units[].role` | Recommendation `learning_units` |
-| `learning_units[].is_primary` | Recommendation `learning_units` |
-| `learning_units[].evidence_*` | Recommendation `learning_units[].evidence` |
-
-Feed facade 的 batch 补齐范围只包括：
-
-```text
-title
-description
-video_url
-cover_image_url
-transcript_url
-view_count
-like_count
-favorite_count
-has_liked
-has_favorited
-learning_units[].text
-```
-
-`duration_seconds` 不在这个 batch 查询范围内，直接来自 Recommendation plan item 的 `duration_ms`。
-
-## 8. 错误响应
-
-错误 envelope、request id、principal 规则统一遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。
-
-| HTTP 状态 | 场景 |
-| --- | --- |
-| `400 Bad Request` | JSON 格式错误、字段类型错误、未知字段、`target_video_count` 越界。 |
-| `401 Unauthorized` | 未登录或 principal 缺失。 |
-| `500 Internal Server Error` | Recommendation pipeline、Catalog 批量读取或 semantic 批量读取失败。 |
-| `503 Service Unavailable` | 请求超时或 context canceled。 |
-
-MVP 不把“推荐结果少于请求数量”作为错误。Recommendation 自己会记录 `underfilled` 到 audit；Feed API 返回 Recommendation plan 中实际生成的 items。
-
-但 Feed facade 对 Recommendation plan 采用完整补齐语义：缺少视频展示数据、`duration_ms <= 0`、非空 unit evidence 不完整、非空 unit label 缺失、非空媒体 URL 组装失败，都是后端数据一致性错误，返回 `500 internal_error`。缺少 transcript 行不是错误，`transcript_url` 返回 `null`。`learning_units=[]` 也不是错误；它表示该 item 是 Recommendation 的 video-level 补全视频，Feed facade 只补视频展示字段，不读取或要求 unit label。这样 Recommendation audit / serving state 不会和前端实际收到的 feed item 静默分叉。
-
-## 9. 前端使用约定
-
-Feed 页面只使用本 API 做列表展示和进入 fullscreen 的初始数据。
-
-前端点进某个视频后，视频播放和字幕 / transcript 内容仍由前端按 `video_url`、`transcript_url` 自行拉取；Feed API 只返回 URL，不内联文件内容。
-
-前端应保存当前 item 的：
-
-```text
-recommendation_run_id
-video_id
-transcript_url
-has_liked
-has_favorited
-learning_units[]
-```
-
-这些字段用于后续：
-
-- 字幕高亮与 exposure 候选判断；
-- lookup / exposure 上报；
-- 视频末尾批量 quiz 取题；
-- quiz attempt 上报时的推荐来源归因。
-- action rail 点赞/收藏初始状态展示。
-
-Feed item 的 `like_count` / `favorite_count` 和 `has_liked` / `has_favorited` 是 action rail 初始值。用户点击后调用对应 `PUT/DELETE /like` 或 `PUT/DELETE /favorite`，并用写接口返回的单类状态覆盖本地 UI；点赞响应不顺带刷新收藏状态，收藏响应也不顺带刷新点赞状态。
-
-如果某个 item 的 `learning_units` 为空，前端只按普通视频展示和播放，不做 learning exposure，也不调用 end quiz。若前端统一调用 end quiz，也必须先过滤出非空 `coarse_unit_ids`。
-
-## 10. 成功标准
-
-实现本 API 时至少满足：
-
-1. 一次成功请求会生成 Recommendation run，并写入 `recommendation.video_recommendation_runs` 与 `recommendation.video_recommendation_items`。
-2. response 不暴露 `rank`、`score`、`reason_codes`、`explanation`、`selector_mode`、`underfilled`。
-3. response 中每个 `FeedItem` 都包含前端展示所需视频字段和当前用户互动状态；学习推荐 item 带 evidence 完整的 `learning_unit`，补全 item 允许 `learning_units=[]`。
-4. `items[]` 顺序严格保持 Recommendation 返回顺序。
-5. Catalog / semantic 补充读取必须按 batch 完成，不允许按 item 逐条查询。
+1. `POST /api/feed` 成功返回 `200`，且每个 item 只包含 preview 字段与 `learning_units[]`。
+2. Feed response 不包含 `description / video_url / transcript_url / like_count / favorite_count / has_liked / has_favorited`。
+3. Recommendation audit / serving state 与前端收到的 item 数量保持一致。
+4. 播放详情和 action rail base state 统一由 `GET /api/videos/{video_id}` 获取。

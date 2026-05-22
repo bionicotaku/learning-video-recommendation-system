@@ -25,12 +25,9 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 				{
 					VideoID:         "11111111-1111-1111-1111-111111111111",
 					Title:           "Title",
-					Description:     "Description",
-					VideoURL:        "https://cdn.example.com/hls/master.m3u8",
-					TranscriptURL:   stringPtr("https://cdn.example.com/transcripts/111.json"),
+					CoverImageURL:   stringPtr("https://cdn.example.com/covers/111.webp"),
 					DurationSeconds: 91,
-					HasLiked:        true,
-					HasFavorited:    false,
+					ViewCount:       12,
 					LearningUnits: []apvdto.FeedLearningUnit{
 						{CoarseUnitID: 101, Text: "serendipity", Role: "hard_review", IsPrimary: true, EvidenceSentenceIndex: 2, EvidenceSpanIndex: 1, EvidenceStartMS: 2000, EvidenceEndMS: 2400},
 					},
@@ -54,14 +51,45 @@ func TestFeedReturnsItemsAndPassesPrincipalUserID(t *testing.T) {
 	if body.RecommendationRunID != "run-1" || len(body.Items) != 1 {
 		t.Fatalf("unexpected response: %+v", body)
 	}
-	if !body.Items[0].HasLiked || body.Items[0].HasFavorited {
-		t.Fatalf("unexpected interaction state: %+v", body.Items[0])
-	}
-	if body.Items[0].TranscriptURL == nil || *body.Items[0].TranscriptURL != "https://cdn.example.com/transcripts/111.json" {
-		t.Fatalf("unexpected transcript url: %+v", body.Items[0].TranscriptURL)
-	}
 	if service.request.UserID != "user-1" || service.request.TargetVideoCount != 6 {
 		t.Fatalf("request not mapped: %+v", service.request)
+	}
+}
+
+func TestFeedResponseDoesNotExposeVideoDetailFields(t *testing.T) {
+	service := &fakeFeedService{
+		response: apvdto.FeedResponse{
+			RecommendationRunID: "run-1",
+			Items: []apvdto.FeedItem{
+				{
+					VideoID:         "11111111-1111-1111-1111-111111111111",
+					Title:           "Title",
+					DurationSeconds: 91,
+					ViewCount:       12,
+					LearningUnits:   []apvdto.FeedLearningUnit{},
+				},
+			},
+		},
+	}
+	server := newServer(service)
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, `{}`)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+
+	var raw struct {
+		Items []map[string]any `json:"items"`
+	}
+	decodeJSON(t, response, &raw)
+	if len(raw.Items) != 1 {
+		t.Fatalf("items = %+v, want one item", raw.Items)
+	}
+	for _, field := range []string{"description", "video_url", "transcript_url", "like_count", "favorite_count", "has_liked", "has_favorited"} {
+		if _, ok := raw.Items[0][field]; ok {
+			t.Fatalf("feed item exposed removed field %q: %+v", field, raw.Items[0])
+		}
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const listFeedVideosByIDs = `-- name: ListFeedVideosByIDs :many
+const getVideoDetailByID = `-- name: GetVideoDetailByID :one
 select
   v.video_id,
   v.title,
@@ -19,6 +19,7 @@ select
   v.video_object_path,
   v.thumbnail_url,
   transcript.transcript_object_path,
+  v.duration_ms,
   coalesce(s.view_count, 0)::bigint as view_count,
   coalesce(s.like_count, 0)::bigint as like_count,
   coalesce(s.favorite_count, 0)::bigint as favorite_count,
@@ -30,25 +31,25 @@ left join catalog.video_transcripts transcript on transcript.video_id = v.video_
 left join catalog.video_user_states user_state
   on user_state.user_id = $1::uuid
  and user_state.video_id = v.video_id
-where v.video_id = any($2::uuid[])
+where v.video_id = $2::uuid
   and v.status = 'active'
   and v.visibility_status = 'public'
   and (v.publish_at is null or v.publish_at <= now())
-order by v.video_id
 `
 
-type ListFeedVideosByIDsParams struct {
-	UserID   pgtype.UUID   `json:"user_id"`
-	VideoIds []pgtype.UUID `json:"video_ids"`
+type GetVideoDetailByIDParams struct {
+	UserID  pgtype.UUID `json:"user_id"`
+	VideoID pgtype.UUID `json:"video_id"`
 }
 
-type ListFeedVideosByIDsRow struct {
+type GetVideoDetailByIDRow struct {
 	VideoID              pgtype.UUID `json:"video_id"`
 	Title                string      `json:"title"`
 	Description          string      `json:"description"`
 	VideoObjectPath      string      `json:"video_object_path"`
 	ThumbnailUrl         pgtype.Text `json:"thumbnail_url"`
 	TranscriptObjectPath pgtype.Text `json:"transcript_object_path"`
+	DurationMs           int32       `json:"duration_ms"`
 	ViewCount            int64       `json:"view_count"`
 	LikeCount            int64       `json:"like_count"`
 	FavoriteCount        int64       `json:"favorite_count"`
@@ -56,8 +57,50 @@ type ListFeedVideosByIDsRow struct {
 	HasFavorited         bool        `json:"has_favorited"`
 }
 
-func (q *Queries) ListFeedVideosByIDs(ctx context.Context, arg ListFeedVideosByIDsParams) ([]ListFeedVideosByIDsRow, error) {
-	rows, err := q.db.Query(ctx, listFeedVideosByIDs, arg.UserID, arg.VideoIds)
+func (q *Queries) GetVideoDetailByID(ctx context.Context, arg GetVideoDetailByIDParams) (GetVideoDetailByIDRow, error) {
+	row := q.db.QueryRow(ctx, getVideoDetailByID, arg.UserID, arg.VideoID)
+	var i GetVideoDetailByIDRow
+	err := row.Scan(
+		&i.VideoID,
+		&i.Title,
+		&i.Description,
+		&i.VideoObjectPath,
+		&i.ThumbnailUrl,
+		&i.TranscriptObjectPath,
+		&i.DurationMs,
+		&i.ViewCount,
+		&i.LikeCount,
+		&i.FavoriteCount,
+		&i.HasLiked,
+		&i.HasFavorited,
+	)
+	return i, err
+}
+
+const listFeedVideosByIDs = `-- name: ListFeedVideosByIDs :many
+select
+  v.video_id,
+  v.title,
+  v.thumbnail_url,
+  coalesce(s.view_count, 0)::bigint as view_count
+from catalog.videos v
+left join catalog.video_engagement_stats s on s.video_id = v.video_id
+where v.video_id = any($1::uuid[])
+  and v.status = 'active'
+  and v.visibility_status = 'public'
+  and (v.publish_at is null or v.publish_at <= now())
+order by v.video_id
+`
+
+type ListFeedVideosByIDsRow struct {
+	VideoID      pgtype.UUID `json:"video_id"`
+	Title        string      `json:"title"`
+	ThumbnailUrl pgtype.Text `json:"thumbnail_url"`
+	ViewCount    int64       `json:"view_count"`
+}
+
+func (q *Queries) ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listFeedVideosByIDs, videoIds)
 	if err != nil {
 		return nil, err
 	}
@@ -68,15 +111,8 @@ func (q *Queries) ListFeedVideosByIDs(ctx context.Context, arg ListFeedVideosByI
 		if err := rows.Scan(
 			&i.VideoID,
 			&i.Title,
-			&i.Description,
-			&i.VideoObjectPath,
 			&i.ThumbnailUrl,
-			&i.TranscriptObjectPath,
 			&i.ViewCount,
-			&i.LikeCount,
-			&i.FavoriteCount,
-			&i.HasLiked,
-			&i.HasFavorited,
 		); err != nil {
 			return nil, err
 		}

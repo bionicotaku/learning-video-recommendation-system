@@ -41,11 +41,7 @@ func TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(t *testing.T) {
 	var body struct {
 		RecommendationRunID string `json:"recommendation_run_id"`
 		Items               []struct {
-			VideoID       string  `json:"video_id"`
-			VideoURL      string  `json:"video_url"`
-			TranscriptURL *string `json:"transcript_url"`
-			HasLiked      bool    `json:"has_liked"`
-			HasFavorited  bool    `json:"has_favorited"`
+			VideoID       string `json:"video_id"`
 			LearningUnits []struct {
 				CoarseUnitID int64  `json:"coarse_unit_id"`
 				Text         string `json:"text"`
@@ -56,17 +52,32 @@ func TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(t *testing.T) {
 	if body.RecommendationRunID == "" || len(body.Items) != 1 {
 		t.Fatalf("feed body = %+v, want one recommendation item", body)
 	}
-	if body.Items[0].VideoID != videoID || body.Items[0].VideoURL == "" {
-		t.Fatalf("feed item = %+v, want seeded video with materialized URL", body.Items[0])
-	}
-	if body.Items[0].TranscriptURL == nil || *body.Items[0].TranscriptURL == "" {
-		t.Fatalf("feed transcript url = %+v, want materialized URL", body.Items[0].TranscriptURL)
-	}
-	if !body.Items[0].HasLiked || !body.Items[0].HasFavorited {
-		t.Fatalf("feed interaction state = %+v, want liked and favorited", body.Items[0])
+	if body.Items[0].VideoID != videoID {
+		t.Fatalf("feed item = %+v, want seeded video", body.Items[0])
 	}
 	if len(body.Items[0].LearningUnits) != 1 || body.Items[0].LearningUnits[0].CoarseUnitID != unitID {
 		t.Fatalf("learning units = %+v, want seeded unit", body.Items[0].LearningUnits)
+	}
+	detailResponse := getHTTPWithBearer(t, server, "/api/videos/"+videoID, devBearerToken(userID))
+	requireStatus(t, detailResponse, http.StatusOK)
+	var detailBody struct {
+		VideoID       string  `json:"video_id"`
+		VideoURL      string  `json:"video_url"`
+		TranscriptURL *string `json:"transcript_url"`
+		UserState     struct {
+			HasLiked     bool `json:"has_liked"`
+			HasFavorited bool `json:"has_favorited"`
+		} `json:"user_state"`
+	}
+	decodeResponse(t, detailResponse, &detailBody)
+	if detailBody.VideoID != videoID || detailBody.VideoURL == "" {
+		t.Fatalf("video detail = %+v, want seeded video with materialized URL", detailBody)
+	}
+	if detailBody.TranscriptURL == nil || *detailBody.TranscriptURL == "" {
+		t.Fatalf("video detail transcript url = %+v, want materialized URL", detailBody.TranscriptURL)
+	}
+	if !detailBody.UserState.HasLiked || !detailBody.UserState.HasFavorited {
+		t.Fatalf("video detail user_state = %+v, want liked and favorited", detailBody.UserState)
 	}
 	run := h.LoadRecommendationRun(t, body.RecommendationRunID)
 	if run.ResultCount != 1 {
@@ -249,6 +260,20 @@ func postJSONWithBearer(t *testing.T, server *httptest.Server, path string, bear
 func getHTTP(t *testing.T, server *httptest.Server, path string) *http.Response {
 	t.Helper()
 	return requestHTTP(t, server, http.MethodGet, path, "")
+}
+
+func getHTTPWithBearer(t *testing.T, server *httptest.Server, path string, bearerToken string) *http.Response {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodGet, server.URL+path, nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+bearerToken)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("get with bearer: %v", err)
+	}
+	return response
 }
 
 func requestHTTP(t *testing.T, server *httptest.Server, method string, path string, body string) *http.Response {

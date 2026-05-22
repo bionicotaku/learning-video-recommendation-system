@@ -80,37 +80,102 @@ func TestFeedLookupReaderListFeedVideosByIDs(t *testing.T) {
 	if !ok {
 		t.Fatalf("visible video missing from result: %+v", videos)
 	}
-	if visible.Title != "Visible title" || visible.Description != "Visible description" || visible.VideoObjectPath != "hls/visible/master.m3u8" {
+	if visible.Title != "Visible title" {
 		t.Fatalf("unexpected visible video metadata: %+v", visible)
 	}
 	if visible.CoverImageURL == nil || *visible.CoverImageURL != "covers/visible.webp" {
 		t.Fatalf("unexpected cover image: %+v", visible.CoverImageURL)
 	}
-	if visible.TranscriptObjectPath == nil || *visible.TranscriptObjectPath != "transcripts/visible.json" {
-		t.Fatalf("unexpected transcript path: %+v", visible.TranscriptObjectPath)
-	}
-	if visible.ViewCount != 12 || visible.LikeCount != 3 || visible.FavoriteCount != 2 {
-		t.Fatalf("unexpected stats: %+v", visible)
-	}
-	if !visible.HasLiked || !visible.HasFavorited {
-		t.Fatalf("unexpected interaction state: %+v", visible)
+	if visible.ViewCount != 12 {
+		t.Fatalf("unexpected view count: %+v", visible)
 	}
 
 	noStats, ok := byID[noStatsID]
 	if !ok {
 		t.Fatalf("no-stats video missing from result: %+v", videos)
 	}
-	if noStats.Description != "" || noStats.CoverImageURL != nil {
-		t.Fatalf("empty description/cover should be normalized: %+v", noStats)
+	if noStats.CoverImageURL != nil {
+		t.Fatalf("empty cover should be normalized: %+v", noStats)
 	}
-	if noStats.TranscriptObjectPath != nil {
-		t.Fatalf("missing transcript should return nil: %+v", noStats.TranscriptObjectPath)
+	if noStats.ViewCount != 0 {
+		t.Fatalf("missing stats should default view count to zero: %+v", noStats)
 	}
-	if noStats.ViewCount != 0 || noStats.LikeCount != 0 || noStats.FavoriteCount != 0 {
-		t.Fatalf("missing stats should default to zero: %+v", noStats)
+}
+
+func TestFeedLookupReaderGetVideoDetailByID(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	ctx := context.Background()
+
+	userID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	visibleID := "11111111-1111-1111-1111-111111111111"
+	noStatsID := "22222222-2222-2222-2222-222222222222"
+	inactiveID := "33333333-3333-3333-3333-333333333333"
+
+	seedFeedVideo(t, db.Pool, visibleID, "Visible title", "Visible description", "hls/visible/master.m3u8", "covers/visible.webp", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, noStatsID, "No stats title", "", "https://cdn.example.com/hls/no-stats/master.m3u8", "", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, inactiveID, "Inactive", "", "hls/inactive/master.m3u8", "", "inactive", "public", nil)
+
+	if _, err := db.Pool.Exec(ctx, `
+		insert into auth.users (id, email)
+		values ($1, 'detail-user@example.com')`, userID); err != nil {
+		t.Fatalf("seed auth user: %v", err)
 	}
-	if noStats.HasLiked || noStats.HasFavorited {
-		t.Fatalf("missing user state should default to false: %+v", noStats)
+	if _, err := db.Pool.Exec(ctx, `
+		insert into catalog.video_engagement_stats (video_id, view_count, like_count, favorite_count)
+		values ($1, 12, 3, 2)`, visibleID); err != nil {
+		t.Fatalf("seed stats: %v", err)
+	}
+	if _, err := db.Pool.Exec(ctx, `
+		insert into catalog.video_transcripts (
+			video_id,
+			transcript_object_path,
+			transcript_checksum,
+			sentence_count,
+			semantic_span_count,
+			mapped_span_count,
+			unmapped_span_count,
+			mapped_span_ratio
+		)
+		values ($1, 'transcripts/visible.json', 'checksum-visible', 1, 1, 1, 0, 1.0)`, visibleID); err != nil {
+		t.Fatalf("seed transcript: %v", err)
+	}
+	if _, err := db.Pool.Exec(ctx, `
+		insert into catalog.video_user_states (user_id, video_id, has_liked, has_bookmarked)
+		values ($1, $2, true, true)`, userID, visibleID); err != nil {
+		t.Fatalf("seed user state: %v", err)
+	}
+
+	reader := catalogrepo.NewFeedLookupReader(db.Pool)
+	detail, err := reader.GetVideoDetailByID(ctx, userID, visibleID)
+	if err != nil {
+		t.Fatalf("get video detail: %v", err)
+	}
+	if detail.VideoID != visibleID || detail.Title != "Visible title" || detail.Description != "Visible description" {
+		t.Fatalf("unexpected detail metadata: %+v", detail)
+	}
+	if detail.VideoObjectPath != "hls/visible/master.m3u8" || detail.CoverImageURL == nil || *detail.CoverImageURL != "covers/visible.webp" {
+		t.Fatalf("unexpected media paths: %+v", detail)
+	}
+	if detail.TranscriptObjectPath == nil || *detail.TranscriptObjectPath != "transcripts/visible.json" {
+		t.Fatalf("unexpected transcript path: %+v", detail.TranscriptObjectPath)
+	}
+	if detail.DurationMS != 90000 || detail.ViewCount != 12 || detail.LikeCount != 3 || detail.FavoriteCount != 2 {
+		t.Fatalf("unexpected duration/stats: %+v", detail)
+	}
+	if !detail.HasLiked || !detail.HasFavorited {
+		t.Fatalf("unexpected user state: %+v", detail)
+	}
+
+	noStats, err := reader.GetVideoDetailByID(ctx, userID, noStatsID)
+	if err != nil {
+		t.Fatalf("get no-stats detail: %v", err)
+	}
+	if noStats.TranscriptObjectPath != nil || noStats.ViewCount != 0 || noStats.LikeCount != 0 || noStats.FavoriteCount != 0 || noStats.HasLiked || noStats.HasFavorited {
+		t.Fatalf("missing joins should default to nil/zero/false: %+v", noStats)
+	}
+
+	if _, err := reader.GetVideoDetailByID(ctx, userID, inactiveID); err == nil {
+		t.Fatal("expected inactive video to be hidden")
 	}
 }
 

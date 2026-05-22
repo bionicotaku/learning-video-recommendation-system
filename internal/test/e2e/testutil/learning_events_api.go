@@ -21,6 +21,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/learningevents"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitcollections"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/unitprogress"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videodetail"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/watchprogress"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
@@ -140,9 +141,16 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 		logger,
 	)
 	feedHandler := feed.NewHandler(feedService)
+	videoDetailHandler := videodetail.NewHandler(
+		apiservice.NewVideoDetailService(
+			catalogservice.NewGetVideoDetailUsecase(lookupReader),
+			apiservice.NewPublicAssetURLBuilder("https://cdn.example.com/assets"),
+		),
+	)
 
 	handler := router.New(router.Options{
 		Feed:              feedHandler,
+		VideoDetail:       videoDetailHandler,
 		EndQuiz:           endQuiz,
 		UnitCollections:   unitCollections,
 		VideoInteractions: videoInteractions,

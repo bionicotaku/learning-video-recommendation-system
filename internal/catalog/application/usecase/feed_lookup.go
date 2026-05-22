@@ -13,3 +13,7 @@ type FeedVideoLookupUsecase interface {
 type UnitLabelLookupUsecase interface {
 	Execute(ctx context.Context, request dto.UnitLabelLookupRequest) (dto.UnitLabelLookupResponse, error)
 }
+
+type GetVideoDetailUsecase interface {
+	Execute(ctx context.Context, request dto.GetVideoDetailRequest) (dto.VideoDetailResponse, error)
+}

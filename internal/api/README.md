@@ -25,6 +25,7 @@ Current implemented endpoint group:
 
 ```text
 POST /api/feed
+GET /api/videos/{video_id}
 GET /api/me
 POST /api/videos/end-quiz
 GET /api/unit-collections
@@ -45,17 +46,26 @@ GET /api/legal-documents/{type}
 ```
 
 `POST /api/feed` is a facade endpoint. It calls Recommendation to generate the
-feed plan and audit/serving state, then batch-fills Catalog video display
-fields, transcript URL, engagement stats, current user interaction state, and
-`semantic.coarse_unit.label` text before returning the frontend `FeedResponse`.
+feed plan and audit/serving state, then batch-fills Catalog list preview
+fields and `semantic.coarse_unit.label` text before returning the frontend
+`FeedResponse`.
 It does not expose recommendation rank, score, reason codes, selector mode, or
-underfilled status.
+underfilled status. It also does not return playback detail, transcript URL,
+global like/favorite counts, or current user like/favorite flags; those belong
+to `GET /api/videos/{video_id}`.
 
 Feed materialization is all-or-error: the facade does not silently drop plan
 items or learning units after Recommendation has written audit/serving state.
-Missing display data, incomplete evidence, missing unit labels, or invalid media
-URLs are treated as backend consistency failures. Missing transcript metadata is
-allowed and returns `transcript_url: null`.
+Missing display data, incomplete evidence, or missing unit labels are treated as
+backend consistency failures.
+
+`GET /api/videos/{video_id}` reads the trusted principal as `user_id`, validates
+the path UUID, and calls Catalog for one active/public/published video. It
+returns playback URL, optional transcript URL, description, duration, view /
+like / favorite counts, and current user like / favorite state. Missing
+transcript metadata returns `transcript_url: null`; missing stats or user state
+return zero counts and false flags. The endpoint is read-only and does not write
+Analytics, Learning Engine, Recommendation, or Catalog interaction state.
 
 `GET /api/me` reads the trusted principal as `user_id`, returns the User profile
 cache plus precomputed global activity stats and an embedded seven-day activity
@@ -97,10 +107,9 @@ principal, and calls Catalog. Like responses return only `video_id`,
 `has_liked`, and `like_count`; favorite responses return only `video_id`,
 `has_favorited`, and `favorite_count`.
 
-`POST /api/feed` initializes action rail display with both global counts and
-current user state: each item includes `like_count`, `favorite_count`,
-`has_liked`, and `has_favorited`. Click writes still use the single-purpose
-Video Interactions endpoints above.
+`GET /api/videos/{video_id}` initializes action rail display with both global
+counts and current user state. Click writes still use the single-purpose Video
+Interactions endpoints above.
 
 The learning-event endpoints return only raw Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is

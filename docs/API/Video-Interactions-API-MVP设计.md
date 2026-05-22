@@ -123,7 +123,7 @@ Repository 在单个数据库事务内更新用户状态和全局计数：
 
 ## 6. 前端调用视角
 
-Feed 页面可以用 `FeedResponse.items[].like_count`、`favorite_count`、`has_liked` 和 `has_favorited` 初始化 action rail 的全局计数与当前用户状态。用户点击后调用对应 set / unset API，并用响应中的单类状态覆盖本地 UI：
+Fullscreen action rail 使用 `GET /api/videos/{video_id}` 返回的 `like_count`、`favorite_count`、`user_state.has_liked` 和 `user_state.has_favorited` 初始化全局计数与当前用户状态。用户点击后调用对应 set / unset API，并用响应中的单类状态覆盖本地 UI：
 
 - 点赞按钮只消费 `VideoLikeResponse`。
 - 收藏按钮只消费 `VideoFavoriteResponse`。
