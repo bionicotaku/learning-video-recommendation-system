@@ -147,6 +147,35 @@ func TestUpdateMeProfileAcceptsUnicodeNamesAndMapsPatch(t *testing.T) {
 	}
 }
 
+func TestUpdateMeProfileAcceptsPrimarySchoolEducationStage(t *testing.T) {
+	repository := &fakeProfileRepository{
+		profile: model.UserProfile{
+			UserID:           validUserID,
+			DisplayName:      "old",
+			Locale:           model.DefaultLocale,
+			OnboardingStatus: model.OnboardingStatusNew,
+		},
+		found: true,
+	}
+	usecase := userservice.NewUpdateMeProfileUsecase(repository)
+
+	response, err := usecase.Execute(context.Background(), userdto.UpdateMeProfileRequest{
+		UserID:            validUserID,
+		SetEducationStage: true,
+		EducationStage:    stringPtr("primary_school"),
+	})
+
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !repository.patch.SetEducationStage || repository.patch.EducationStage == nil || *repository.patch.EducationStage != "primary_school" {
+		t.Fatalf("education_stage patch not mapped: %+v", repository.patch)
+	}
+	if response.EducationStage == nil || *response.EducationStage != "primary_school" {
+		t.Fatalf("education_stage response = %+v, want primary_school", response.EducationStage)
+	}
+}
+
 func TestUpdateMeProfileClearsNullableFields(t *testing.T) {
 	repository := &fakeProfileRepository{
 		profile: model.UserProfile{

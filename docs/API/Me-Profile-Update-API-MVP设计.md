@@ -34,6 +34,7 @@ type UpdateMeProfileRequest = {
   birth_date?: string | null;
   gender?: "male" | "female" | "other" | "prefer_not_to_say" | null;
   education_stage?:
+    | "primary_school"
     | "middle_school"
     | "high_school"
     | "undergraduate"
@@ -55,7 +56,7 @@ type UpdateMeProfileRequest = {
 | `display_name` | 不允许 `null`。trim 后必须是 2-20 个 Unicode 字符，只允许 Unicode 字母、Unicode 数字、下划线。 |
 | `birth_date` | 格式必须是 `YYYY-MM-DD`，范围 `1900-01-01 <= birth_date <= today`；`null` 表示清空。 |
 | `gender` | 只能是 `male`、`female`、`other`、`prefer_not_to_say`；`null` 表示清空。 |
-| `education_stage` | 只能是 `middle_school`、`high_school`、`undergraduate`、`graduate`、`phd`、`working`、`other`；`null` 表示清空。 |
+| `education_stage` | 只能是 `primary_school`、`middle_school`、`high_school`、`undergraduate`、`graduate`、`phd`、`working`、`other`；`null` 表示清空。 |
 | `timezone` | 必须是合法 IANA timezone name；`null` 表示清空。 |
 
 `display_name` 的 Unicode 字母/数字规则包含中文、日语、韩语、法语等自然语言字符；不允许空格、emoji、标点和连字符。
@@ -79,6 +80,7 @@ type UpdateMeProfileResponse = {
   birth_date: string | null;
   gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
   education_stage:
+    | "primary_school"
     | "middle_school"
     | "high_school"
     | "undergraduate"
@@ -105,7 +107,7 @@ type UpdateMeProfileResponse = {
   "onboarding_status": "collection_selected",
   "birth_date": "2001-09-01",
   "gender": "prefer_not_to_say",
-  "education_stage": "undergraduate",
+  "education_stage": "primary_school",
   "ip_region": null
 }
 ```

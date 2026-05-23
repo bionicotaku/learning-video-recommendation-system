@@ -139,7 +139,7 @@ func TestPatchMeProfileMapsRequestAndReturnsProfile(t *testing.T) {
 		OnboardingStatus: "collection_selected",
 		BirthDate:        stringPtr("2001-09-01"),
 		Gender:           stringPtr("prefer_not_to_say"),
-		EducationStage:   stringPtr("undergraduate"),
+		EducationStage:   stringPtr("primary_school"),
 	}}
 	server := newServerWithUpdate(&fakeMeService{}, updateService, true)
 	t.Cleanup(server.Close)
@@ -148,7 +148,7 @@ func TestPatchMeProfileMapsRequestAndReturnsProfile(t *testing.T) {
 		"display_name": " Alice_01 ",
 		"birth_date": "2001-09-01",
 		"gender": "prefer_not_to_say",
-		"education_stage": "undergraduate",
+		"education_stage": "primary_school",
 		"timezone": "Asia/Shanghai"
 	}`)
 
@@ -163,7 +163,7 @@ func TestPatchMeProfileMapsRequestAndReturnsProfile(t *testing.T) {
 		!request.SetDisplayName || request.DisplayName != " Alice_01 " ||
 		!request.SetBirthDate || request.BirthDate == nil || *request.BirthDate != "2001-09-01" ||
 		!request.SetGender || request.Gender == nil || *request.Gender != "prefer_not_to_say" ||
-		!request.SetEducationStage || request.EducationStage == nil || *request.EducationStage != "undergraduate" ||
+		!request.SetEducationStage || request.EducationStage == nil || *request.EducationStage != "primary_school" ||
 		!request.SetTimezone || request.Timezone == nil || *request.Timezone != "Asia/Shanghai" {
 		t.Fatalf("request not mapped: %+v", request)
 	}

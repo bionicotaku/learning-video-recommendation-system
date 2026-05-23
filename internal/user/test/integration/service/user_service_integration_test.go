@@ -159,7 +159,7 @@ func TestUpdateMeProfileUpdatesAndClearsFields(t *testing.T) {
 		SetGender:         true,
 		Gender:            stringPtr("prefer_not_to_say"),
 		SetEducationStage: true,
-		EducationStage:    stringPtr("undergraduate"),
+		EducationStage:    stringPtr("primary_school"),
 		SetTimezone:       true,
 		Timezone:          stringPtr("Asia/Shanghai"),
 	})
@@ -169,7 +169,7 @@ func TestUpdateMeProfileUpdatesAndClearsFields(t *testing.T) {
 	if response.DisplayName != "Patched_1" ||
 		response.BirthDate == nil || *response.BirthDate != "2001-09-01" ||
 		response.Gender == nil || *response.Gender != "prefer_not_to_say" ||
-		response.EducationStage == nil || *response.EducationStage != "undergraduate" ||
+		response.EducationStage == nil || *response.EducationStage != "primary_school" ||
 		response.Timezone == nil || *response.Timezone != "Asia/Shanghai" {
 		t.Fatalf("unexpected response: %+v", response)
 	}

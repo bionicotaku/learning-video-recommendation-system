@@ -23,13 +23,14 @@ var (
 	}
 
 	allowedEducationStages = map[string]struct{}{
-		"middle_school": {},
-		"high_school":   {},
-		"undergraduate": {},
-		"graduate":      {},
-		"phd":           {},
-		"working":       {},
-		"other":         {},
+		"primary_school": {},
+		"middle_school":  {},
+		"high_school":    {},
+		"undergraduate":  {},
+		"graduate":       {},
+		"phd":            {},
+		"working":        {},
+		"other":          {},
 	}
 )
 

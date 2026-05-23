@@ -1,8 +1,8 @@
 # 当前数据库 Schema 现状
 
 状态：LIVE DB SNAPSHOT
-更新时间：2026-05-22
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 User module migration 000003 后记录。
+更新时间：2026-05-23
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 User module migration 000004 后记录。
 
 ## 1. Schema 概览
 
@@ -18,7 +18,7 @@
 | `learning` | 存在，包含 `learning.unit_learning_events`、`learning.user_unit_states` |
 | `app_user` | 存在，包含 User profile、activity stats、feedback 表 |
 
-当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation、User 自有表、索引和物化视图。User module tracking 状态为 `module=user current=3 applied=3 pending=0`。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
+当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation、User 自有表、索引和物化视图。User module tracking 状态为 `module=user current=4 applied=4 pending=0`。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
 
 时间字段统一口径：
 
@@ -168,7 +168,7 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 | `onboarding_status` | `text` | no | `new` / `collection_selected` / `completed`。 |
 | `birth_date` | `date` | yes | 用户生日。 |
 | `gender` | `text` | yes | `male` / `female` / `other` / `prefer_not_to_say`。 |
-| `education_stage` | `text` | yes | `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`。 |
+| `education_stage` | `text` | yes | `primary_school` / `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`。 |
 | `ip_region` | `text` | yes | IP 属地缓存预留字段，MVP 暂不写入。 |
 | `created_at` | `timestamptz` | no | 创建时间。 |
 | `updated_at` | `timestamptz` | no | 更新时间。 |

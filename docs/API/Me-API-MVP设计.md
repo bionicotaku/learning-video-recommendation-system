@@ -82,6 +82,7 @@ type MeResponse = {
   birth_date: string | null;
   gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
   education_stage:
+    | "primary_school"
     | "middle_school"
     | "high_school"
     | "undergraduate"

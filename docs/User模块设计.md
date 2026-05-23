@@ -83,6 +83,7 @@ create table app_user.user_profiles (
     check (gender is null or gender in ('male', 'female', 'other', 'prefer_not_to_say')),
   education_stage text
     check (education_stage is null or education_stage in (
+      'primary_school',
       'middle_school',
       'high_school',
       'undergraduate',
@@ -138,6 +139,7 @@ where email is not null;
 
 | 值 | 中文展示建议 |
 |---|---|
+| `primary_school` | 小学 |
 | `middle_school` | 初中 |
 | `high_school` | 高中 |
 | `undergraduate` | 大学本科 |
@@ -449,7 +451,7 @@ UpdateProfile(ctx, user_id, patch)
 | `display_name` | 必填值不能为 `null`；trim 后 2-20 个 Unicode 字符；只允许 Unicode 字母、Unicode 数字、下划线。 |
 | `birth_date` | `YYYY-MM-DD`；范围 `1900-01-01` 到当天；`null` 表示清空。 |
 | `gender` | `male` / `female` / `other` / `prefer_not_to_say`；`null` 表示清空。 |
-| `education_stage` | `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`；`null` 表示清空。 |
+| `education_stage` | `primary_school` / `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`；`null` 表示清空。 |
 | `timezone` | 合法 IANA timezone；`null` 表示清空。 |
 
 详细 HTTP 契约见 [API/Me-Profile-Update-API-MVP设计.md](API/Me-Profile-Update-API-MVP设计.md)。
