@@ -47,8 +47,6 @@ type LearningSuite struct {
 	EnsureTargetUnits learningusecase.EnsureTargetUnitsUsecase
 	ActivateTarget    learningusecase.ActivateUnitCollectionTargetUsecase
 	SetTargetInactive learningusecase.SetTargetInactiveUsecase
-	SuspendTargetUnit learningusecase.SuspendTargetUnitUsecase
-	ResumeTargetUnit  learningusecase.ResumeTargetUnitUsecase
 	RecordEvents      learningusecase.RecordLearningEventsUsecase
 	ReplayUserStates  learningusecase.ReplayUserStatesUsecase
 	ListUserUnitState learningusecase.ListUserUnitStatesUsecase
@@ -156,8 +154,6 @@ func (h *Harness) LearningSuite() *LearningSuite {
 		EnsureTargetUnits: learningservice.NewEnsureTargetUnitsUsecase(txManager),
 		ActivateTarget:    learningservice.NewActivateUnitCollectionTargetUsecase(txManager),
 		SetTargetInactive: learningservice.NewSetTargetInactiveUsecase(txManager),
-		SuspendTargetUnit: learningservice.NewSuspendTargetUnitUsecase(txManager),
-		ResumeTargetUnit:  learningservice.NewResumeTargetUnitUsecase(txManager),
 		RecordEvents:      learningservice.NewRecordLearningEventsUsecase(txManager),
 		ReplayUserStates:  learningservice.NewReplayUserStatesUsecase(txManager),
 		ListUserUnitState: learningservice.NewListUserUnitStatesUsecase(stateRepo),

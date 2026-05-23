@@ -28,9 +28,8 @@ func TestE2E_EnsureTargetWithoutEventsFeedsRecommendation(t *testing.T) {
 	testutil.MustEnsureTarget(t, learning, userID, targetSpec(unitID, 0.95, "lesson_zero_event"))
 
 	states, err := learning.ListUserUnitState.Execute(context.Background(), learningdto.ListUserUnitStatesRequest{
-		UserID:           userID,
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     userID,
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates.Execute(): %v", err)
@@ -84,29 +83,23 @@ func TestE2E_TargetControlsAreVisibleToRecommendation(t *testing.T) {
 		targetSpec(unitB, 0.80, "lesson_b"),
 	)
 
-	if _, err := learning.SuspendTargetUnit.Execute(context.Background(), learningdto.SuspendTargetUnitRequest{
-		UserID:          userID,
-		CoarseUnitID:    unitB,
-		SuspendedReason: "manual_pause",
-	}); err != nil {
-		t.Fatalf("SuspendTargetUnit.Execute(): %v", err)
-	}
-
-	suspended := testutil.MustRecommend(t, recommendation, userID, 2)
-	if videoIndex(suspended.Items, videoB) != -1 {
-		t.Fatalf("suspended video %s should be excluded, got %v", videoB, videoIDs(suspended.Items))
-	}
-
-	if _, err := learning.ResumeTargetUnit.Execute(context.Background(), learningdto.ResumeTargetUnitRequest{
+	if _, err := learning.SetTargetInactive.Execute(context.Background(), learningdto.SetTargetInactiveRequest{
 		UserID:       userID,
 		CoarseUnitID: unitB,
 	}); err != nil {
-		t.Fatalf("ResumeTargetUnit.Execute(): %v", err)
+		t.Fatalf("SetTargetInactive.Execute(): %v", err)
 	}
 
-	resumed := testutil.MustRecommend(t, recommendation, userID, 2)
-	if videoIndex(resumed.Items, videoB) == -1 {
-		t.Fatalf("resumed video %s should be visible, got %v", videoB, videoIDs(resumed.Items))
+	inactivated := testutil.MustRecommend(t, recommendation, userID, 2)
+	if videoIndex(inactivated.Items, videoB) != -1 {
+		t.Fatalf("inactive target video %s should be excluded, got %v", videoB, videoIDs(inactivated.Items))
+	}
+
+	testutil.MustEnsureTarget(t, learning, userID, targetSpec(unitB, 0.80, "lesson_b"))
+
+	reactivated := testutil.MustRecommend(t, recommendation, userID, 2)
+	if videoIndex(reactivated.Items, videoB) == -1 {
+		t.Fatalf("reactivated video %s should be visible, got %v", videoB, videoIDs(reactivated.Items))
 	}
 
 	if _, err := learning.SetTargetInactive.Execute(context.Background(), learningdto.SetTargetInactiveRequest{
@@ -174,9 +167,8 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 
 	beforeReplay := testutil.MustRecommend(t, recommendation, userID, 4)
 	beforeStates, err := learning.ListUserUnitState.Execute(context.Background(), learningdto.ListUserUnitStatesRequest{
-		UserID:           userID,
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     userID,
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates(before replay): %v", err)
@@ -195,9 +187,8 @@ func TestE2E_ReplayPreservesObservableRecommendationSemantics(t *testing.T) {
 
 	afterReplay := testutil.MustRecommend(t, recommendation, userID, 4)
 	afterStates, err := learning.ListUserUnitState.Execute(context.Background(), learningdto.ListUserUnitStatesRequest{
-		UserID:           userID,
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     userID,
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates(after replay): %v", err)

@@ -90,12 +90,10 @@ func TestE2E_LearningInteractionsBatchHTTPWritesRawAndObservationOnlyState(t *te
 	if lookupState.Status != "new" || lookupState.ObservationCount != 1 || lookupState.ProgressEventCount != 0 || lookupState.LastProgressQuality != nil {
 		t.Fatalf("lookup state = %+v, want observe-only new state", lookupState)
 	}
-	exposureState := loadLearningState(t, h.Pool, userID, unitExposure)
-	if exposureState.Status != "new" || exposureState.ObservationCount != 1 || exposureState.ProgressEventCount != 0 || exposureState.LastProgressQuality != nil {
-		t.Fatalf("exposure state = %+v, want observe-only new state", exposureState)
-	}
 	assertLearningEvent(t, h.Pool, userID, unitLookup, "learning_interaction_event", "lookup", "observe_only", nil)
-	assertLearningEvent(t, h.Pool, userID, unitExposure, "learning_interaction_event", "exposure", "observe_only", nil)
+	if got := countRows(t, h.Pool, `select count(*) from learning.unit_learning_events where user_id = $1 and coarse_unit_id = $2`, userID, unitExposure); got != 0 {
+		t.Fatalf("exposure learning event rows = %d, want 0 before session3 aggregation", got)
+	}
 }
 
 func TestE2E_QuizAttemptHTTPWritesRawAndProgressesLearningState(t *testing.T) {
@@ -489,7 +487,6 @@ type learningStateRow struct {
 	ProgressEventCount  int32
 	LastProgressQuality *int16
 	NextReviewIsNull    bool
-	SuspendedReason     string
 }
 
 type videoUserStateRow struct {
@@ -549,13 +546,12 @@ func loadLearningState(t *testing.T, db queryer, userID string, unitID int64) le
 			is_target,
 			progress_percent::float8,
 			mastery_score::float8,
-			observation_count,
-			progress_event_count,
-			last_progress_quality,
-			next_review_at is null,
-			coalesce(suspended_reason, '')
-		from learning.user_unit_states
-		where user_id = $1 and coarse_unit_id = $2
+				observation_count,
+				progress_event_count,
+				last_progress_quality,
+				next_review_at is null
+			from learning.user_unit_states
+			where user_id = $1 and coarse_unit_id = $2
 	`, userID, unitID).Scan(
 		&row.Status,
 		&row.IsTarget,
@@ -565,7 +561,6 @@ func loadLearningState(t *testing.T, db queryer, userID string, unitID int64) le
 		&row.ProgressEventCount,
 		&row.LastProgressQuality,
 		&row.NextReviewIsNull,
-		&row.SuspendedReason,
 	); err != nil {
 		t.Fatalf("load learning state: %v", err)
 	}
@@ -575,11 +570,9 @@ func loadLearningState(t *testing.T, db queryer, userID string, unitID int64) le
 func assertTerminalMastered(t *testing.T, state learningStateRow) {
 	t.Helper()
 	if state.Status != "mastered" ||
-		state.IsTarget ||
 		state.ProgressPercent != 100 ||
 		state.MasteryScore != 1 ||
-		!state.NextReviewIsNull ||
-		state.SuspendedReason != "" {
+		!state.NextReviewIsNull {
 		t.Fatalf("state = %+v, want terminal mastered", state)
 	}
 }

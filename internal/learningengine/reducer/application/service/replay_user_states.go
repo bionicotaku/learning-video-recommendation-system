@@ -74,8 +74,6 @@ type controlSnapshot struct {
 	TargetSource      string
 	TargetSourceRefID string
 	TargetPriority    float64
-	Status            string
-	SuspendedReason   string
 	CreatedAt         *model.UserUnitState
 }
 
@@ -90,8 +88,6 @@ func buildControlSnapshots(states []model.UserUnitState) map[int64]controlSnapsh
 			TargetSource:      state.TargetSource,
 			TargetSourceRefID: state.TargetSourceRefID,
 			TargetPriority:    state.TargetPriority,
-			Status:            state.Status,
-			SuspendedReason:   state.SuspendedReason,
 			CreatedAt:         &stateCopy,
 		}
 	}
@@ -130,24 +126,10 @@ func mergeSnapshots(userID string, rebuilt map[int64]*model.UserUnitState, snaps
 }
 
 func applyControlSnapshot(state *model.UserUnitState, snapshot controlSnapshot) {
-	if state.Status == enum.StatusMastered && !state.IsTarget {
-		state.TargetSource = snapshot.TargetSource
-		state.TargetSourceRefID = snapshot.TargetSourceRefID
-		state.TargetPriority = snapshot.TargetPriority
-		if snapshot.CreatedAt != nil {
-			state.CreatedAt = snapshot.CreatedAt.CreatedAt
-		}
-		return
-	}
-
 	state.IsTarget = snapshot.IsTarget
 	state.TargetSource = snapshot.TargetSource
 	state.TargetSourceRefID = snapshot.TargetSourceRefID
 	state.TargetPriority = snapshot.TargetPriority
-	state.SuspendedReason = snapshot.SuspendedReason
-	if snapshot.Status == enum.StatusSuspended || snapshot.SuspendedReason != "" {
-		state.Status = enum.StatusSuspended
-	}
 	if snapshot.CreatedAt != nil {
 		state.CreatedAt = snapshot.CreatedAt.CreatedAt
 	}
@@ -163,10 +145,6 @@ func defaultStateFromSnapshot(userID string, snapshot controlSnapshot) *model.Us
 		TargetPriority:     snapshot.TargetPriority,
 		Status:             enum.StatusNew,
 		ScheduleEaseFactor: 2.5,
-	}
-	if snapshot.Status == enum.StatusSuspended || snapshot.SuspendedReason != "" {
-		state.Status = enum.StatusSuspended
-		state.SuspendedReason = snapshot.SuspendedReason
 	}
 	if snapshot.CreatedAt != nil {
 		state.CreatedAt = snapshot.CreatedAt.CreatedAt

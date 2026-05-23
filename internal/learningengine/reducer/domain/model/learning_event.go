@@ -4,6 +4,7 @@ import "time"
 
 type LearningEvent struct {
 	EventID                   string
+	LedgerSeq                 int64
 	UserID                    string
 	CoarseUnitID              int64
 	VideoID                   string
@@ -17,5 +18,12 @@ type LearningEvent struct {
 	ConsumedWatchSessionIDs   []string
 	Metadata                  []byte
 	OccurredAt                time.Time
+	ResetBoundaryAt           *time.Time
 	CreatedAt                 time.Time
+}
+
+type UnitLearningEventWatermark struct {
+	CoarseUnitID       int64
+	MaxOccurredAt      *time.Time
+	MaxResetBoundaryAt *time.Time
 }

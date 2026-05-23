@@ -5,5 +5,4 @@ const (
 	StatusLearning  = "learning"
 	StatusReviewing = "reviewing"
 	StatusMastered  = "mastered"
-	StatusSuspended = "suspended"
 )

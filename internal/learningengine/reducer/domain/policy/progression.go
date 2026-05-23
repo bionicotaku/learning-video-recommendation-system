@@ -116,10 +116,6 @@ func ComputeActiveStatus(state model.UserUnitState) string {
 	return enum.StatusReviewing
 }
 
-func IsSuspendedControl(state model.UserUnitState) bool {
-	return state.Status == enum.StatusSuspended || state.SuspendedReason != ""
-}
-
 func AppendRecentProgressQuality(values []int16, quality int16) []int16 {
 	return trimRecentWindow(append(values, quality), recentWindowLimit)
 }

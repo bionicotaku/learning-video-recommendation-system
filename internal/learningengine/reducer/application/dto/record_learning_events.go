@@ -15,6 +15,7 @@ type LearningEventInput struct {
 	ConsumedWatchSessionIDs   []string
 	Metadata                  []byte
 	OccurredAt                time.Time
+	ResetBoundaryAt           *time.Time
 }
 
 type RecordLearningEventsRequest struct {
@@ -23,7 +24,8 @@ type RecordLearningEventsRequest struct {
 }
 
 type RecordLearningEventsResponse struct {
-	ReceivedCount  int
-	RecordedCount  int
-	DuplicateCount int
+	ReceivedCount           int
+	RecordedCount           int
+	DuplicateCount          int
+	SkippedBeforeResetCount int
 }

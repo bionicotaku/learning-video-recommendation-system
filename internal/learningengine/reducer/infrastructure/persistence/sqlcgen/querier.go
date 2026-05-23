@@ -21,6 +21,7 @@ type Querier interface {
 	GetLearningEventByUserSourceRef(ctx context.Context, arg GetLearningEventByUserSourceRefParams) (LearningUnitLearningEvent, error)
 	GetUserUnitState(ctx context.Context, arg GetUserUnitStateParams) (LearningUserUnitState, error)
 	GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnitStateForUpdateParams) (LearningUserUnitState, error)
+	ListLearningEventWatermarksByUserUnits(ctx context.Context, arg ListLearningEventWatermarksByUserUnitsParams) ([]ListLearningEventWatermarksByUserUnitsRow, error)
 	ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error)
 	ListLearningEventsByUserUnitOrdered(ctx context.Context, arg ListLearningEventsByUserUnitOrderedParams) ([]LearningUnitLearningEvent, error)
 	ListMasteredUnitProgress(ctx context.Context, arg ListMasteredUnitProgressParams) ([]ListMasteredUnitProgressRow, error)

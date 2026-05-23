@@ -56,18 +56,3 @@ type SetTargetInactiveRequest struct {
 }
 
 type SetTargetInactiveResponse struct{}
-
-type SuspendTargetUnitRequest struct {
-	UserID          string
-	CoarseUnitID    int64
-	SuspendedReason string
-}
-
-type SuspendTargetUnitResponse struct{}
-
-type ResumeTargetUnitRequest struct {
-	UserID       string
-	CoarseUnitID int64
-}
-
-type ResumeTargetUnitResponse struct{}

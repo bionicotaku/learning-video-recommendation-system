@@ -21,11 +21,12 @@ with input as (
         end
       )::uuid
     ) as consumed_watch_session_ids,
-    coalesce(item.value->'metadata', '{}'::jsonb) as metadata,
-    (item.value->>'occurred_at')::timestamptz as occurred_at
-  from jsonb_array_elements(sqlc.arg(events)::jsonb) as item(value)
-),
-inserted as (
+	    coalesce(item.value->'metadata', '{}'::jsonb) as metadata,
+	    (item.value->>'occurred_at')::timestamptz as occurred_at,
+	    nullif(item.value->>'reset_boundary_at', '')::timestamptz as reset_boundary_at
+	  from jsonb_array_elements(sqlc.arg(events)::jsonb) as item(value)
+	),
+	inserted as (
 insert into learning.unit_learning_events (
   user_id,
   coarse_unit_id,
@@ -37,11 +38,12 @@ insert into learning.unit_learning_events (
   source_ref_id,
   is_correct,
   counts_toward_success_streak,
-  consumed_watch_session_ids,
-  metadata,
-  occurred_at
-)
-select
+	  consumed_watch_session_ids,
+	  metadata,
+	  occurred_at,
+	  reset_boundary_at
+	)
+	select
   user_id,
   coarse_unit_id,
   video_id,
@@ -52,30 +54,31 @@ select
   source_ref_id,
   is_correct,
   counts_toward_success_streak,
-  consumed_watch_session_ids,
-  coalesce(metadata, '{}'::jsonb),
-  occurred_at
-from input
-order by input_index asc
-on conflict (user_id, source_type, source_ref_id, coarse_unit_id) do nothing
+	  consumed_watch_session_ids,
+	  coalesce(metadata, '{}'::jsonb),
+	  occurred_at,
+	  reset_boundary_at
+	from input
+	order by input_index asc
+	on conflict (user_id, source_type, source_ref_id, coarse_unit_id) do nothing
 returning *
 )
 select *
 from inserted
-order by coarse_unit_id asc, occurred_at asc, event_id asc;
+order by ledger_seq asc;
 
 -- name: ListLearningEventsByUserOrdered :many
 select *
 from learning.unit_learning_events
 where user_id = sqlc.arg(user_id)
-order by occurred_at asc, event_id asc;
+order by ledger_seq asc;
 
 -- name: ListLearningEventsByUserUnitOrdered :many
 select *
 from learning.unit_learning_events
 where user_id = sqlc.arg(user_id)
   and coarse_unit_id = sqlc.arg(coarse_unit_id)
-order by occurred_at asc, event_id asc;
+order by ledger_seq asc;
 
 -- name: GetLearningEventByUserSourceRef :one
 select *
@@ -83,5 +86,21 @@ from learning.unit_learning_events
 where user_id = sqlc.arg(user_id)
   and source_type = sqlc.arg(source_type)
   and source_ref_id = sqlc.arg(source_ref_id)
-order by created_at asc, event_id asc
+order by ledger_seq asc
 limit 1;
+
+-- name: ListLearningEventWatermarksByUserUnits :many
+with unit_ids as (
+  select distinct (value)::bigint as coarse_unit_id
+  from jsonb_array_elements_text(sqlc.arg(coarse_unit_ids)::jsonb)
+)
+select
+  u.coarse_unit_id,
+  max(e.occurred_at)::timestamptz as max_occurred_at,
+  max(e.reset_boundary_at)::timestamptz as max_reset_boundary_at
+from unit_ids u
+left join learning.unit_learning_events e
+  on e.user_id = sqlc.arg(user_id)
+ and e.coarse_unit_id = u.coarse_unit_id
+group by u.coarse_unit_id
+order by u.coarse_unit_id asc;

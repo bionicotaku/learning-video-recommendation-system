@@ -53,8 +53,7 @@ func (u *ListUserUnitStatesUsecase) Execute(ctx context.Context, request dto.Lis
 	}
 
 	states, err := u.userUnitStates.ListByUser(ctx, request.UserID, model.UserUnitStateFilter{
-		OnlyTarget:       request.OnlyTarget,
-		ExcludeSuspended: request.ExcludeSuspended,
+		OnlyTarget: request.OnlyTarget,
 	})
 	if err != nil {
 		return dto.ListUserUnitStatesResponse{}, err

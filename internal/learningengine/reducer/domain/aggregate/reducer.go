@@ -77,10 +77,6 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 	return state, nil
 }
 
-func RecomputeActiveStatus(state model.UserUnitState) string {
-	return policy.ComputeActiveStatus(state)
-}
-
 func initState(currentState *model.UserUnitState, event model.LearningEvent) *model.UserUnitState {
 	if currentState == nil {
 		now := event.OccurredAt
@@ -130,14 +126,11 @@ func finalizeState(state *model.UserUnitState) {
 		state.UpdatedAt = time.Now().UTC()
 		return
 	}
-	if policy.IsSuspendedControl(*state) {
-		state.Status = enum.StatusSuspended
-	}
 	state.UpdatedAt = time.Now().UTC()
 }
 
 func isTerminalMastered(state *model.UserUnitState) bool {
-	return state.Status == enum.StatusMastered && !state.IsTarget
+	return state.Status == enum.StatusMastered
 }
 
 func applyCompletedMasteredState(state *model.UserUnitState) {
@@ -145,8 +138,6 @@ func applyCompletedMasteredState(state *model.UserUnitState) {
 	state.ProgressPercent = 100
 	state.MasteryScore = 1
 	state.NextReviewAt = nil
-	state.IsTarget = false
-	state.SuspendedReason = ""
 }
 
 func applyResetUnlearnedState(state *model.UserUnitState) {
@@ -169,7 +160,6 @@ func applyResetUnlearnedState(state *model.UserUnitState) {
 	state.ScheduleIntervalDays = 0
 	state.ScheduleEaseFactor = 2.5
 	state.NextReviewAt = nil
-	state.SuspendedReason = ""
 }
 
 func timePointer(value time.Time) *time.Time {

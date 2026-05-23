@@ -193,111 +193,6 @@ func TestSetTargetInactiveExecute(t *testing.T) {
 	}
 }
 
-func TestSuspendTargetUnitExecute(t *testing.T) {
-	stateRepo := &fakeUserUnitStateRepository{
-		state: &model.UserUnitState{
-			UserID:             "11111111-1111-1111-1111-111111111111",
-			CoarseUnitID:       101,
-			IsTarget:           true,
-			Status:             enum.StatusReviewing,
-			ScheduleEaseFactor: 2.5,
-		},
-	}
-	txManager := &fakeTxManager{
-		repositories: fakeTransactionalRepositories{
-			userUnitStates: stateRepo,
-		},
-	}
-	usecase := service.NewSuspendTargetUnitUsecase(txManager)
-
-	_, err := usecase.Execute(context.Background(), dto.SuspendTargetUnitRequest{
-		UserID:          "11111111-1111-1111-1111-111111111111",
-		CoarseUnitID:    101,
-		SuspendedReason: "manual_pause",
-	})
-	if err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-
-	if !txManager.withinUserCalled || txManager.lastLockedUserID != "11111111-1111-1111-1111-111111111111" {
-		t.Fatalf("expected user-scoped transaction lock, got called=%v user=%q", txManager.withinUserCalled, txManager.lastLockedUserID)
-	}
-	if stateRepo.upserted == nil {
-		t.Fatalf("state was not upserted")
-	}
-	if stateRepo.upserted.Status != enum.StatusSuspended {
-		t.Fatalf("status = %q, want %q", stateRepo.upserted.Status, enum.StatusSuspended)
-	}
-	if stateRepo.upserted.SuspendedReason != "manual_pause" {
-		t.Fatalf("suspended_reason = %q, want manual_pause", stateRepo.upserted.SuspendedReason)
-	}
-}
-
-func TestResumeTargetUnitExecuteRecomputesStatus(t *testing.T) {
-	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
-	lastQuality := int16(4)
-	stateRepo := &fakeUserUnitStateRepository{
-		state: &model.UserUnitState{
-			UserID:                  "11111111-1111-1111-1111-111111111111",
-			CoarseUnitID:            101,
-			IsTarget:                true,
-			Status:                  enum.StatusSuspended,
-			SuspendedReason:         "manual_pause",
-			ProgressEventCount:      2,
-			ProgressSuccessCount:    2,
-			ConsecutiveSuccessCount: 2,
-			LastProgressQuality:     &lastQuality,
-			RecentProgressQualities: []int16{4, 4},
-			RecentProgressPasses:    []bool{true, true},
-			ScheduleRepetition:      2,
-			ScheduleIntervalDays:    3,
-			ScheduleEaseFactor:      2.5,
-			LastProgressAt:          &lastProgressAt,
-		},
-	}
-	txManager := &fakeTxManager{
-		repositories: fakeTransactionalRepositories{
-			userUnitStates: stateRepo,
-		},
-	}
-	usecase := service.NewResumeTargetUnitUsecase(txManager)
-
-	_, err := usecase.Execute(context.Background(), dto.ResumeTargetUnitRequest{
-		UserID:       "11111111-1111-1111-1111-111111111111",
-		CoarseUnitID: 101,
-	})
-	if err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-
-	if stateRepo.upserted == nil {
-		t.Fatalf("state was not upserted")
-	}
-	if stateRepo.upserted.Status != enum.StatusReviewing {
-		t.Fatalf("status = %q, want %q", stateRepo.upserted.Status, enum.StatusReviewing)
-	}
-	if stateRepo.upserted.SuspendedReason != "" {
-		t.Fatalf("suspended_reason = %q, want empty", stateRepo.upserted.SuspendedReason)
-	}
-}
-
-func TestResumeTargetUnitExecuteReturnsNotFound(t *testing.T) {
-	txManager := &fakeTxManager{
-		repositories: fakeTransactionalRepositories{
-			userUnitStates: &fakeUserUnitStateRepository{},
-		},
-	}
-	usecase := service.NewResumeTargetUnitUsecase(txManager)
-
-	_, err := usecase.Execute(context.Background(), dto.ResumeTargetUnitRequest{
-		UserID:       "11111111-1111-1111-1111-111111111111",
-		CoarseUnitID: 101,
-	})
-	if !errors.Is(err, service.ErrUserUnitStateNotFound) {
-		t.Fatalf("Execute() error = %v, want ErrUserUnitStateNotFound", err)
-	}
-}
-
 func TestListUserUnitStatesExecuteUsesFilter(t *testing.T) {
 	stateRepo := &fakeUserUnitStateRepository{
 		listStates: []model.UserUnitState{{UserID: "11111111-1111-1111-1111-111111111111", CoarseUnitID: 101}},
@@ -305,16 +200,15 @@ func TestListUserUnitStatesExecuteUsesFilter(t *testing.T) {
 	usecase := service.NewListUserUnitStatesUsecase(stateRepo)
 
 	response, err := usecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
-		UserID:           "11111111-1111-1111-1111-111111111111",
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     "11111111-1111-1111-1111-111111111111",
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 
-	if !stateRepo.lastFilter.OnlyTarget || !stateRepo.lastFilter.ExcludeSuspended {
-		t.Fatalf("filter = %+v, want both flags true", stateRepo.lastFilter)
+	if !stateRepo.lastFilter.OnlyTarget {
+		t.Fatalf("filter = %+v, want only_target true", stateRepo.lastFilter)
 	}
 	if len(response.States) != 1 {
 		t.Fatalf("states len = %d, want 1", len(response.States))
@@ -445,8 +339,8 @@ func TestRecordLearningEventsExecuteSetMasteredTerminalState(t *testing.T) {
 	if state.Status != enum.StatusMastered {
 		t.Fatalf("status = %q, want %q", state.Status, enum.StatusMastered)
 	}
-	if state.IsTarget {
-		t.Fatalf("is_target = true, want false")
+	if !state.IsTarget {
+		t.Fatalf("is_target = false, want true")
 	}
 	if state.ProgressPercent != 100 {
 		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
@@ -493,15 +387,16 @@ func TestResetUserUnitProgressExecuteWritesResetEventAndClearsState(t *testing.T
 	eventRepo := &fakeUnitLearningEventRepository{
 		appendResult: applearningrepo.AppendLearningEventsResult{
 			InsertedEvents: []model.LearningEvent{{
-				EventID:       "55555555-5555-5555-5555-555555555555",
-				UserID:        "11111111-1111-1111-1111-111111111111",
-				CoarseUnitID:  101,
-				EventType:     enum.EventResetUnlearned,
-				ReducerEffect: enum.ReducerEffectResetUnlearned,
-				SourceType:    "learning_unit_reset",
-				SourceRefID:   "reset-1",
-				Metadata:      []byte("{}"),
-				OccurredAt:    occurredAt,
+				EventID:         "55555555-5555-5555-5555-555555555555",
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventResetUnlearned,
+				ReducerEffect:   enum.ReducerEffectResetUnlearned,
+				SourceType:      "learning_unit_reset",
+				SourceRefID:     "reset-1",
+				Metadata:        []byte("{}"),
+				OccurredAt:      occurredAt,
+				ResetBoundaryAt: &occurredAt,
 			}},
 		},
 	}
@@ -1012,8 +907,8 @@ func TestReplayUserStatesExecutePreservesSetMasteredInactiveTarget(t *testing.T)
 	if state.Status != enum.StatusMastered {
 		t.Fatalf("status = %q, want %q", state.Status, enum.StatusMastered)
 	}
-	if state.IsTarget {
-		t.Fatalf("is_target = true, want false")
+	if !state.IsTarget {
+		t.Fatalf("is_target = false, want true")
 	}
 	if state.TargetSource != "curriculum" {
 		t.Fatalf("target_source = %q, want curriculum", state.TargetSource)
@@ -1074,8 +969,6 @@ func TestReplayUserStatesExecutePreservesControlSliceAndTargetOnlyRows(t *testin
 				TargetSource:      "curriculum",
 				TargetSourceRefID: "lesson_1",
 				TargetPriority:    0.8,
-				Status:            enum.StatusSuspended,
-				SuspendedReason:   "manual_pause",
 			},
 		},
 	}
@@ -1118,8 +1011,8 @@ func TestReplayUserStatesExecutePreservesControlSliceAndTargetOnlyRows(t *testin
 	if rebuiltByUnit[101].TargetSource != "curriculum" {
 		t.Fatalf("unit 101 target_source = %q, want curriculum", rebuiltByUnit[101].TargetSource)
 	}
-	if rebuiltByUnit[102].Status != enum.StatusSuspended {
-		t.Fatalf("unit 102 status = %q, want %q", rebuiltByUnit[102].Status, enum.StatusSuspended)
+	if rebuiltByUnit[102].Status != enum.StatusNew {
+		t.Fatalf("unit 102 status = %q, want %q", rebuiltByUnit[102].Status, enum.StatusNew)
 	}
 	if rebuiltByUnit[102].ProgressEventCount != 0 {
 		t.Fatalf("unit 102 progress_event_count = %d, want 0", rebuiltByUnit[102].ProgressEventCount)
@@ -1304,6 +1197,7 @@ type fakeUnitLearningEventRepository struct {
 	eventBySourceResults []*model.LearningEvent
 	eventBySourceCalls   int
 	listByUserOrdered    []model.LearningEvent
+	watermarks           map[int64]model.UnitLearningEventWatermark
 }
 
 func (f *fakeUnitLearningEventRepository) Append(_ context.Context, events []model.LearningEvent) (applearningrepo.AppendLearningEventsResult, error) {
@@ -1335,6 +1229,20 @@ func (f *fakeUnitLearningEventRepository) ListByUserOrdered(_ context.Context, _
 
 func (f *fakeUnitLearningEventRepository) ListByUserAndUnitOrdered(_ context.Context, _ string, _ int64) ([]model.LearningEvent, error) {
 	return nil, nil
+}
+
+func (f *fakeUnitLearningEventRepository) ListWatermarksByUserUnits(_ context.Context, _ string, coarseUnitIDs []int64) (map[int64]model.UnitLearningEventWatermark, error) {
+	result := make(map[int64]model.UnitLearningEventWatermark, len(coarseUnitIDs))
+	for _, coarseUnitID := range coarseUnitIDs {
+		if f.watermarks != nil {
+			if watermark, ok := f.watermarks[coarseUnitID]; ok {
+				result[coarseUnitID] = watermark
+				continue
+			}
+		}
+		result[coarseUnitID] = model.UnitLearningEventWatermark{CoarseUnitID: coarseUnitID}
+	}
+	return result, nil
 }
 
 func int16Pointer(value int16) *int16 {

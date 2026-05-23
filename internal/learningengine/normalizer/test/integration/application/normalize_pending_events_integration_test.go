@@ -59,6 +59,7 @@ func TestNormalizePendingEventsSelfMarkSetsTerminalMastered(t *testing.T) {
 	userID := "11111111-1111-1111-1111-111111111111"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
+	seedTargetState(t, db, userID, 101)
 	seedLearningInteraction(t, db, "44444444-4444-4444-4444-444444444444", userID, 101, learningenum.EventSelfMarkMastered, time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC))
 
 	usecase := newNormalizerUsecase(db)
@@ -74,8 +75,8 @@ func TestNormalizePendingEventsSelfMarkSetsTerminalMastered(t *testing.T) {
 	if state.status != "mastered" {
 		t.Fatalf("status = %q, want mastered", state.status)
 	}
-	if state.isTarget {
-		t.Fatalf("is_target = true, want false")
+	if !state.isTarget {
+		t.Fatal("is_target = false, want true")
 	}
 	if state.progressPercent != 100 || state.masteryScore != 1 {
 		t.Fatalf("progress/mastery = %v/%v, want 100/1", state.progressPercent, state.masteryScore)
@@ -405,6 +406,145 @@ func TestNormalizeLearningInteractionsByIDCreatesPassiveProgressAfterLookupReset
 	}
 }
 
+func TestNormalizePendingEventsSkipsRawBeforeResetBoundary(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	questionID := "22222222-2222-2222-2222-222222222222"
+	lookupEventID := "44444444-4444-4444-4444-444444444444"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedQuestion(t, questionID)
+	boundary := time.Date(2026, 5, 15, 12, 0, 0, 0, time.UTC)
+	seedResetBoundary(t, db, "99999999-9999-9999-9999-999999999991", userID, 101, boundary)
+	seedQuizEvent(t, db, "33333333-3333-3333-3333-333333333333", userID, questionID, 101, true, 5000, boundary.Add(-time.Hour))
+	seedLearningInteraction(t, db, lookupEventID, userID, 101, learningenum.EventLookup, boundary)
+
+	usecase := newNormalizerUsecase(db)
+	quizResponse, err := usecase.Execute(context.Background(), dto.NormalizePendingEventsRequest{SourceKind: dto.SourceKindQuiz})
+	if err != nil {
+		t.Fatalf("quiz Execute() error = %v", err)
+	}
+	if quizResponse.ReadRawCount != 0 || quizResponse.RecordedEventCount != 0 {
+		t.Fatalf("quiz response = %+v, want old raw filtered before normalize", quizResponse)
+	}
+
+	interactionResponse, err := usecase.Execute(context.Background(), dto.NormalizePendingEventsRequest{SourceKind: dto.SourceKindLearningInteraction})
+	if err != nil {
+		t.Fatalf("interaction Execute() error = %v", err)
+	}
+	if interactionResponse.ReadRawCount != 0 || interactionResponse.RecordedEventCount != 0 {
+		t.Fatalf("interaction response = %+v, want old raw filtered before normalize", interactionResponse)
+	}
+
+	quizByID := newNormalizeQuizAttemptByIDUsecase(db)
+	quizByIDResponse, err := quizByID.Execute(context.Background(), dto.NormalizeQuizAttemptByIDRequest{
+		UserID:      userID,
+		QuizEventID: "33333333-3333-3333-3333-333333333333",
+	})
+	if err != nil {
+		t.Fatalf("quiz by-id Execute() error = %v", err)
+	}
+	if quizByIDResponse.ReadRawCount != 0 || quizByIDResponse.RecordedEventCount != 0 {
+		t.Fatalf("quiz by-id response = %+v, want old raw filtered before normalize", quizByIDResponse)
+	}
+
+	interactionByID := newNormalizeLearningInteractionsByIDsUsecase(db)
+	interactionByIDResponse, err := interactionByID.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{lookupEventID},
+	})
+	if err != nil {
+		t.Fatalf("interaction by-id Execute() error = %v", err)
+	}
+	if interactionByIDResponse.ReadRawCount != 0 || interactionByIDResponse.RecordedEventCount != 0 {
+		t.Fatalf("interaction by-id response = %+v, want old raw filtered before normalize", interactionByIDResponse)
+	}
+
+	var eventCount int
+	if err := db.Pool.QueryRow(context.Background(), `select count(*) from learning.unit_learning_events where source_type <> 'learning_unit_reset'`).Scan(&eventCount); err != nil {
+		t.Fatalf("count normalized learning events: %v", err)
+	}
+	if eventCount != 0 {
+		t.Fatalf("normalized learning events = %d, want 0", eventCount)
+	}
+}
+
+func TestNormalizeExposureSession3UsesResetBoundaryAsWindowStart(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoID)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	boundary := base.Add(150 * time.Minute)
+	seedResetBoundary(t, db, "99999999-9999-9999-9999-999999999992", userID, 101, boundary)
+
+	sessionIDs := []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb05",
+	}
+	eventIDs := []string{
+		"55555555-5555-5555-5555-555555555551",
+		"55555555-5555-5555-5555-555555555552",
+		"55555555-5555-5555-5555-555555555553",
+		"55555555-5555-5555-5555-555555555554",
+		"55555555-5555-5555-5555-555555555555",
+	}
+	for index, sessionID := range sessionIDs {
+		occurredAt := base.Add(time.Duration(index) * time.Hour)
+		seedWatchSession(t, db, sessionID, userID, videoID, occurredAt)
+		seedExposureInteraction(t, db, eventIDs[index], userID, videoID, sessionID, 101, occurredAt)
+	}
+
+	usecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	firstResponse, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{eventIDs[4]},
+	})
+	if err != nil {
+		t.Fatalf("first Execute() error = %v", err)
+	}
+	if firstResponse.RecordedEventCount != 0 {
+		t.Fatalf("first RecordedEventCount = %d, want 0 because only two sessions after reset", firstResponse.RecordedEventCount)
+	}
+
+	afterBoundarySession := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06"
+	afterBoundaryEvent := "55555555-5555-5555-5555-555555555556"
+	seedWatchSession(t, db, afterBoundarySession, userID, videoID, boundary.Add(3*time.Hour))
+	seedExposureInteraction(t, db, afterBoundaryEvent, userID, videoID, afterBoundarySession, 101, boundary.Add(3*time.Hour))
+
+	secondResponse, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{afterBoundaryEvent},
+	})
+	if err != nil {
+		t.Fatalf("second Execute() error = %v", err)
+	}
+	if secondResponse.RecordedEventCount != 1 {
+		t.Fatalf("second RecordedEventCount = %d, want one session3 event after reset", secondResponse.RecordedEventCount)
+	}
+
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want reset plus one session3 event", len(events))
+	}
+	wantSourceRef := expectedExposureSession3SourceRef([]string{sessionIDs[3], sessionIDs[4], afterBoundarySession})
+	if events[1].SourceRefID != wantSourceRef {
+		t.Fatalf("source_ref_id = %s, want %s", events[1].SourceRefID, wantSourceRef)
+	}
+}
+
 func TestNormalizeByIDsOnlyProcessesRequestedUserRows(t *testing.T) {
 	t.Parallel()
 
@@ -476,6 +616,7 @@ func TestNormalizeSelfMarkMasteredByIDSetsTerminalMastered(t *testing.T) {
 	eventID := "44444444-4444-4444-4444-444444444444"
 	db.SeedUser(t, userID)
 	db.SeedCoarseUnit(t, 101)
+	seedTargetState(t, db, userID, 101)
 	seedLearningInteraction(t, db, eventID, userID, 101, learningenum.EventSelfMarkMastered, time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC))
 
 	usecase := newNormalizeSelfMarkMasteredByIDUsecase(db)
@@ -491,7 +632,7 @@ func TestNormalizeSelfMarkMasteredByIDSetsTerminalMastered(t *testing.T) {
 	}
 
 	state := readState(t, db, userID, 101)
-	if state.status != "mastered" || state.isTarget || state.progressPercent != 100 || state.masteryScore != 1 || !state.nextReviewIsNull {
+	if state.status != "mastered" || !state.isTarget || state.progressPercent != 100 || state.masteryScore != 1 || !state.nextReviewIsNull {
 		t.Fatalf("state = %+v, want terminal mastered", state)
 	}
 }
@@ -663,6 +804,58 @@ func seedWatchSession(t *testing.T, db *fixture.TestDatabase, sessionID, userID,
 			$4
 		)`, sessionID, userID, videoID, startedAt); err != nil {
 		t.Fatalf("seed analytics.video_watch_events: %v", err)
+	}
+}
+
+func seedTargetState(t *testing.T, db *fixture.TestDatabase, userID string, unitID int64) {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `
+		insert into learning.user_unit_states (
+			user_id,
+			coarse_unit_id,
+			is_target,
+			target_source,
+			target_source_ref_id,
+			target_priority
+		) values (
+			$1::uuid,
+			$2,
+			true,
+			'curriculum',
+			'lesson_1',
+			0.9
+		)`, userID, unitID); err != nil {
+		t.Fatalf("seed learning.user_unit_states: %v", err)
+	}
+}
+
+func seedResetBoundary(t *testing.T, db *fixture.TestDatabase, eventID, userID string, unitID int64, boundary time.Time) {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `
+		insert into learning.unit_learning_events (
+			event_id,
+			user_id,
+			coarse_unit_id,
+			event_type,
+			reducer_effect,
+			source_type,
+			source_ref_id,
+			metadata,
+			occurred_at,
+			reset_boundary_at
+		) values (
+			$1::uuid,
+			$2::uuid,
+			$3,
+			'reset_unlearned',
+			'reset_unlearned',
+			'learning_unit_reset',
+			$1::text,
+			'{}'::jsonb,
+			$4,
+			$4
+		)`, eventID, userID, unitID, boundary); err != nil {
+		t.Fatalf("seed reset boundary: %v", err)
 	}
 }
 

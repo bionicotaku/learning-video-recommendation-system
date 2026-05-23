@@ -84,48 +84,42 @@ func TestE2E_RecommendationDemandMapping_NewTargetWithoutSupplyMarksExtremeSpars
 	}
 }
 
-func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreExcluded(t *testing.T) {
+func TestE2E_RecommendationDemandMapping_MasteredInactiveAndNonTargetUnitsAreExcluded(t *testing.T) {
 	h := harness(t)
 	learning := h.LearningSuite()
 	recommendation := h.RecommendationUsecaseWithoutFill()
 
 	userID := h.NewUserID()
 	activeUnit := h.NewUnitID()
-	suspendedUnit := h.NewUnitID()
+	masteredUnit := h.NewUnitID()
 	inactiveUnit := h.NewUnitID()
 	nonTargetUnit := h.NewUnitID()
 	h.SeedUser(t, userID)
-	h.SeedCoarseUnits(t, activeUnit, suspendedUnit, inactiveUnit, nonTargetUnit)
+	h.SeedCoarseUnits(t, activeUnit, masteredUnit, inactiveUnit, nonTargetUnit)
 
 	activeVideo := h.NewVideoID()
-	suspendedVideo := h.NewVideoID()
+	masteredVideo := h.NewVideoID()
 	inactiveVideoID := h.NewVideoID()
 	nonTargetVideo := h.NewVideoID()
 	h.SeedCatalogVideo(t, strongSupplyVideo(activeVideo, activeUnit, 1_000, 2_200, 0, "active-target", 90_000))
-	h.SeedCatalogVideo(t, strongSupplyVideo(suspendedVideo, suspendedUnit, 3_000, 4_200, 2, "suspended-target", 90_000))
+	h.SeedCatalogVideo(t, strongSupplyVideo(masteredVideo, masteredUnit, 3_000, 4_200, 2, "mastered-target", 90_000))
 	h.SeedCatalogVideo(t, strongSupplyVideo(inactiveVideoID, inactiveUnit, 5_000, 6_200, 4, "inactive-target", 90_000))
 	h.SeedCatalogVideo(t, strongSupplyVideo(nonTargetVideo, nonTargetUnit, 7_000, 8_300, 6, "non-target", 90_000))
 	h.RefreshRecommendationViews(t)
 
 	testutil.MustEnsureTarget(t, learning, userID,
 		targetSpec(activeUnit, 0.95, "active"),
-		targetSpec(suspendedUnit, 0.90, "suspended"),
+		targetSpec(masteredUnit, 0.90, "mastered"),
 		targetSpec(inactiveUnit, 0.85, "inactive"),
 	)
 
 	now := time.Now().UTC()
 	q4 := int16(4)
 	mustRecordEvents(t, learning, userID,
+		learningdto.LearningEventInput{CoarseUnitID: masteredUnit, EventType: "self_mark_mastered", ReducerEffect: "set_mastered", SourceType: "learning_interaction_event", SourceRefID: "self-mark-mastered-target", OccurredAt: mustTimeAdd(now, -24*time.Hour)},
 		learningdto.LearningEventInput{CoarseUnitID: nonTargetUnit, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", ProgressQuality: &q4, OccurredAt: mustTimeAdd(now, -12*time.Hour)},
 	)
 
-	if _, err := learning.SuspendTargetUnit.Execute(ctx(), learningdto.SuspendTargetUnitRequest{
-		UserID:          userID,
-		CoarseUnitID:    suspendedUnit,
-		SuspendedReason: "paused",
-	}); err != nil {
-		t.Fatalf("SuspendTargetUnit.Execute(): %v", err)
-	}
 	if _, err := learning.SetTargetInactive.Execute(ctx(), learningdto.SetTargetInactiveRequest{
 		UserID:       userID,
 		CoarseUnitID: inactiveUnit,
@@ -135,7 +129,7 @@ func TestE2E_RecommendationDemandMapping_SuspendedInactiveAndNonTargetUnitsAreEx
 
 	response := mustRecommendN(t, recommendation, userID, 4)
 	assertContainsVideo(t, response.Items, activeVideo)
-	assertNotContainsVideo(t, response.Items, suspendedVideo)
+	assertNotContainsVideo(t, response.Items, masteredVideo)
 	assertNotContainsVideo(t, response.Items, inactiveVideoID)
 	assertNotContainsVideo(t, response.Items, nonTargetVideo)
 }

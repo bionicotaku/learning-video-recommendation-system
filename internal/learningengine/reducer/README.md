@@ -61,7 +61,8 @@ internal/learningengine/reducer/
 ```text
 request
   -> validate normalized events
-  -> group and sort by coarse_unit_id / occurred_at
+  -> group and preserve accepted ledger order
+  -> skip non-reset events at or before latest reset_boundary_at
   -> batch append learning.unit_learning_events
   -> skip duplicate source events
   -> lock affected user_unit_states in one query
@@ -76,7 +77,7 @@ The reducer keeps business state-machine logic in Go. SQL is only responsible fo
 ```text
 request
   -> read existing control snapshot
-  -> read all unit_learning_events ordered by occurred_at, event_id
+  -> read all unit_learning_events ordered by ledger_seq
   -> delete current user states
   -> replay reducer from empty state
   -> merge control snapshot
@@ -84,6 +85,9 @@ request
 ```
 
 Replay never re-reads analytics raw facts. It only uses the reducer-owned normalized ledger.
+`ledger_seq` is the authoritative replay order; `occurred_at` remains business
+event time only. Replay always merges the current control snapshot back into
+rebuilt states, including mastered rows.
 
 ### ResetUserUnitProgress
 
@@ -91,6 +95,7 @@ Replay never re-reads analytics raw facts. It only uses the reducer-owned normal
 request
   -> require existing learning.user_unit_states row for user_id + coarse_unit_id
   -> lookup existing reset event by user_id + client_event_id
+  -> compute reset_boundary_at
   -> append reset_unlearned event to learning.unit_learning_events
   -> reduce newly inserted event
   -> upsert learning.user_unit_states
@@ -108,6 +113,11 @@ while preserving target/control fields such as `is_target`,
 does not reduce the request body unit again. The database enforces this with a
 partial unique index on `learning.unit_learning_events` for
 `source_type = 'learning_unit_reset'`.
+
+`reset_boundary_at` is stored only on reset events. It is computed as the max of
+the request `occurred_at`, the current user+unit ledger max `occurred_at`, and
+the current user+unit max reset boundary. `RecordLearningEvents` skips later
+non-reset events whose business time is at or before that boundary.
 
 ### ListUserUnitProgress
 
@@ -128,7 +138,7 @@ active targets with status `new`, `learning` or `reviewing`.
 
 - `observe_only`: updates observation fields only.
 - `affects_progress`: updates observation, progress, schedule, status and mastery fields.
-- `set_mastered`: updates observation and moves the unit to terminal mastered state.
+- `set_mastered`: updates observation and moves the unit to terminal mastered state without changing target/control fields.
 - `reset_unlearned`: clears observation/progress/schedule fields and moves the
   unit back to `status = 'new'` without changing target/control fields.
 

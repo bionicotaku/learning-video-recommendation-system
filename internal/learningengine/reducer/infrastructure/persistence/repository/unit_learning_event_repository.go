@@ -55,6 +55,7 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 			ConsumedWatchSessionIDs:   append([]string(nil), event.ConsumedWatchSessionIDs...),
 			Metadata:                  metadata,
 			OccurredAt:                event.OccurredAt.UTC(),
+			ResetBoundaryAt:           event.ResetBoundaryAt,
 		})
 	}
 
@@ -101,6 +102,7 @@ type appendLearningEventPayload struct {
 	ConsumedWatchSessionIDs   []string        `json:"consumed_watch_session_ids"`
 	Metadata                  json.RawMessage `json:"metadata"`
 	OccurredAt                time.Time       `json:"occurred_at"`
+	ResetBoundaryAt           *time.Time      `json:"reset_boundary_at,omitempty"`
 }
 
 func (r *UnitLearningEventRepository) GetByUserSourceRef(ctx context.Context, userID string, sourceType string, sourceRefID string) (*model.LearningEvent, error) {
@@ -159,6 +161,38 @@ func (r *UnitLearningEventRepository) ListByUserAndUnitOrdered(ctx context.Conte
 	result := make([]model.LearningEvent, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, mapper.ToLearningEvent(row))
+	}
+	return result, nil
+}
+
+func (r *UnitLearningEventRepository) ListWatermarksByUserUnits(ctx context.Context, userID string, coarseUnitIDs []int64) (map[int64]model.UnitLearningEventWatermark, error) {
+	result := make(map[int64]model.UnitLearningEventWatermark, len(coarseUnitIDs))
+	if len(coarseUnitIDs) == 0 {
+		return result, nil
+	}
+
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	encodedUnitIDs, err := json.Marshal(coarseUnitIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListLearningEventWatermarksByUserUnits(ctx, learningenginesqlc.ListLearningEventWatermarksByUserUnitsParams{
+		UserID:        pgUserID,
+		CoarseUnitIds: encodedUnitIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.CoarseUnitID] = model.UnitLearningEventWatermark{
+			CoarseUnitID:       row.CoarseUnitID,
+			MaxOccurredAt:      mapper.TimePointerFromPG(row.MaxOccurredAt),
+			MaxResetBoundaryAt: mapper.TimePointerFromPG(row.MaxResetBoundaryAt),
+		}
 	}
 	return result, nil
 }

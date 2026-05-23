@@ -34,11 +34,12 @@ with input as (
         end
       )::uuid
     ) as consumed_watch_session_ids,
-    coalesce(item.value->'metadata', '{}'::jsonb) as metadata,
-    (item.value->>'occurred_at')::timestamptz as occurred_at
-  from jsonb_array_elements($1::jsonb) as item(value)
-),
-inserted as (
+	    coalesce(item.value->'metadata', '{}'::jsonb) as metadata,
+	    (item.value->>'occurred_at')::timestamptz as occurred_at,
+	    nullif(item.value->>'reset_boundary_at', '')::timestamptz as reset_boundary_at
+	  from jsonb_array_elements($1::jsonb) as item(value)
+	),
+	inserted as (
 insert into learning.unit_learning_events (
   user_id,
   coarse_unit_id,
@@ -50,11 +51,12 @@ insert into learning.unit_learning_events (
   source_ref_id,
   is_correct,
   counts_toward_success_streak,
-  consumed_watch_session_ids,
-  metadata,
-  occurred_at
-)
-select
+	  consumed_watch_session_ids,
+	  metadata,
+	  occurred_at,
+	  reset_boundary_at
+	)
+	select
   user_id,
   coarse_unit_id,
   video_id,
@@ -65,21 +67,23 @@ select
   source_ref_id,
   is_correct,
   counts_toward_success_streak,
-  consumed_watch_session_ids,
-  coalesce(metadata, '{}'::jsonb),
-  occurred_at
-from input
-order by input_index asc
-on conflict (user_id, source_type, source_ref_id, coarse_unit_id) do nothing
-returning event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+	  consumed_watch_session_ids,
+	  coalesce(metadata, '{}'::jsonb),
+	  occurred_at,
+	  reset_boundary_at
+	from input
+	order by input_index asc
+	on conflict (user_id, source_type, source_ref_id, coarse_unit_id) do nothing
+returning event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 )
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+select event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 from inserted
-order by coarse_unit_id asc, occurred_at asc, event_id asc
+order by ledger_seq asc
 `
 
 type AppendLearningEventsRow struct {
 	EventID                   pgtype.UUID        `json:"event_id"`
+	LedgerSeq                 pgtype.Int8        `json:"ledger_seq"`
 	UserID                    pgtype.UUID        `json:"user_id"`
 	CoarseUnitID              int64              `json:"coarse_unit_id"`
 	VideoID                   pgtype.UUID        `json:"video_id"`
@@ -93,6 +97,7 @@ type AppendLearningEventsRow struct {
 	ConsumedWatchSessionIds   []pgtype.UUID      `json:"consumed_watch_session_ids"`
 	Metadata                  []byte             `json:"metadata"`
 	OccurredAt                pgtype.Timestamptz `json:"occurred_at"`
+	ResetBoundaryAt           pgtype.Timestamptz `json:"reset_boundary_at"`
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -107,6 +112,7 @@ func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]Ap
 		var i AppendLearningEventsRow
 		if err := rows.Scan(
 			&i.EventID,
+			&i.LedgerSeq,
 			&i.UserID,
 			&i.CoarseUnitID,
 			&i.VideoID,
@@ -120,6 +126,7 @@ func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]Ap
 			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
+			&i.ResetBoundaryAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -133,12 +140,12 @@ func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]Ap
 }
 
 const getLearningEventByUserSourceRef = `-- name: GetLearningEventByUserSourceRef :one
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+select event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 from learning.unit_learning_events
 where user_id = $1
   and source_type = $2
   and source_ref_id = $3
-order by created_at asc, event_id asc
+order by ledger_seq asc
 limit 1
 `
 
@@ -153,6 +160,7 @@ func (q *Queries) GetLearningEventByUserSourceRef(ctx context.Context, arg GetLe
 	var i LearningUnitLearningEvent
 	err := row.Scan(
 		&i.EventID,
+		&i.LedgerSeq,
 		&i.UserID,
 		&i.CoarseUnitID,
 		&i.VideoID,
@@ -166,16 +174,65 @@ func (q *Queries) GetLearningEventByUserSourceRef(ctx context.Context, arg GetLe
 		&i.ConsumedWatchSessionIds,
 		&i.Metadata,
 		&i.OccurredAt,
+		&i.ResetBoundaryAt,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
+const listLearningEventWatermarksByUserUnits = `-- name: ListLearningEventWatermarksByUserUnits :many
+with unit_ids as (
+  select distinct (value)::bigint as coarse_unit_id
+  from jsonb_array_elements_text($2::jsonb)
+)
+select
+  u.coarse_unit_id,
+  max(e.occurred_at)::timestamptz as max_occurred_at,
+  max(e.reset_boundary_at)::timestamptz as max_reset_boundary_at
+from unit_ids u
+left join learning.unit_learning_events e
+  on e.user_id = $1
+ and e.coarse_unit_id = u.coarse_unit_id
+group by u.coarse_unit_id
+order by u.coarse_unit_id asc
+`
+
+type ListLearningEventWatermarksByUserUnitsParams struct {
+	UserID        pgtype.UUID `json:"user_id"`
+	CoarseUnitIds []byte      `json:"coarse_unit_ids"`
+}
+
+type ListLearningEventWatermarksByUserUnitsRow struct {
+	CoarseUnitID       int64              `json:"coarse_unit_id"`
+	MaxOccurredAt      pgtype.Timestamptz `json:"max_occurred_at"`
+	MaxResetBoundaryAt pgtype.Timestamptz `json:"max_reset_boundary_at"`
+}
+
+func (q *Queries) ListLearningEventWatermarksByUserUnits(ctx context.Context, arg ListLearningEventWatermarksByUserUnitsParams) ([]ListLearningEventWatermarksByUserUnitsRow, error) {
+	rows, err := q.db.Query(ctx, listLearningEventWatermarksByUserUnits, arg.UserID, arg.CoarseUnitIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLearningEventWatermarksByUserUnitsRow{}
+	for rows.Next() {
+		var i ListLearningEventWatermarksByUserUnitsRow
+		if err := rows.Scan(&i.CoarseUnitID, &i.MaxOccurredAt, &i.MaxResetBoundaryAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLearningEventsByUserOrdered = `-- name: ListLearningEventsByUserOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+select event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 from learning.unit_learning_events
 where user_id = $1
-order by occurred_at asc, event_id asc
+order by ledger_seq asc
 `
 
 func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pgtype.UUID) ([]LearningUnitLearningEvent, error) {
@@ -189,6 +246,7 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 		var i LearningUnitLearningEvent
 		if err := rows.Scan(
 			&i.EventID,
+			&i.LedgerSeq,
 			&i.UserID,
 			&i.CoarseUnitID,
 			&i.VideoID,
@@ -202,6 +260,7 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
+			&i.ResetBoundaryAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -215,11 +274,11 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 }
 
 const listLearningEventsByUserUnitOrdered = `-- name: ListLearningEventsByUserUnitOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+select event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 from learning.unit_learning_events
 where user_id = $1
   and coarse_unit_id = $2
-order by occurred_at asc, event_id asc
+order by ledger_seq asc
 `
 
 type ListLearningEventsByUserUnitOrderedParams struct {
@@ -238,6 +297,7 @@ func (q *Queries) ListLearningEventsByUserUnitOrdered(ctx context.Context, arg L
 		var i LearningUnitLearningEvent
 		if err := rows.Scan(
 			&i.EventID,
+			&i.LedgerSeq,
 			&i.UserID,
 			&i.CoarseUnitID,
 			&i.VideoID,
@@ -251,6 +311,7 @@ func (q *Queries) ListLearningEventsByUserUnitOrdered(ctx context.Context, arg L
 			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
+			&i.ResetBoundaryAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -8,8 +8,6 @@ import (
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	appusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
-	"learning-video-recommendation-system/internal/learningengine/reducer/domain/aggregate"
-	"learning-video-recommendation-system/internal/learningengine/reducer/domain/enum"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
 )
 
@@ -181,87 +179,4 @@ func (u *SetTargetInactiveUsecase) Execute(ctx context.Context, request dto.SetT
 	}
 
 	return dto.SetTargetInactiveResponse{}, nil
-}
-
-type SuspendTargetUnitUsecase struct {
-	txManager TxManager
-}
-
-var _ appusecase.SuspendTargetUnitUsecase = (*SuspendTargetUnitUsecase)(nil)
-
-func NewSuspendTargetUnitUsecase(txManager TxManager) *SuspendTargetUnitUsecase {
-	return &SuspendTargetUnitUsecase{txManager: txManager}
-}
-
-func (u *SuspendTargetUnitUsecase) Execute(ctx context.Context, request dto.SuspendTargetUnitRequest) (dto.SuspendTargetUnitResponse, error) {
-	if request.UserID == "" {
-		return dto.SuspendTargetUnitResponse{}, fmt.Errorf("user_id is required")
-	}
-	if request.CoarseUnitID == 0 {
-		return dto.SuspendTargetUnitResponse{}, fmt.Errorf("coarse_unit_id is required")
-	}
-
-	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
-		state, err := repos.UserUnitStates().GetByUserAndUnitForUpdate(ctx, request.UserID, request.CoarseUnitID)
-		if err != nil {
-			return err
-		}
-		if state == nil {
-			return ErrUserUnitStateNotFound
-		}
-
-		state.Status = enum.StatusSuspended
-		state.SuspendedReason = request.SuspendedReason
-
-		_, err = repos.UserUnitStates().Upsert(ctx, state)
-		return err
-	})
-	if err != nil {
-		return dto.SuspendTargetUnitResponse{}, err
-	}
-
-	return dto.SuspendTargetUnitResponse{}, nil
-}
-
-type ResumeTargetUnitUsecase struct {
-	txManager TxManager
-}
-
-var _ appusecase.ResumeTargetUnitUsecase = (*ResumeTargetUnitUsecase)(nil)
-
-func NewResumeTargetUnitUsecase(txManager TxManager) *ResumeTargetUnitUsecase {
-	return &ResumeTargetUnitUsecase{txManager: txManager}
-}
-
-func (u *ResumeTargetUnitUsecase) Execute(ctx context.Context, request dto.ResumeTargetUnitRequest) (dto.ResumeTargetUnitResponse, error) {
-	if request.UserID == "" {
-		return dto.ResumeTargetUnitResponse{}, fmt.Errorf("user_id is required")
-	}
-	if request.CoarseUnitID == 0 {
-		return dto.ResumeTargetUnitResponse{}, fmt.Errorf("coarse_unit_id is required")
-	}
-
-	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
-		state, err := repos.UserUnitStates().GetByUserAndUnitForUpdate(ctx, request.UserID, request.CoarseUnitID)
-		if err != nil {
-			return err
-		}
-		if state == nil {
-			return ErrUserUnitStateNotFound
-		}
-		if state.Status != enum.StatusSuspended && state.SuspendedReason == "" {
-			return ErrUserUnitStateNotSuspended
-		}
-
-		state.SuspendedReason = ""
-		state.Status = aggregate.RecomputeActiveStatus(*state)
-
-		_, err = repos.UserUnitStates().Upsert(ctx, state)
-		return err
-	})
-	if err != nil {
-		return dto.ResumeTargetUnitResponse{}, err
-	}
-
-	return dto.ResumeTargetUnitResponse{}, nil
 }

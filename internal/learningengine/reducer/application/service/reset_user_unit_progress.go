@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
@@ -81,16 +82,23 @@ func (u *ResetUserUnitProgressUsecase) Execute(ctx context.Context, request dto.
 			return nil
 		}
 
+		watermarks, err := repos.UnitLearningEvents().ListWatermarksByUserUnits(ctx, request.UserID, []int64{request.CoarseUnitID})
+		if err != nil {
+			return err
+		}
+		resetBoundaryAt := resetBoundaryFromWatermark(request.OccurredAt.UTC(), watermarks[request.CoarseUnitID])
+
 		event := model.LearningEvent{
-			UserID:        request.UserID,
-			CoarseUnitID:  request.CoarseUnitID,
-			VideoID:       request.VideoID,
-			EventType:     enum.EventResetUnlearned,
-			ReducerEffect: enum.ReducerEffectResetUnlearned,
-			SourceType:    resetUserUnitProgressSourceType,
-			SourceRefID:   request.ClientEventID,
-			Metadata:      metadata,
-			OccurredAt:    request.OccurredAt.UTC(),
+			UserID:          request.UserID,
+			CoarseUnitID:    request.CoarseUnitID,
+			VideoID:         request.VideoID,
+			EventType:       enum.EventResetUnlearned,
+			ReducerEffect:   enum.ReducerEffectResetUnlearned,
+			SourceType:      resetUserUnitProgressSourceType,
+			SourceRefID:     request.ClientEventID,
+			Metadata:        metadata,
+			OccurredAt:      request.OccurredAt.UTC(),
+			ResetBoundaryAt: &resetBoundaryAt,
 		}
 		appendResult, err := repos.UnitLearningEvents().Append(ctx, []model.LearningEvent{event})
 		if err != nil {
@@ -122,6 +130,17 @@ func (u *ResetUserUnitProgressUsecase) Execute(ctx context.Context, request dto.
 	return response, nil
 }
 
+func resetBoundaryFromWatermark(clientOccurredAt time.Time, watermark model.UnitLearningEventWatermark) time.Time {
+	boundary := clientOccurredAt
+	if watermark.MaxOccurredAt != nil && watermark.MaxOccurredAt.After(boundary) {
+		boundary = *watermark.MaxOccurredAt
+	}
+	if watermark.MaxResetBoundaryAt != nil && watermark.MaxResetBoundaryAt.After(boundary) {
+		boundary = *watermark.MaxResetBoundaryAt
+	}
+	return boundary.UTC()
+}
+
 func resetUserUnitProgressMetadata(request dto.ResetUserUnitProgressRequest) ([]byte, error) {
 	clientContext := request.ClientContext
 	if len(clientContext) == 0 {
@@ -133,9 +152,10 @@ func resetUserUnitProgressMetadata(request dto.ResetUserUnitProgressRequest) ([]
 	}
 
 	metadata := map[string]any{
-		"client_context": clientContextJSON(clientContext),
-		"event_payload":  clientContextJSON(eventPayload),
-		"source_surface": request.SourceSurface,
+		"client_context":     clientContextJSON(clientContext),
+		"client_occurred_at": request.OccurredAt.UTC().Format(time.RFC3339Nano),
+		"event_payload":      clientContextJSON(eventPayload),
+		"source_surface":     request.SourceSurface,
 	}
 	if request.WatchSessionID != "" {
 		metadata["watch_session_id"] = request.WatchSessionID

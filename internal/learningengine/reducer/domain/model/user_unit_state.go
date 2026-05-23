@@ -28,7 +28,6 @@ type UserUnitState struct {
 	ScheduleIntervalDays    float64
 	ScheduleEaseFactor      float64
 	NextReviewAt            *time.Time
-	SuspendedReason         string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 }

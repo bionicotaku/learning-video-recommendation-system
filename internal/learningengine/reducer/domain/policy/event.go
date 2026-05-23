@@ -61,6 +61,11 @@ func ValidateEvent(event model.LearningEvent) error {
 		if event.ProgressQuality != nil {
 			return fmt.Errorf("progress_quality must be empty for reset_unlearned events")
 		}
+		if event.ResetBoundaryAt == nil {
+			return fmt.Errorf("reset_boundary_at is required for reset_unlearned events")
+		}
+	} else if event.ResetBoundaryAt != nil {
+		return fmt.Errorf("reset_boundary_at is only allowed for reset_unlearned events")
 	}
 	if event.ProgressQuality != nil && (*event.ProgressQuality < 0 || *event.ProgressQuality > 5) {
 		return fmt.Errorf("progress_quality must be between 0 and 5")

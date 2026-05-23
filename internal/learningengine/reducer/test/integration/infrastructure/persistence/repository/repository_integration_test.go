@@ -107,14 +107,15 @@ func TestUnitLearningEventRepositoryRejectsResetDuplicateClientEventAcrossUnits(
 
 	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
 	first := model.LearningEvent{
-		UserID:        userID,
-		CoarseUnitID:  101,
-		EventType:     "reset_unlearned",
-		ReducerEffect: "reset_unlearned",
-		SourceType:    "learning_unit_reset",
-		SourceRefID:   "reset-client-event-1",
-		Metadata:      []byte("{}"),
-		OccurredAt:    time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+		UserID:          userID,
+		CoarseUnitID:    101,
+		EventType:       "reset_unlearned",
+		ReducerEffect:   "reset_unlearned",
+		SourceType:      "learning_unit_reset",
+		SourceRefID:     "reset-client-event-1",
+		Metadata:        []byte("{}"),
+		OccurredAt:      time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+		ResetBoundaryAt: timePtr(time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)),
 	}
 	if _, err := repo.Append(context.Background(), []model.LearningEvent{first}); err != nil {
 		t.Fatalf("first Append() error = %v", err)
@@ -123,8 +124,73 @@ func TestUnitLearningEventRepositoryRejectsResetDuplicateClientEventAcrossUnits(
 	second := first
 	second.CoarseUnitID = 102
 	second.OccurredAt = first.OccurredAt.Add(time.Hour)
+	second.ResetBoundaryAt = timePtr(second.OccurredAt)
 	if _, err := repo.Append(context.Background(), []model.LearningEvent{second}); !errors.Is(err, apprepo.ErrDuplicateResetClientEvent) {
 		t.Fatalf("second Append() error = %v, want ErrDuplicateResetClientEvent", err)
+	}
+}
+
+func TestUnitLearningEventRepositoryListWatermarksByUserUnits(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
+
+	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+	q4 := int16(4)
+	t1 := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+	t3 := t1.Add(2 * time.Hour)
+	events := []model.LearningEvent{
+		{
+			UserID:          userID,
+			CoarseUnitID:    101,
+			EventType:       "quiz",
+			ReducerEffect:   "affects_progress",
+			SourceType:      "quiz_event",
+			SourceRefID:     "watermark-quiz-1",
+			ProgressQuality: &q4,
+			Metadata:        []byte("{}"),
+			OccurredAt:      t1,
+		},
+		{
+			UserID:          userID,
+			CoarseUnitID:    101,
+			EventType:       "reset_unlearned",
+			ReducerEffect:   "reset_unlearned",
+			SourceType:      "learning_unit_reset",
+			SourceRefID:     "watermark-reset-1",
+			Metadata:        []byte("{}"),
+			OccurredAt:      t2,
+			ResetBoundaryAt: &t3,
+		},
+	}
+	if _, err := repo.Append(context.Background(), events); err != nil {
+		t.Fatalf("Append() error = %v", err)
+	}
+
+	watermarks, err := repo.ListWatermarksByUserUnits(context.Background(), userID, []int64{101, 102})
+	if err != nil {
+		t.Fatalf("ListWatermarksByUserUnits() error = %v", err)
+	}
+	if len(watermarks) != 2 {
+		t.Fatalf("watermarks len = %d, want 2", len(watermarks))
+	}
+	watermark, ok := watermarks[101]
+	if !ok {
+		t.Fatal("missing watermark for unit 101")
+	}
+	if watermark.MaxOccurredAt == nil || !watermark.MaxOccurredAt.Equal(t2) {
+		t.Fatalf("MaxOccurredAt = %v, want %v", watermark.MaxOccurredAt, t2)
+	}
+	if watermark.MaxResetBoundaryAt == nil || !watermark.MaxResetBoundaryAt.Equal(t3) {
+		t.Fatalf("MaxResetBoundaryAt = %v, want %v", watermark.MaxResetBoundaryAt, t3)
+	}
+	if watermarks[102].MaxOccurredAt != nil || watermarks[102].MaxResetBoundaryAt != nil {
+		t.Fatalf("unit 102 watermark = %+v, want empty", watermarks[102])
 	}
 }
 
@@ -346,4 +412,8 @@ func TestTargetStateCommandRepositoryEnsureAndSetInactive(t *testing.T) {
 	if states[0].IsTarget {
 		t.Fatalf("is_target = true, want false")
 	}
+}
+
+func timePtr(value time.Time) *time.Time {
+	return &value
 }

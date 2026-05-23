@@ -161,6 +161,7 @@ func (u *NormalizePendingEventsUsecase) Execute(ctx context.Context, request dto
 	}
 	response.RecordedEventCount += recordResult.recordedCount
 	response.DuplicateEventCount += recordResult.duplicateCount
+	response.SkippedCount += recordResult.skippedCount
 	response.RecordedUserBatchCount += recordResult.userBatchCount
 	return response, nil
 }
@@ -230,6 +231,7 @@ func (u *NormalizeLearningInteractionsByIDsUsecase) Execute(ctx context.Context,
 	}
 	response.RecordedEventCount += recordResult.recordedCount
 	response.DuplicateEventCount += recordResult.duplicateCount
+	response.SkippedCount += recordResult.skippedCount
 	response.RecordedUserBatchCount += recordResult.userBatchCount
 	return response, nil
 }
@@ -271,6 +273,7 @@ func (u *NormalizeQuizAttemptByIDUsecase) Execute(ctx context.Context, request d
 	}
 	response.RecordedEventCount += recordResult.recordedCount
 	response.DuplicateEventCount += recordResult.duplicateCount
+	response.SkippedCount += recordResult.skippedCount
 	response.RecordedUserBatchCount += recordResult.userBatchCount
 	return response, nil
 }
@@ -319,6 +322,7 @@ func (u *NormalizeSelfMarkMasteredByIDUsecase) Execute(ctx context.Context, requ
 	}
 	response.RecordedEventCount += recordResult.recordedCount
 	response.DuplicateEventCount += recordResult.duplicateCount
+	response.SkippedCount += recordResult.skippedCount
 	response.RecordedUserBatchCount += recordResult.userBatchCount
 	return response, nil
 }
@@ -326,6 +330,7 @@ func (u *NormalizeSelfMarkMasteredByIDUsecase) Execute(ctx context.Context, requ
 type recordResult struct {
 	recordedCount  int
 	duplicateCount int
+	skippedCount   int
 	userBatchCount int
 }
 
@@ -434,6 +439,7 @@ func recordNormalizedEvents(ctx context.Context, recorder normalizerrepo.Learnin
 		}
 		result.recordedCount += recordResponse.RecordedCount
 		result.duplicateCount += recordResponse.DuplicateCount
+		result.skippedCount += recordResponse.SkippedBeforeResetCount
 		result.userBatchCount++
 	}
 

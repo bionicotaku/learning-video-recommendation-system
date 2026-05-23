@@ -49,14 +49,18 @@ internal/learningengine/normalizer/
 - Lookup is `observe_only`.
 - Exposure raw rows are not normalized one-by-one. They are grouped by
   `user_id + coarse_unit_id + watch_session_id`; three unconsumed distinct
-  watch sessions since the latest lookup produce one passive
+  watch sessions after `max(latest lookup, latest reset_boundary_at)` produce one passive
   `exposure_session3_v1` progress event with `progress_quality=4` and
   `counts_toward_success_streak=false`. The event `source_ref_id` is a
   deterministic SHA-256 hash of the three consumed watch session ids. The
   reducer ledger stores those ids in `consumed_watch_session_ids`; metadata
   keeps an audit copy of the original `watch_session_ids`.
-- Self mark is `set_mastered`.
-- Reset-unlearned is not a raw fact and does not pass through Normalizer.
+- Self mark is `set_mastered`; it changes learning state to mastered and leaves
+  target/control fields alone.
+- Reset-unlearned is not a raw fact and does not pass through Normalizer, but
+  its reducer ledger row stores `reset_boundary_at`. Pending/by-ID raw reads
+  filter out quiz/lookup/self-mark/exposure facts whose business time is at or
+  before that latest boundary.
 
 ## Current Flow
 
@@ -97,13 +101,13 @@ NormalizeSelfMarkMasteredByID
 
 This is the main path for `POST /api/learning-units:mark-mastered` after Analytics raw write returns `learning_interaction_event_id`.
 
-Reset-unlearned has no Normalizer usecase. `POST /api/learning-units:reset-unlearned` calls reducer `ResetUserUnitProgress` directly and persists `event_type = reset_unlearned`.
+Reset-unlearned has no Normalizer usecase. `POST /api/learning-units:reset-unlearned` calls reducer `ResetUserUnitProgress` directly and persists `event_type = reset_unlearned` with an internal `reset_boundary_at`.
 
 ### NormalizePendingEvents
 
 ```text
 NormalizePendingEvents
-  -> read pending raw facts with anti-join against learning.unit_learning_events
+  -> read pending raw facts with anti-join against learning.unit_learning_events and latest reset boundary filter
   -> read pending exposure session3 windows
   -> map raw facts and session windows with domain/rule
   -> group normalized events by user_id

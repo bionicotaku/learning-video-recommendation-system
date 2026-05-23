@@ -170,9 +170,8 @@ func (r *UserUnitStateRepository) ListByUser(ctx context.Context, userID string,
 	}
 
 	rows, err := r.queries.ListUserUnitStates(ctx, learningenginesqlc.ListUserUnitStatesParams{
-		UserID:           pgUserID,
-		OnlyTarget:       filter.OnlyTarget,
-		ExcludeSuspended: filter.ExcludeSuspended,
+		UserID:     pgUserID,
+		OnlyTarget: filter.OnlyTarget,
 	})
 	if err != nil {
 		return nil, err
@@ -250,7 +249,6 @@ func toUpsertUserUnitStateParams(state *model.UserUnitState) (learningenginesqlc
 		ScheduleIntervalDays:    scheduleIntervalDays,
 		ScheduleEaseFactor:      scheduleEaseFactor,
 		NextReviewAt:            mapper.TimePointerToPG(state.NextReviewAt),
-		SuspendedReason:         mapper.StringToText(state.SuspendedReason),
 	}, nil
 }
 
@@ -280,7 +278,6 @@ type userUnitStatePayload struct {
 	ScheduleIntervalDays    float64    `json:"schedule_interval_days"`
 	ScheduleEaseFactor      float64    `json:"schedule_ease_factor"`
 	NextReviewAt            *time.Time `json:"next_review_at"`
-	SuspendedReason         string     `json:"suspended_reason"`
 }
 
 func toUserUnitStatePayload(state *model.UserUnitState) userUnitStatePayload {
@@ -319,7 +316,6 @@ func toUserUnitStatePayload(state *model.UserUnitState) userUnitStatePayload {
 		ScheduleIntervalDays:    state.ScheduleIntervalDays,
 		ScheduleEaseFactor:      state.ScheduleEaseFactor,
 		NextReviewAt:            utcPointer(state.NextReviewAt),
-		SuspendedReason:         state.SuspendedReason,
 	}
 }
 

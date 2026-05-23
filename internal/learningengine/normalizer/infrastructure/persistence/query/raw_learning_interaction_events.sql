@@ -26,6 +26,15 @@ where i.coarse_unit_id is not null
   and i.event_type in ('lookup', 'self_mark_mastered')
   and (sqlc.narg(user_id)::uuid is null or i.user_id = sqlc.narg(user_id)::uuid)
   and (sqlc.narg(occurred_before)::timestamptz is null or i.occurred_at < sqlc.narg(occurred_before)::timestamptz)
+  and i.occurred_at > coalesce((
+    select max(e.reset_boundary_at)
+    from learning.unit_learning_events e
+    where e.user_id = i.user_id
+      and e.coarse_unit_id = i.coarse_unit_id
+      and e.source_type = 'learning_unit_reset'
+      and e.event_type = 'reset_unlearned'
+      and e.reducer_effect = 'reset_unlearned'
+  ), '-infinity'::timestamptz)
   and not exists (
     select 1
     from learning.unit_learning_events e
@@ -64,6 +73,15 @@ from analytics.learning_interaction_events i
 where i.user_id = sqlc.arg(user_id)
   and i.event_type in ('exposure', 'lookup', 'self_mark_mastered')
   and i.event_id = any(sqlc.arg(event_ids)::uuid[])
+  and i.occurred_at > coalesce((
+    select max(e.reset_boundary_at)
+    from learning.unit_learning_events e
+    where e.user_id = i.user_id
+      and e.coarse_unit_id = i.coarse_unit_id
+      and e.source_type = 'learning_unit_reset'
+      and e.event_type = 'reset_unlearned'
+      and e.reducer_effect = 'reset_unlearned'
+  ), '-infinity'::timestamptz)
 order by i.occurred_at asc, i.event_id asc;
 
 -- name: ListPendingExposureSession3Windows :many
@@ -86,7 +104,31 @@ latest_lookup as (
     on l.user_id = p.user_id
    and l.coarse_unit_id = p.coarse_unit_id
    and l.event_type = 'lookup'
+	  group by p.user_id, p.coarse_unit_id
+	),
+latest_reset as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    coalesce(max(e.reset_boundary_at), '-infinity'::timestamptz) as latest_reset_boundary_at
+  from candidate_pairs p
+  left join learning.unit_learning_events e
+    on e.user_id = p.user_id
+   and e.coarse_unit_id = p.coarse_unit_id
+   and e.source_type = 'learning_unit_reset'
+   and e.event_type = 'reset_unlearned'
+   and e.reducer_effect = 'reset_unlearned'
   group by p.user_id, p.coarse_unit_id
+),
+latest_boundary as (
+  select
+    l.user_id,
+    l.coarse_unit_id,
+    greatest(l.latest_lookup_at, r.latest_reset_boundary_at) as latest_boundary_at
+  from latest_lookup l
+  join latest_reset r
+    on r.user_id = l.user_id
+   and r.coarse_unit_id = l.coarse_unit_id
 ),
 consumed_sessions as (
   select
@@ -108,13 +150,13 @@ session_exposures as (
     (array_agg(i.video_id order by i.occurred_at asc, i.event_id asc))[1] as video_id,
     min(i.occurred_at) as first_exposed_at,
     count(*)::integer as raw_event_count
-  from latest_lookup l
-  join analytics.learning_interaction_events i
+	  from latest_boundary l
+	  join analytics.learning_interaction_events i
     on i.user_id = l.user_id
    and i.coarse_unit_id = l.coarse_unit_id
    and i.event_type = 'exposure'
    and i.watch_session_id is not null
-   and i.occurred_at > l.latest_lookup_at
+	   and i.occurred_at > l.latest_boundary_at
    and (sqlc.narg(occurred_before)::timestamptz is null or i.occurred_at < sqlc.narg(occurred_before)::timestamptz)
   left join consumed_sessions c
     on c.user_id = l.user_id
@@ -183,7 +225,31 @@ latest_lookup as (
     on l.user_id = p.user_id
    and l.coarse_unit_id = p.coarse_unit_id
    and l.event_type = 'lookup'
+	  group by p.user_id, p.coarse_unit_id
+	),
+latest_reset as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    coalesce(max(e.reset_boundary_at), '-infinity'::timestamptz) as latest_reset_boundary_at
+  from candidate_pairs p
+  left join learning.unit_learning_events e
+    on e.user_id = p.user_id
+   and e.coarse_unit_id = p.coarse_unit_id
+   and e.source_type = 'learning_unit_reset'
+   and e.event_type = 'reset_unlearned'
+   and e.reducer_effect = 'reset_unlearned'
   group by p.user_id, p.coarse_unit_id
+),
+latest_boundary as (
+  select
+    l.user_id,
+    l.coarse_unit_id,
+    greatest(l.latest_lookup_at, r.latest_reset_boundary_at) as latest_boundary_at
+  from latest_lookup l
+  join latest_reset r
+    on r.user_id = l.user_id
+   and r.coarse_unit_id = l.coarse_unit_id
 ),
 consumed_sessions as (
   select
@@ -205,13 +271,13 @@ session_exposures as (
     (array_agg(i.video_id order by i.occurred_at asc, i.event_id asc))[1] as video_id,
     min(i.occurred_at) as first_exposed_at,
     count(*)::integer as raw_event_count
-  from latest_lookup l
-  join analytics.learning_interaction_events i
+	  from latest_boundary l
+	  join analytics.learning_interaction_events i
     on i.user_id = l.user_id
    and i.coarse_unit_id = l.coarse_unit_id
    and i.event_type = 'exposure'
    and i.watch_session_id is not null
-   and i.occurred_at > l.latest_lookup_at
+	   and i.occurred_at > l.latest_boundary_at
   left join consumed_sessions c
     on c.user_id = l.user_id
    and c.coarse_unit_id = l.coarse_unit_id

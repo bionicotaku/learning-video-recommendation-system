@@ -145,7 +145,9 @@ use the dedicated Analytics writer and `NormalizeSelfMarkMasteredByID`
 normalizer path. Before writing the raw fact, self-mark mastered requires an
 existing `learning.user_unit_states` row for the current user and
 `coarse_unit_id`; existing inactive or already mastered states are still
-accepted and reduced to terminal mastered with `is_target=false`.
+accepted and reduced to terminal mastered while preserving target/control
+fields. `mark-mastered` sets learning state; it does not remove a unit from the
+current target set.
 
 `POST /api/learning-units:reset-unlearned` uses the same request shape as
 self-mark mastered but calls the Learning Engine reducer directly. It requires
@@ -154,7 +156,8 @@ the current user to already have a `learning.user_unit_states` row for the
 accepted. The endpoint appends a `reset_unlearned` normalized event to
 `learning.unit_learning_events` and, when newly inserted, synchronously resets
 the projection to unlearned state in the same user-scoped transaction. It does
-not write Analytics and is not handled by Normalizer repair/backfill. Its
+not write Analytics; Normalizer repair/backfill uses the event's internal
+`reset_boundary_at` to ignore raw facts at or before the reset boundary. Its
 `client_event_id` is user-scoped: duplicate `user_id + client_event_id`
 requests return the existing reset event and do not reduce another body unit.
 

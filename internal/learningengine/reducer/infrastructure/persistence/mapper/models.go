@@ -8,6 +8,7 @@ import (
 func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.LearningEvent {
 	return model.LearningEvent{
 		EventID:                   UUIDToString(row.EventID),
+		LedgerSeq:                 Int64FromPG(row.LedgerSeq),
 		UserID:                    UUIDToString(row.UserID),
 		CoarseUnitID:              row.CoarseUnitID,
 		VideoID:                   UUIDToString(row.VideoID),
@@ -21,6 +22,7 @@ func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.Lea
 		ConsumedWatchSessionIDs:   UUIDsToStrings(row.ConsumedWatchSessionIds),
 		Metadata:                  row.Metadata,
 		OccurredAt:                TimeFromPG(row.OccurredAt),
+		ResetBoundaryAt:           TimePointerFromPG(row.ResetBoundaryAt),
 		CreatedAt:                 TimeFromPG(row.CreatedAt),
 	}
 }
@@ -28,6 +30,7 @@ func ToLearningEvent(row learningenginesqlc.LearningUnitLearningEvent) model.Lea
 func ToLearningEventFromAppendRow(row learningenginesqlc.AppendLearningEventsRow) model.LearningEvent {
 	return model.LearningEvent{
 		EventID:                   UUIDToString(row.EventID),
+		LedgerSeq:                 Int64FromPG(row.LedgerSeq),
 		UserID:                    UUIDToString(row.UserID),
 		CoarseUnitID:              row.CoarseUnitID,
 		VideoID:                   UUIDToString(row.VideoID),
@@ -41,6 +44,7 @@ func ToLearningEventFromAppendRow(row learningenginesqlc.AppendLearningEventsRow
 		ConsumedWatchSessionIDs:   UUIDsToStrings(row.ConsumedWatchSessionIds),
 		Metadata:                  row.Metadata,
 		OccurredAt:                TimeFromPG(row.OccurredAt),
+		ResetBoundaryAt:           TimePointerFromPG(row.ResetBoundaryAt),
 		CreatedAt:                 TimeFromPG(row.CreatedAt),
 	}
 }
@@ -93,7 +97,6 @@ func ToUserUnitState(row learningenginesqlc.LearningUserUnitState) (model.UserUn
 		ScheduleIntervalDays:    scheduleIntervalDays,
 		ScheduleEaseFactor:      scheduleEaseFactor,
 		NextReviewAt:            TimePointerFromPG(row.NextReviewAt),
-		SuspendedReason:         TextToString(row.SuspendedReason),
 		CreatedAt:               TimeFromPG(row.CreatedAt),
 		UpdatedAt:               TimeFromPG(row.UpdatedAt),
 	}, nil

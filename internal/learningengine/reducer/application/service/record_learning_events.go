@@ -52,6 +52,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 			ConsumedWatchSessionIDs:   append([]string(nil), input.ConsumedWatchSessionIDs...),
 			Metadata:                  metadata,
 			OccurredAt:                input.OccurredAt.UTC(),
+			ResetBoundaryAt:           input.ResetBoundaryAt,
 		}
 		if err := policy.ValidateEvent(event); err != nil {
 			return dto.RecordLearningEventsResponse{}, err
@@ -64,7 +65,17 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 	response := dto.RecordLearningEventsResponse{ReceivedCount: len(orderedEvents)}
 
 	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
-		appendResult, err := repos.UnitLearningEvents().Append(ctx, orderedEvents)
+		watermarks, err := repos.UnitLearningEvents().ListWatermarksByUserUnits(ctx, request.UserID, sortedCoarseUnitIDs(groupedEvents))
+		if err != nil {
+			return err
+		}
+		eventsToAppend := filterEventsAfterResetBoundary(orderedEvents, watermarks)
+		response.SkippedBeforeResetCount = len(orderedEvents) - len(eventsToAppend)
+		if len(eventsToAppend) == 0 {
+			return nil
+		}
+
+		appendResult, err := repos.UnitLearningEvents().Append(ctx, eventsToAppend)
 		if err != nil {
 			return err
 		}
@@ -75,7 +86,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 			return nil
 		}
 
-		groupedInsertedEvents := groupAndSortEvents(appendResult.InsertedEvents)
+		groupedInsertedEvents := groupEventsPreserveOrder(appendResult.InsertedEvents)
 		coarseUnitIDs := sortedCoarseUnitIDs(groupedInsertedEvents)
 		currentStates, err := repos.UserUnitStates().ListByUserAndUnitIDsForUpdate(ctx, request.UserID, coarseUnitIDs)
 		if err != nil {
@@ -134,6 +145,19 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 	return response, nil
 }
 
+func filterEventsAfterResetBoundary(events []model.LearningEvent, watermarks map[int64]model.UnitLearningEventWatermark) []model.LearningEvent {
+	filtered := make([]model.LearningEvent, 0, len(events))
+	for _, event := range events {
+		if !policy.IsResetUnlearnedEffect(event.ReducerEffect) {
+			if boundary := watermarks[event.CoarseUnitID].MaxResetBoundaryAt; boundary != nil && !event.OccurredAt.After(*boundary) {
+				continue
+			}
+		}
+		filtered = append(filtered, event)
+	}
+	return filtered
+}
+
 func groupAndSortEvents(events []model.LearningEvent) map[int64][]model.LearningEvent {
 	grouped := make(map[int64][]model.LearningEvent, len(events))
 	for _, event := range events {
@@ -146,6 +170,14 @@ func groupAndSortEvents(events []model.LearningEvent) map[int64][]model.Learning
 		})
 	}
 
+	return grouped
+}
+
+func groupEventsPreserveOrder(events []model.LearningEvent) map[int64][]model.LearningEvent {
+	grouped := make(map[int64][]model.LearningEvent, len(events))
+	for _, event := range events {
+		grouped[event.CoarseUnitID] = append(grouped[event.CoarseUnitID], event)
+	}
 	return grouped
 }
 

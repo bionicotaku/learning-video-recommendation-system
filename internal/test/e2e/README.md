@@ -40,7 +40,7 @@
   - API：Learning Events HTTP handler + API application service
   - Analytics：learning interaction / quiz / self mark raw fact write
   - Normalizer：by-ID normalize
-  - Learning engine：`EnsureTargetUnits`、`SetTargetInactive`、`SuspendTargetUnit`、`ResumeTargetUnit`、`RecordLearningEvents`、`ReplayUserStates`、`ListUserUnitStates`
+  - Learning engine：`EnsureTargetUnits`、`SetTargetInactive`、`RecordLearningEvents`、`ReplayUserStates`、`ListUserUnitStates`
   - Recommendation：完整 pipeline + `RecommendationResultWriter`
 
 ## 当前场景矩阵
@@ -55,12 +55,12 @@
   - self mark 后追加普通 quiz event 不会让 terminal mastered state 回落
 - `learning_to_recommendation_test.go`
   - `ensure target` 后零事件用户可被 Recommendation 读取
-  - `suspend / resume / inactive` 对 Recommendation 输入即时生效
+  - `set inactive / reactivate target` 对 Recommendation 输入即时生效
   - `ReplayUserStates` 前后跨模块可观察结果保持一致
 - `recommendation_demand_mapping_test.go`
   - `learning.user_unit_states` 的真实字段组合映射到 `hard_review / new_now / soft_review`
   - 零事件但无供给的 target 会形成真实 demand，并在 underfill 时标记 `extreme_sparse`
-  - suspended / inactive / 非 target 单元不会进入 Recommendation demand
+  - mastered / inactive / 非 target 单元不会进入 Recommendation demand
 - `recommendation_supply_modes_test.go`
   - 正常库存下 `selector_mode = normal`
   - `hard_review` 低供给下 `selector_mode = low_supply`

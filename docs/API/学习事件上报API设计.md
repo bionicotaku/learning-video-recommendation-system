@@ -513,6 +513,8 @@ Content-Type: application/json
 
 Self mark 的 API 成功语义仍然只是 raw accepted。raw 写入前会先校验该用户已有对应 `learning.user_unit_states` 行；缺失时返回 `invalid_request`，且不写入 raw fact。后端会同步尝试 `NormalizeSelfMarkMasteredByID`；即使同步归一化失败，也由 pending repair/backfill 最终补偿。
 
+`mark-mastered` 的业务语义是“设置学习状态为 mastered”，不是“移出当前 target”。归一化后的 `set_mastered` 只收敛 `status/progress/mastery/schedule`，不修改 `is_target` 或其他 target/control 字段。
+
 ## 8. Reset Unlearned 单点 API
 
 ### 8.1 Endpoint
@@ -583,9 +585,13 @@ reducer_effect = reset_unlearned
 progress_quality = null
 source_type = learning_unit_reset
 source_ref_id = client_event_id
+occurred_at = request.occurred_at
+reset_boundary_at = 后端计算的 reset 边界
 ```
 
-reducer 新插入时把状态重置为未学习：`status = new`、`progress_percent = 0`、`mastery_score = 0`，清空观察、进度、最近质量、成功/失败计数、schedule 和 `next_review_at`。它不改变 target/control 字段本身；因此如果 reset 前该 row 是 `is_target=false`，reset 后仍是 `is_target=false`。该事件会进入 `learning.unit_learning_events`，后续 `ReplayUserStates` 会重放并得到一致结果。重复 `client_event_id` 只返回已有 event，不重新 reduce。
+`occurred_at` 是客户端业务发生时间。后端另存内部字段 `reset_boundary_at = max(request.occurred_at, 当前 user+unit 已接受 ledger max(occurred_at), 当前 user+unit max(reset_boundary_at))`，用于屏蔽 reset 前旧 raw fact。`reset_boundary_at` 不出现在 public response。
+
+reducer 新插入时把状态重置为未学习：`status = new`、`progress_percent = 0`、`mastery_score = 0`，清空观察、进度、最近质量、成功/失败计数、schedule 和 `next_review_at`。它不改变 target/control 字段本身；因此如果 reset 前该 row 是 `is_target=false`，reset 后仍是 `is_target=false`；如果 reset 前仍是 `is_target=true`，reset 后仍是 `is_target=true`。该事件会进入 `learning.unit_learning_events`，后续 `ReplayUserStates` 按 `ledger_seq` 重放并得到一致结果。重复 `client_event_id` 只返回已有 event，不重新 reduce。
 
 ## 9. Normalizer 语义
 
@@ -598,10 +604,10 @@ NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
 | raw `event_type` | normalized `event_type` | `reducer_effect` | `progress_quality` | 说明 |
 | --- | --- | --- | --- | --- |
 | `exposure` | - | - | - | raw exposure 不再逐条写 normalized observe-only event；normalizer 只提取受影响的 `user_id + coarse_unit_id` 执行 session3 聚合检查。 |
-| 3 个未消费过的不同 watch session exposure，且最近无 lookup reset | `exposure` | `affects_progress` | `4` | 生成一条 synthetic `exposure_session3_v1` passive progress；`source_ref_id` 是三 session 组合 hash，typed `consumed_watch_session_ids` 记录被消费的 3 个 session，`counts_toward_success_streak=false`。 |
+| 3 个未消费过的不同 watch session exposure，且晚于 latest lookup/reset boundary | `exposure` | `affects_progress` | `4` | 生成一条 synthetic `exposure_session3_v1` passive progress；`source_ref_id` 是三 session 组合 hash，typed `consumed_watch_session_ids` 记录被消费的 3 个 session，`counts_toward_success_streak=false`。 |
 | `lookup` | `lookup` | `observe_only` | `null` | mapped lookup 进入 Learning Engine；unmapped lookup skipped。 |
 
-`NormalizeLearningInteractionsByIDs` 是 batch API 专属入口，只允许 exposure / lookup raw row。self mark raw row 必须走 `NormalizeSelfMarkMasteredByID`。同一 `watch_session_id` 内同一个 `coarse_unit_id` 的多条 exposure raw row 只计为一次 session exposure；已被 session3 event 的 typed `consumed_watch_session_ids` 消费的 `watch_session_id` 不会再次计入后续 window；lookup 会重置之后的 session3 计数窗口。
+`NormalizeLearningInteractionsByIDs` 是 batch API 专属入口，只允许 exposure / lookup raw row。self mark raw row 必须走 `NormalizeSelfMarkMasteredByID`。同一 `watch_session_id` 内同一个 `coarse_unit_id` 的多条 exposure raw row 只计为一次 session exposure；已被 session3 event 的 typed `consumed_watch_session_ids` 消费的 `watch_session_id` 不会再次计入后续 window；lookup 会重置之后的 session3 计数窗口，`reset_unlearned.reset_boundary_at` 也会作为窗口起点并屏蔽旧 raw。
 
 ### 9.2 Quiz Attempt
 
@@ -633,7 +639,7 @@ NormalizeSelfMarkMasteredByID(user_id, learning_interaction_event_id)
 
 raw row 必须满足 `event_type = self_mark_mastered`。如果传入 exposure / lookup 的 raw ID，该用例返回错误且不调用 reducer。
 
-API 层已经保证 self mark raw row 只来自已有 `learning.user_unit_states` 的 unit。normalizer 固定生成 `set_mastered`，reducer 不再检查该 state 是否仍是 target：已有 state 无论 `is_target=true/false` 或是否已经 mastered，最终都收敛为 terminal mastered 且 `is_target=false`。
+API 层已经保证 self mark raw row 只来自已有 `learning.user_unit_states` 的 unit。normalizer 固定生成 `set_mastered`，reducer 不再检查该 state 是否仍是 target：已有 state 无论 `is_target=true/false` 或是否已经 mastered，最终都收敛为 `status=mastered`，但保留原有 target/control 字段。
 
 normalized event 固定为：
 

@@ -1,16 +1,16 @@
 # Graph Report - learning-video-recommendation-system  (2026-05-22)
 
 ## Corpus Check
-- 634 files · ~233,681 words
+- 634 files · ~235,698 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5213 nodes · 7676 edges · 557 communities (390 shown, 167 thin omitted)
-- Extraction: 82% EXTRACTED · 18% INFERRED · 0% AMBIGUOUS · INFERRED: 1378 edges (avg confidence: 0.79)
+- 5238 nodes · 7773 edges · 561 communities (388 shown, 173 thin omitted)
+- Extraction: 82% EXTRACTED · 18% INFERRED · 0% AMBIGUOUS · INFERRED: 1401 edges (avg confidence: 0.79)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f634ebc4`
+- Built from commit: `932f1de9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -484,6 +484,7 @@
 - [[_COMMUNITY_Community 484|Community 484]]
 - [[_COMMUNITY_Community 485|Community 485]]
 - [[_COMMUNITY_Community 486|Community 486]]
+- [[_COMMUNITY_Community 487|Community 487]]
 - [[_COMMUNITY_Community 488|Community 488]]
 - [[_COMMUNITY_Community 489|Community 489]]
 - [[_COMMUNITY_Community 490|Community 490]]
@@ -493,12 +494,13 @@
 - [[_COMMUNITY_Community 494|Community 494]]
 - [[_COMMUNITY_Community 495|Community 495]]
 - [[_COMMUNITY_Community 541|Community 541]]
+- [[_COMMUNITY_Community 544|Community 544]]
 - [[_COMMUNITY_Community 545|Community 545]]
 - [[_COMMUNITY_Community 546|Community 546]]
 - [[_COMMUNITY_Community 547|Community 547]]
 - [[_COMMUNITY_Community 548|Community 548]]
+- [[_COMMUNITY_Community 549|Community 549]]
 - [[_COMMUNITY_Community 550|Community 550]]
-- [[_COMMUNITY_Community 551|Community 551]]
 - [[_COMMUNITY_Community 552|Community 552]]
 - [[_COMMUNITY_Community 553|Community 553]]
 - [[_COMMUNITY_Community 554|Community 554]]
@@ -506,18 +508,20 @@
 - [[_COMMUNITY_Community 556|Community 556]]
 - [[_COMMUNITY_Community 557|Community 557]]
 - [[_COMMUNITY_Community 558|Community 558]]
+- [[_COMMUNITY_Community 559|Community 559]]
+- [[_COMMUNITY_Community 561|Community 561]]
 - [[_COMMUNITY_Community 565|Community 565]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `InvalidRequestError()` - 42 edges
-2. `Reduce()` - 40 edges
+1. `Reduce()` - 43 edges
+2. `InvalidRequestError()` - 42 edges
 3. `CatalogIngestError` - 32 edges
-4. `Harness` - 27 edges
-5. `NewRecordLearningEventsUsecase()` - 27 edges
-6. `CatalogRepository` - 27 edges
-7. `buildRecommendationUsecase()` - 26 edges
-8. `targetSpec()` - 26 edges
-9. `MustEnsureTarget()` - 26 edges
+4. `NewRecordLearningEventsUsecase()` - 28 edges
+5. `targetSpec()` - 27 edges
+6. `Harness` - 27 edges
+7. `MustEnsureTarget()` - 27 edges
+8. `CatalogRepository` - 27 edges
+9. `buildRecommendationUsecase()` - 26 edges
 10. `CatalogIngestAlignmentTest` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -532,15 +536,15 @@
 - `buildMeHandler()` --calls--> `NewUpdateMeProfileUsecase()`  [INFERRED]
   cmd/server/wiring_user.go → internal/user/application/service/update_profile.go
 
-## Communities (557 total, 167 thin omitted)
+## Communities (561 total, 173 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.05
-Nodes (96): devBearerToken(), getHTTP(), getHTTPWithBearer(), loadVideoInteractionState(), postJSONWithBearer(), requestHTTP(), TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(), TestE2E_EndQuizHTTPReturnsVideoContextQuestion() (+88 more)
+Nodes (98): devBearerToken(), getHTTP(), getHTTPWithBearer(), loadVideoInteractionState(), postJSONWithBearer(), requestHTTP(), TestE2E_DevModeAuthorizationFallbackAllowsFeedHTTP(), TestE2E_EndQuizHTTPReturnsVideoContextQuestion() (+90 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.05
-Nodes (74): applyCompletedMasteredState(), applyResetUnlearnedState(), finalizeState(), initState(), int16Pointer(), isTerminalMastered(), RecomputeActiveStatus(), Reduce() (+66 more)
+Cohesion: 0.23
+Nodes (26): Reduce(), emptyState(), learningEvent(), masteredState(), passiveLearningEvent(), TestReduce_AffectsProgressRequiresProgressQuality(), TestReduce_FailureAfterRetargetedMasteredFallsBackToReviewing(), TestReduce_FirstProgressEventTransitionsToLearning() (+18 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.07
@@ -551,20 +555,20 @@ Cohesion: 0.19
 Nodes (21): aggregatedLearningUnit, bestSentenceIndex(), bestSpanIndex(), bestStart(), bucketDemandCounts(), bundleValueScore(), coverageRatio(), durationFit() (+13 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.19
-Nodes (14): fakeFeedbackWriter, isHex(), isUUID(), NewSubmitFeedbackUsecase(), TestSubmitFeedbackPassesValidatedSubmissionToWriter(), TestSubmitFeedbackRejectsInvalidClientFeedbackID(), TestSubmitFeedbackRejectsInvalidUserID(), TestSubmitFeedbackRejectsMismatchedImageMetadata() (+6 more)
+Cohesion: 0.22
+Nodes (16): AppendRecentProgressPass(), AppendRecentProgressQuality(), ApplyProgressFailureSchedule(), ApplyProgressSuccessSchedule(), averageBoolWindow(), averageInt16Window(), clamp01(), ComputeActiveStatus() (+8 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.10
 Nodes (18): FeedbackWriter, dailyParamSet, newUUID(), optionalStringToUUID(), datePointerValue(), dateValue(), textValue(), timestamptzPointer() (+10 more)
 
 ### Community 6 - "Community 6"
-Cohesion: 0.13
-Nodes (17): ConflictError(), NotFoundError(), UnprocessableError(), GetVideoDetailUsecase, RecordVideoWatchProgressUsecase, SetVideoFavoriteUsecase, SetVideoLikeUsecase, fakeRecorder (+9 more)
+Cohesion: 0.05
+Nodes (51): decodeJSON(), newServer(), postJSON(), readBody(), TestEndQuizMapsErrors(), TestEndQuizRejectsInvalidTransportRequest(), TestEndQuizRequiresPrincipal(), TestEndQuizReturnsItemsAndMapsRequest() (+43 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.11
-Nodes (40): containsReason(), NewDefaultExplanationBuilder(), contains(), futureUnit(), hardUnit(), int64Ptr(), learningUnitsWithEvidence(), newUnit() (+32 more)
+Nodes (39): NewDefaultExplanationBuilder(), contains(), futureUnit(), hardUnit(), int64Ptr(), learningUnitsWithEvidence(), newUnit(), recommendationDemand() (+31 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.10
@@ -599,8 +603,8 @@ Cohesion: 0.13
 Nodes (33): bundleRow, bucketPriority(), bundleBucketBonus(), bundleUnitScore(), bundleVideoLaneBonus(), bundleVideoScore(), capCandidatesByDistinctVideos(), contentQuality() (+25 more)
 
 ### Community 16 - "Community 16"
-Cohesion: 0.22
-Nodes (29): writeHandlerError(), writeHandlerError(), writeHandlerError(), writeHandlerError(), writeHandlerError(), writeHandlerError(), Recover(), RequestIDFromContext() (+21 more)
+Cohesion: 0.17
+Nodes (34): writeHandlerError(), writeHandlerError(), writeHandlerError(), ErrorCode, IsValidationError(), writeHandlerError(), writeHandlerError(), writeHandlerError() (+26 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.10
@@ -619,8 +623,8 @@ Cohesion: 0.05
 Nodes (37): 0. 文档信息, 10. 事务、一致性与并发, 11. 性能与预计算, 12. 推荐目录结构, 13. 测试设计, 14. 非目标与后续扩展口, 15. 总结, 1. 模块定位 (+29 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.20
-Nodes (8): Handler, Handler, Handler, ParseCursor(), ParseOptionalLimit(), TestParseCursorTrimsValue(), TestParseOptionalLimitReturnsZeroWhenMissingAndRejectsOutOfRange(), TestParseOptionalLimitTrimsValue()
+Cohesion: 0.10
+Nodes (13): BodyLimit(), BodyLimitByPath(), TestBodyLimitByPathUsesFeedbackOverride(), Timeout(), TestFeedbackWriterStoresSubmissionImagesAndDeduplicatesClientFeedbackID(), NewFeedbackWriter(), buildHTTPHandler(), buildLearningTargetsHandler() (+5 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.06
@@ -628,15 +632,15 @@ Nodes (31): 0. 文档信息, 10. 不做事项, 11. 当前实现入口, 12. 测�
 
 ### Community 23 - "Community 23"
 Cohesion: 0.06
-Nodes (33): `affects_progress`, code:text (analytics raw fact), code:sql (event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mast), code:sql (unique (user_id, source_type, source_ref_id, coarse_unit_id)), Control, `event_type` 和 `reducer_effect`, Identity, Learning Engine 不负责 (+25 more)
+Nodes (34): `affects_progress`, code:text (analytics raw fact), code:sql (event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mast), code:sql (unique (user_id, source_type, source_ref_id, coarse_unit_id)), code:sql (unique (user_id, source_type, source_ref_id)), Control, `event_type` 和 `reducer_effect`, Identity (+26 more)
 
 ### Community 24 - "Community 24"
-Cohesion: 0.09
-Nodes (18): newFailingRecommendationUsecase(), LearningStateReader, RecommendationAuditRepository, UnitInventoryReader, VideoUserStateReader, ToLearningStateSnapshot(), ToUnitVideoInventory(), ToVideoUserState() (+10 more)
+Cohesion: 0.25
+Nodes (14): newFailingRecommendationUsecase(), TestReadModelRepositoriesUseRealMaterializedViews(), NewLearningStateReader(), NewRecommendableVideoUnitReader(), NewRecommendationAuditRepository(), NewUnitInventoryReader(), NewVideoFillCandidateReader(), NewVideoUserStateReader() (+6 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.27
-Nodes (16): appendFillCandidates(), clamp01(), fillCoverageScore(), fillDurationFit(), fillFreshnessScore(), fillPopularityScore(), fillRecencyPenalty(), fillRecentServedPenalty() (+8 more)
+Cohesion: 0.15
+Nodes (28): appendFillCandidates(), clamp01(), fillCoverageScore(), fillDurationFit(), fillFreshnessScore(), fillPopularityScore(), fillRecencyPenalty(), fillRecentServedPenalty() (+20 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.09
@@ -671,8 +675,8 @@ Cohesion: 0.07
 Nodes (25): 1. 设计目标, 2. 模块边界, 3.1 `analytics.video_watch_events`, 3.2 `catalog.video_user_states`, 3.3 `catalog.video_engagement_stats`, 3. 数据库设计, 4.1 上报观看进度, 4.2 给前端的接口说明 (+17 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.09
-Nodes (20): UnitLabelReader, seedQuizQuestion(), seedQuizUnit(), TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates(), NewEndQuizQuestionReader(), NewUnitLabelReader(), seedFeedVideo(), TestUnitLabelReaderListUnitLabelsByIDs() (+12 more)
+Cohesion: 0.12
+Nodes (14): UnitLabelReader, NewUnitLabelReader(), seedFeedVideo(), TestUnitLabelReaderListUnitLabelsByIDs(), TestVideoPresentationReaderGetVideoDetailByID(), TestVideoPresentationReaderListFeedVideosByIDs(), NewVideoPresentationReader(), VideoPresentationReader (+6 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.14
@@ -683,20 +687,20 @@ Cohesion: 0.08
 Nodes (23): mapFeedBody(), feedBody, Handler, Handler, Handler, Handler, Handler, Handler (+15 more)
 
 ### Community 37 - "Community 37"
-Cohesion: 0.14
-Nodes (21): NewUserUnitStateRepository(), failingBatchUpsertRepositories, NewListUserUnitStatesUsecase(), NewReplayUserStatesUsecase(), NewEnsureTargetUnitsUsecase(), NewSetTargetInactiveUsecase(), NewSuspendTargetUnitUsecase(), assertCompletedMasteredState() (+13 more)
+Cohesion: 0.22
+Nodes (19): NewUserUnitStateRepository(), NewListUserUnitStatesUsecase(), NewReplayUserStatesUsecase(), NewEnsureTargetUnitsUsecase(), NewSetTargetInactiveUsecase(), NewSuspendTargetUnitUsecase(), assertCompletedMasteredState(), assertResetUnlearnedState() (+11 more)
 
 ### Community 38 - "Community 38"
 Cohesion: 0.08
 Nodes (23): 0. 文档信息, 10. `catalog.video_ingestion_records`, 11. `catalog.video_user_states`, 12. `catalog.video_engagement_stats`, 13. 原始 transcript JSON 的保留策略, 14. 入库流程设计, 15. 轻量后处理逻辑, 16. 幂等与更新策略 (+15 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.25
-Nodes (7): GetMeUsecase, dateOnly(), dateString(), dateStringPointer(), MeOption, resolveTimezone(), validTimezone()
+Cohesion: 0.28
+Nodes (13): NewRepository(), NewGetMeUsecase(), WithMeNow(), stringPtr(), TestActivityCalendarReturnsCurrentStreakFromYesterdayWhenTodayInactive(), TestActivityCalendarReturnsZeroStreakWhenTodayAndYesterdayInactive(), TestActivityStatsRecorderAndCalendar(), TestGetMeRepairsProfileAndUpdatesTimezone() (+5 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.16
-Nodes (31): fakeLearningInteractionRecorder, fakeQuizAttemptRecorder, fakeResetUserUnitProgressRecorder, fakeSelfMarkMasteredRecorder, decodeJSON(), newTestServer(), postJSON(), postRaw() (+23 more)
+Cohesion: 0.24
+Nodes (27): decodeJSON(), newTestServer(), postJSON(), postRaw(), readBody(), TestLearningInteractionsBatchAllowsUnmappedLookupWithoutCoarseUnitID(), TestLearningInteractionsBatchPassesPrincipalUserIDAndReturnsAcceptedRawFacts(), TestLearningInteractionsBatchRejectsEventLevelVideoContext() (+19 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.13
@@ -707,16 +711,16 @@ Cohesion: 0.09
 Nodes (22): [API/](API/README.md), [archive/README.md](archive/README.md), [Catalog-数据库设计.md](Catalog-数据库设计.md), [Cloud-Run-测试部署流程.md](Cloud-Run-测试部署流程.md), [User模块设计.md](User模块设计.md), 专题设计草案, 历史归档, [学习互动信号架构图.md](学习互动信号架构图.md) (+14 more)
 
 ### Community 43 - "Community 43"
-Cohesion: 0.10
-Nodes (19): 0. 文档信息, 11. Self mark policy, 12. 跨视频 exposure 语义, 1. 一句话结论, 20. 调用方式, 23. 当前设计决策, 3. 设计目标, 4. 非目标 (+11 more)
+Cohesion: 0.11
+Nodes (18): 0. 文档信息, 1. 一句话结论, 21.1 Domain unit tests, 21.2 Application unit tests, 21.3 Integration tests, 21. 测试策略, 23. 当前设计决策, 3. 设计目标 (+10 more)
 
 ### Community 44 - "Community 44"
 Cohesion: 0.18
 Nodes (17): Handler, decodeFeedbackImage(), decodeMultipartFeedback(), isPayloadTooLargeError(), isResponsePayloadTooLarge(), normalizedJPEGContentType(), payloadTooLargeError(), singleFormValue() (+9 more)
 
 ### Community 45 - "Community 45"
-Cohesion: 0.29
-Nodes (4): Handler, GetMeUsecase, requiredPrincipal(), UpdateMeProfileUsecase
+Cohesion: 0.25
+Nodes (7): GetMeUsecase, dateOnly(), dateString(), dateStringPointer(), MeOption, resolveTimezone(), validTimezone()
 
 ### Community 46 - "Community 46"
 Cohesion: 0.27
@@ -751,12 +755,16 @@ Cohesion: 0.11
 Nodes (19): TimeFromPG(), TimePointerToPG(), TimeFromPG(), TimeFromPG(), TimePointerFromPG(), TimePointerToPG(), TimeFromPG(), TimePointerFromPG() (+11 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.14
-Nodes (15): firstValidEndQuizItem(), groupEndQuizCandidates(), mapEndQuizCandidate(), NewEndQuizQuestionLookupUsecase(), nonBlankStringPointer(), normalizeEndQuizUnitIDs(), candidate(), TestEndQuizQuestionLookupPrefersVideoContextAndFallsBackToGeneric() (+7 more)
+Cohesion: 0.33
+Nodes (10): IsAffectsProgressEffect(), isJSONObject(), IsObserveOnlyEffect(), IsPassingQuality(), IsResetUnlearnedEffect(), IsSetMasteredEffect(), IsSupportedEventType(), IsSupportedReducerEffect() (+2 more)
 
 ### Community 55 - "Community 55"
 Cohesion: 0.35
 Nodes (13): statsRow, userStateRow, at(), progressRequest(), readStats(), readUserState(), TestVideoWatchProgressConcurrentDuplicateSessionDoesNotDoubleCount(), TestVideoWatchProgressCreatesAndUpdatesProjections() (+5 more)
+
+### Community 56 - "Community 56"
+Cohesion: 0.20
+Nodes (10): applyCompletedMasteredState(), applyResetUnlearnedState(), finalizeState(), initState(), int16Pointer(), isTerminalMastered(), RecomputeActiveStatus(), timePointer() (+2 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.10
@@ -787,8 +795,8 @@ Cohesion: 0.20
 Nodes (13): fakeFavoritesService, fakeHistoryService, fakeVideoLibraryService, assertDetailFieldsAbsent(), decodeJSON(), get(), newServer(), requireStatus() (+5 more)
 
 ### Community 64 - "Community 64"
-Cohesion: 0.35
-Nodes (9): UserUnitProgressReader, cursorCoarseUnitID(), cursorLabel(), cursorLabelKey(), cursorProgressPercent(), int32LimitPlusOne(), mapMasteredUnitProgressRows(), mapUnmasteredUnitProgressRows() (+1 more)
+Cohesion: 0.23
+Nodes (17): UserUnitProgressReader, seedUnitProgressState(), seedUnitProgressUnit(), TestUserUnitProgressReaderListMasteredFiltersAndSortsByLabel(), TestUserUnitProgressReaderListUnmasteredFiltersAndSortsByProgressThenLabel(), TestUserUnitProgressReaderMasteredCursorReturnsNextPage(), TestUserUnitProgressReaderUnmasteredCursorReturnsNextPage(), unitProgressIDs() (+9 more)
 
 ### Community 65 - "Community 65"
 Cohesion: 0.11
@@ -803,8 +811,8 @@ Cohesion: 0.11
 Nodes (16): 3.10 入库样例：视频上下文题, 3.11 入库样例：通用题, 3.1 表职责, 3.2 推荐 DDL, 3.3 字段说明, 3.4 `scope_type`, 3.5 `question_type`, 3.6 `content_payload` (+8 more)
 
 ### Community 68 - "Community 68"
-Cohesion: 0.14
-Nodes (18): VideoLibraryReader, cursorAt(), cursorVideoID(), seedVideoLibraryUser(), seedVideoStats(), TestVideoLibraryReaderListVideoFavoritesPaginatesAndFilters(), TestVideoLibraryReaderListVideoHistoryPaginatesAndFilters(), TestVideoLibraryUsecaseRejectsInvalidCursorsBeforeRepositoryRead() (+10 more)
+Cohesion: 0.19
+Nodes (15): seedVideoLibraryUser(), seedVideoStats(), TestVideoLibraryReaderListVideoFavoritesPaginatesAndFilters(), TestVideoLibraryReaderListVideoHistoryPaginatesAndFilters(), TestVideoLibraryUsecaseRejectsInvalidCursorsBeforeRepositoryRead(), videoFavoriteIDs(), videoHistoryIDs(), NewVideoLibraryReader() (+7 more)
 
 ### Community 69 - "Community 69"
 Cohesion: 0.21
@@ -815,11 +823,11 @@ Cohesion: 0.23
 Nodes (9): Database, Options, Suite, freePort(), normalizeOptions(), OpenSuite(), TestValidateIdentifier(), validateIdentifier() (+1 more)
 
 ### Community 71 - "Community 71"
-Cohesion: 0.18
-Nodes (10): RawLearningInteractionReader, RawQuizEventReader, ToExposureSession3Window(), ToExposureSession3WindowByID(), ToRawLearningInteraction(), ToRawLearningInteractionByID(), ToRawQuizEvent(), ToRawQuizEventByID() (+2 more)
+Cohesion: 0.12
+Nodes (11): TimePointerToPG(), RawLearningInteractionReader, RawQuizEventReader, ToExposureSession3Window(), ToExposureSession3WindowByID(), ToRawLearningInteraction(), ToRawLearningInteractionByID(), ToRawQuizEvent() (+3 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.12
+Cohesion: 0.24
 Nodes (8): Float64ToNumeric(), NumericToFloat64(), Float64ToNumeric(), NumericToFloat64(), FromFloat64(), TestFromFloat64MapsToNumeric(), TestToFloat64MapsInvalidToZero(), ToFloat64()
 
 ### Community 73 - "Community 73"
@@ -827,8 +835,8 @@ Cohesion: 0.12
 Nodes (13): TestMain(), CatalogVideoFixture, e2eSchemaPlan(), OpenHarness(), supplementalDropPlaceholderRecommendationViewsSQL(), supplementalExternalCatalogSQL(), LearningSuite, noOpVideoFillService (+5 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.15
-Nodes (14): TestRecordQuizAttemptRejectsOldTriggerTypeBeforeDB(), TestRecordQuizAttemptWritesDBTriggerType(), TestRecordLearningInteractionsBatchRejectsSelfMarkMasteredInRealDBPath(), TestRecordSelfMarkMasteredWritesSelfMarkRawInteraction(), int32Pointer(), learningInteraction(), TestRawEventWriterReturnsExistingIDsForDuplicates(), TestRawEventWriterUpsertsLearningInteractionBatchInInputOrder() (+6 more)
+Cohesion: 0.16
+Nodes (12): TestRecordQuizAttemptRejectsOldTriggerTypeBeforeDB(), TestRecordQuizAttemptWritesDBTriggerType(), TestRecordLearningInteractionsBatchRejectsSelfMarkMasteredInRealDBPath(), TestRecordSelfMarkMasteredWritesSelfMarkRawInteraction(), int32Pointer(), learningInteraction(), TestRawEventWriterReturnsExistingIDsForDuplicates(), TestRawEventWriterUpsertsLearningInteractionBatchInInputOrder() (+4 more)
 
 ### Community 75 - "Community 75"
 Cohesion: 0.11
@@ -843,8 +851,8 @@ Cohesion: 0.11
 Nodes (17): Catalog mapped JSON 入库方案, `catalog.questions`, `catalog.video_semantic_spans`, `catalog.video_transcript_sentences`, `catalog.video_transcripts`, `catalog.video_unit_index`, `catalog.videos`, code:text (<parent_video_name>-clip<clip_id>.json) (+9 more)
 
 ### Community 78 - "Community 78"
-Cohesion: 0.11
-Nodes (18): 14.1 API 主路径：`NormalizeLearningInteractionsByIDs`, 14.2 API 主路径：`NormalizeQuizAttemptByID`, 14.3 API 主路径：`NormalizeSelfMarkMasteredByID`, 14.4 repair/backfill：`NormalizePendingEvents`, 14. 应用层用例, code:text (NormalizeLearningInteractionsByIDs), code:text (user_id required), code:text (read_raw_count) (+10 more)
+Cohesion: 0.14
+Nodes (17): 14.1 API 主路径：`NormalizeLearningInteractionsByIDs`, 14.2 API 主路径：`NormalizeQuizAttemptByID`, 14.3 API 主路径：`NormalizeSelfMarkMasteredByID`, 14.4 repair/backfill：`NormalizePendingEvents`, 14. 应用层用例, code:text (NormalizeLearningInteractionsByIDs), code:text (user_id required), code:text (read_raw_count) (+9 more)
 
 ### Community 79 - "Community 79"
 Cohesion: 0.11
@@ -855,8 +863,8 @@ Cohesion: 0.21
 Nodes (18): LearningUnitIDsByRoles(), PrimaryLearningUnitIDs(), canSelect(), countCoreDominant(), countFallback(), countFutureDominant(), countFutureLike(), countUncovered() (+10 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.09
-Nodes (26): fakeActiveUnitCollectionReader, fakeTxManager, NewRecordLearningEventsUsecase(), NewResetUserUnitProgressUsecase(), NewResumeTargetUnitUsecase(), int16Pointer(), TestEnsureTargetUnitsExecute(), TestListUserUnitStatesExecuteUsesFilter() (+18 more)
+Cohesion: 0.10
+Nodes (24): fakeActiveUnitCollectionReader, fakeTxManager, NewRecordLearningEventsUsecase(), NewResetUserUnitProgressUsecase(), TestRecordLearningEventsRollsBackWhenStateWriteFails(), int16Pointer(), TestEnsureTargetUnitsExecute(), TestListUserUnitStatesExecuteUsesFilter() (+16 more)
 
 ### Community 82 - "Community 82"
 Cohesion: 0.31
@@ -875,16 +883,16 @@ Cohesion: 0.13
 Nodes (8): NewActivateLearningCollectionService(), TestActivateLearningCollectionMapsMissingCollection(), TestActivateLearningCollectionRollsBackWhenOnboardingFails(), TestActivateLearningCollectionUpdatesTargetAndOnboardingInOneTx(), ActivateLearningCollectionService, fakeActivateCollectionRepositories, fakeActivateCollectionTxManager, fakeTargetCommandRepository
 
 ### Community 86 - "Community 86"
-Cohesion: 0.32
-Nodes (10): seedLearningEvent(), seedLearningInteraction(), seedQuizEvent(), TestRawLearningInteractionReaderExcludesAlreadyRecordedEvents(), TestRawQuizEventReaderExcludesAlreadyRecordedEvents(), TestRawReadersByIDsFilterByUserAndSelectedIDs(), TestRawReadersReturnTimesInUTC(), NewRawLearningInteractionReader() (+2 more)
+Cohesion: 0.18
+Nodes (15): seedLearningEvent(), seedLearningInteraction(), seedQuizEvent(), TestRawLearningInteractionReaderExcludesAlreadyRecordedEvents(), TestRawQuizEventReaderExcludesAlreadyRecordedEvents(), TestRawReadersByIDsFilterByUserAndSelectedIDs(), TestRawReadersReturnTimesInUTC(), NewRawLearningInteractionReader() (+7 more)
 
 ### Community 87 - "Community 87"
 Cohesion: 0.09
 Nodes (26): inventoryFromRecallScope(), learningStatesFromRecallScope(), NewDefaultContextAssembler(), normalizeRequest(), recallFetchScopeUnitIDs(), servingStatesFromRecallScope(), TestDefaultContextAssemblerAssembleAppliesDefaultsAndLoadsDependencies(), TestDefaultContextAssemblerAssembleReturnsErrors() (+18 more)
 
 ### Community 88 - "Community 88"
-Cohesion: 0.15
-Nodes (9): RecommendationItemsToJSON(), insertItemsWithQueries(), insertRunWithQueries(), NewDefaultRecommendationResultWriter(), DefaultAuditWriter, DefaultRecommendationResultWriter, queriesContextKey, queriesFromContext() (+1 more)
+Cohesion: 0.13
+Nodes (9): RecommendationAuditRepository, RecommendationItemsToJSON(), insertItemsWithQueries(), insertRunWithQueries(), DefaultAuditWriter, DefaultRecommendationResultWriter, queriesContextKey, queriesFromContext() (+1 more)
 
 ### Community 89 - "Community 89"
 Cohesion: 0.12
@@ -903,8 +911,8 @@ Cohesion: 0.23
 Nodes (14): bucketBaseWeight(), ceilFraction(), classifyDemandUnit(), floorFraction(), isHardReview(), isSoftReview(), plannerFlags(), plannerLaneBudget() (+6 more)
 
 ### Community 93 - "Community 93"
-Cohesion: 0.23
-Nodes (24): expectedExposureSession3SourceRef(), newNormalizeLearningInteractionsByIDsUsecase(), newNormalizeQuizAttemptByIDUsecase(), newNormalizerUsecase(), newNormalizeSelfMarkMasteredByIDUsecase(), readState(), seedExposureInteraction(), seedLearningInteraction() (+16 more)
+Cohesion: 0.21
+Nodes (28): expectedExposureSession3SourceRef(), newNormalizeLearningInteractionsByIDsUsecase(), newNormalizeQuizAttemptByIDUsecase(), newNormalizerUsecase(), newNormalizeSelfMarkMasteredByIDUsecase(), readState(), seedExposureInteraction(), seedLearningInteraction() (+20 more)
 
 ### Community 94 - "Community 94"
 Cohesion: 0.13
@@ -935,16 +943,16 @@ Cohesion: 0.14
 Nodes (14): 6.10 serving state, 6.11 recommendation run, 6.1 coarse unit, 6.2 视频内容对象, 6.3 transcript 顶层摘要, 6.4 sentence, 6.5 semantic span, 6.6 video-unit index (+6 more)
 
 ### Community 101 - "Community 101"
-Cohesion: 0.17
-Nodes (9): UnitCollectionReader, NewUnitCollectionReader(), textPointer(), uuidToString(), buildUnitCollectionsHandler(), ListUnitCollectionsUsecase, NewListUnitCollectionsUsecase(), stringPtr() (+1 more)
+Cohesion: 0.12
+Nodes (9): ActivateUnitCollectionTargetUsecase, EnsureTargetUnitsUsecase, GetActiveLearningTargetCoarseUnitIDsUsecase, GetActiveUnitCollectionUsecase, SetTargetInactiveUsecase, SuspendTargetUnitUsecase, NewResumeTargetUnitUsecase(), TestResumeTargetUnitExecuteRecomputesStatus() (+1 more)
 
 ### Community 102 - "Community 102"
 Cohesion: 0.18
 Nodes (8): NewDefaultVideoStateEnricher(), uniqueVideoIDs(), DefaultVideoStateEnricher, spyVideoServingRepository, spyVideoUserStateReader, TestDefaultVideoStateEnricherLoadsVideoScopedStateWithCallerContext(), TestDefaultVideoStateEnricherPropagatesContextCancellation(), TestDefaultVideoStateEnricherSkipsReadsForEmptyVideos()
 
 ### Community 103 - "Community 103"
-Cohesion: 0.12
-Nodes (13): TargetStateCommandRepository, TestTargetStateCommandRepositoryEnsureAndSetInactive(), TestUnitLearningEventRepositoryAppendAndList(), TestUnitLearningEventRepositoryAppendDuplicateReturnsDuplicateCount(), TestUnitLearningEventRepositoryAppendSetMastered(), TestUnitLearningEventRepositoryRejectsInvalidSetMasteredEventType(), TestUnitLearningEventRepositoryRejectsInvalidSetMasteredQuality(), TestUnitLearningEventRepositoryRejectsResetDuplicateClientEventAcrossUnits() (+5 more)
+Cohesion: 0.15
+Nodes (14): TestTargetStateCommandRepositoryEnsureAndSetInactive(), TestUnitLearningEventRepositoryAppendAndList(), TestUnitLearningEventRepositoryAppendDuplicateReturnsDuplicateCount(), TestUnitLearningEventRepositoryAppendSetMastered(), TestUnitLearningEventRepositoryListWatermarksByUserUnits(), TestUnitLearningEventRepositoryRejectsInvalidSetMasteredEventType(), TestUnitLearningEventRepositoryRejectsInvalidSetMasteredQuality(), TestUnitLearningEventRepositoryRejectsResetDuplicateClientEventAcrossUnits() (+6 more)
 
 ### Community 104 - "Community 104"
 Cohesion: 0.27
@@ -995,8 +1003,8 @@ Cohesion: 0.24
 Nodes (10): isValidQuizTriggerType(), mapQuizAttemptRequest(), NewRecordQuizAttemptUsecase(), TestRecordQuizAttemptAcceptsLooseClientContextObject(), TestRecordQuizAttemptNormalizesTimesToUTC(), TestRecordQuizAttemptRejectsInvalidAttemptBeforeWrite(), TestRecordQuizAttemptRejectsNonObjectClientContext(), TestRecordQuizAttemptValidatesTriggerType() (+2 more)
 
 ### Community 118 - "Community 118"
-Cohesion: 0.08
-Nodes (20): ActiveUnitCollectionReader, NewActiveUnitCollectionReader(), buildLearningTargetsHandler(), ActivateUnitCollectionTargetUsecase, assertState(), TestActivateUnitCollectionTargetCreatesProfileAndPreservesLearningState(), TestActivateUnitCollectionTargetHandlesEmptyAndMissingCollections(), TestGetActiveLearningTargetCoarseUnitIDsReadsCurrentUnmasteredTargets() (+12 more)
+Cohesion: 0.09
+Nodes (20): ActiveUnitCollectionReader, UnitCollectionReader, NewActiveUnitCollectionReader(), NewUnitCollectionReader(), textPointer(), uuidToString(), buildUnitCollectionsHandler(), assertState() (+12 more)
 
 ### Community 119 - "Community 119"
 Cohesion: 0.26
@@ -1011,11 +1019,11 @@ Cohesion: 0.17
 Nodes (12): 9.1 前端上报答题事实，不上报学习结论, 9.2 Practice attempt 和 Learning event 不是一回事, 9.3 practice / quiz evidence 必须有明确学习对象, 9.4 practice / quiz attempt 的来源可以不同, 9.5 practice / quiz attempt 是当前主要强反馈, 9.6 `legacy-new-learn` / `review` 的位置, 9. practice / quiz attempt：习题答题上报, code:text (event_type = quiz) (+4 more)
 
 ### Community 122 - "Community 122"
-Cohesion: 0.17
-Nodes (11): 0. 文档信息, 11. MVP 决策, 12. 当前不讨论的内容, 1. 一句话结论, 2. 整体链路, 3. 为什么 Recommendation 要给 learning_units, code:mermaid (flowchart TD), code:text (这个视频里，本轮最希望用户学习或复习哪些 unit？) (+3 more)
+Cohesion: 0.12
+Nodes (15): 0. 文档信息, 10. 为什么前端只负责上报事实, 11. MVP 决策, 12. 当前不讨论的内容, 1. 一句话结论, 2. 整体链路, 3. 为什么 Recommendation 要给 learning_units, code:mermaid (flowchart TD) (+7 more)
 
 ### Community 123 - "Community 123"
-Cohesion: 0.17
+Cohesion: 0.21
 Nodes (12): 13.1 如何避免重复写入, 13.2 API 主路径如何读取 raw facts, 13.3 repair/backfill 如何查询 pending raw facts, 13.4 skipped raw facts 怎么处理, 13.5 失败重试, 13. 暂不加 checkpoint 的幂等策略, code:text (learning.normalization_checkpoints), code:sql (unique (user_id, source_type, source_ref_id, coarse_unit_id)) (+4 more)
 
 ### Community 124 - "Community 124"
@@ -1124,18 +1132,18 @@ Nodes (10): 8.1 目标, 8.2 数据链, 8.3 设计关键点, 8. Catalog 设计摘
 
 ### Community 151 - "Community 151"
 Cohesion: 0.20
-Nodes (10): 2.1 词书集合和学习状态分离, 2.2 `is_target` 和 `status` 分离, 2.3 词书切换不重置学习进度, 2. 核心原则, code:text (TOEFL 1000 Essential 是什么？), code:text (这个用户当前激活哪本词书？), code:text (new / learning / reviewing / mastered / suspended), code:text (is_target=true, status=mastered) (+2 more)
+Nodes (10): 2.1 词书集合和学习状态分离, 2.2 `is_target` 和 `status` 分离, 2.3 词书切换不重置学习进度, 2. 核心原则, code:text (TOEFL 1000 Essential 是什么？), code:text (这个用户当前激活哪本词书？), code:text (new / learning / reviewing / mastered), code:text (is_target=true, status=mastered) (+2 more)
 
 ### Community 152 - "Community 152"
-Cohesion: 0.11
-Nodes (13): UnitServingStateRepository, VideoServingStateRepository, VideoFillCandidateReader, ToUserUnitServingState(), ToUserVideoServingState(), ToVideoFillCandidateFromMasteredTarget(), ToVideoFillCandidateFromPopular(), recommendationItemJSON (+5 more)
+Cohesion: 0.10
+Nodes (11): LearningStateReader, UnitInventoryReader, VideoFillCandidateReader, VideoUserStateReader, ToLearningStateSnapshot(), ToUnitVideoInventory(), ToVideoFillCandidateFromMasteredTarget(), ToVideoFillCandidateFromPopular() (+3 more)
 
 ### Community 153 - "Community 153"
-Cohesion: 0.33
-Nodes (4): mapProfileResponse(), normalizeDisplayName(), UpdateMeProfileOption, UpdateMeProfileUsecase
+Cohesion: 0.20
+Nodes (8): Handler, Handler, Handler, ParseCursor(), ParseOptionalLimit(), TestParseCursorTrimsValue(), TestParseOptionalLimitReturnsZeroWhenMissingAndRejectsOutOfRange(), TestParseOptionalLimitTrimsValue()
 
 ### Community 154 - "Community 154"
-Cohesion: 0.26
+Cohesion: 0.12
 Nodes (7): UnitLearningEventRepository, ToLearningEvent(), ToLearningEventFromAppendRow(), BoolPointerFromPG(), UUIDsToStrings(), appendLearningEventPayload, isResetClientEventDuplicate()
 
 ### Community 155 - "Community 155"
@@ -1187,12 +1195,12 @@ Cohesion: 0.22
 Nodes (9): 11. 验证, code:bash (gcloud run services describe lvrs-api \), code:bash (gcloud run services describe lvrs-api \), code:bash (curl -i https://lvrs-api-49376215414.us-central1.run.app/), code:bash (curl -i https://lvrs-api-49376215414.us-central1.run.app/api), code:text (401 unauthorized), code:bash (TOKEN="$(printf '{"alg":"none"}' | base64 | tr '+/' '-_' | t), code:bash (gcloud run services logs read lvrs-api \) (+1 more)
 
 ### Community 168 - "Community 168"
-Cohesion: 0.22
-Nodes (9): 15.1 Policy, 15.2 Rule / Mapper, 15.3 Model, 15. 领域规则结构, code:text (domain/policy/quiz_quality_policy.go), code:text (quiz_speed_threshold_ms = 5000), code:text (domain/rule/quiz_mapper.go), code:text (NormalizationResult) (+1 more)
+Cohesion: 0.28
+Nodes (9): 15.1 Policy, 15.2 Rule / Mapper, 15.3 Model, 15. 领域规则结构, code:text (1. 读取 pending quiz raw facts。), code:text (domain/policy/quiz_quality_policy.go), code:text (quiz_speed_threshold_ms = 5000), code:text (domain/rule/quiz_mapper.go) (+1 more)
 
 ### Community 169 - "Community 169"
-Cohesion: 0.22
-Nodes (9): 18.1 quiz metadata, 18.2 lookup metadata, 18.3 exposure metadata, 18.4 self mark metadata, 18. Metadata 契约, code:json ({), code:json ({), code:json ({) (+1 more)
+Cohesion: 0.31
+Nodes (9): 18.1 quiz metadata, 18.2 lookup metadata, 18.3 exposure metadata, 18.4 self mark metadata, 18. Metadata 契约, code:text (RecordLearningEvents(ctx, dto.RecordLearningEventsRequest) (), code:json ({), code:json ({) (+1 more)
 
 ### Community 170 - "Community 170"
 Cohesion: 0.22
@@ -1219,8 +1227,8 @@ Cohesion: 0.22
 Nodes (8): SetVideoFavoritedParams, SetVideoFavoritedRow, SetVideoLikedParams, SetVideoLikedRow, SetVideoUnfavoritedParams, SetVideoUnfavoritedRow, SetVideoUnlikedParams, SetVideoUnlikedRow
 
 ### Community 176 - "Community 176"
-Cohesion: 0.20
-Nodes (12): fakeVideoDetailLookup, fakeVideoFavoritesList, fakeVideoHistoryList, NewPublicAssetURLBuilder(), NewVideoDetailService(), TestVideoDetailServiceAllowsMissingTranscript(), TestVideoDetailServiceBuildsPublicDetailResponse(), TestVideoDetailServiceValidatesRequiredInputs() (+4 more)
+Cohesion: 0.19
+Nodes (13): buildVideoDetailHandler(), fakeVideoDetailLookup, fakeVideoFavoritesList, fakeVideoHistoryList, NewPublicAssetURLBuilder(), NewVideoDetailService(), TestVideoDetailServiceAllowsMissingTranscript(), TestVideoDetailServiceBuildsPublicDetailResponse() (+5 more)
 
 ### Community 177 - "Community 177"
 Cohesion: 0.22
@@ -1239,16 +1247,16 @@ Cohesion: 0.36
 Nodes (6): RawEventWriter, learningInteractionEventJSON, defaultJSONObject(), learningInteractionEventsJSON(), upsertLearningInteractions(), upsertQuizEvent()
 
 ### Community 182 - "Community 182"
-Cohesion: 0.33
-Nodes (6): classifyOwnerError(), toAnalyticsLearningInteractionsRequest(), RecordLearningInteractionsBatchService, RecordQuizAttemptService, RecordSelfMarkMasteredService, ResetUserUnitProgressService
+Cohesion: 0.29
+Nodes (7): ServiceUnavailableError(), classifyOwnerError(), toAnalyticsLearningInteractionsRequest(), RecordLearningInteractionsBatchService, RecordQuizAttemptService, RecordSelfMarkMasteredService, ResetUserUnitProgressService
 
 ### Community 183 - "Community 183"
 Cohesion: 0.22
-Nodes (5): NewDefaultServingStateManager(), preReadFailingUnitServingRepository, preReadFailingVideoServingRepository, TestDefaultServingStateManagerApplySelectionDoesNotPreReadServingCounts(), TestDefaultServingStateManagerApplySelectionSkipsUnitServingForFillItems()
+Nodes (4): preReadFailingUnitServingRepository, preReadFailingVideoServingRepository, TestDefaultServingStateManagerApplySelectionDoesNotPreReadServingCounts(), TestDefaultServingStateManagerApplySelectionSkipsUnitServingForFillItems()
 
 ### Community 184 - "Community 184"
-Cohesion: 0.31
-Nodes (6): NewDefaultEvidenceResolver(), resolveCandidateBounds(), resolveCandidateWindowSentenceIndexes(), DefaultEvidenceResolver, TestDefaultEvidenceResolverReturnsCanceledWhenContextCanceled(), TestDefaultEvidenceResolverUsesRecallRowEvidenceDirectly()
+Cohesion: 0.60
+Nodes (3): resolveCandidateBounds(), resolveCandidateWindowSentenceIndexes(), DefaultEvidenceResolver
 
 ### Community 185 - "Community 185"
 Cohesion: 0.16
@@ -1283,8 +1291,8 @@ Cohesion: 0.25
 Nodes (7): ListVideoFavoritesRequest, ListVideoFavoritesResponse, ListVideoHistoryRequest, ListVideoHistoryResponse, VideoFavoriteItem, VideoHistoryItem, VideoLibraryPage
 
 ### Community 193 - "Community 193"
-Cohesion: 0.13
-Nodes (9): BodyLimit(), BodyLimitByPath(), TestBodyLimitByPathUsesFeedbackOverride(), Timeout(), TestFeedbackWriterStoresSubmissionImagesAndDeduplicatesClientFeedbackID(), NewFeedbackWriter(), buildHTTPHandler(), buildFeedbackHandler() (+1 more)
+Cohesion: 0.22
+Nodes (6): UnitServingStateRepository, VideoServingStateRepository, ToUserUnitServingState(), ToUserVideoServingState(), uniqueInt64s(), uniqueStrings()
 
 ### Community 194 - "Community 194"
 Cohesion: 0.22
@@ -1299,8 +1307,8 @@ Cohesion: 0.32
 Nodes (4): validateNonNegativePointer(), learningInteractionEventRequiresSubtitleIndexes(), mapLearningInteractionInput(), RecordLearningInteractionsBatchUsecase
 
 ### Community 198 - "Community 198"
-Cohesion: 0.06
-Nodes (21): TestRequirePrincipalRejectsMissingPrincipal(), RequirePrincipal(), EndQuizQuestionLookupUsecase, invalidRequest(), requiredPrincipal(), FeedService, invalidRequest(), requiredPrincipal() (+13 more)
+Cohesion: 0.07
+Nodes (17): TestRequirePrincipalRejectsMissingPrincipal(), RequirePrincipal(), Handler, Handler, Handler, Handler, requiredPrincipal(), GetMeUsecase (+9 more)
 
 ### Community 199 - "Community 199"
 Cohesion: 0.25
@@ -1339,8 +1347,8 @@ Cohesion: 0.29
 Nodes (7): 2.1 为什么属于 Learning Engine, 2.2 和 Learning Engine reducer 的关系, 2.3 和 Analytics 的关系, 2.4 和 Recommendation 的关系, 2. Owner 与模块边界, code:text (event_type), code:text (analytics.quiz_events)
 
 ### Community 209 - "Community 209"
-Cohesion: 0.29
-Nodes (6): 17.1 `RawQuizEventReader`, 17.2 `RawLearningInteractionReader`, 17.3 `LearningEventRecorder`, 17. Repository ports, code:text (ListPendingQuizEvents(ctx, filter) ([]RawQuizEvent, error)), code:text (ListPendingLearningInteractions(ctx, filter) ([]RawLearningI)
+Cohesion: 0.24
+Nodes (10): 16. 推荐代码结构, 17.1 `RawQuizEventReader`, 17.2 `RawLearningInteractionReader`, 17.3 `LearningEventRecorder`, 17. Repository ports, code:text (domain/model/raw_quiz_event.go), code:text (internal/learningengine/normalizer/), code:text (normalizer/infrastructure/migration/) (+2 more)
 
 ### Community 210 - "Community 210"
 Cohesion: 0.29
@@ -1353,10 +1361,6 @@ Nodes (7): 12.1 内容入库链路, 12.2 学习反馈链路, 12.3 推荐生成�
 ### Community 212 - "Community 212"
 Cohesion: 0.29
 Nodes (7): 15.1 当前包含的能力, 15.2 当前明确不做的能力, 15. MVP 范围与明确不做的内容, Catalog 侧, Learning engine 侧, Recommendation 侧, 闭环侧
-
-### Community 213 - "Community 213"
-Cohesion: 0.40
-Nodes (9): NewUpdateMeProfileUsecase(), stringPtr(), TestUpdateMeProfileAcceptsPrimarySchoolEducationStage(), TestUpdateMeProfileAcceptsUnicodeNamesAndMapsPatch(), TestUpdateMeProfileClearsNullableFields(), TestUpdateMeProfileRejectsInvalidRequests(), TestUpdateMeProfileRepairsMissingProfileBeforeUpdate(), TestUpdateMeProfileReturnsAuthUserNotFoundWhenRepairFails() (+1 more)
 
 ### Community 214 - "Community 214"
 Cohesion: 0.29
@@ -1371,8 +1375,12 @@ Cohesion: 0.48
 Nodes (6): NewDefaultDemandPlanner(), TestDefaultDemandPlannerGoldenReviewHeavy(), TestDefaultDemandPlannerRaisesBundleBudgetWhenHardReviewSupplyIsWeak(), TestDefaultDemandPlannerRespectsBucketPrecedence(), TestDefaultDemandPlannerSeparatesSoftReviewAndNearFuture(), TestDefaultDemandPlannerTreatsUnsuppliedNewUnitsAsNearFuture()
 
 ### Community 219 - "Community 219"
-Cohesion: 0.64
-Nodes (8): seedUnitProgressState(), seedUnitProgressUnit(), TestUserUnitProgressReaderListMasteredFiltersAndSortsByLabel(), TestUserUnitProgressReaderListUnmasteredFiltersAndSortsByProgressThenLabel(), TestUserUnitProgressReaderMasteredCursorReturnsNextPage(), TestUserUnitProgressReaderUnmasteredCursorReturnsNextPage(), unitProgressIDs(), NewUserUnitProgressReader()
+Cohesion: 0.36
+Nodes (7): controlSnapshot, applyControlSnapshot(), buildControlSnapshots(), defaultStateFromSnapshot(), mergeSnapshots(), replayStates(), ReplayUserStatesUsecase
+
+### Community 220 - "Community 220"
+Cohesion: 0.29
+Nodes (4): Handler, invalidRequest(), requiredPrincipal(), ListUnitCollectionsUsecase
 
 ### Community 221 - "Community 221"
 Cohesion: 0.50
@@ -1435,8 +1443,8 @@ Cohesion: 0.33
 Nodes (6): 3. 仓库部署文件, code:text (server), code:text (Dockerfile), code:text (./cmd/server), code:text (stat /src/cmd/server: directory not found), code:text (/server)
 
 ### Community 236 - "Community 236"
-Cohesion: 0.38
-Nodes (7): 10.1 有效 exposure, 10.2 session3 passive progress, 10.2 非推荐目标 unit 的 exposure, 10. Exposure policy, code:text (event_type = exposure), code:text (同一个 user + coarse_unit_id + watch_session_id 最多计为一次 session ), code:text (event_type = exposure)
+Cohesion: 0.16
+Nodes (14): 10.1 有效 exposure, 10.2 session3 passive progress, 10.2 非推荐目标 unit 的 exposure, 10. Exposure policy, 11. Self mark policy, 12. 跨视频 exposure 语义, code:text (event_type = exposure), code:text (同一个 user + coarse_unit_id + watch_session_id 最多计为一次 session ) (+6 more)
 
 ### Community 237 - "Community 237"
 Cohesion: 0.33
@@ -1458,9 +1466,13 @@ Nodes (6): 6.1 取题, 6.2 前端展示, 6.3 入库, 6. 取题与上报流程, c
 Cohesion: 0.33
 Nodes (5): InsertLearningInteractionEventParams, InsertLearningInteractionEventRow, InsertLearningInteractionEventsRow, InsertQuizEventParams, InsertQuizEventRow
 
+### Community 245 - "Community 245"
+Cohesion: 0.21
+Nodes (7): EndQuizQuestionReader, int32Pointer(), seedQuizQuestion(), seedQuizUnit(), TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates(), NewEndQuizQuestionReader(), buildEndQuizHandler()
+
 ### Community 246 - "Community 246"
-Cohesion: 0.35
-Nodes (12): NewDefaultVideoFillService(), spyVideoFillCandidateReader, containsString(), fillCandidate(), fillContext(), fillTestVideo(), TestDefaultVideoFillServiceAllowsUnderfillWhenCandidatesAreInsufficient(), TestDefaultVideoFillServiceFillsMasteredTargetBeforePopular() (+4 more)
+Cohesion: 0.46
+Nodes (6): filterEventsAfterResetBoundary(), flattenGroupedEvents(), groupAndSortEvents(), groupEventsPreserveOrder(), sortedCoarseUnitIDs(), RecordLearningEventsUsecase
 
 ### Community 249 - "Community 249"
 Cohesion: 0.33
@@ -1474,6 +1486,10 @@ Nodes (5): DemandBundle, DemandUnit, LaneBudget, MixQuota, PlannerFlags
 Cohesion: 0.33
 Nodes (5): Bucket, Lane, ReasonCode, SelectorMode, SessionMode
 
+### Community 254 - "Community 254"
+Cohesion: 0.48
+Nodes (5): clientContextJSON(), findResetUserUnitProgressEvent(), resetBoundaryFromWatermark(), resetUserUnitProgressMetadata(), ResetUserUnitProgressUsecase
+
 ### Community 255 - "Community 255"
 Cohesion: 0.40
 Nodes (5): TestDevModeAuthorizationFallbackInjectsPrincipal(), TestGatewayUserinfoPrincipalMiddlewareInjectsPrincipal(), newRequestID(), RequestID(), requestIDContextKey
@@ -1483,12 +1499,12 @@ Cohesion: 0.33
 Nodes (3): Logging(), NewStatusRecorder(), StatusRecorder
 
 ### Community 257 - "Community 257"
-Cohesion: 0.28
-Nodes (13): NewRepository(), NewGetMeUsecase(), WithMeNow(), stringPtr(), TestActivityCalendarReturnsCurrentStreakFromYesterdayWhenTodayInactive(), TestActivityCalendarReturnsZeroStreakWhenTodayAndYesterdayInactive(), TestActivityStatsRecorderAndCalendar(), TestGetMeRepairsProfileAndUpdatesTimezone() (+5 more)
+Cohesion: 0.40
+Nodes (9): NewUpdateMeProfileUsecase(), stringPtr(), TestUpdateMeProfileAcceptsPrimarySchoolEducationStage(), TestUpdateMeProfileAcceptsUnicodeNamesAndMapsPatch(), TestUpdateMeProfileClearsNullableFields(), TestUpdateMeProfileRejectsInvalidRequests(), TestUpdateMeProfileRepairsMissingProfileBeforeUpdate(), TestUpdateMeProfileReturnsAuthUserNotFoundWhenRepairFails() (+1 more)
 
 ### Community 258 - "Community 258"
-Cohesion: 0.25
-Nodes (6): VideoWatchProgressWriter, metadataWithSourceSurface(), WithWatchProgressActivityStats(), VideoWatchProgressWriterOption, buildUnitProgressHandler(), buildWatchProgressHandler()
+Cohesion: 0.60
+Nodes (3): VideoLibraryReader, cursorAt(), cursorVideoID()
 
 ### Community 260 - "Community 260"
 Cohesion: 0.33
@@ -1497,10 +1513,6 @@ Nodes (5): AuditWriter, RecommendationResultWriter, ServingStateManager, VideoFi
 ### Community 261 - "Community 261"
 Cohesion: 0.33
 Nodes (5): code:text (_unit_collection_ingest/), code:bash (.venv/bin/python -m scripts.unit_collection_ingest.main matc), Commands, Count Semantics, Unit Collection Ingest
-
-### Community 262 - "Community 262"
-Cohesion: 0.35
-Nodes (11): fakeFavoriteUsecase, fakeLikeUsecase, decodeJSON(), newServer(), readBody(), requestInteraction(), TestVideoFavoriteRoutesMapRequestAndReturnFavoriteOnly(), TestVideoInteractionsMapCatalogErrors() (+3 more)
 
 ### Community 263 - "Community 263"
 Cohesion: 0.33
@@ -1523,8 +1535,8 @@ Cohesion: 0.40
 Nodes (5): 1. 当前已验证环境, code:text (project_id: project-84868034-4a49-4556-b47), code:text (artifactregistry.googleapis.com), code:text (lvrs-database-url), code:text (API_ADDR=<from .env>)
 
 ### Community 268 - "Community 268"
-Cohesion: 0.40
-Nodes (5): 19.1 raw fact 不合法, 19.2 RecordLearningEvents 失败, 19.3 late progress event, 19. 错误处理, code:text (coarse_unit_id missing)
+Cohesion: 0.17
+Nodes (12): 19.1 raw fact 不合法, 19.2 RecordLearningEvents 失败, 19.3 late progress event, 19. 错误处理, 20. 调用方式, 22. MVP 实施顺序, code:json ({), code:text (coarse_unit_id missing) (+4 more)
 
 ### Community 269 - "Community 269"
 Cohesion: 0.40
@@ -1623,8 +1635,8 @@ Cohesion: 0.40
 Nodes (5): 11.1 Interaction queue, 11.2 Quiz submit, 11.3 Self mark submit, 11.4 Reset unlearned submit, 11. 前端队列建议
 
 ### Community 308 - "Community 308"
-Cohesion: 0.50
-Nodes (4): 22. MVP 实施顺序, code:text (RawQuizEvent -> LearningEventInput), code:text (read pending raw facts), code:text (sqlc query with anti-join)
+Cohesion: 0.33
+Nodes (4): TestDefaultAuditWriterSkipsItemInsertForEmptyItems(), TestDefaultAuditWriterWritesItemsInOneRepositoryCall(), NewDefaultAuditWriter(), fakeRecommendationAuditRepository
 
 ### Community 310 - "Community 310"
 Cohesion: 0.40
@@ -1637,10 +1649,6 @@ Nodes (4): 6.1 Response, 6.2 Item 字段, 6. 返回结构, code:json ({)
 ### Community 312 - "Community 312"
 Cohesion: 0.50
 Nodes (4): 10.1 Interaction queue, 10.2 Quiz submit, 10.3 Self mark submit, 10. 前端队列建议
-
-### Community 313 - "Community 313"
-Cohesion: 0.27
-Nodes (6): Error, ErrorCode, IsValidationError(), hasCode(), IsConflictError(), IsUnprocessableError()
 
 ### Community 314 - "Community 314"
 Cohesion: 0.50
@@ -1659,8 +1667,8 @@ Cohesion: 0.50
 Nodes (4): 8. 数据库迁移检查, code:bash (make analytics-migrate-status), code:text (analytics: current=5 applied=5 pending=0), code:bash (make analytics-migrate-up)
 
 ### Community 318 - "Community 318"
-Cohesion: 0.44
-Nodes (9): decodeJSON(), newServer(), postJSON(), readBody(), TestEndQuizMapsErrors(), TestEndQuizRejectsInvalidTransportRequest(), TestEndQuizRequiresPrincipal(), TestEndQuizReturnsItemsAndMapsRequest() (+1 more)
+Cohesion: 0.33
+Nodes (5): VideoWatchProgressWriter, metadataWithSourceSurface(), WithWatchProgressActivityStats(), VideoWatchProgressWriterOption, buildWatchProgressHandler()
 
 ### Community 319 - "Community 319"
 Cohesion: 0.50
@@ -1669,10 +1677,6 @@ Nodes (4): 4.1 三层语义模型, 4. 几个角色分别负责什么, code:merma
 ### Community 320 - "Community 320"
 Cohesion: 0.50
 Nodes (4): 8. lookup 弹窗内附加行为, code:text (认识 / 有点模糊 / 不认识), code:text (重放全句音频), code:mermaid (flowchart TD)
-
-### Community 321 - "Community 321"
-Cohesion: 0.50
-Nodes (4): 21.1 Domain unit tests, 21.2 Application unit tests, 21.3 Integration tests, 21. 测试策略
 
 ### Community 322 - "Community 322"
 Cohesion: 0.25
@@ -1723,8 +1727,8 @@ Cohesion: 0.50
 Nodes (3): FeedVideoDisplay, UnitLabel, VideoDetail
 
 ### Community 339 - "Community 339"
-Cohesion: 0.27
-Nodes (9): fakeWatchProgressRecorder, Option, NewRecordVideoWatchProgressUsecase(), TestRecordVideoWatchProgressDefaultsAndNormalizesInput(), TestRecordVideoWatchProgressMapsRepositoryErrors(), TestRecordVideoWatchProgressRejectsInvalidInput(), TestRecordVideoWatchProgressRejectsMalformedJSONObjects(), validRequest() (+1 more)
+Cohesion: 0.24
+Nodes (10): fakeWatchProgressRecorder, Option, NewRecordVideoWatchProgressUsecase(), TestRecordVideoWatchProgressDefaultsAndNormalizesInput(), TestRecordVideoWatchProgressMapsRepositoryErrors(), TestRecordVideoWatchProgressRejectsInvalidInput(), TestRecordVideoWatchProgressRejectsMalformedJSONObjects(), validRequest() (+2 more)
 
 ### Community 340 - "Community 340"
 Cohesion: 0.50
@@ -1745,10 +1749,6 @@ Nodes (3): InsertFeedbackImageParams, UpsertFeedbackSubmissionParams, UpsertFeed
 ### Community 351 - "Community 351"
 Cohesion: 0.50
 Nodes (3): FeedbackImage, FeedbackSubmission, FeedbackSubmissionResult
-
-### Community 352 - "Community 352"
-Cohesion: 0.33
-Nodes (3): Error, ErrorCode, ServiceUnavailableError()
 
 ### Community 354 - "Community 354"
 Cohesion: 0.50
@@ -1799,8 +1799,12 @@ Cohesion: 0.67
 Nodes (3): 4.7 前端上报 JSON 样例, code:json ({), code:json ({)
 
 ### Community 388 - "Community 388"
-Cohesion: 0.50
-Nodes (3): AppendLearningEventsRow, GetLearningEventByUserSourceRefParams, ListLearningEventsByUserUnitOrderedParams
+Cohesion: 0.33
+Nodes (5): AppendLearningEventsRow, GetLearningEventByUserSourceRefParams, ListLearningEventsByUserUnitOrderedParams, ListLearningEventWatermarksByUserUnitsParams, ListLearningEventWatermarksByUserUnitsRow
+
+### Community 403 - "Community 403"
+Cohesion: 0.19
+Nodes (14): fakeFeedbackWriter, isHex(), isUUID(), NewSubmitFeedbackUsecase(), TestSubmitFeedbackPassesValidatedSubmissionToWriter(), TestSubmitFeedbackRejectsInvalidClientFeedbackID(), TestSubmitFeedbackRejectsInvalidUserID(), TestSubmitFeedbackRejectsMismatchedImageMetadata() (+6 more)
 
 ### Community 460 - "Community 460"
 Cohesion: 0.47
@@ -1810,49 +1814,41 @@ Nodes (9): freshnessScore(), overloadPenalty(), recencyPenalty(), recentServedPe
 Cohesion: 0.39
 Nodes (4): LearningUnitIDs(), appendUniqueInt64(), appendUniqueString(), DefaultServingStateManager
 
-### Community 480 - "Community 480"
-Cohesion: 0.67
-Nodes (3): 5.1 `analytics.quiz_events`, 5.2 `analytics.learning_interaction_events`, 5. 输入表
-
-### Community 482 - "Community 482"
+### Community 485 - "Community 485"
 Cohesion: 0.33
-Nodes (3): GetUserUnitStateUsecase, NewGetUserUnitStateUsecase(), ListUserUnitStatesUsecase
+Nodes (4): mapProfileResponse(), normalizeDisplayName(), UpdateMeProfileOption, UpdateMeProfileUsecase
 
-### Community 484 - "Community 484"
-Cohesion: 0.50
-Nodes (4): 10. 为什么前端只负责上报事实, code:text (用户刚刚做了什么？), code:text (这个行为能不能映射到学习单元？), code:mermaid (sequenceDiagram)
-
-### Community 486 - "Community 486"
-Cohesion: 0.67
-Nodes (3): 16. 推荐代码结构, code:text (internal/learningengine/normalizer/), code:text (normalizer/infrastructure/migration/)
-
-### Community 551 - "Community 551"
+### Community 487 - "Community 487"
 Cohesion: 0.29
-Nodes (4): Handler, invalidRequest(), requiredPrincipal(), VideoDetailService
+Nodes (4): EndQuizQuestionLookupUsecase, invalidRequest(), requiredPrincipal(), Handler
+
+### Community 544 - "Community 544"
+Cohesion: 0.29
+Nodes (4): FeedService, invalidRequest(), requiredPrincipal(), Handler
 
 ### Community 552 - "Community 552"
 Cohesion: 0.29
 Nodes (4): Handler, invalidRequest(), requiredPrincipal(), RecordVideoWatchProgressUsecase
 
 ## Knowledge Gaps
-- **1625 isolated node(s):** `moduleSpec`, `migrationFile`, `migrationStatus`, `config`, `candidateSummary` (+1620 more)
+- **1606 isolated node(s):** `moduleSpec`, `migrationFile`, `migrationStatus`, `config`, `candidateSummary` (+1601 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **167 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **173 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `buildRecommendationUsecase()` connect `Community 24` to `Community 34`, `Community 102`, `Community 7`, `Community 105`, `Community 365`, `Community 46`, `Community 143`, `Community 52`, `Community 246`, `Community 87`, `Community 152`, `Community 183`, `Community 218`, `Community 88`, `Community 184`, `Community 159`?**
-  _High betweenness centrality (0.045) - this node is a cross-community bridge._
-- **Why does `buildFeedHandler()` connect `Community 34` to `Community 24`, `Community 193`, `Community 69`, `Community 176`?**
+- **Why does `buildRecommendationUsecase()` connect `Community 24` to `Community 34`, `Community 102`, `Community 7`, `Community 105`, `Community 365`, `Community 46`, `Community 143`, `Community 52`, `Community 308`, `Community 87`, `Community 25`, `Community 218`, `Community 159`?**
+  _High betweenness centrality (0.048) - this node is a cross-community bridge._
+- **Why does `buildFeedHandler()` connect `Community 34` to `Community 69`, `Community 176`, `Community 21`, `Community 245`, `Community 24`?**
+  _High betweenness centrality (0.046) - this node is a cross-community bridge._
+- **Why does `buildHTTPHandler()` connect `Community 21` to `Community 256`, `Community 34`, `Community 68`, `Community 176`, `Community 16`, `Community 144`, `Community 245`, `Community 118`, `Community 86`, `Community 62`, `Community 125`, `Community 318`, `Community 255`?**
   _High betweenness centrality (0.044) - this node is a cross-community bridge._
-- **Why does `buildHTTPHandler()` connect `Community 193` to `Community 256`, `Community 34`, `Community 258`, `Community 68`, `Community 101`, `Community 74`, `Community 16`, `Community 144`, `Community 118`, `Community 125`, `Community 62`, `Community 255`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+- **Are the 34 inferred relationships involving `Reduce()` (e.g. with `TestReduce_ObserveOnlyEventOnlyUpdatesObservationFields()` and `TestReduce_ObserveOnlyRejectsProgressQuality()`) actually correct?**
+  _`Reduce()` has 34 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 41 inferred relationships involving `InvalidRequestError()` (e.g. with `TestVideoLibraryRejectsMissingPrincipalAndBadQuery()` and `TestVideoDetailMapsErrors()`) actually correct?**
   _`InvalidRequestError()` has 41 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 31 inferred relationships involving `Reduce()` (e.g. with `TestReduce_ObserveOnlyEventOnlyUpdatesObservationFields()` and `TestReduce_ObserveOnlyRejectsProgressQuality()`) actually correct?**
-  _`Reduce()` has 31 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 2 inferred relationships involving `CatalogIngestError` (e.g. with `ValidationWarning` and `CatalogRepository`) actually correct?**
   _`CatalogIngestError` has 2 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 26 inferred relationships involving `NewRecordLearningEventsUsecase()` (e.g. with `buildLearningEventsHandler()` and `.LearningSuite()`) actually correct?**
-  _`NewRecordLearningEventsUsecase()` has 26 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 27 inferred relationships involving `NewRecordLearningEventsUsecase()` (e.g. with `buildLearningEventsHandler()` and `.LearningSuite()`) actually correct?**
+  _`NewRecordLearningEventsUsecase()` has 27 INFERRED edges - model-reasoned connections that need verification._

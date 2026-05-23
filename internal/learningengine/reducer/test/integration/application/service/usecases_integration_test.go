@@ -31,9 +31,8 @@ func TestTargetControlUsecasesWithDatabase(t *testing.T) {
 	txManager := persisttx.NewManager(db.Pool)
 
 	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	setInactiveUsecase := service.NewSetTargetInactiveUsecase(txManager)
 	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
-	suspendUsecase := service.NewSuspendTargetUnitUsecase(txManager)
-	resumeUsecase := service.NewResumeTargetUnitUsecase(txManager)
 
 	if _, err := ensureUsecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
 		UserID: "11111111-1111-1111-1111-111111111111",
@@ -45,9 +44,8 @@ func TestTargetControlUsecasesWithDatabase(t *testing.T) {
 	}
 
 	response, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
-		UserID:           "11111111-1111-1111-1111-111111111111",
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     "11111111-1111-1111-1111-111111111111",
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates.Execute() error = %v", err)
@@ -59,43 +57,22 @@ func TestTargetControlUsecasesWithDatabase(t *testing.T) {
 		t.Fatalf("status = %q, want new", response.States[0].Status)
 	}
 
-	if _, err := suspendUsecase.Execute(context.Background(), dto.SuspendTargetUnitRequest{
-		UserID:          "11111111-1111-1111-1111-111111111111",
-		CoarseUnitID:    101,
-		SuspendedReason: "manual_pause",
-	}); err != nil {
-		t.Fatalf("SuspendTargetUnit.Execute() error = %v", err)
-	}
-
-	suspended, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
-		UserID:           "11111111-1111-1111-1111-111111111111",
-		OnlyTarget:       true,
-		ExcludeSuspended: false,
-	})
-	if err != nil {
-		t.Fatalf("ListUserUnitStates.Execute() error = %v", err)
-	}
-	if suspended.States[0].Status != "suspended" {
-		t.Fatalf("status = %q, want suspended", suspended.States[0].Status)
-	}
-
-	if _, err := resumeUsecase.Execute(context.Background(), dto.ResumeTargetUnitRequest{
+	if _, err := setInactiveUsecase.Execute(context.Background(), dto.SetTargetInactiveRequest{
 		UserID:       "11111111-1111-1111-1111-111111111111",
 		CoarseUnitID: 101,
 	}); err != nil {
-		t.Fatalf("ResumeTargetUnit.Execute() error = %v", err)
+		t.Fatalf("SetTargetInactive.Execute() error = %v", err)
 	}
 
-	resumed, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
-		UserID:           "11111111-1111-1111-1111-111111111111",
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+	inactiveTargets, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
+		UserID:     "11111111-1111-1111-1111-111111111111",
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates.Execute() error = %v", err)
 	}
-	if resumed.States[0].Status != "new" {
-		t.Fatalf("status = %q, want new", resumed.States[0].Status)
+	if len(inactiveTargets.States) != 0 {
+		t.Fatalf("target states len = %d, want 0 after SetTargetInactive", len(inactiveTargets.States))
 	}
 }
 
@@ -379,15 +356,14 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 	}
 
 	activeTargets, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
-		UserID:           userID,
-		OnlyTarget:       true,
-		ExcludeSuspended: true,
+		UserID:     userID,
+		OnlyTarget: true,
 	})
 	if err != nil {
 		t.Fatalf("ListUserUnitStates(active targets) error = %v", err)
 	}
-	if len(activeTargets.States) != 0 {
-		t.Fatalf("active target states len = %d, want 0", len(activeTargets.States))
+	if len(activeTargets.States) != 1 {
+		t.Fatalf("active target states len = %d, want 1", len(activeTargets.States))
 	}
 
 	allStates, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{
@@ -399,7 +375,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 	if len(allStates.States) != 1 {
 		t.Fatalf("all states len = %d, want 1", len(allStates.States))
 	}
-	assertCompletedMasteredState(t, allStates.States[0], selfMarkOccurredAt)
+	assertCompletedMasteredState(t, allStates.States[0], selfMarkOccurredAt, true)
 
 	if _, err := replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID}); err != nil {
 		t.Fatalf("ReplayUserStates.Execute() error = %v", err)
@@ -414,7 +390,7 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 	if len(afterReplay.States) != 1 {
 		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
 	}
-	assertCompletedMasteredState(t, afterReplay.States[0], selfMarkOccurredAt)
+	assertCompletedMasteredState(t, afterReplay.States[0], selfMarkOccurredAt, true)
 }
 
 func TestResetUserUnitProgressWithDatabaseAndReplay(t *testing.T) {
@@ -485,7 +461,7 @@ func TestResetUserUnitProgressWithDatabaseAndReplay(t *testing.T) {
 	if len(allStates.States) != 1 {
 		t.Fatalf("all states len = %d, want 1", len(allStates.States))
 	}
-	assertResetUnlearnedState(t, allStates.States[0])
+	assertResetUnlearnedState(t, allStates.States[0], false)
 
 	second, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
 		UserID:        userID,
@@ -513,7 +489,98 @@ func TestResetUserUnitProgressWithDatabaseAndReplay(t *testing.T) {
 	if len(afterReplay.States) != 1 {
 		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
 	}
-	assertResetUnlearnedState(t, afterReplay.States[0])
+	assertResetUnlearnedState(t, afterReplay.States[0], false)
+}
+
+func TestResetUserUnitProgressUsesLedgerOrderAndBoundaryForReplay(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	txManager := persisttx.NewManager(db.Pool)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
+	resetUsecase := service.NewResetUserUnitProgressUsecase(txManager)
+	replayUsecase := service.NewReplayUserStatesUsecase(txManager)
+	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
+	eventRepo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+
+	if _, err := ensureUsecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
+		UserID: userID,
+		Targets: []dto.TargetUnitSpec{
+			{CoarseUnitID: 101, TargetSource: "curriculum", TargetSourceRefID: "lesson_1", TargetPriority: 0.9},
+		},
+	}); err != nil {
+		t.Fatalf("EnsureTargetUnits.Execute() error = %v", err)
+	}
+
+	q4 := int16(4)
+	progressAt := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
+	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "reset-boundary-progress-1", ProgressQuality: &q4, OccurredAt: progressAt},
+		},
+	}); err != nil {
+		t.Fatalf("RecordLearningEvents.Execute(progress) error = %v", err)
+	}
+
+	resetOccurredAt := progressAt.Add(-2 * time.Hour)
+	response, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        userID,
+		ClientEventID: "reset-boundary-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    resetOccurredAt,
+	})
+	if err != nil {
+		t.Fatalf("ResetUserUnitProgress.Execute() error = %v", err)
+	}
+	if !response.Accepted || !response.Inserted {
+		t.Fatalf("reset response = %+v, want inserted", response)
+	}
+
+	events, err := eventRepo.ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events len = %d, want 2", len(events))
+	}
+	if events[1].ReducerEffect != "reset_unlearned" {
+		t.Fatalf("event order = %+v, want reset second by ledger order", events)
+	}
+	if events[1].ResetBoundaryAt == nil || !events[1].ResetBoundaryAt.Equal(progressAt) {
+		t.Fatalf("reset_boundary_at = %v, want %v", events[1].ResetBoundaryAt, progressAt)
+	}
+
+	stale, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "reset-boundary-stale-1", ProgressQuality: &q4, OccurredAt: progressAt},
+		},
+	})
+	if err != nil {
+		t.Fatalf("RecordLearningEvents.Execute(stale) error = %v", err)
+	}
+	if stale.RecordedCount != 0 || stale.SkippedBeforeResetCount != 1 {
+		t.Fatalf("stale response = %+v, want skipped before reset", stale)
+	}
+
+	if _, err := replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID}); err != nil {
+		t.Fatalf("ReplayUserStates.Execute() error = %v", err)
+	}
+	states, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates.Execute() error = %v", err)
+	}
+	if len(states.States) != 1 {
+		t.Fatalf("states len = %d, want 1", len(states.States))
+	}
+	assertResetUnlearnedState(t, states.States[0], true)
 }
 
 func TestResetUserUnitProgressDuplicateClientEventAcrossUnitsIsIdempotent(t *testing.T) {
@@ -654,7 +721,6 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	txManager := persisttx.NewManager(db.Pool)
 
 	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
-	suspendUsecase := service.NewSuspendTargetUnitUsecase(txManager)
 	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
 	replayUsecase := service.NewReplayUserStatesUsecase(txManager)
 
@@ -679,14 +745,6 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 		},
 	}); err != nil {
 		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
-	}
-
-	if _, err := suspendUsecase.Execute(context.Background(), dto.SuspendTargetUnitRequest{
-		UserID:          userID,
-		CoarseUnitID:    102,
-		SuspendedReason: "manual_pause",
-	}); err != nil {
-		t.Fatalf("SuspendTargetUnit.Execute() error = %v", err)
 	}
 
 	beforeReplay, err := stateRepo.ListByUser(context.Background(), userID, model.UserUnitStateFilter{})
@@ -716,8 +774,8 @@ func TestReplayUserStatesWithDatabase(t *testing.T) {
 	if afterByUnit[101].Status != "reviewing" {
 		t.Fatalf("unit 101 status = %q, want reviewing", afterByUnit[101].Status)
 	}
-	if afterByUnit[102].Status != "suspended" {
-		t.Fatalf("unit 102 status = %q, want suspended", afterByUnit[102].Status)
+	if afterByUnit[102].Status != "new" {
+		t.Fatalf("unit 102 status = %q, want new", afterByUnit[102].Status)
 	}
 	if afterByUnit[102].ProgressEventCount != 0 {
 		t.Fatalf("unit 102 progress_event_count = %d, want 0", afterByUnit[102].ProgressEventCount)
@@ -908,14 +966,14 @@ func indexStatesByUnit(states []model.UserUnitState) map[int64]model.UserUnitSta
 	return indexed
 }
 
-func assertCompletedMasteredState(t *testing.T, state model.UserUnitState, lastProgressAt time.Time) {
+func assertCompletedMasteredState(t *testing.T, state model.UserUnitState, lastProgressAt time.Time, wantTarget bool) {
 	t.Helper()
 
 	if state.Status != "mastered" {
 		t.Fatalf("status = %q, want mastered", state.Status)
 	}
-	if state.IsTarget {
-		t.Fatalf("is_target = true, want false")
+	if state.IsTarget != wantTarget {
+		t.Fatalf("is_target = %v, want %v", state.IsTarget, wantTarget)
 	}
 	if state.ProgressPercent != 100 {
 		t.Fatalf("progress_percent = %v, want 100", state.ProgressPercent)
@@ -926,19 +984,16 @@ func assertCompletedMasteredState(t *testing.T, state model.UserUnitState, lastP
 	if state.NextReviewAt != nil {
 		t.Fatalf("next_review_at = %v, want nil", state.NextReviewAt)
 	}
-	if state.SuspendedReason != "" {
-		t.Fatalf("suspended_reason = %q, want empty", state.SuspendedReason)
-	}
 	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(lastProgressAt) {
 		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, lastProgressAt)
 	}
 }
 
-func assertResetUnlearnedState(t *testing.T, state model.UserUnitState) {
+func assertResetUnlearnedState(t *testing.T, state model.UserUnitState, wantTarget bool) {
 	t.Helper()
 
-	if state.IsTarget {
-		t.Fatalf("is_target = true, want false")
+	if state.IsTarget != wantTarget {
+		t.Fatalf("is_target = %v, want %v", state.IsTarget, wantTarget)
 	}
 	if state.Status != "new" {
 		t.Fatalf("status = %q, want new", state.Status)
@@ -960,9 +1015,6 @@ func assertResetUnlearnedState(t *testing.T, state model.UserUnitState) {
 	}
 	if state.ScheduleRepetition != 0 || state.ScheduleIntervalDays != 0 || state.ScheduleEaseFactor != 2.5 {
 		t.Fatalf("schedule = repetition:%d interval:%v ease:%v, want reset defaults", state.ScheduleRepetition, state.ScheduleIntervalDays, state.ScheduleEaseFactor)
-	}
-	if state.SuspendedReason != "" {
-		t.Fatalf("suspended_reason = %q, want empty", state.SuspendedReason)
 	}
 }
 

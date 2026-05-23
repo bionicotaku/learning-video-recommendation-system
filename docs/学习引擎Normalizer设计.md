@@ -70,7 +70,7 @@ reducer
 learning.user_unit_states
 ```
 
-`reset-unlearned` 不是 raw fact 归一化链路，不进入 Normalizer pending repair/backfill；它由 API 直接调用 reducer，在 `learning.unit_learning_events` 中持久化 `reset_unlearned` normalized event。
+`reset-unlearned` 不是 raw fact 归一化链路；它由 API 直接调用 reducer，在 `learning.unit_learning_events` 中持久化 `reset_unlearned` normalized event。Normalizer 的 pending/by-ID repair 必须读取当前 latest `reset_boundary_at`，并忽略该 user+unit boundary 之前或等于 boundary 的旧 raw fact，防止 backfill 复活 reset 前学习状态。
 
 后台补偿路径是 pending scan：
 
@@ -257,7 +257,7 @@ Normalizer 输出的是 `RecordLearningEvents` 可消费的 DTO，不是 SQL row
 | `source_type` | `quiz_event` 或 `learning_interaction_event`。 |
 | `source_ref_id` | raw fact 的 `event_id` 字符串。 |
 | `metadata` | raw 上下文的裁剪版 JSON object。 |
-| `occurred_at` | quiz 用 `completed_at`；互动事件用 `occurred_at`。 |
+| `occurred_at` | quiz 用 `completed_at`；互动事件用 `occurred_at`。这是业务时间，不是 reducer replay 顺序。 |
 
 幂等依赖 Learning Engine 现有唯一约束：
 
@@ -280,7 +280,7 @@ unique (user_id, source_type, source_ref_id, coarse_unit_id)
 | mapped lookup | 是 | `lookup` | `observe_only` | `null` | `null` | 只要 lookup 能绑定 `coarse_unit_id` 就生成一条 observe-only event；停留、音频、练一下等附加字段只进 metadata，不改变入库判断。 |
 | unmapped lookup | 否 | - | - | - | - | 只保留 analytics raw fact。 |
 | 单条 raw exposure | 否 | - | - | - | - | raw 表保留原始快照；normalizer 不再逐条生成 observe-only event。 |
-| 同一 unit 满 3 个未消费过的不同 watch session exposure，且最近无 lookup reset | 是 | `exposure` | `affects_progress` | `4` | `null` | 生成 synthetic `exposure_session3_v1` passive progress，`source_ref_id` 为三 session hash，`counts_toward_success_streak=false`。 |
+| 同一 unit 满 3 个未消费过的不同 watch session exposure，且晚于 latest lookup/reset boundary | 是 | `exposure` | `affects_progress` | `4` | `null` | 生成 synthetic `exposure_session3_v1` passive progress，`source_ref_id` 为三 session hash，`counts_toward_success_streak=false`。 |
 | 非 target / 已 mastered unit 的普通 exposure | 后端不额外校验 | - | - | - | - | 前端负责只上报当前 target/unmastered coarse units；后端第一版只做字段合法性和 FK 级校验。 |
 
 ## 8. Quiz quality policy
@@ -473,7 +473,11 @@ MVP 语义：
 
 ### 10.2 session3 passive progress
 
-当同一个 `user_id + coarse_unit_id` 在最近一次 lookup 之后，累计到 3 个尚未被 `exposure_session3_v1` 消费过的不同 `watch_session_id` exposure，normalizer 生成一条 synthetic event：
+当同一个 `user_id + coarse_unit_id` 在窗口起点之后，累计到 3 个尚未被 `exposure_session3_v1` 消费过的不同 `watch_session_id` exposure，normalizer 生成一条 synthetic event。窗口起点为：
+
+```text
+max(latest lookup occurred_at, latest reset_boundary_at)
+```
 
 ```text
 event_type = exposure
@@ -488,7 +492,7 @@ occurred_at = 第 3 个 session exposure 的 first_exposed_at
 
 同一个 session 内 15 秒一次的多条 exposure raw row 仍只算 1 个 session exposure。视频 A session 1、视频 B session 2、再次观看视频 A 形成的新 session 3，可以算 3 次。被某条 session3 event 消费过的 session 会记录在 `learning.unit_learning_events.consumed_watch_session_ids` typed 列中，后续窗口按该列排除这些 session；metadata 中的 `watch_session_ids` 只是审计副本。
 
-lookup 是 reset 信号。`exposure -> exposure -> lookup -> exposure` 不触发；lookup 后需要重新累计 3 个不同 watch session。
+lookup 是 session3 窗口 reset 信号；`reset_unlearned.reset_boundary_at` 是更强的学习状态边界。`exposure -> exposure -> lookup -> exposure` 不触发；lookup 或 reset boundary 后都需要重新累计 3 个不同 watch session。
 
 ## 11. Self mark policy
 
@@ -506,16 +510,16 @@ source_type = learning_interaction_event
 source_ref_id = analytics.learning_interaction_events.event_id
 ```
 
-Reducer 会把该 unit 收敛为：
+Reducer 会把该 unit 的学习状态收敛为：
 
 ```text
 status = mastered
 progress_percent = 100
 mastery_score = 1
 next_review_at = null
-is_target = false
-suspended_reason = ''
 ```
+
+`set_mastered` 不修改 `is_target` 或其他 target/control 字段；如果该 unit 仍属于当前词书/目标范围，`status=mastered AND is_target=true` 是合法状态。
 
 ## 12. 跨视频 exposure 语义
 
@@ -817,6 +821,8 @@ source_kind optional: quiz / learning_interaction / all
 limit
 occurred_before optional
 ```
+
+`occurred_before` 只是 raw 候选读取上限，用来限制本次 repair/backfill 扫描范围；它不是 historical snapshot。latest lookup 与 latest `reset_boundary_at` 始终使用当前最新事实，保证旧 raw backfill 不会跨过已经发生的 reset 边界。
 
 输出 DTO：
 
@@ -1152,7 +1158,7 @@ Learning interaction:
 - unmapped lookup -> skipped。
 - lookup 附加字段不改变 reducer_effect。
 - single raw exposure -> no direct normalized event。
-- session3 exposure window -> q4 passive affects_progress, `counts_toward_success_streak=false`。
+- session3 exposure window -> q4 passive affects_progress, `counts_toward_success_streak=false`，窗口起点为 latest lookup/reset boundary。
 - self_mark_mastered -> set_mastered。
 - validation 失败的 raw fact 不调用 mapper。
 

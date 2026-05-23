@@ -130,8 +130,8 @@
 |---|---|---|
 | `POST` | `/api/learning-interactions:batch` | 批量写入 exposure / lookup raw learning interactions；HTTP success 只承诺 raw fact accepted。 |
 | `POST` | `/api/quiz-attempts` | 写入一次 quiz attempt raw fact；Learning Engine normalization 作为 best-effort 同步尝试；duplicate 不重复增加 User stats。 |
-| `POST` | `/api/learning-units:mark-mastered` | 写入 self-mark mastered raw fact；走 dedicated Analytics writer 和 self-mark normalizer path。 |
-| `POST` | `/api/learning-units:reset-unlearned` | 当前用户已有 user-unit state row 时，把该学习单元重置为未学习；接受 `is_target=false` 或已 mastered 的已有 row，按当前用户 + `client_event_id` 幂等写 Learning Engine reducer ledger。 |
+| `POST` | `/api/learning-units:mark-mastered` | 写入 self-mark mastered raw fact；要求当前用户已有 user-unit state row，后续 `set_mastered` 只改学习状态，不改 target/control 字段。 |
+| `POST` | `/api/learning-units:reset-unlearned` | 当前用户已有 user-unit state row 时，把该学习单元重置为未学习；接受 `is_target=false` 或已 mastered 的已有 row，按当前用户 + `client_event_id` 幂等写 Learning Engine reducer ledger，并用内部 `reset_boundary_at` 屏蔽旧 raw。 |
 
 ### Unit Progress / 学习单元进度读取
 

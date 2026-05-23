@@ -76,7 +76,7 @@ func TestLearningStateReaderListActiveByUserExcludesMasteredTargets(t *testing.T
 			($1, 322, true, 0.80, 'new', 0.0),
 			($1, 323, true, 0.70, 'learning', 0.3),
 			($1, 324, true, 0.60, 'reviewing', 0.7),
-			($1, 325, true, 0.50, 'suspended', 0.4)
+				($1, 325, false, 0.50, 'learning', 0.4)
 	`, userID); err != nil {
 		t.Fatalf("seed learning states: %v", err)
 	}

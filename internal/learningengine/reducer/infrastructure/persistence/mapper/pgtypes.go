@@ -67,6 +67,13 @@ func Int32PointerFromPG(value pgtype.Int4) *int32 {
 	return &result
 }
 
+func Int64FromPG(value pgtype.Int8) int64 {
+	if !value.Valid {
+		return 0
+	}
+	return value.Int64
+}
+
 func TimePointerToPG(value *time.Time) pgtype.Timestamptz {
 	return pgtime.ToTimestamptz(value)
 }

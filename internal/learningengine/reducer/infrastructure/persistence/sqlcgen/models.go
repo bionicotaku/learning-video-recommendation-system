@@ -20,6 +20,7 @@ type CatalogVideo struct {
 
 type LearningUnitLearningEvent struct {
 	EventID                   pgtype.UUID        `json:"event_id"`
+	LedgerSeq                 pgtype.Int8        `json:"ledger_seq"`
 	UserID                    pgtype.UUID        `json:"user_id"`
 	CoarseUnitID              int64              `json:"coarse_unit_id"`
 	VideoID                   pgtype.UUID        `json:"video_id"`
@@ -33,6 +34,7 @@ type LearningUnitLearningEvent struct {
 	ConsumedWatchSessionIds   []pgtype.UUID      `json:"consumed_watch_session_ids"`
 	Metadata                  []byte             `json:"metadata"`
 	OccurredAt                pgtype.Timestamptz `json:"occurred_at"`
+	ResetBoundaryAt           pgtype.Timestamptz `json:"reset_boundary_at"`
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -71,7 +73,6 @@ type LearningUserUnitState struct {
 	ScheduleIntervalDays    pgtype.Numeric     `json:"schedule_interval_days"`
 	ScheduleEaseFactor      pgtype.Numeric     `json:"schedule_ease_factor"`
 	NextReviewAt            pgtype.Timestamptz `json:"next_review_at"`
-	SuspendedReason         pgtype.Text        `json:"suspended_reason"`
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 }

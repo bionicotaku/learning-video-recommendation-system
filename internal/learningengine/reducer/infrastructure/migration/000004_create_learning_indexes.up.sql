@@ -4,11 +4,21 @@ on learning.user_unit_states (user_id, is_target, status, next_review_at);
 create index if not exists idx_learning_states_user_updated_at
 on learning.user_unit_states (user_id, updated_at desc);
 
-create index if not exists idx_learning_events_user_time
-on learning.unit_learning_events (user_id, occurred_at, event_id);
+create unique index if not exists uq_unit_learning_events_ledger_seq
+on learning.unit_learning_events (ledger_seq);
 
-create index if not exists idx_learning_events_user_unit_time
-on learning.unit_learning_events (user_id, coarse_unit_id, occurred_at, event_id);
+create index if not exists idx_learning_events_user_ledger_seq
+on learning.unit_learning_events (user_id, ledger_seq);
+
+create index if not exists idx_learning_events_user_unit_ledger_seq
+on learning.unit_learning_events (user_id, coarse_unit_id, ledger_seq);
+
+create index if not exists idx_learning_events_reset_boundary
+on learning.unit_learning_events (user_id, coarse_unit_id, reset_boundary_at desc, ledger_seq desc)
+where source_type = 'learning_unit_reset'
+  and event_type = 'reset_unlearned'
+  and reducer_effect = 'reset_unlearned'
+  and reset_boundary_at is not null;
 
 create unique index if not exists uq_unit_learning_events_reset_client_event
 on learning.unit_learning_events (user_id, source_type, source_ref_id)

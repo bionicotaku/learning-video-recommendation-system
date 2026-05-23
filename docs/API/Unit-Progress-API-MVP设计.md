@@ -36,7 +36,7 @@ MVP 不解决：
 
 - 不提供按中文、释义、词性搜索。
 - 不提供所有历史 exposure / lookup 过的非目标词列表。
-- 不提供 suspended / inactive target 的混合列表。
+- 不提供 inactive target 的混合列表。
 - 不提供 Recommendation 维度的推荐理由、视频覆盖信息或 serving state。
 - 不定义 HTTP 鉴权细节；本文只定义 Learning Engine 对外读契约。
 
@@ -125,7 +125,7 @@ s.status in ('new', 'learning', 'reviewing')
 s.status <> 'mastered'
 ```
 
-原因是 `suspended` 是控制态，不应混入正常未掌握学习列表。
+原因是未来如果新增非学习状态，也不应自动混入正常未掌握学习列表。
 
 ### 4.3 Target 范围
 
@@ -137,7 +137,7 @@ s.is_target = true
 
 `is_target = false` 表示该 user-unit state 已不在当前目标学习范围内。未掌握列表不应默认混入 inactive target。
 
-已掌握列表不使用 `is_target = true` 过滤。当前 reducer 在 `set_mastered` 或自然 mastered 后会把状态收敛为 completed mastered，并同时把 `is_target` 置为 `false`，所以 mastered 列表必须只依赖 `status = 'mastered'`。
+已掌握列表不使用 `is_target = true` 过滤。`mastered` 与 `is_target` 是独立语义：`status='mastered' AND is_target=true` 表示该 unit 仍属于当前词书/目标范围但已经掌握。因此 mastered bucket 只依赖 `status = 'mastered'`；unmastered active bucket 只依赖 `is_target = true AND status in ('new','learning','reviewing')`。
 
 ---
 
@@ -494,6 +494,6 @@ MVP 完成后应满足：
 3. 返回项包含 `coarse_unit_id`、`kind`、`label`、`pos`、`chinese_label`、`chinese_def`、`progress_percent`、`last_progress_at`。
 4. mastered 判定只依赖 `status = 'mastered'`。
 5. unmastered 判定只包含 `new`、`learning`、`reviewing`。
-6. `suspended` 和 `is_target = false` 默认不出现在 unmastered 列表里；mastered 列表不按 `is_target` 过滤。
+6. `is_target = false` 默认不出现在 unmastered 列表里；mastered 列表不按 `is_target` 过滤。
 7. 分页使用 cursor，不使用 offset。
 8. 后端不返回 `display_text`，不伪造不存在的展示字段。

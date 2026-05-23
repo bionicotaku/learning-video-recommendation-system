@@ -130,18 +130,21 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `000005_create_user_learning_profiles`
 - `000006_create_recommendation_target_indexes`
 
-当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。clean baseline 中该表包含 15 个字段，并包含以下关键约束与索引：
+当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。clean baseline 中该表包含 `ledger_seq`、`reset_boundary_at` 等内部 ledger 字段，并包含以下关键约束与索引：
 
 - `unit_learning_events_pkey`
+- `uq_unit_learning_events_ledger_seq`
 - `uq_unit_learning_events_source_unit`
 - `uq_unit_learning_events_reset_client_event`：仅用于 `source_type = 'learning_unit_reset'`，约束 reset-unlearned 的 `(user_id, source_type, source_ref_id)` 唯一，即同一用户同一 `client_event_id` 只对应一条 reset event
-- `idx_learning_events_user_time`
-- `idx_learning_events_user_unit_time`
+- `idx_learning_events_user_ledger_seq`
+- `idx_learning_events_user_unit_ledger_seq`
+- `idx_learning_events_reset_boundary`
 - `event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mastered', 'reset_unlearned')`
 - `reducer_effect in ('observe_only', 'affects_progress', 'set_mastered', 'reset_unlearned')`
 - `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`；`observe_only`、`set_mastered` 和 `reset_unlearned` 必须为空
 - `set_mastered` 只能与 `event_type = 'self_mark_mastered'` 一起使用
 - `reset_unlearned` 只能与 `event_type = 'reset_unlearned'` 一起使用
+- `reset_unlearned` 必须写 `reset_boundary_at`；非 reset event 的 `reset_boundary_at` 必须为空
 - `counts_toward_success_streak=true` 只能用于 `affects_progress`
 - `source_type = 'exposure_session3_v1'` 固定要求 `event_type = exposure`、`reducer_effect = affects_progress`、`progress_quality = 4`、`counts_toward_success_streak = false`，并且 `consumed_watch_session_ids` 必须是 3 个非空 UUID；其他事件必须为空数组
 - `metadata` 必须为 JSON object

@@ -8,7 +8,7 @@ create table if not exists learning.user_unit_states (
   target_priority numeric(8,4) not null default 0,
 
   status text not null default 'new'
-    check (status in ('new', 'learning', 'reviewing', 'mastered', 'suspended')),
+    check (status in ('new', 'learning', 'reviewing', 'mastered')),
 
   progress_percent numeric(5,2) not null default 0
     check (progress_percent between 0 and 100),
@@ -35,8 +35,6 @@ create table if not exists learning.user_unit_states (
   schedule_ease_factor numeric(6,4) not null default 2.5
     check (schedule_ease_factor >= 1.3),
   next_review_at timestamptz,
-
-  suspended_reason text,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
