@@ -1,0 +1,30 @@
+# .graphifyignore
+
+# 默认忽略所有文件
+
+-
+
+# 只允许 docs
+
+!docs/
+!docs/\*\*
+
+# 只允许 cmd
+
+!cmd/
+!cmd/\*\*
+
+# 只允许 internal
+
+!internal/
+!internal/\*\*
+
+# 只允许 scripts
+
+!scripts/
+!scripts/\*\*
+
+# 允许根目录关键文件
+
+!.env
+!.env.example
