@@ -70,7 +70,7 @@ PUT/DELETE /api/videos/{video_id}/favorite
   -> catalog.video_engagement_stats
 ```
 
-这两个命令都是幂等 set / unset，不做 toggle。Repository 在同一事务内更新 `catalog.video_user_states.has_liked` / `has_bookmarked` 与 `catalog.video_engagement_stats.like_count` / `favorite_count`。重复 set 不重复增加计数，重复 unset 不重复减少计数；unset 没有状态行时不创建空的 user state 行。MVP 不新增点赞/收藏审计表，不写 Analytics，不写 Learning Engine，也不写 Recommendation。
+这两个命令都是幂等 set / unset，不做 toggle。调用方必须提供客户端动作时间 `occurred_at`。Repository 在同一事务内更新 `catalog.video_user_states.has_liked` / `has_bookmarked`、对应的 `like_state_updated_at` / `favorite_state_updated_at` 水位，以及 `catalog.video_engagement_stats.like_count` / `favorite_count`。重复 set 不重复增加计数，重复 unset 不重复减少计数；旧 `occurred_at` 请求不会覆盖更新状态，也不会改动计数；unset 没有状态行时不创建空的 user state 行。MVP 不新增点赞/收藏审计表，不写 Analytics，不写 Learning Engine，也不写 Recommendation。
 
 Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 

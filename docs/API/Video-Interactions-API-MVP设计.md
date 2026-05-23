@@ -19,8 +19,8 @@ internal/api videointeractions.Handler
 
 | 表 | 字段 | 用途 |
 |---|---|---|
-| `catalog.video_user_states` | `has_liked`, `liked_at` | 当前用户是否点赞该视频及最近设置时间。 |
-| `catalog.video_user_states` | `has_bookmarked`, `bookmarked_at` | 当前用户是否收藏该视频及最近设置时间。 |
+| `catalog.video_user_states` | `has_liked`, `liked_at`, `like_state_updated_at` | 当前用户是否点赞该视频、最近设置为点赞的时间、以及点赞状态水位。 |
+| `catalog.video_user_states` | `has_bookmarked`, `bookmarked_at`, `favorite_state_updated_at` | 当前用户是否收藏该视频、最近设置为收藏的时间、以及收藏状态水位。 |
 | `catalog.video_engagement_stats` | `like_count` | 当前点赞该视频的用户数。 |
 | `catalog.video_engagement_stats` | `favorite_count` | 当前收藏该视频的用户数。 |
 
@@ -33,7 +33,17 @@ PUT    /api/videos/{video_id}/favorite
 DELETE /api/videos/{video_id}/favorite
 ```
 
-请求不需要 body，也不要求 `Content-Type`。
+请求必须是 JSON object body，并要求 `Content-Type: application/json`：
+
+```json
+{
+  "occurred_at": "2026-05-23T12:00:00Z"
+}
+```
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `occurred_at` | 是 | 客户端这次点赞 / 取消点赞 / 收藏 / 取消收藏动作发生的业务时间。必须是 RFC3339 datetime。 |
 
 `user_id` 只能从 trusted principal 获取。客户端不能通过 body、query 或 path 传入用户身份。
 
@@ -100,6 +110,14 @@ type VideoFavoriteResponse = {
 | `PUT /api/videos/{video_id}/favorite` | `has_bookmarked = true` | 不重复增加 `favorite_count`。 |
 | `DELETE /api/videos/{video_id}/favorite` | `has_bookmarked = false` | 不重复减少 `favorite_count`。 |
 
+`occurred_at` 是当前状态裁决时间，不是服务端写入时间：
+
+- like 使用 `like_state_updated_at` 作为状态水位。
+- favorite 使用 `favorite_state_updated_at` 作为状态水位。
+- 当 `occurred_at >= 当前对应状态水位` 时，请求生效；同状态的更新也会推进对应水位，重复 set 会刷新对应的 `liked_at` / `bookmarked_at`，重复 unset 会继续保持这些时间为空。
+- 当 `occurred_at < 当前对应状态水位` 时，请求视为 stale no-op：不改变 `has_liked` / `has_bookmarked`，不改变 count，响应仍返回当前状态和当前 count。
+- 旧请求不返回错误，因为它已被服务端正确接收并判定为过期操作。
+
 Repository 在单个数据库事务内更新用户状态和全局计数：
 
 - `PUT` 在插入新状态行，或从 false 改成 true 时，计数 `+1`。
@@ -114,7 +132,7 @@ Repository 在单个数据库事务内更新用户状态和全局计数：
 | HTTP | code | 场景 |
 |---|---|---|
 | `200 OK` | - | 状态已设置，或本来就是目标状态。 |
-| `400 Bad Request` | `invalid_request` | `video_id` 不是 UUID。 |
+| `400 Bad Request` | `invalid_request` | `video_id` 不是 UUID；body 缺失；`Content-Type` 不是 `application/json`；`occurred_at` 缺失或不是 RFC3339 datetime。 |
 | `401 Unauthorized` | `unauthorized` | trusted principal 缺失。 |
 | `404 Not Found` | `not_found` | 视频不存在或不可交互。 |
 | `500 Internal Server Error` | `internal_error` | 数据库或未知服务端错误。 |
@@ -127,6 +145,7 @@ Fullscreen action rail 使用 `GET /api/videos/{video_id}` 返回的 `like_count
 
 - 点赞按钮只消费 `VideoLikeResponse`。
 - 收藏按钮只消费 `VideoFavoriteResponse`。
+- 每次点击都必须传入点击发生时的 `occurred_at`；重试同一次点击时应复用同一个 `occurred_at`。
 - 前端不要依赖一次点赞请求顺带刷新收藏状态，反之亦然。
 - 失败时前端保留或回滚 optimistic UI，由客户端交互策略决定。
 
@@ -173,6 +192,8 @@ go test ./internal/catalog/test/integration/repository -tags=integration -run Vi
 - 重复 `PUT /like` 不重复增加 count。
 - `DELETE /like` 返回 `has_liked=false`，`like_count - 1`。
 - 重复 `DELETE /like` 不重复减少 count。
+- 旧 `occurred_at` 的 `DELETE /like` 不覆盖较新的 liked 状态，且不减少 count。
+- 旧 `occurred_at` 的 `DELETE /favorite` 不覆盖较新的 favorited 状态，且不减少 count。
 - favorite set / unset / idempotency 同样覆盖。
 - like response 不包含 favorite 字段。
 - favorite response 不包含 like 字段。

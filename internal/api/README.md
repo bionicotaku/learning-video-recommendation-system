@@ -124,11 +124,13 @@ and `status in ('new','learning','reviewing')`. Missing active profile is a
 successful empty response.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
-`PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset
-endpoints. The handler reads `video_id` from the path, validates the trusted
-principal, and calls Catalog. Like responses return only `video_id`,
-`has_liked`, and `like_count`; favorite responses return only `video_id`,
-`has_favorited`, and `favorite_count`.
+`PUT/DELETE /api/videos/{video_id}/favorite` are idempotent set/unset endpoints
+with a required JSON body containing `occurred_at`. The handler reads `video_id`
+from the path, validates the trusted principal, parses the client action time,
+and calls Catalog. Catalog uses per-field state watermarks so stale requests do
+not roll back the current like/favorite state or counts. Like responses return
+only `video_id`, `has_liked`, and `like_count`; favorite responses return only
+`video_id`, `has_favorited`, and `favorite_count`.
 
 `GET /api/videos/{video_id}` initializes action rail display with both global
 counts and current user state. Video Favorites / Video History list endpoints

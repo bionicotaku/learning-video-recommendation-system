@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"learning-video-recommendation-system/internal/catalog/application/dto"
 	apprepo "learning-video-recommendation-system/internal/catalog/application/repository"
@@ -16,7 +17,7 @@ func TestVideoInteractionUsecasesValidateRequiredInput(t *testing.T) {
 		writer := &fakeVideoInteractionWriter{}
 		usecase := service.NewSetVideoLikeUsecase(writer)
 
-		_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{VideoID: videoID, Enabled: true})
+		_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{VideoID: videoID, Enabled: true, OccurredAt: occurredAt})
 		if err == nil || !service.IsValidationError(err) {
 			t.Fatalf("expected validation error, got %T %v", err, err)
 		}
@@ -29,7 +30,7 @@ func TestVideoInteractionUsecasesValidateRequiredInput(t *testing.T) {
 		writer := &fakeVideoInteractionWriter{}
 		usecase := service.NewSetVideoFavoriteUsecase(writer)
 
-		_, err := usecase.Execute(context.Background(), dto.SetVideoFavoriteRequest{UserID: userID, Enabled: true})
+		_, err := usecase.Execute(context.Background(), dto.SetVideoFavoriteRequest{UserID: userID, Enabled: true, OccurredAt: occurredAt})
 		if err == nil || !service.IsValidationError(err) {
 			t.Fatalf("expected validation error, got %T %v", err, err)
 		}
@@ -50,14 +51,15 @@ func TestSetVideoLikeUsecaseMapsCommandAndResponse(t *testing.T) {
 	usecase := service.NewSetVideoLikeUsecase(writer)
 
 	response, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{
-		UserID:  userID,
-		VideoID: videoID,
-		Enabled: true,
+		UserID:     userID,
+		VideoID:    videoID,
+		Enabled:    true,
+		OccurredAt: occurredAt,
 	})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if !writer.likeCalled || writer.likeCommand.UserID != userID || writer.likeCommand.VideoID != videoID || !writer.likeCommand.Enabled {
+	if !writer.likeCalled || writer.likeCommand.UserID != userID || writer.likeCommand.VideoID != videoID || !writer.likeCommand.Enabled || !writer.likeCommand.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("unexpected writer command: %+v", writer.likeCommand)
 	}
 	if response.VideoID != videoID || !response.HasLiked || response.LikeCount != 86 {
@@ -76,14 +78,15 @@ func TestSetVideoFavoriteUsecaseMapsCommandAndResponse(t *testing.T) {
 	usecase := service.NewSetVideoFavoriteUsecase(writer)
 
 	response, err := usecase.Execute(context.Background(), dto.SetVideoFavoriteRequest{
-		UserID:  userID,
-		VideoID: videoID,
-		Enabled: false,
+		UserID:     userID,
+		VideoID:    videoID,
+		Enabled:    false,
+		OccurredAt: occurredAt,
 	})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if !writer.favoriteCalled || writer.favoriteCommand.UserID != userID || writer.favoriteCommand.VideoID != videoID || writer.favoriteCommand.Enabled {
+	if !writer.favoriteCalled || writer.favoriteCommand.UserID != userID || writer.favoriteCommand.VideoID != videoID || writer.favoriteCommand.Enabled || !writer.favoriteCommand.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("unexpected writer command: %+v", writer.favoriteCommand)
 	}
 	if response.VideoID != videoID || response.HasFavorited || response.FavoriteCount != 17 {
@@ -95,7 +98,7 @@ func TestVideoInteractionUsecasesMapRepositoryNotFound(t *testing.T) {
 	t.Run("like", func(t *testing.T) {
 		usecase := service.NewSetVideoLikeUsecase(&fakeVideoInteractionWriter{err: apprepo.ErrVideoNotFound})
 
-		_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{UserID: userID, VideoID: videoID, Enabled: true})
+		_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{UserID: userID, VideoID: videoID, Enabled: true, OccurredAt: occurredAt})
 		if err == nil || !service.IsNotFoundError(err) {
 			t.Fatalf("expected not found error, got %T %v", err, err)
 		}
@@ -104,7 +107,7 @@ func TestVideoInteractionUsecasesMapRepositoryNotFound(t *testing.T) {
 	t.Run("favorite", func(t *testing.T) {
 		usecase := service.NewSetVideoFavoriteUsecase(&fakeVideoInteractionWriter{err: apprepo.ErrVideoNotFound})
 
-		_, err := usecase.Execute(context.Background(), dto.SetVideoFavoriteRequest{UserID: userID, VideoID: videoID, Enabled: true})
+		_, err := usecase.Execute(context.Background(), dto.SetVideoFavoriteRequest{UserID: userID, VideoID: videoID, Enabled: true, OccurredAt: occurredAt})
 		if err == nil || !service.IsNotFoundError(err) {
 			t.Fatalf("expected not found error, got %T %v", err, err)
 		}
@@ -114,7 +117,7 @@ func TestVideoInteractionUsecasesMapRepositoryNotFound(t *testing.T) {
 func TestVideoInteractionUsecasesPropagateUnexpectedErrors(t *testing.T) {
 	usecase := service.NewSetVideoLikeUsecase(&fakeVideoInteractionWriter{err: errors.New("db down")})
 
-	_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{UserID: userID, VideoID: videoID, Enabled: true})
+	_, err := usecase.Execute(context.Background(), dto.SetVideoLikeRequest{UserID: userID, VideoID: videoID, Enabled: true, OccurredAt: occurredAt})
 	if err == nil || service.IsNotFoundError(err) || service.IsValidationError(err) {
 		t.Fatalf("expected raw unexpected error, got %T %v", err, err)
 	}
@@ -146,3 +149,5 @@ const (
 	userID  = "11111111-1111-1111-1111-111111111111"
 	videoID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 )
+
+var occurredAt = time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)

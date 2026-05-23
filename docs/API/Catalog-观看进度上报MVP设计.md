@@ -128,6 +128,8 @@ on analytics.video_watch_events (video_id, updated_at desc);
 | `has_watched` | 用户是否至少观看过该视频。 | 第一次成功上报时置为 `true`。 |
 | `liked_at` | 最近点赞时间。 | 观看进度 API 不修改。 |
 | `bookmarked_at` | 最近收藏时间。 | 观看进度 API 不修改。 |
+| `like_state_updated_at` | 点赞状态水位。 | 观看进度 API 不修改。 |
+| `favorite_state_updated_at` | 收藏状态水位。 | 观看进度 API 不修改。 |
 | `first_watched_at` | 用户第一次观看该视频的时间。 | 为空时写入新 session 的 `started_at`。 |
 | `last_watched_at` | 用户最近观看该视频的时间。 | 每次成功上报后更新为最新 `last_seen_at`。 |
 | `watch_count` | 观看 session 数。 | 每个新 `watch_session_id` 只加 1。 |

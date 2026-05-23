@@ -1,37 +1,80 @@
 -- name: SetVideoLiked :one
-with target_video as (
-  select video_id
-  from catalog.videos
-  where video_id = sqlc.arg(video_id)::uuid
-    and status = 'active'
-    and visibility_status = 'public'
-    and (publish_at is null or publish_at <= now())
+with input as (
+  select
+    sqlc.arg(user_id)::uuid as user_id,
+    sqlc.arg(video_id)::uuid as video_id,
+    sqlc.arg(occurred_at)::timestamptz as occurred_at
 ),
-changed_state as (
+target_video as (
+  select videos.video_id
+  from catalog.videos
+  join input on input.video_id = videos.video_id
+  where videos.status = 'active'
+    and videos.visibility_status = 'public'
+    and (videos.publish_at is null or videos.publish_at <= now())
+),
+inserted_state as (
   insert into catalog.video_user_states (
     user_id,
     video_id,
     has_liked,
     liked_at,
+    like_state_updated_at,
     updated_at
   )
   select
-    sqlc.arg(user_id)::uuid,
+    input.user_id,
     target_video.video_id,
     true,
-    now(),
+    input.occurred_at,
+    input.occurred_at,
     now()
-  from target_video
-  on conflict (user_id, video_id) do update set
-    has_liked = true,
-    liked_at = now(),
-    updated_at = now()
-  where catalog.video_user_states.has_liked = false
+  from input
+  join target_video on true
+  on conflict (user_id, video_id) do nothing
   returning video_id
 ),
+previous_state as (
+  select
+    state.video_id,
+    state.has_liked,
+    state.like_state_updated_at
+  from catalog.video_user_states state
+  join input
+    on input.user_id = state.user_id
+   and input.video_id = state.video_id
+  join target_video on target_video.video_id = state.video_id
+  where not exists (select 1 from inserted_state)
+  for update of state
+),
+accepted_update as (
+  update catalog.video_user_states state
+  set
+    has_liked = true,
+    liked_at = input.occurred_at,
+    like_state_updated_at = input.occurred_at,
+    updated_at = now()
+  from input
+  join previous_state previous on previous.video_id = input.video_id
+  where state.user_id = input.user_id
+    and state.video_id = input.video_id
+    and coalesce(previous.like_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+  returning state.video_id
+),
 delta as (
-  select count(*)::bigint as value
-  from changed_state
+  select (
+    (select count(*) from inserted_state)
+    + coalesce((
+      select case
+        when previous.has_liked = false
+         and coalesce(previous.like_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+        then 1
+        else 0
+      end
+      from previous_state previous
+      cross join input
+    ), 0)
+  )::bigint as value
 ),
 upsert_stats as (
   insert into catalog.video_engagement_stats (
@@ -52,39 +95,78 @@ upsert_stats as (
       else catalog.video_engagement_stats.updated_at
     end
   returning video_id, like_count
+),
+final_state as (
+  select
+    target_video.video_id,
+    case
+      when exists (select 1 from inserted_state) then true
+      when exists (select 1 from accepted_update) then true
+      else coalesce((select previous.has_liked from previous_state previous), false)
+    end as has_liked
+  from target_video
 )
 select
   target_video.video_id,
-  true::boolean as has_liked,
+  coalesce(final_state.has_liked, false)::boolean as has_liked,
   coalesce(upsert_stats.like_count, stats.like_count, 0)::bigint as like_count
 from target_video
+left join final_state on final_state.video_id = target_video.video_id
 left join upsert_stats on upsert_stats.video_id = target_video.video_id
 left join catalog.video_engagement_stats stats on stats.video_id = target_video.video_id;
 
 -- name: SetVideoUnliked :one
-with target_video as (
-  select video_id
-  from catalog.videos
-  where video_id = sqlc.arg(video_id)::uuid
-    and status = 'active'
-    and visibility_status = 'public'
-    and (publish_at is null or publish_at <= now())
+with input as (
+  select
+    sqlc.arg(user_id)::uuid as user_id,
+    sqlc.arg(video_id)::uuid as video_id,
+    sqlc.arg(occurred_at)::timestamptz as occurred_at
 ),
-changed_state as (
+target_video as (
+  select videos.video_id
+  from catalog.videos
+  join input on input.video_id = videos.video_id
+  where videos.status = 'active'
+    and videos.visibility_status = 'public'
+    and (videos.publish_at is null or videos.publish_at <= now())
+),
+previous_state as (
+  select
+    state.video_id,
+    state.has_liked,
+    state.like_state_updated_at
+  from catalog.video_user_states state
+  join input
+    on input.user_id = state.user_id
+   and input.video_id = state.video_id
+  join target_video on target_video.video_id = state.video_id
+  for update of state
+),
+accepted_update as (
   update catalog.video_user_states state
   set
     has_liked = false,
     liked_at = null,
+    like_state_updated_at = input.occurred_at,
     updated_at = now()
-  from target_video
-  where state.user_id = sqlc.arg(user_id)::uuid
-    and state.video_id = target_video.video_id
-    and state.has_liked = true
+  from input
+  join previous_state previous on previous.video_id = input.video_id
+  where state.user_id = input.user_id
+    and state.video_id = input.video_id
+    and coalesce(previous.like_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
   returning state.video_id
 ),
 delta as (
-  select count(*)::bigint as value
-  from changed_state
+  select coalesce((
+    select case
+      when previous.has_liked = true
+       and coalesce(previous.like_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+      then 1
+      else 0
+    end
+    from previous_state previous
+    cross join input
+  ), 0)::bigint as value
 ),
 upsert_stats as (
   insert into catalog.video_engagement_stats (
@@ -104,49 +186,102 @@ upsert_stats as (
       else catalog.video_engagement_stats.updated_at
     end
   returning video_id, like_count
+),
+final_state as (
+  select
+    target_video.video_id,
+    case
+      when exists (select 1 from accepted_update) then false
+      else coalesce((select previous.has_liked from previous_state previous), false)
+    end as has_liked
+  from target_video
 )
 select
   target_video.video_id,
-  false::boolean as has_liked,
+  coalesce(final_state.has_liked, false)::boolean as has_liked,
   coalesce(upsert_stats.like_count, stats.like_count, 0)::bigint as like_count
 from target_video
+left join final_state on final_state.video_id = target_video.video_id
 left join upsert_stats on upsert_stats.video_id = target_video.video_id
 left join catalog.video_engagement_stats stats on stats.video_id = target_video.video_id;
 
 -- name: SetVideoFavorited :one
-with target_video as (
-  select video_id
-  from catalog.videos
-  where video_id = sqlc.arg(video_id)::uuid
-    and status = 'active'
-    and visibility_status = 'public'
-    and (publish_at is null or publish_at <= now())
+with input as (
+  select
+    sqlc.arg(user_id)::uuid as user_id,
+    sqlc.arg(video_id)::uuid as video_id,
+    sqlc.arg(occurred_at)::timestamptz as occurred_at
 ),
-changed_state as (
+target_video as (
+  select videos.video_id
+  from catalog.videos
+  join input on input.video_id = videos.video_id
+  where videos.status = 'active'
+    and videos.visibility_status = 'public'
+    and (videos.publish_at is null or videos.publish_at <= now())
+),
+inserted_state as (
   insert into catalog.video_user_states (
     user_id,
     video_id,
     has_bookmarked,
     bookmarked_at,
+    favorite_state_updated_at,
     updated_at
   )
   select
-    sqlc.arg(user_id)::uuid,
+    input.user_id,
     target_video.video_id,
     true,
-    now(),
+    input.occurred_at,
+    input.occurred_at,
     now()
-  from target_video
-  on conflict (user_id, video_id) do update set
-    has_bookmarked = true,
-    bookmarked_at = now(),
-    updated_at = now()
-  where catalog.video_user_states.has_bookmarked = false
+  from input
+  join target_video on true
+  on conflict (user_id, video_id) do nothing
   returning video_id
 ),
+previous_state as (
+  select
+    state.video_id,
+    state.has_bookmarked,
+    state.favorite_state_updated_at
+  from catalog.video_user_states state
+  join input
+    on input.user_id = state.user_id
+   and input.video_id = state.video_id
+  join target_video on target_video.video_id = state.video_id
+  where not exists (select 1 from inserted_state)
+  for update of state
+),
+accepted_update as (
+  update catalog.video_user_states state
+  set
+    has_bookmarked = true,
+    bookmarked_at = input.occurred_at,
+    favorite_state_updated_at = input.occurred_at,
+    updated_at = now()
+  from input
+  join previous_state previous on previous.video_id = input.video_id
+  where state.user_id = input.user_id
+    and state.video_id = input.video_id
+    and coalesce(previous.favorite_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+  returning state.video_id
+),
 delta as (
-  select count(*)::bigint as value
-  from changed_state
+  select (
+    (select count(*) from inserted_state)
+    + coalesce((
+      select case
+        when previous.has_bookmarked = false
+         and coalesce(previous.favorite_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+        then 1
+        else 0
+      end
+      from previous_state previous
+      cross join input
+    ), 0)
+  )::bigint as value
 ),
 upsert_stats as (
   insert into catalog.video_engagement_stats (
@@ -167,39 +302,78 @@ upsert_stats as (
       else catalog.video_engagement_stats.updated_at
     end
   returning video_id, favorite_count
+),
+final_state as (
+  select
+    target_video.video_id,
+    case
+      when exists (select 1 from inserted_state) then true
+      when exists (select 1 from accepted_update) then true
+      else coalesce((select previous.has_bookmarked from previous_state previous), false)
+    end as has_bookmarked
+  from target_video
 )
 select
   target_video.video_id,
-  true::boolean as has_favorited,
+  coalesce(final_state.has_bookmarked, false)::boolean as has_favorited,
   coalesce(upsert_stats.favorite_count, stats.favorite_count, 0)::bigint as favorite_count
 from target_video
+left join final_state on final_state.video_id = target_video.video_id
 left join upsert_stats on upsert_stats.video_id = target_video.video_id
 left join catalog.video_engagement_stats stats on stats.video_id = target_video.video_id;
 
 -- name: SetVideoUnfavorited :one
-with target_video as (
-  select video_id
-  from catalog.videos
-  where video_id = sqlc.arg(video_id)::uuid
-    and status = 'active'
-    and visibility_status = 'public'
-    and (publish_at is null or publish_at <= now())
+with input as (
+  select
+    sqlc.arg(user_id)::uuid as user_id,
+    sqlc.arg(video_id)::uuid as video_id,
+    sqlc.arg(occurred_at)::timestamptz as occurred_at
 ),
-changed_state as (
+target_video as (
+  select videos.video_id
+  from catalog.videos
+  join input on input.video_id = videos.video_id
+  where videos.status = 'active'
+    and videos.visibility_status = 'public'
+    and (videos.publish_at is null or videos.publish_at <= now())
+),
+previous_state as (
+  select
+    state.video_id,
+    state.has_bookmarked,
+    state.favorite_state_updated_at
+  from catalog.video_user_states state
+  join input
+    on input.user_id = state.user_id
+   and input.video_id = state.video_id
+  join target_video on target_video.video_id = state.video_id
+  for update of state
+),
+accepted_update as (
   update catalog.video_user_states state
   set
     has_bookmarked = false,
     bookmarked_at = null,
+    favorite_state_updated_at = input.occurred_at,
     updated_at = now()
-  from target_video
-  where state.user_id = sqlc.arg(user_id)::uuid
-    and state.video_id = target_video.video_id
-    and state.has_bookmarked = true
+  from input
+  join previous_state previous on previous.video_id = input.video_id
+  where state.user_id = input.user_id
+    and state.video_id = input.video_id
+    and coalesce(previous.favorite_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
   returning state.video_id
 ),
 delta as (
-  select count(*)::bigint as value
-  from changed_state
+  select coalesce((
+    select case
+      when previous.has_bookmarked = true
+       and coalesce(previous.favorite_state_updated_at, '-infinity'::timestamptz) <= input.occurred_at
+      then 1
+      else 0
+    end
+    from previous_state previous
+    cross join input
+  ), 0)::bigint as value
 ),
 upsert_stats as (
   insert into catalog.video_engagement_stats (
@@ -219,11 +393,21 @@ upsert_stats as (
       else catalog.video_engagement_stats.updated_at
     end
   returning video_id, favorite_count
+),
+final_state as (
+  select
+    target_video.video_id,
+    case
+      when exists (select 1 from accepted_update) then false
+      else coalesce((select previous.has_bookmarked from previous_state previous), false)
+    end as has_bookmarked
+  from target_video
 )
 select
   target_video.video_id,
-  false::boolean as has_favorited,
+  coalesce(final_state.has_bookmarked, false)::boolean as has_favorited,
   coalesce(upsert_stats.favorite_count, stats.favorite_count, 0)::bigint as favorite_count
 from target_video
+left join final_state on final_state.video_id = target_video.video_id
 left join upsert_stats on upsert_stats.video_id = target_video.video_id
 left join catalog.video_engagement_stats stats on stats.video_id = target_video.video_id;

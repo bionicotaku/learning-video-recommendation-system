@@ -26,11 +26,17 @@ func (h *Handler) handleVideoFavorite(w http.ResponseWriter, r *http.Request, en
 		writeHandlerError(w, r, err)
 		return
 	}
+	occurredAt, err := parseInteractionOccurredAt(r)
+	if err != nil {
+		writeHandlerError(w, r, err)
+		return
+	}
 
 	result, err := h.setFavorite.Execute(r.Context(), catalogdto.SetVideoFavoriteRequest{
-		UserID:  principal.UserID,
-		VideoID: videoID,
-		Enabled: enabled,
+		UserID:     principal.UserID,
+		VideoID:    videoID,
+		Enabled:    enabled,
+		OccurredAt: occurredAt,
 	})
 	if err != nil {
 		writeHandlerError(w, r, err)

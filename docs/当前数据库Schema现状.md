@@ -59,7 +59,7 @@
 
 当前新增的 `catalog.video_engagement_stats` 已存在。只读核对显示该表字段为：`video_id`、`view_count`、`like_count`、`favorite_count`、`completed_count`、`total_watch_ms`、`updated_at`。
 
-当前 `catalog.video_user_states` 已删除 `last_watch_ratio`、`max_watch_ratio`，并新增 `last_position_ms`、`max_position_ms`、`total_watch_ms`。
+当前 `catalog.video_user_states` 已删除 `last_watch_ratio`、`max_watch_ratio`，并新增 `last_position_ms`、`max_position_ms`、`total_watch_ms`、`like_state_updated_at`、`favorite_state_updated_at`。其中 `like_state_updated_at` / `favorite_state_updated_at` 是 Video Interactions API 的状态水位，用于丢弃旧时间的点赞/收藏 set-unset 请求。
 
 ## 3. Analytics Migration 状态
 

@@ -1,9 +1,12 @@
 package model
 
+import "time"
+
 type VideoLikeCommand struct {
-	UserID  string
-	VideoID string
-	Enabled bool
+	UserID     string
+	VideoID    string
+	Enabled    bool
+	OccurredAt time.Time
 }
 
 type VideoLikeResult struct {
@@ -13,9 +16,10 @@ type VideoLikeResult struct {
 }
 
 type VideoFavoriteCommand struct {
-	UserID  string
-	VideoID string
-	Enabled bool
+	UserID     string
+	VideoID    string
+	Enabled    bool
+	OccurredAt time.Time
 }
 
 type VideoFavoriteResult struct {

@@ -27,11 +27,15 @@ func (u *SetVideoFavoriteUsecase) Execute(ctx context.Context, request dto.SetVi
 	if request.VideoID == "" {
 		return dto.VideoFavoriteResponse{}, validationError("video_id is required")
 	}
+	if request.OccurredAt.IsZero() {
+		return dto.VideoFavoriteResponse{}, validationError("occurred_at is required")
+	}
 
 	result, err := u.writer.SetVideoFavorite(ctx, model.VideoFavoriteCommand{
-		UserID:  request.UserID,
-		VideoID: request.VideoID,
-		Enabled: request.Enabled,
+		UserID:     request.UserID,
+		VideoID:    request.VideoID,
+		Enabled:    request.Enabled,
+		OccurredAt: request.OccurredAt.UTC(),
 	})
 	if err != nil {
 		if errors.Is(err, apprepo.ErrVideoNotFound) {

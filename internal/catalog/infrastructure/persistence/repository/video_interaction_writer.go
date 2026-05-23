@@ -44,9 +44,17 @@ func (w *VideoInteractionWriter) SetVideoLike(ctx context.Context, command model
 	queries := catalogsqlc.New(tx)
 	var row catalogsqlc.SetVideoLikedRow
 	if command.Enabled {
-		row, err = queries.SetVideoLiked(ctx, catalogsqlc.SetVideoLikedParams{UserID: userID, VideoID: videoID})
+		row, err = queries.SetVideoLiked(ctx, catalogsqlc.SetVideoLikedParams{
+			UserID:     userID,
+			VideoID:    videoID,
+			OccurredAt: mapper.TimePointerToPG(&command.OccurredAt),
+		})
 	} else {
-		unliked, queryErr := queries.SetVideoUnliked(ctx, catalogsqlc.SetVideoUnlikedParams{UserID: userID, VideoID: videoID})
+		unliked, queryErr := queries.SetVideoUnliked(ctx, catalogsqlc.SetVideoUnlikedParams{
+			UserID:     userID,
+			VideoID:    videoID,
+			OccurredAt: mapper.TimePointerToPG(&command.OccurredAt),
+		})
 		err = queryErr
 		row = catalogsqlc.SetVideoLikedRow{
 			VideoID:   unliked.VideoID,
@@ -92,9 +100,17 @@ func (w *VideoInteractionWriter) SetVideoFavorite(ctx context.Context, command m
 	queries := catalogsqlc.New(tx)
 	var row catalogsqlc.SetVideoFavoritedRow
 	if command.Enabled {
-		row, err = queries.SetVideoFavorited(ctx, catalogsqlc.SetVideoFavoritedParams{UserID: userID, VideoID: videoID})
+		row, err = queries.SetVideoFavorited(ctx, catalogsqlc.SetVideoFavoritedParams{
+			UserID:     userID,
+			VideoID:    videoID,
+			OccurredAt: mapper.TimePointerToPG(&command.OccurredAt),
+		})
 	} else {
-		unfavorited, queryErr := queries.SetVideoUnfavorited(ctx, catalogsqlc.SetVideoUnfavoritedParams{UserID: userID, VideoID: videoID})
+		unfavorited, queryErr := queries.SetVideoUnfavorited(ctx, catalogsqlc.SetVideoUnfavoritedParams{
+			UserID:     userID,
+			VideoID:    videoID,
+			OccurredAt: mapper.TimePointerToPG(&command.OccurredAt),
+		})
 		err = queryErr
 		row = catalogsqlc.SetVideoFavoritedRow{
 			VideoID:       unfavorited.VideoID,

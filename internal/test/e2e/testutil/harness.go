@@ -816,6 +816,8 @@ create table if not exists catalog.video_user_states (
   has_watched boolean not null default false,
   liked_at timestamptz,
   bookmarked_at timestamptz,
+  like_state_updated_at timestamptz,
+  favorite_state_updated_at timestamptz,
   first_watched_at timestamptz,
   last_watched_at timestamptz,
   watch_count integer not null default 0,

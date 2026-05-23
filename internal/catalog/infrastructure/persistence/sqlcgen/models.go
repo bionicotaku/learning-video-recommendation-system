@@ -161,21 +161,23 @@ type CatalogVideoUnitIndex struct {
 }
 
 type CatalogVideoUserState struct {
-	UserID         pgtype.UUID        `json:"user_id"`
-	VideoID        pgtype.UUID        `json:"video_id"`
-	HasLiked       bool               `json:"has_liked"`
-	HasBookmarked  bool               `json:"has_bookmarked"`
-	HasWatched     bool               `json:"has_watched"`
-	LikedAt        pgtype.Timestamptz `json:"liked_at"`
-	BookmarkedAt   pgtype.Timestamptz `json:"bookmarked_at"`
-	FirstWatchedAt pgtype.Timestamptz `json:"first_watched_at"`
-	LastWatchedAt  pgtype.Timestamptz `json:"last_watched_at"`
-	WatchCount     int32              `json:"watch_count"`
-	CompletedCount int32              `json:"completed_count"`
-	LastPositionMs int32              `json:"last_position_ms"`
-	MaxPositionMs  int32              `json:"max_position_ms"`
-	TotalWatchMs   int64              `json:"total_watch_ms"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	UserID                 pgtype.UUID        `json:"user_id"`
+	VideoID                pgtype.UUID        `json:"video_id"`
+	HasLiked               bool               `json:"has_liked"`
+	HasBookmarked          bool               `json:"has_bookmarked"`
+	HasWatched             bool               `json:"has_watched"`
+	LikedAt                pgtype.Timestamptz `json:"liked_at"`
+	BookmarkedAt           pgtype.Timestamptz `json:"bookmarked_at"`
+	LikeStateUpdatedAt     pgtype.Timestamptz `json:"like_state_updated_at"`
+	FavoriteStateUpdatedAt pgtype.Timestamptz `json:"favorite_state_updated_at"`
+	FirstWatchedAt         pgtype.Timestamptz `json:"first_watched_at"`
+	LastWatchedAt          pgtype.Timestamptz `json:"last_watched_at"`
+	WatchCount             int32              `json:"watch_count"`
+	CompletedCount         int32              `json:"completed_count"`
+	LastPositionMs         int32              `json:"last_position_ms"`
+	MaxPositionMs          int32              `json:"max_position_ms"`
+	TotalWatchMs           int64              `json:"total_watch_ms"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SemanticCoarseUnit struct {

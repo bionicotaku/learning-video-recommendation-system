@@ -154,7 +154,7 @@ func TestE2E_VideoInteractionsHTTPUpdatesCatalogStateAndCounts(t *testing.T) {
 	server := h.APIServer(t, userID)
 	t.Cleanup(server.Close)
 
-	like := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", "")
+	like := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", interactionBody("2026-05-23T12:00:00Z"))
 	requireStatus(t, like, http.StatusOK)
 	var likeBody struct {
 		HasLiked bool  `json:"has_liked"`
@@ -165,7 +165,7 @@ func TestE2E_VideoInteractionsHTTPUpdatesCatalogStateAndCounts(t *testing.T) {
 		t.Fatalf("like body = %+v, want liked count=1", likeBody)
 	}
 
-	favorite := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", "")
+	favorite := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", interactionBody("2026-05-23T12:01:00Z"))
 	requireStatus(t, favorite, http.StatusOK)
 	var favoriteBody struct {
 		HasFavorited bool  `json:"has_favorited"`
@@ -176,7 +176,7 @@ func TestE2E_VideoInteractionsHTTPUpdatesCatalogStateAndCounts(t *testing.T) {
 		t.Fatalf("favorite body = %+v, want favorited count=1", favoriteBody)
 	}
 
-	unlike := requestHTTP(t, server, http.MethodDelete, "/api/videos/"+videoID+"/like", "")
+	unlike := requestHTTP(t, server, http.MethodDelete, "/api/videos/"+videoID+"/like", interactionBody("2026-05-23T12:02:00Z"))
 	requireStatus(t, unlike, http.StatusOK)
 	decodeResponse(t, unlike, &likeBody)
 	if likeBody.HasLiked || likeBody.Count != 0 {
@@ -204,7 +204,7 @@ func TestE2E_VideoFavoritesHTTPListsCurrentFavorites(t *testing.T) {
 	server := h.APIServer(t, userID)
 	t.Cleanup(server.Close)
 
-	favorite := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", "")
+	favorite := requestHTTP(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", interactionBody("2026-05-23T12:03:00Z"))
 	requireStatus(t, favorite, http.StatusOK)
 	decodeResponse(t, favorite, &struct {
 		HasFavorited bool `json:"has_favorited"`
@@ -227,7 +227,7 @@ func TestE2E_VideoFavoritesHTTPListsCurrentFavorites(t *testing.T) {
 		t.Fatalf("favorites body = %+v, want current favorite video", listBody)
 	}
 
-	unfavorite := requestHTTP(t, server, http.MethodDelete, "/api/videos/"+videoID+"/favorite", "")
+	unfavorite := requestHTTP(t, server, http.MethodDelete, "/api/videos/"+videoID+"/favorite", interactionBody("2026-05-23T12:04:00Z"))
 	requireStatus(t, unfavorite, http.StatusOK)
 	decodeResponse(t, unfavorite, &struct {
 		HasFavorited bool `json:"has_favorited"`
@@ -424,6 +424,10 @@ func requestHTTP(t *testing.T, server *httptest.Server, method string, path stri
 		t.Fatalf("request http: %v", err)
 	}
 	return response
+}
+
+func interactionBody(occurredAt string) string {
+	return `{"occurred_at":"` + occurredAt + `"}`
 }
 
 func devBearerToken(userID string) string {

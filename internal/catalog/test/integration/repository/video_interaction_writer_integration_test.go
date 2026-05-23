@@ -110,6 +110,124 @@ func TestVideoInteractionWriterFavoriteIdempotency(t *testing.T) {
 	}
 }
 
+func TestVideoInteractionWriterIgnoresStaleLikeStateChanges(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoInteractionWriter(db.Pool)
+
+	newer := likeCommandAt(true, time.Date(2026, 5, 23, 12, 10, 0, 0, time.UTC))
+	if _, err := writer.SetVideoLike(context.Background(), newer); err != nil {
+		t.Fatalf("newer like: %v", err)
+	}
+
+	stale := likeCommandAt(false, time.Date(2026, 5, 23, 12, 5, 0, 0, time.UTC))
+	result, err := writer.SetVideoLike(context.Background(), stale)
+	if err != nil {
+		t.Fatalf("stale unlike: %v", err)
+	}
+	if !result.HasLiked || result.LikeCount != 1 {
+		t.Fatalf("stale unlike should return current liked state/count: %+v", result)
+	}
+
+	state := readInteractionState(t, db, userID, videoID)
+	if !state.HasLiked || state.LikedAt == nil || !state.LikedAt.Equal(newer.OccurredAt) || state.LikeStateUpdatedAt == nil || !state.LikeStateUpdatedAt.Equal(newer.OccurredAt) {
+		t.Fatalf("stale unlike changed persisted like state: %+v", state)
+	}
+	stats := readInteractionStats(t, db, videoID)
+	if stats.LikeCount != 1 {
+		t.Fatalf("stale unlike changed like count: %+v", stats)
+	}
+}
+
+func TestVideoInteractionWriterIgnoresStaleLikeSetAfterNewerUnset(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoInteractionWriter(db.Pool)
+
+	if _, err := writer.SetVideoLike(context.Background(), likeCommandAt(true, time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC))); err != nil {
+		t.Fatalf("initial like: %v", err)
+	}
+	newerUnset := likeCommandAt(false, time.Date(2026, 5, 23, 12, 10, 0, 0, time.UTC))
+	if _, err := writer.SetVideoLike(context.Background(), newerUnset); err != nil {
+		t.Fatalf("newer unlike: %v", err)
+	}
+
+	staleSet := likeCommandAt(true, time.Date(2026, 5, 23, 12, 5, 0, 0, time.UTC))
+	result, err := writer.SetVideoLike(context.Background(), staleSet)
+	if err != nil {
+		t.Fatalf("stale like: %v", err)
+	}
+	if result.HasLiked || result.LikeCount != 0 {
+		t.Fatalf("stale like should return current unliked state/count: %+v", result)
+	}
+
+	state := readInteractionState(t, db, userID, videoID)
+	if state.HasLiked || state.LikedAt != nil || state.LikeStateUpdatedAt == nil || !state.LikeStateUpdatedAt.Equal(newerUnset.OccurredAt) {
+		t.Fatalf("stale like changed persisted unliked state: %+v", state)
+	}
+}
+
+func TestVideoInteractionWriterIgnoresStaleFavoriteStateChanges(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoInteractionWriter(db.Pool)
+
+	newer := favoriteCommandAt(true, time.Date(2026, 5, 23, 12, 10, 0, 0, time.UTC))
+	if _, err := writer.SetVideoFavorite(context.Background(), newer); err != nil {
+		t.Fatalf("newer favorite: %v", err)
+	}
+
+	stale := favoriteCommandAt(false, time.Date(2026, 5, 23, 12, 5, 0, 0, time.UTC))
+	result, err := writer.SetVideoFavorite(context.Background(), stale)
+	if err != nil {
+		t.Fatalf("stale unfavorite: %v", err)
+	}
+	if !result.HasFavorited || result.FavoriteCount != 1 {
+		t.Fatalf("stale unfavorite should return current favorite state/count: %+v", result)
+	}
+
+	state := readInteractionState(t, db, userID, videoID)
+	if !state.HasBookmarked || state.BookmarkedAt == nil || !state.BookmarkedAt.Equal(newer.OccurredAt) || state.FavoriteStateUpdatedAt == nil || !state.FavoriteStateUpdatedAt.Equal(newer.OccurredAt) {
+		t.Fatalf("stale unfavorite changed persisted favorite state: %+v", state)
+	}
+	stats := readInteractionStats(t, db, videoID)
+	if stats.FavoriteCount != 1 {
+		t.Fatalf("stale unfavorite changed favorite count: %+v", stats)
+	}
+}
+
+func TestVideoInteractionWriterIgnoresStaleFavoriteSetAfterNewerUnset(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoInteractionWriter(db.Pool)
+
+	if _, err := writer.SetVideoFavorite(context.Background(), favoriteCommandAt(true, time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC))); err != nil {
+		t.Fatalf("initial favorite: %v", err)
+	}
+	newerUnset := favoriteCommandAt(false, time.Date(2026, 5, 23, 12, 10, 0, 0, time.UTC))
+	if _, err := writer.SetVideoFavorite(context.Background(), newerUnset); err != nil {
+		t.Fatalf("newer unfavorite: %v", err)
+	}
+
+	staleSet := favoriteCommandAt(true, time.Date(2026, 5, 23, 12, 5, 0, 0, time.UTC))
+	result, err := writer.SetVideoFavorite(context.Background(), staleSet)
+	if err != nil {
+		t.Fatalf("stale favorite: %v", err)
+	}
+	if result.HasFavorited || result.FavoriteCount != 0 {
+		t.Fatalf("stale favorite should return current unfavorited state/count: %+v", result)
+	}
+
+	state := readInteractionState(t, db, userID, videoID)
+	if state.HasBookmarked || state.BookmarkedAt != nil || state.FavoriteStateUpdatedAt == nil || !state.FavoriteStateUpdatedAt.Equal(newerUnset.OccurredAt) {
+		t.Fatalf("stale favorite changed persisted unfavorited state: %+v", state)
+	}
+}
+
 func TestVideoInteractionWriterDeleteDoesNotCreateUserState(t *testing.T) {
 	db := suite.CreateTestDatabase(t)
 	db.SeedUser(t, userID)
@@ -165,39 +283,53 @@ func TestVideoInteractionWriterRejectsUnavailableVideos(t *testing.T) {
 }
 
 func likeCommand(enabled bool) model.VideoLikeCommand {
+	return likeCommandAt(enabled, time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC))
+}
+
+func likeCommandAt(enabled bool, occurredAt time.Time) model.VideoLikeCommand {
 	return model.VideoLikeCommand{
-		UserID:  userID,
-		VideoID: videoID,
-		Enabled: enabled,
+		UserID:     userID,
+		VideoID:    videoID,
+		Enabled:    enabled,
+		OccurredAt: occurredAt,
 	}
 }
 
 func favoriteCommand(enabled bool) model.VideoFavoriteCommand {
+	return favoriteCommandAt(enabled, time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC))
+}
+
+func favoriteCommandAt(enabled bool, occurredAt time.Time) model.VideoFavoriteCommand {
 	return model.VideoFavoriteCommand{
-		UserID:  userID,
-		VideoID: videoID,
-		Enabled: enabled,
+		UserID:     userID,
+		VideoID:    videoID,
+		Enabled:    enabled,
+		OccurredAt: occurredAt,
 	}
 }
 
 type interactionStateRow struct {
-	HasLiked      bool
-	HasBookmarked bool
-	LikedAt       *time.Time
-	BookmarkedAt  *time.Time
+	HasLiked               bool
+	HasBookmarked          bool
+	LikedAt                *time.Time
+	BookmarkedAt           *time.Time
+	LikeStateUpdatedAt     *time.Time
+	FavoriteStateUpdatedAt *time.Time
 }
 
 func readInteractionState(t *testing.T, db *fixture.TestDatabase, userID string, videoID string) interactionStateRow {
 	t.Helper()
 	var row interactionStateRow
 	if err := db.Pool.QueryRow(context.Background(), `
-		select has_liked, has_bookmarked, liked_at, bookmarked_at
+		select has_liked, has_bookmarked, liked_at, bookmarked_at, like_state_updated_at, favorite_state_updated_at
 		from catalog.video_user_states
 		where user_id = $1 and video_id = $2`, userID, videoID).Scan(
 		&row.HasLiked,
 		&row.HasBookmarked,
 		&row.LikedAt,
 		&row.BookmarkedAt,
+		&row.LikeStateUpdatedAt,
+		&row.FavoriteStateUpdatedAt,
 	); err != nil {
 		t.Fatalf("read interaction state: %v", err)
 	}

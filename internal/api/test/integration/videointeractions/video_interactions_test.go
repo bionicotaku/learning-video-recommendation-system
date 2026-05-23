@@ -7,7 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
@@ -18,6 +20,7 @@ import (
 )
 
 func TestVideoLikeRoutesMapRequestAndReturnLikeOnly(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC)
 	like := &fakeLikeUsecase{
 		response: catalogdto.VideoLikeResponse{
 			VideoID:   videoID,
@@ -28,7 +31,7 @@ func TestVideoLikeRoutesMapRequestAndReturnLikeOnly(t *testing.T) {
 	server := newServer(like, &fakeFavoriteUsecase{})
 	t.Cleanup(server.Close)
 
-	response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", true)
+	response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", true, occurredAt)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
@@ -43,12 +46,13 @@ func TestVideoLikeRoutesMapRequestAndReturnLikeOnly(t *testing.T) {
 	if _, ok := body["favorite_count"]; ok {
 		t.Fatalf("like response must not include favorite count: %+v", body)
 	}
-	if !like.called || like.request.UserID != userID || like.request.VideoID != videoID || !like.request.Enabled {
+	if !like.called || like.request.UserID != userID || like.request.VideoID != videoID || !like.request.Enabled || !like.request.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("unexpected like request: %+v", like.request)
 	}
 }
 
 func TestVideoLikeDeleteMapsUnset(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 23, 12, 1, 0, 0, time.UTC)
 	like := &fakeLikeUsecase{
 		response: catalogdto.VideoLikeResponse{
 			VideoID:   videoID,
@@ -59,7 +63,7 @@ func TestVideoLikeDeleteMapsUnset(t *testing.T) {
 	server := newServer(like, &fakeFavoriteUsecase{})
 	t.Cleanup(server.Close)
 
-	response := requestInteraction(t, server, http.MethodDelete, "/api/videos/"+videoID+"/like", true)
+	response := requestInteraction(t, server, http.MethodDelete, "/api/videos/"+videoID+"/like", true, occurredAt)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
@@ -68,12 +72,13 @@ func TestVideoLikeDeleteMapsUnset(t *testing.T) {
 	if body.HasLiked || body.LikeCount != 85 {
 		t.Fatalf("unexpected response: %+v", body)
 	}
-	if !like.called || like.request.Enabled {
+	if !like.called || like.request.Enabled || !like.request.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("expected unset request, got %+v", like.request)
 	}
 }
 
 func TestVideoFavoriteRoutesMapRequestAndReturnFavoriteOnly(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 23, 12, 2, 0, 0, time.UTC)
 	favorite := &fakeFavoriteUsecase{
 		response: catalogdto.VideoFavoriteResponse{
 			VideoID:       videoID,
@@ -84,7 +89,7 @@ func TestVideoFavoriteRoutesMapRequestAndReturnFavoriteOnly(t *testing.T) {
 	server := newServer(&fakeLikeUsecase{}, favorite)
 	t.Cleanup(server.Close)
 
-	response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", true)
+	response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/favorite", true, occurredAt)
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
 	}
@@ -99,8 +104,31 @@ func TestVideoFavoriteRoutesMapRequestAndReturnFavoriteOnly(t *testing.T) {
 	if _, ok := body["like_count"]; ok {
 		t.Fatalf("favorite response must not include like count: %+v", body)
 	}
-	if !favorite.called || favorite.request.UserID != userID || favorite.request.VideoID != videoID || !favorite.request.Enabled {
+	if !favorite.called || favorite.request.UserID != userID || favorite.request.VideoID != videoID || !favorite.request.Enabled || !favorite.request.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("unexpected favorite request: %+v", favorite.request)
+	}
+}
+
+func TestVideoInteractionsRequireOccurredAtBody(t *testing.T) {
+	like := &fakeLikeUsecase{}
+	server := newServer(like, &fakeFavoriteUsecase{})
+	t.Cleanup(server.Close)
+
+	request, err := http.NewRequest(http.MethodPut, server.URL+"/api/videos/"+videoID+"/like", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEifQ")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if like.called {
+		t.Fatal("like service should not be called")
 	}
 }
 
@@ -110,7 +138,7 @@ func TestVideoInteractionsRejectInvalidVideoIDAndMissingPrincipal(t *testing.T) 
 		server := newServer(like, &fakeFavoriteUsecase{})
 		t.Cleanup(server.Close)
 
-		response := requestInteraction(t, server, http.MethodPut, "/api/videos/not-a-uuid/like", true)
+		response := requestInteraction(t, server, http.MethodPut, "/api/videos/not-a-uuid/like", true, time.Date(2026, 5, 23, 12, 3, 0, 0, time.UTC))
 		if response.StatusCode != http.StatusBadRequest {
 			t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
 		}
@@ -124,7 +152,7 @@ func TestVideoInteractionsRejectInvalidVideoIDAndMissingPrincipal(t *testing.T) 
 		server := newServer(like, &fakeFavoriteUsecase{})
 		t.Cleanup(server.Close)
 
-		response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", false)
+		response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", false, time.Date(2026, 5, 23, 12, 4, 0, 0, time.UTC))
 		if response.StatusCode != http.StatusUnauthorized {
 			t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
 		}
@@ -151,7 +179,7 @@ func TestVideoInteractionsMapCatalogErrors(t *testing.T) {
 			server := newServer(&fakeLikeUsecase{err: tt.err}, &fakeFavoriteUsecase{})
 			t.Cleanup(server.Close)
 
-			response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", true)
+			response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", true, time.Date(2026, 5, 23, 12, 5, 0, 0, time.UTC))
 			if response.StatusCode != tt.status {
 				t.Fatalf("expected %d, got %d: %s", tt.status, response.StatusCode, readBody(t, response))
 			}
@@ -176,12 +204,14 @@ func newServer(like *fakeLikeUsecase, favorite *fakeFavoriteUsecase) *httptest.S
 	return httptest.NewServer(handler)
 }
 
-func requestInteraction(t *testing.T, server *httptest.Server, method string, path string, withPrincipal bool) *http.Response {
+func requestInteraction(t *testing.T, server *httptest.Server, method string, path string, withPrincipal bool, occurredAt time.Time) *http.Response {
 	t.Helper()
-	request, err := http.NewRequest(method, server.URL+path, nil)
+	body := strings.NewReader(`{"occurred_at":"` + occurredAt.Format(time.RFC3339Nano) + `"}`)
+	request, err := http.NewRequest(method, server.URL+path, body)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
+	request.Header.Set("Content-Type", "application/json")
 	if withPrincipal {
 		request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiIxMTExMTExMS0xMTExLTExMTEtMTExMS0xMTExMTExMTExMTEifQ")
 	}

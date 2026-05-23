@@ -49,10 +49,10 @@
 | `GET` | `/api/unit-collections` | Unit Collections / 词书列表 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
 | `GET` | `/api/learning-targets/active-coarse-unit-ids` | Active Learning Targets / 学习目标读取 | Learning Engine reducer read model | 读取当前用户 `is_target=true AND status in ('new','learning','reviewing')` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | `PUT` | `/api/learning-targets/active-collection` | Learning Targets / 学习目标写入 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
-| `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
-| `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户点赞，并返回点赞状态和 `like_count`。 |
-| `PUT` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已收藏，并返回收藏状态和 `favorite_count`。 |
-| `DELETE` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户收藏，并返回收藏状态和 `favorite_count`。 |
+| `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 携带 `occurred_at` 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
+| `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 携带 `occurred_at` 幂等取消当前用户点赞；旧时间请求 no-op 返回当前状态。 |
+| `PUT` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 携带 `occurred_at` 幂等设置当前用户已收藏，并返回收藏状态和 `favorite_count`。 |
+| `DELETE` | `/api/videos/{video_id}/favorite` | Video Interactions / 视频互动 | Catalog | 携带 `occurred_at` 幂等取消当前用户收藏；旧时间请求 no-op 返回当前状态。 |
 | `POST` | `/api/video-watch-progress` | Watch Progress / 观看进度 | Catalog，User stats projection | 同事务维护 watch session ledger、Catalog 视频消费投影和 User watch stats；返回 accepted。 |
 | `POST` | `/api/learning-interactions:batch` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User daily stats | 写入 exposure / lookup raw facts；HTTP success 只承诺 raw accepted，normalization 是同步 best-effort。 |
 | `POST` | `/api/quiz-attempts` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User stats projection | 写入 quiz attempt raw fact；duplicate 不重复增加 stats；HTTP success 只承诺 raw accepted。 |
@@ -113,10 +113,10 @@
 
 | Method | Path | 说明 |
 |---|---|---|
-| `PUT` | `/api/videos/{video_id}/like` | 当前用户点赞视频；幂等 set。 |
-| `DELETE` | `/api/videos/{video_id}/like` | 当前用户取消点赞视频；幂等 unset。 |
-| `PUT` | `/api/videos/{video_id}/favorite` | 当前用户收藏视频；幂等 set。 |
-| `DELETE` | `/api/videos/{video_id}/favorite` | 当前用户取消收藏视频；幂等 unset。 |
+| `PUT` | `/api/videos/{video_id}/like` | 当前用户点赞视频；JSON body 必须包含 `occurred_at`；幂等 set。 |
+| `DELETE` | `/api/videos/{video_id}/like` | 当前用户取消点赞视频；JSON body 必须包含 `occurred_at`；幂等 unset。 |
+| `PUT` | `/api/videos/{video_id}/favorite` | 当前用户收藏视频；JSON body 必须包含 `occurred_at`；幂等 set。 |
+| `DELETE` | `/api/videos/{video_id}/favorite` | 当前用户取消收藏视频；JSON body 必须包含 `occurred_at`；幂等 unset。 |
 
 ### Watch Progress / 观看进度
 

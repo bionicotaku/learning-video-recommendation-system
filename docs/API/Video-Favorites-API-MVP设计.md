@@ -140,7 +140,7 @@ favorite_id
 - `description / video_url / transcript_url / like_count / favorite_count / user_state` 属于 Video Detail 真值。
 - `learning_units / recommendation_run_id / occurrence_index` 属于 Feed occurrence 语义。
 - `last_position_ms / watch_session_id` 属于观看进度或播放恢复语义。
-- `favorite_id` 不暴露；视频收藏写 API 使用 `video_id` 作为唯一输入，且已是幂等 set / unset。
+- `favorite_id` 不暴露；视频收藏写 API 使用 path `video_id` 加 body `occurred_at` 表达一次幂等 set / unset 动作。
 
 ## 7. 可展示视频过滤
 
@@ -272,7 +272,7 @@ where has_bookmarked = true and bookmarked_at is not null;
 
 ## 12. 与 Video Interactions / Video Detail 的关系
 
-- `PUT /api/videos/{video_id}/favorite` 和 `DELETE /api/videos/{video_id}/favorite` 是写入口。
+- `PUT /api/videos/{video_id}/favorite` 和 `DELETE /api/videos/{video_id}/favorite` 是写入口；写请求必须携带 `occurred_at`，旧时间请求不会回滚当前收藏状态。
 - `GET /api/video-favorites` 是当前用户收藏投影的列表读取入口。
 - `GET /api/videos/{video_id}` 是播放页完整详情和当前用户 action rail base state 的权威读取入口。
 - Favorite list 成功读取后可以给前端 seed video preview，但不应替代 Video Detail cache。

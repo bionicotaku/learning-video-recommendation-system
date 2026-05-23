@@ -99,7 +99,7 @@ and (publish_at is null or publish_at <= now())
 
 - Feed API 只返回列表 preview 和 learning context，不返回播放详情或互动 base state。
 - Video Detail API 返回 action rail 的 base count 与当前用户 base flags。
-- Video Interactions API 只负责 like / favorite 幂等写入，并返回单类写入结果；它不替代 Video Detail 的完整读取快照。
+- Video Interactions API 只负责携带 `occurred_at` 的 like / favorite 幂等写入，并返回单类写入结果；旧时间写请求不会回滚当前状态。它不替代 Video Detail 的完整读取快照。
 - Watch Progress API 可以维护 `view_count` 等消费投影，但不修改 like / favorite 字段。
 
 ## 7. 成功标准

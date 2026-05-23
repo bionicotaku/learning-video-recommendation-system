@@ -1,9 +1,12 @@
 package dto
 
+import "time"
+
 type SetVideoLikeRequest struct {
-	UserID  string
-	VideoID string
-	Enabled bool
+	UserID     string
+	VideoID    string
+	Enabled    bool
+	OccurredAt time.Time
 }
 
 type VideoLikeResponse struct {
@@ -13,9 +16,10 @@ type VideoLikeResponse struct {
 }
 
 type SetVideoFavoriteRequest struct {
-	UserID  string
-	VideoID string
-	Enabled bool
+	UserID     string
+	VideoID    string
+	Enabled    bool
+	OccurredAt time.Time
 }
 
 type VideoFavoriteResponse struct {
