@@ -111,14 +111,31 @@ func (q *Queries) GetCurrentActivityStreakDays(ctx context.Context, arg GetCurre
 }
 
 const getUserProfile = `-- name: GetUserProfile :one
-select user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, created_at, updated_at
+select user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at
 from app_user.user_profiles
 where user_id = $1
 `
 
-func (q *Queries) GetUserProfile(ctx context.Context, userID pgtype.UUID) (AppUserUserProfile, error) {
+type GetUserProfileRow struct {
+	UserID           pgtype.UUID        `json:"user_id"`
+	Email            pgtype.Text        `json:"email"`
+	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
+	DisplayName      string             `json:"display_name"`
+	AvatarUrl        pgtype.Text        `json:"avatar_url"`
+	Locale           string             `json:"locale"`
+	Timezone         pgtype.Text        `json:"timezone"`
+	OnboardingStatus string             `json:"onboarding_status"`
+	BirthDate        pgtype.Date        `json:"birth_date"`
+	Gender           pgtype.Text        `json:"gender"`
+	EducationStage   pgtype.Text        `json:"education_stage"`
+	IpRegion         pgtype.Text        `json:"ip_region"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetUserProfile(ctx context.Context, userID pgtype.UUID) (GetUserProfileRow, error) {
 	row := q.db.QueryRow(ctx, getUserProfile, userID)
-	var i AppUserUserProfile
+	var i GetUserProfileRow
 	err := row.Scan(
 		&i.UserID,
 		&i.Email,
@@ -128,6 +145,10 @@ func (q *Queries) GetUserProfile(ctx context.Context, userID pgtype.UUID) (AppUs
 		&i.Locale,
 		&i.Timezone,
 		&i.OnboardingStatus,
+		&i.BirthDate,
+		&i.Gender,
+		&i.EducationStage,
+		&i.IpRegion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -146,12 +167,12 @@ insert into app_user.user_profiles (
   $1,
   $2,
   $3,
-  nullif(split_part(coalesce($2::text, ''), '@', 1), ''),
+  coalesce(nullif(split_part(coalesce($2::text, ''), '@', 1), ''), 'user'),
   'zh-CN',
   'new'
 )
 on conflict (user_id) do nothing
-returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, created_at, updated_at
+returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at
 `
 
 type InsertRepairedUserProfileParams struct {
@@ -160,9 +181,26 @@ type InsertRepairedUserProfileParams struct {
 	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
 }
 
-func (q *Queries) InsertRepairedUserProfile(ctx context.Context, arg InsertRepairedUserProfileParams) (AppUserUserProfile, error) {
+type InsertRepairedUserProfileRow struct {
+	UserID           pgtype.UUID        `json:"user_id"`
+	Email            pgtype.Text        `json:"email"`
+	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
+	DisplayName      string             `json:"display_name"`
+	AvatarUrl        pgtype.Text        `json:"avatar_url"`
+	Locale           string             `json:"locale"`
+	Timezone         pgtype.Text        `json:"timezone"`
+	OnboardingStatus string             `json:"onboarding_status"`
+	BirthDate        pgtype.Date        `json:"birth_date"`
+	Gender           pgtype.Text        `json:"gender"`
+	EducationStage   pgtype.Text        `json:"education_stage"`
+	IpRegion         pgtype.Text        `json:"ip_region"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) InsertRepairedUserProfile(ctx context.Context, arg InsertRepairedUserProfileParams) (InsertRepairedUserProfileRow, error) {
 	row := q.db.QueryRow(ctx, insertRepairedUserProfile, arg.UserID, arg.Email, arg.EmailConfirmedAt)
-	var i AppUserUserProfile
+	var i InsertRepairedUserProfileRow
 	err := row.Scan(
 		&i.UserID,
 		&i.Email,
@@ -172,6 +210,10 @@ func (q *Queries) InsertRepairedUserProfile(ctx context.Context, arg InsertRepai
 		&i.Locale,
 		&i.Timezone,
 		&i.OnboardingStatus,
+		&i.BirthDate,
+		&i.Gender,
+		&i.EducationStage,
+		&i.IpRegion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

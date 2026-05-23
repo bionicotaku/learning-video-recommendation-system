@@ -1,8 +1,8 @@
 # 当前数据库 Schema 现状
 
 状态：LIVE DB SNAPSHOT
-更新时间：2026-05-14
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行视频观看状态与全局统计 live DB 临时 SQL 后记录。
+更新时间：2026-05-22
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 User module migration 000003 后记录。
 
 ## 1. Schema 概览
 
@@ -16,8 +16,9 @@
 | `analytics` | 存在，包含 `analytics.quiz_events`、`analytics.video_watch_events`、`analytics.learning_interaction_events` |
 | `recommendation` | 存在，包含 Recommendation 自有表与物化视图 |
 | `learning` | 存在，包含 `learning.unit_learning_events`、`learning.user_unit_states` |
+| `app_user` | 存在，包含 User profile、activity stats、feedback 表 |
 
-当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation 自有表、索引和物化视图。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
+当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation、User 自有表、索引和物化视图。User module tracking 状态为 `module=user current=3 applied=3 pending=0`。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
 
 时间字段统一口径：
 
@@ -144,6 +145,35 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `idx_learning_states_user_updated_at`
 
 该表当前已使用 `first_observed_at`、`observation_count`、`progress_event_count`、`last_progress_quality`、`recent_progress_qualities`、`recent_progress_passes`、`schedule_repetition`、`schedule_interval_days`、`schedule_ease_factor` 等新字段，不再包含旧 `strong_event_count`、`review_count`、`last_quality`。
+
+## 4.2 User Migration 状态
+
+`user_schema_migrations` 当前有 3 条记录，对应仓库内 3 个 User migration：
+
+- `000001_create_user_schema`
+- `000002_create_feedback_tables`
+- `000003_extend_user_profile_fields`
+
+当前 `app_user.user_profiles` 已包含以下用户资料字段：
+
+| column | type | nullable | 说明 |
+|---|---|---|---|
+| `user_id` | `uuid` | no | 主键，引用 `auth.users(id)`。 |
+| `email` | `text` | yes | `auth.users.email` 的缓存。 |
+| `email_confirmed_at` | `timestamptz` | yes | `auth.users.email_confirmed_at` 的缓存。 |
+| `display_name` | `text` | no | 用户展示昵称，带非空白 check。 |
+| `avatar_url` | `text` | yes | 头像地址，MVP 暂不开放修改。 |
+| `locale` | `text` | no | 默认 `zh-CN`。 |
+| `timezone` | `text` | yes | IANA timezone name。 |
+| `onboarding_status` | `text` | no | `new` / `collection_selected` / `completed`。 |
+| `birth_date` | `date` | yes | 用户生日。 |
+| `gender` | `text` | yes | `male` / `female` / `other` / `prefer_not_to_say`。 |
+| `education_stage` | `text` | yes | `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`。 |
+| `ip_region` | `text` | yes | IP 属地缓存预留字段，MVP 暂不写入。 |
+| `created_at` | `timestamptz` | no | 创建时间。 |
+| `updated_at` | `timestamptz` | no | 更新时间。 |
+
+`app_user.handle_auth_user_created()` 注册 trigger 已更新为：新 Auth user 创建时写 `display_name = email @ 前缀`，email 缺失或前缀为空时 fallback 为 `user`。邮箱更新 trigger 仍只同步 `email` 和 `email_confirmed_at`，不覆盖 `display_name`。
 
 ## 5. Recommendation 表与视图
 

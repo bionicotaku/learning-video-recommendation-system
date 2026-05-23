@@ -14,11 +14,15 @@ type UserProfile struct {
 	UserID           string
 	Email            *string
 	EmailConfirmedAt *time.Time
-	DisplayName      *string
+	DisplayName      string
 	AvatarURL        *string
 	Locale           string
 	Timezone         *string
 	OnboardingStatus string
+	BirthDate        *time.Time
+	Gender           *string
+	EducationStage   *string
+	IPRegion         *string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }

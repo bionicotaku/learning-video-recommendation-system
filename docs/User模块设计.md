@@ -10,6 +10,7 @@
 关联文档：
 
 - [API/Me-API-MVP设计.md](API/Me-API-MVP设计.md)
+- [API/Me-Profile-Update-API-MVP设计.md](API/Me-Profile-Update-API-MVP设计.md)
 - [API/API模块总体设计规范.md](API/API模块总体设计规范.md)
 - [词书系统设计.md](词书系统设计.md)
 - [学习引擎设计.md](学习引擎设计.md)
@@ -70,11 +71,27 @@ create table app_user.user_profiles (
   email text,
   email_confirmed_at timestamptz,
 
-  display_name text,
+  display_name text not null
+    check (length(btrim(display_name)) > 0),
   avatar_url text,
 
   locale text not null default 'zh-CN',
   timezone text,
+
+  birth_date date,
+  gender text
+    check (gender is null or gender in ('male', 'female', 'other', 'prefer_not_to_say')),
+  education_stage text
+    check (education_stage is null or education_stage in (
+      'middle_school',
+      'high_school',
+      'undergraduate',
+      'graduate',
+      'phd',
+      'working',
+      'other'
+    )),
+  ip_region text,
 
   onboarding_status text not null default 'new'
     check (onboarding_status in ('new', 'collection_selected', 'completed')),
@@ -95,14 +112,41 @@ where email is not null;
 | `user_id` | 用户业务主键，对应 `auth.users.id`。 |
 | `email` | `auth.users.email` 的缓存，不是权威来源。 |
 | `email_confirmed_at` | `auth.users.email_confirmed_at` 的缓存。 |
-| `display_name` | App 内展示昵称。注册时默认取 email 的 `@` 前缀，之后由 User 模块维护。 |
+| `display_name` | App 内展示昵称，非空。注册/lazy repair 默认取 email 的 `@` 前缀；如果 email 缺失或前缀为空，则写 `user`。 |
 | `avatar_url` | App 内头像地址。MVP trigger 默认写 `null`。 |
 | `locale` | 用户界面和展示偏好，MVP 默认 `zh-CN`。 |
 | `timezone` | IANA timezone name，例如 `Asia/Shanghai`。用于后续本地日期、streak、每日统计。 |
+| `birth_date` | 用户生日，格式语义为 date。MVP 默认 `null`。 |
+| `gender` | 性别枚举，MVP 默认 `null`。 |
+| `education_stage` | 学业/人生阶段枚举，MVP 默认 `null`。 |
+| `ip_region` | IP 属地缓存预留字段。MVP 不写入、不更新、不接受前端提交。 |
 | `onboarding_status` | 新用户初始化状态。 |
 | `created_at` / `updated_at` | profile 创建和更新时间。 |
 
 不加 `email unique` 约束。`email` 是 Auth 派生缓存，可能为空，也可能受 Supabase 身份合并、邮箱确认流程、provider 策略影响。缓存字段加唯一约束会增加注册和邮箱同步失败风险。
+
+`gender` 枚举：
+
+| 值 | 中文展示建议 |
+|---|---|
+| `male` | 男 |
+| `female` | 女 |
+| `other` | 其他 |
+| `prefer_not_to_say` | 不愿透露 |
+
+`education_stage` 枚举：
+
+| 值 | 中文展示建议 |
+|---|---|
+| `middle_school` | 初中 |
+| `high_school` | 高中 |
+| `undergraduate` | 大学本科 |
+| `graduate` | 研究生 |
+| `phd` | 博士生 |
+| `working` | 工作党 |
+| `other` | 其他 |
+
+`locale` 暂不开放修改。后续如要支持 UI 语言切换，应单独设计设置入口和合法 locale allowlist。
 
 ### 3.3 `app_user.user_activity_stats`
 
@@ -237,10 +281,14 @@ User 模块只维护 onboarding 状态本身。词书激活由 API facade 打开
 user_id = new.id
 email = new.email
 email_confirmed_at = new.email_confirmed_at
-display_name = email @ 前缀
+display_name = email @ 前缀；email 缺失或前缀为空时 fallback 为 'user'
 avatar_url = null
 locale = 'zh-CN'
 timezone = null
+birth_date = null
+gender = null
+education_stage = null
+ip_region = null
 onboarding_status = 'new'
 ```
 
@@ -266,7 +314,7 @@ begin
     new.id,
     new.email,
     new.email_confirmed_at,
-    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    coalesce(nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'user'),
     'zh-CN',
     'new'
   )
@@ -340,6 +388,8 @@ Trigger 不做：
 不调用外部服务
 不根据 raw_user_meta_data 覆盖 profile
 不在邮箱更新时覆盖 display_name
+不根据 IP 写 ip_region
+不写 birth_date / gender / education_stage
 ```
 
 原因是 Auth trigger 失败会影响注册或邮箱更新，必须把失败面压到最小。
@@ -389,10 +439,22 @@ activity calendar 是 `GetMe` response 的内嵌字段，不再暴露独立 HTTP
 后续可新增：
 
 ```text
-UpdateProfile(ctx, user_id, display_name, avatar_url, locale)
+UpdateProfile(ctx, user_id, patch)
 ```
 
-MVP 可以先不实现。实现时不允许修改 email。
+MVP 当前只设计 HTTP 契约，代码暂不实现 `PATCH /api/me/profile`。实现时不允许修改 email、email confirmation、avatar_url、locale、onboarding_status、ip_region 或活动统计。
+
+可修改字段：
+
+| 字段 | 规则 |
+|---|---|
+| `display_name` | 必填值不能为 `null`；trim 后 2-20 个 Unicode 字符；只允许 Unicode 字母、Unicode 数字、下划线。 |
+| `birth_date` | `YYYY-MM-DD`；范围 `1900-01-01` 到当天；`null` 表示清空。 |
+| `gender` | `male` / `female` / `other` / `prefer_not_to_say`；`null` 表示清空。 |
+| `education_stage` | `middle_school` / `high_school` / `undergraduate` / `graduate` / `phd` / `working` / `other`；`null` 表示清空。 |
+| `timezone` | 合法 IANA timezone；`null` 表示清空。 |
+
+详细 HTTP 契约见 [API/Me-Profile-Update-API-MVP设计.md](API/Me-Profile-Update-API-MVP设计.md)。
 
 ### 7.4 `UpdateOnboardingStatus`
 
@@ -500,7 +562,8 @@ make quick-check
 覆盖场景：
 
 - 新注册 Auth user 触发创建 profile。
-- profile 的 `display_name` 默认是 email 的 `@` 前缀。
+- profile 的 `display_name` 非空，默认是 email 的 `@` 前缀；email 缺失或前缀为空时 fallback 为 `user`。
+- profile 新增字段 `birth_date`、`gender`、`education_stage`、`ip_region` 默认是 `null`。
 - 邮箱更新只同步 `email` 和 `email_confirmed_at`，不覆盖 `display_name`。
 - `GetMe` 在 profile 缺失时可以 lazy repair。
 - `GET /api/me` 缺 principal 返回 `401 unauthorized`。

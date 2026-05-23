@@ -1,5 +1,5 @@
 -- name: GetUserProfile :one
-select user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, created_at, updated_at
+select user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at
 from app_user.user_profiles
 where user_id = $1;
 
@@ -20,12 +20,12 @@ insert into app_user.user_profiles (
   sqlc.arg(user_id),
   sqlc.arg(email),
   sqlc.arg(email_confirmed_at),
-  nullif(split_part(coalesce(sqlc.arg(email)::text, ''), '@', 1), ''),
+  coalesce(nullif(split_part(coalesce(sqlc.arg(email)::text, ''), '@', 1), ''), 'user'),
   'zh-CN',
   'new'
 )
 on conflict (user_id) do nothing
-returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, created_at, updated_at;
+returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at;
 
 -- name: UpdateUserTimezone :exec
 update app_user.user_profiles

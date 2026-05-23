@@ -16,16 +16,19 @@ import (
 )
 
 func TestMeReturnsProfileStatsAndUpdatesTimezoneHeader(t *testing.T) {
-	displayName := "alice"
 	timezone := "Asia/Shanghai"
 	service := &fakeMeService{response: userdto.MeResponse{
 		UserID:           "user-1",
 		Email:            stringPtr("alice@example.com"),
 		EmailConfirmed:   true,
-		DisplayName:      &displayName,
+		DisplayName:      "alice",
 		Locale:           "zh-CN",
 		Timezone:         &timezone,
 		OnboardingStatus: "new",
+		BirthDate:        stringPtr("1998-03-14"),
+		Gender:           stringPtr("prefer_not_to_say"),
+		EducationStage:   stringPtr("undergraduate"),
+		IPRegion:         stringPtr("CN-GD"),
 		Stats: userdto.MeStats{
 			TotalWatchSeconds: 3600,
 			QuizAttemptCount:  12,
@@ -68,6 +71,13 @@ func TestMeReturnsProfileStatsAndUpdatesTimezoneHeader(t *testing.T) {
 	}
 	if body.UserID != "user-1" || body.Email == nil || *body.Email != "alice@example.com" || body.Stats.StartedUnitCount != 48 {
 		t.Fatalf("unexpected body: %+v", body)
+	}
+	if body.DisplayName != "alice" ||
+		body.BirthDate == nil || *body.BirthDate != "1998-03-14" ||
+		body.Gender == nil || *body.Gender != "prefer_not_to_say" ||
+		body.EducationStage == nil || *body.EducationStage != "undergraduate" ||
+		body.IPRegion == nil || *body.IPRegion != "CN-GD" {
+		t.Fatalf("unexpected profile fields: %+v", body)
 	}
 	if body.ActivityCalendar.Timezone != "Asia/Shanghai" ||
 		body.ActivityCalendar.CurrentStreakDays != 3 ||

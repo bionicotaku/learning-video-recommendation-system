@@ -9,11 +9,15 @@ type MeResponse struct {
 	UserID           string           `json:"user_id"`
 	Email            *string          `json:"email"`
 	EmailConfirmed   bool             `json:"email_confirmed"`
-	DisplayName      *string          `json:"display_name"`
+	DisplayName      string           `json:"display_name"`
 	AvatarURL        *string          `json:"avatar_url"`
 	Locale           string           `json:"locale"`
 	Timezone         *string          `json:"timezone"`
 	OnboardingStatus string           `json:"onboarding_status"`
+	BirthDate        *string          `json:"birth_date"`
+	Gender           *string          `json:"gender"`
+	EducationStage   *string          `json:"education_stage"`
+	IPRegion         *string          `json:"ip_region"`
 	Stats            MeStats          `json:"stats"`
 	ActivityCalendar ActivityCalendar `json:"activity_calendar"`
 }

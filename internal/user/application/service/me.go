@@ -76,6 +76,10 @@ func (u *GetMeUsecase) Execute(ctx context.Context, request dto.MeRequest) (dto.
 		Locale:           profile.Locale,
 		Timezone:         profile.Timezone,
 		OnboardingStatus: profile.OnboardingStatus,
+		BirthDate:        dateStringPointer(profile.BirthDate),
+		Gender:           profile.Gender,
+		EducationStage:   profile.EducationStage,
+		IPRegion:         profile.IPRegion,
 		Stats: dto.MeStats{
 			TotalWatchSeconds: activityStats.TotalWatchMS / 1000,
 			QuizAttemptCount:  activityStats.QuizAttemptCount,
@@ -169,4 +173,12 @@ func dateOnly(value time.Time) time.Time {
 
 func dateString(value time.Time) string {
 	return value.Format("2006-01-02")
+}
+
+func dateStringPointer(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	result := dateString(*value)
+	return &result
 }

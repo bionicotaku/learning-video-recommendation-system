@@ -42,14 +42,35 @@ func TestAuthTriggersCreateProfileAndSyncEmailOnly(t *testing.T) {
 	var displayName string
 	var email string
 	var locale string
+	var birthDateIsNull bool
+	var genderIsNull bool
+	var educationStageIsNull bool
+	var ipRegionIsNull bool
 	if err := db.Pool.QueryRow(context.Background(), `
-		select email, display_name, locale
+		select email, display_name, locale, birth_date is null, gender is null, education_stage is null, ip_region is null
 		from app_user.user_profiles
-		where user_id = $1`, userID).Scan(&email, &displayName, &locale); err != nil {
+		where user_id = $1`, userID).Scan(&email, &displayName, &locale, &birthDateIsNull, &genderIsNull, &educationStageIsNull, &ipRegionIsNull); err != nil {
 		t.Fatalf("read profile: %v", err)
 	}
 	if email != "alice@example.com" || displayName != "alice" || locale != "zh-CN" {
 		t.Fatalf("unexpected profile defaults: email=%q display=%q locale=%q", email, displayName, locale)
+	}
+	if !birthDateIsNull || !genderIsNull || !educationStageIsNull || !ipRegionIsNull {
+		t.Fatalf("new profile fields should default to null")
+	}
+
+	fallbackUserID := "11111111-1111-4111-8111-111111111112"
+	if _, err := db.Pool.Exec(context.Background(), `insert into auth.users (id, email, email_confirmed_at) values ($1, null, now())`, fallbackUserID); err != nil {
+		t.Fatalf("seed auth user without email: %v", err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `
+		select display_name
+		from app_user.user_profiles
+		where user_id = $1`, fallbackUserID).Scan(&displayName); err != nil {
+		t.Fatalf("read fallback profile: %v", err)
+	}
+	if displayName != "user" {
+		t.Fatalf("display_name fallback = %q, want user", displayName)
 	}
 
 	if _, err := db.Pool.Exec(context.Background(), `update app_user.user_profiles set display_name = 'custom' where user_id = $1`, userID); err != nil {
@@ -83,11 +104,35 @@ func TestGetMeRepairsProfileAndUpdatesTimezone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetMe Execute: %v", err)
 	}
-	if response.DisplayName == nil || *response.DisplayName != "bob" || response.Timezone == nil || *response.Timezone != "Asia/Shanghai" {
+	if response.DisplayName != "bob" || response.Timezone == nil || *response.Timezone != "Asia/Shanghai" {
 		t.Fatalf("unexpected response: %+v", response)
+	}
+	if response.BirthDate != nil || response.Gender != nil || response.EducationStage != nil || response.IPRegion != nil {
+		t.Fatalf("new profile fields should default to nil: %+v", response)
 	}
 	if response.Stats.TotalWatchSeconds != 0 || response.Stats.QuizAttemptCount != 0 || response.Stats.StartedUnitCount != 0 {
 		t.Fatalf("stats should default to zero: %+v", response.Stats)
+	}
+}
+
+func TestGetMeRepairsProfileWithDisplayNameFallback(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "22222222-2222-4222-8222-222222222223"
+	if _, err := db.Pool.Exec(context.Background(), `insert into auth.users (id, email, email_confirmed_at) values ($1, null, now())`, userID); err != nil {
+		t.Fatalf("seed auth user without email: %v", err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `delete from app_user.user_profiles where user_id = $1`, userID); err != nil {
+		t.Fatalf("delete profile: %v", err)
+	}
+
+	repository := userrepo.NewRepository(db.Pool)
+	usecase := userservice.NewGetMeUsecase(repository, repository)
+	response, err := usecase.Execute(context.Background(), userdtoMeRequest(userID, ""))
+	if err != nil {
+		t.Fatalf("GetMe Execute: %v", err)
+	}
+	if response.DisplayName != "user" {
+		t.Fatalf("display_name fallback = %q, want user", response.DisplayName)
 	}
 }
 

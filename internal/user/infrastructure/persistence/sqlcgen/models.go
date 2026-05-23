@@ -53,13 +53,17 @@ type AppUserUserProfile struct {
 	UserID           pgtype.UUID        `json:"user_id"`
 	Email            pgtype.Text        `json:"email"`
 	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
-	DisplayName      pgtype.Text        `json:"display_name"`
+	DisplayName      string             `json:"display_name"`
 	AvatarUrl        pgtype.Text        `json:"avatar_url"`
 	Locale           string             `json:"locale"`
 	Timezone         pgtype.Text        `json:"timezone"`
 	OnboardingStatus string             `json:"onboarding_status"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	BirthDate        pgtype.Date        `json:"birth_date"`
+	Gender           pgtype.Text        `json:"gender"`
+	EducationStage   pgtype.Text        `json:"education_stage"`
+	IpRegion         pgtype.Text        `json:"ip_region"`
 }
 
 type AuthUser struct {

@@ -37,7 +37,7 @@ func (r *Repository) GetProfile(ctx context.Context, userID string) (model.UserP
 		}
 		return model.UserProfile{}, false, err
 	}
-	return toUserProfile(row), true, nil
+	return toUserProfileFromGet(row), true, nil
 }
 
 func (r *Repository) RepairProfile(ctx context.Context, userID string) (model.UserProfile, error) {
@@ -61,15 +61,19 @@ func (r *Repository) RepairProfile(ctx context.Context, userID string) (model.Us
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return model.UserProfile{}, err
 		}
-		row, err = r.queries.GetUserProfile(ctx, uuid)
+		getRow, err := r.queries.GetUserProfile(ctx, uuid)
 		if err != nil {
 			return model.UserProfile{}, err
 		}
+		if err := r.queries.EnsureActivityStats(ctx, uuid); err != nil {
+			return model.UserProfile{}, err
+		}
+		return toUserProfileFromGet(getRow), nil
 	}
 	if err := r.queries.EnsureActivityStats(ctx, uuid); err != nil {
 		return model.UserProfile{}, err
 	}
-	return toUserProfile(row), nil
+	return toUserProfileFromInsert(row), nil
 }
 
 func (r *Repository) UpdateTimezone(ctx context.Context, userID string, timezone string) error {
@@ -229,16 +233,39 @@ func (r *Repository) dailyParams(ctx context.Context, userID string, activityAt 
 	}, nil
 }
 
-func toUserProfile(row usersqlc.AppUserUserProfile) model.UserProfile {
+func toUserProfileFromGet(row usersqlc.GetUserProfileRow) model.UserProfile {
 	return model.UserProfile{
 		UserID:           uuidToString(row.UserID),
 		Email:            textPointer(row.Email),
 		EmailConfirmedAt: timestamptzPointer(row.EmailConfirmedAt),
-		DisplayName:      textPointer(row.DisplayName),
+		DisplayName:      row.DisplayName,
 		AvatarURL:        textPointer(row.AvatarUrl),
 		Locale:           row.Locale,
 		Timezone:         textPointer(row.Timezone),
 		OnboardingStatus: row.OnboardingStatus,
+		BirthDate:        datePointer(row.BirthDate),
+		Gender:           textPointer(row.Gender),
+		EducationStage:   textPointer(row.EducationStage),
+		IPRegion:         textPointer(row.IpRegion),
+		CreatedAt:        timeOrZero(row.CreatedAt),
+		UpdatedAt:        timeOrZero(row.UpdatedAt),
+	}
+}
+
+func toUserProfileFromInsert(row usersqlc.InsertRepairedUserProfileRow) model.UserProfile {
+	return model.UserProfile{
+		UserID:           uuidToString(row.UserID),
+		Email:            textPointer(row.Email),
+		EmailConfirmedAt: timestamptzPointer(row.EmailConfirmedAt),
+		DisplayName:      row.DisplayName,
+		AvatarURL:        textPointer(row.AvatarUrl),
+		Locale:           row.Locale,
+		Timezone:         textPointer(row.Timezone),
+		OnboardingStatus: row.OnboardingStatus,
+		BirthDate:        datePointer(row.BirthDate),
+		Gender:           textPointer(row.Gender),
+		EducationStage:   textPointer(row.EducationStage),
+		IPRegion:         textPointer(row.IpRegion),
 		CreatedAt:        timeOrZero(row.CreatedAt),
 		UpdatedAt:        timeOrZero(row.UpdatedAt),
 	}
@@ -280,4 +307,12 @@ func timeOrZeroDate(value pgtype.Date) time.Time {
 		return time.Time{}
 	}
 	return time.Date(value.Time.Year(), value.Time.Month(), value.Time.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+func datePointer(value pgtype.Date) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	result := timeOrZeroDate(value)
+	return &result
 }

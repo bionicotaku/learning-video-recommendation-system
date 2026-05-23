@@ -5,11 +5,12 @@
 文档状态：MVP 已实现，作为当前 API 契约维护。
 目标读者：前端、后端 API、User、Supabase Auth 维护者。
 当前范围：定义 `GET /api/me` 的请求、响应、profile lazy repair、timezone 顺手更新、累计活动统计、内嵌 activity calendar、错误语义和模块边界。
-当前明确不做：不做用户资料编辑 API、不做邮箱修改、不做头像上传、不做登录注册 API、不做复杂 streak 规则。
+当前明确不做：不在本接口修改用户资料、不做邮箱修改、不做头像上传、不做登录注册 API、不做复杂 streak 规则。
 
 关联文档：
 
 - [../User模块设计.md](../User模块设计.md)
+- [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)
 - [API模块总体设计规范.md](API模块总体设计规范.md)
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)
 
@@ -73,11 +74,23 @@ type MeResponse = {
   user_id: string;
   email: string | null;
   email_confirmed: boolean;
-  display_name: string | null;
+  display_name: string;
   avatar_url: string | null;
   locale: string;
   timezone: string | null;
   onboarding_status: "new" | "collection_selected" | "completed";
+  birth_date: string | null;
+  gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
+  education_stage:
+    | "middle_school"
+    | "high_school"
+    | "undergraduate"
+    | "graduate"
+    | "phd"
+    | "working"
+    | "other"
+    | null;
+  ip_region: string | null;
   stats: MeStats;
   activity_calendar: ActivityCalendar;
 };
@@ -115,6 +128,10 @@ type ActivityDay = {
   "locale": "zh-CN",
   "timezone": "Asia/Shanghai",
   "onboarding_status": "new",
+  "birth_date": null,
+  "gender": null,
+  "education_stage": null,
+  "ip_region": null,
   "stats": {
     "total_watch_seconds": 3600,
     "quiz_attempt_count": 12,
@@ -149,11 +166,15 @@ type ActivityDay = {
 | `user_id` | trusted principal / `app_user.user_profiles.user_id` | 当前用户 ID。 |
 | `email` | `app_user.user_profiles.email` | `auth.users.email` 的缓存。 |
 | `email_confirmed` | `email_confirmed_at is not null` | 邮箱是否已确认。 |
-| `display_name` | `app_user.user_profiles.display_name` | 用户展示昵称。 |
+| `display_name` | `app_user.user_profiles.display_name` | 用户展示昵称，非空。 |
 | `avatar_url` | `app_user.user_profiles.avatar_url` | 头像地址，MVP 可为空。 |
 | `locale` | `app_user.user_profiles.locale` | 展示语言/地区偏好，MVP 默认 `zh-CN`。 |
 | `timezone` | `app_user.user_profiles.timezone` | 用户 IANA timezone。 |
 | `onboarding_status` | `app_user.user_profiles.onboarding_status` | 新用户初始化状态。 |
+| `birth_date` | `app_user.user_profiles.birth_date` | 用户生日，`YYYY-MM-DD`；未填写为 `null`。 |
+| `gender` | `app_user.user_profiles.gender` | 性别枚举；未填写为 `null`。 |
+| `education_stage` | `app_user.user_profiles.education_stage` | 学业/人生阶段枚举；未填写为 `null`。 |
+| `ip_region` | `app_user.user_profiles.ip_region` | IP 属地缓存预留字段；MVP 暂不写入，通常为 `null`。 |
 | `stats.total_watch_seconds` | `app_user.user_activity_stats.total_watch_ms` | 用户累计有效观看时长，向下取整为秒。 |
 | `stats.quiz_attempt_count` | `app_user.user_activity_stats.quiz_attempt_count` | 用户累计完成 quiz 次数。 |
 | `stats.started_unit_count` | `app_user.user_activity_stats.started_unit_count` | 用户历史上第一次让 learning unit 产生正进度的数量。 |
@@ -193,10 +214,14 @@ Trigger 正常工作时，新用户注册会自动创建 `app_user.user_profiles
 ```text
 email = auth.users.email
 email_confirmed_at = auth.users.email_confirmed_at
-display_name = email @ 前缀
+display_name = email @ 前缀；email 缺失或前缀为空时 fallback 为 'user'
 avatar_url = null
 locale = 'zh-CN'
 timezone = null
+birth_date = null
+gender = null
+education_stage = null
+ip_region = null
 onboarding_status = 'new'
 ```
 
@@ -306,7 +331,11 @@ select
   avatar_url,
   locale,
   timezone,
-  onboarding_status
+  onboarding_status,
+  birth_date,
+  gender,
+  education_stage,
+  ip_region
 from app_user.user_profiles
 where user_id = $1;
 ```
@@ -353,7 +382,7 @@ values (
   $1,
   $2,
   $3,
-  nullif(split_part(coalesce($2, ''), '@', 1), ''),
+  coalesce(nullif(split_part(coalesce($2, ''), '@', 1), ''), 'user'),
   'zh-CN',
   'new'
 )
@@ -467,7 +496,7 @@ PUT /api/learning-targets/active-collection
 MVP 不做：
 
 ```text
-PATCH /api/me
+PATCH /api/me/profile
 上传头像
 修改邮箱
 修改密码
@@ -478,6 +507,8 @@ activity calendar 自定义日期范围
 ```
 
 这些能力后续单独设计，避免 `/api/me` 变成过重的首页聚合接口。
+
+用户资料编辑已独立设计为 [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)，当前文档只描述 `GET /api/me`。
 
 ## 13. 测试计划
 
@@ -494,7 +525,8 @@ make quick-check
 - 缺 principal 返回 `401 unauthorized`。
 - 已存在 profile 时返回完整 `MeResponse`。
 - profile 缺失时 lazy repair 并返回默认字段。
-- `display_name` 默认使用 email 的 `@` 前缀。
+- `display_name` 非空；默认使用 email 的 `@` 前缀，email 缺失或前缀为空时 fallback 为 `user`。
+- `/api/me` 返回 `birth_date`、`gender`、`education_stage`、`ip_region`，新用户默认均为 `null`。
 - `locale` 默认 `zh-CN`。
 - 合法 `X-Client-Timezone` 更新 `timezone`。
 - 重复传同一 timezone 不产生额外业务变化。

@@ -28,6 +28,7 @@
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取，以及学习目标激活接口的业务语义说明。
 - [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md)：当前用户 active learning target coarse unit id 列表读取。
 - [Me-API-MVP设计.md](Me-API-MVP设计.md)：当前用户 profile 读取、累计活动统计、activity calendar、profile lazy repair 和 timezone 顺手更新。
+- [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)：当前用户 profile 编辑接口设计，当前仅文档设计，尚未实现 handler。
 - [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md)：当前用户反馈上传，支持一个自定义 JSON payload 和最多 5 张 JPEG 图片。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
@@ -158,7 +159,14 @@
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 的词书列表契约，并记录 `PUT /api/learning-targets/active-collection` 的业务语义；代码层前者由 `unitcollections` handler 负责，后者由 `learningtargets` handler 负责。 |
 | [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
+| [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 已写入 | 未实现 | 设计 `PATCH /api/me/profile`；用于后续修改 `display_name`、`birth_date`、`gender`、`education_stage`、`timezone`。 |
 | [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feedback`；由 User 模块写 `app_user.feedback_submissions` 与 `app_user.feedback_images`，总请求限制 5 MiB，图片以 `bytea` 存储。 |
+
+## 已设计未实现 Endpoint
+
+| Method | Path | 文档 | 状态 |
+|---|---|---|---|
+| `PATCH` | `/api/me/profile` | [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 仅设计；尚未注册 route，尚未实现 handler/usecase/repository query。 |
 
 ## 未开始范围
 
