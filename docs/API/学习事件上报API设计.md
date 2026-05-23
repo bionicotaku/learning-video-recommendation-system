@@ -589,7 +589,7 @@ occurred_at = request.occurred_at
 reset_boundary_at = 后端计算的 reset 边界
 ```
 
-`occurred_at` 是客户端业务发生时间。后端另存内部字段 `reset_boundary_at = max(request.occurred_at, 当前 user+unit 已接受 ledger max(occurred_at), 当前 user+unit max(reset_boundary_at))`，用于屏蔽 reset 前旧 raw fact。`reset_boundary_at` 不出现在 public response。
+`occurred_at` 是客户端业务发生时间。后端另存内部字段 `reset_boundary_at = max(request.occurred_at, learning.user_unit_states.latest_learning_event_occurred_at, learning.user_unit_states.latest_reset_boundary_at)`，用于屏蔽 reset 前旧 raw fact。`reset_boundary_at` 不出现在 public response；`latest_*` 字段是 reducer 内部 projection watermark，不属于 public API。
 
 reducer 新插入时把状态重置为未学习：`status = new`、`progress_percent = 0`、`mastery_score = 0`，清空观察、进度、最近质量、成功/失败计数、schedule 和 `next_review_at`。它不改变 target/control 字段本身；因此如果 reset 前该 row 是 `is_target=false`，reset 后仍是 `is_target=false`；如果 reset 前仍是 `is_target=true`，reset 后仍是 `is_target=true`。该事件会进入 `learning.unit_learning_events`，后续 `ReplayUserStates` 按 `ledger_seq` 重放并得到一致结果。重复 `client_event_id` 只返回已有 event，不重新 reduce。
 

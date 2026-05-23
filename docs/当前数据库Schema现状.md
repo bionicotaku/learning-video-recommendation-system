@@ -149,11 +149,23 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 - `source_type = 'exposure_session3_v1'` 固定要求 `event_type = exposure`、`reducer_effect = affects_progress`、`progress_quality = 4`、`counts_toward_success_streak = false`，并且 `consumed_watch_session_ids` 必须是 3 个非空 UUID；其他事件必须为空数组
 - `metadata` 必须为 JSON object
 
-当前 `learning.user_unit_states` 已是 progress / schedule 语义的状态投影表。只读核对显示该表有 28 个字段，并包含以下索引：
+当前 `learning.user_unit_states` 已是 progress / schedule 语义的状态投影表。clean baseline 中该表有 30 个字段；除 target、progress、schedule 字段外，还包含 reducer 内部 projection watermark：
+
+- `latest_learning_event_occurred_at`
+- `latest_reset_boundary_at`
+- `latest_learning_event_ledger_seq`
+
+这些字段用于 reset boundary 和 replay 一致性，不出现在 public API。该表包含以下索引：
 
 - `user_unit_states_pkey`
 - `idx_learning_states_user_target_status_due`
 - `idx_learning_states_user_updated_at`
+- `idx_user_unit_states_active_unit_ids`
+- `idx_user_unit_states_unmastered_progress`
+- `idx_user_unit_states_mastered_progress`
+- `idx_user_unit_states_active_collection_targets`
+- `idx_user_unit_states_active_target_priority`
+- `idx_user_unit_states_mastered_target`
 
 该表当前已使用 `first_observed_at`、`observation_count`、`progress_event_count`、`last_progress_quality`、`recent_progress_qualities`、`recent_progress_passes`、`schedule_repetition`、`schedule_interval_days`、`schedule_ease_factor` 等新字段，不再包含旧 `strong_event_count`、`review_count`、`last_quality`。
 

@@ -25,7 +25,7 @@ GET /api/learning-targets/active-coarse-unit-ids
 learning.user_unit_states
 where user_id = current_user
   and is_target = true
-  and status <> 'mastered'
+  and status in ('new', 'learning', 'reviewing')
 ```
 
 `active_collection` 只从 `learning.user_learning_profiles.active_collection_slug` 读取；没有 learning profile 时返回 `null` 和空列表。
@@ -62,7 +62,7 @@ type ActiveLearningTargetCoarseUnitIdsResponse = {
 |---|---|
 | `active_collection` | 当前用户 active collection slug；没有 learning profile 时为 `null`。 |
 | `target_count` | `coarse_unit_ids.length`。表示当前仍可用于 exposure 上报的未 mastered target 数量。 |
-| `coarse_unit_ids` | 当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，升序返回。 |
+| `coarse_unit_ids` | 当前用户 `is_target=true AND status in ('new','learning','reviewing')` 的 coarse unit ids，升序返回。 |
 
 无 active profile：
 
@@ -125,7 +125,7 @@ targets as (
   from learning.user_unit_states
   where user_id = $1
     and is_target = true
-    and status <> 'mastered'
+    and status in ('new', 'learning', 'reviewing')
 )
 select
   coalesce((select active_collection_slug from profile), '')::text as active_collection_slug,
@@ -155,7 +155,7 @@ select
 
 - 缺 principal 返回 `401`。
 - 无 learning profile 返回 null/empty。
-- active profile 存在时返回 `is_target=true AND status!='mastered'` ids。
+- active profile 存在时返回 `is_target=true AND status in ('new','learning','reviewing')` ids。
 - mastered target 不返回。
 - `is_target=false` 不返回。
 - ids 按 `coarse_unit_id asc` 返回。

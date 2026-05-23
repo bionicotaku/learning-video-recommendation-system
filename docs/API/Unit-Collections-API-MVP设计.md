@@ -57,7 +57,7 @@ where is_target = true
 ```sql
 learning.user_unit_states
 where is_target = true
-  and status <> 'mastered'
+  and status in ('new', 'learning', 'reviewing')
 ```
 
 该接口服务 fullscreen exposure 过滤，`target_count` 是当前 exposure target set 数量，不是词书总词数。

@@ -115,6 +115,12 @@ func TestRecordLearningEventsWithDatabase(t *testing.T) {
 	if states[0].Status != "reviewing" {
 		t.Fatalf("status = %q, want reviewing", states[0].Status)
 	}
+	if states[0].LatestLearningEventOccurredAt == nil || !states[0].LatestLearningEventOccurredAt.Equal(t2) {
+		t.Fatalf("latest_learning_event_occurred_at = %v, want %v", states[0].LatestLearningEventOccurredAt, t2)
+	}
+	if states[0].LatestLearningEventLedgerSeq == 0 {
+		t.Fatalf("latest_learning_event_ledger_seq = 0, want inserted ledger seq")
+	}
 }
 
 func TestRecordLearningEventsStoresConsumedWatchSessions(t *testing.T) {
@@ -556,6 +562,16 @@ func TestResetUserUnitProgressUsesLedgerOrderAndBoundaryForReplay(t *testing.T) 
 	if events[1].ResetBoundaryAt == nil || !events[1].ResetBoundaryAt.Equal(progressAt) {
 		t.Fatalf("reset_boundary_at = %v, want %v", events[1].ResetBoundaryAt, progressAt)
 	}
+	beforeReplay, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates.Execute(before replay) error = %v", err)
+	}
+	if len(beforeReplay.States) != 1 {
+		t.Fatalf("before replay states len = %d, want 1", len(beforeReplay.States))
+	}
+	if beforeReplay.States[0].LatestResetBoundaryAt == nil || !beforeReplay.States[0].LatestResetBoundaryAt.Equal(progressAt) {
+		t.Fatalf("latest_reset_boundary_at = %v, want %v", beforeReplay.States[0].LatestResetBoundaryAt, progressAt)
+	}
 
 	stale, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
 		UserID: userID,
@@ -579,6 +595,9 @@ func TestResetUserUnitProgressUsesLedgerOrderAndBoundaryForReplay(t *testing.T) 
 	}
 	if len(states.States) != 1 {
 		t.Fatalf("states len = %d, want 1", len(states.States))
+	}
+	if states.States[0].LatestResetBoundaryAt == nil || !states.States[0].LatestResetBoundaryAt.Equal(progressAt) {
+		t.Fatalf("replayed latest_reset_boundary_at = %v, want %v", states.States[0].LatestResetBoundaryAt, progressAt)
 	}
 	assertResetUnlearnedState(t, states.States[0], true)
 }

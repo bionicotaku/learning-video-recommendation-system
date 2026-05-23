@@ -120,7 +120,8 @@ is no activation job or background switching state in the MVP.
 returns the current Learning Engine target projection for fullscreen exposure
 filtering. It returns `active_collection` from `learning.user_learning_profiles`
 and `coarse_unit_ids` from `learning.user_unit_states` where `is_target=true`
-and `status!='mastered'`. Missing active profile is a successful empty response.
+and `status in ('new','learning','reviewing')`. Missing active profile is a
+successful empty response.
 
 `PUT/DELETE /api/videos/{video_id}/like` and
 `PUT/DELETE /api/videos/{video_id}/favorite` are bodyless idempotent set/unset

@@ -82,11 +82,7 @@ func (u *ResetUserUnitProgressUsecase) Execute(ctx context.Context, request dto.
 			return nil
 		}
 
-		watermarks, err := repos.UnitLearningEvents().ListWatermarksByUserUnits(ctx, request.UserID, []int64{request.CoarseUnitID})
-		if err != nil {
-			return err
-		}
-		resetBoundaryAt := resetBoundaryFromWatermark(request.OccurredAt.UTC(), watermarks[request.CoarseUnitID])
+		resetBoundaryAt := resetBoundaryFromState(request.OccurredAt.UTC(), state)
 
 		event := model.LearningEvent{
 			UserID:          request.UserID,
@@ -117,6 +113,7 @@ func (u *ResetUserUnitProgressUsecase) Execute(ctx context.Context, request dto.
 		if err != nil {
 			return err
 		}
+		applyLearningEventProjection(nextState, inserted)
 		if _, err := repos.UserUnitStates().BatchUpsert(ctx, []*model.UserUnitState{nextState}); err != nil {
 			return err
 		}
@@ -128,17 +125,6 @@ func (u *ResetUserUnitProgressUsecase) Execute(ctx context.Context, request dto.
 		return dto.ResetUserUnitProgressResponse{}, err
 	}
 	return response, nil
-}
-
-func resetBoundaryFromWatermark(clientOccurredAt time.Time, watermark model.UnitLearningEventWatermark) time.Time {
-	boundary := clientOccurredAt
-	if watermark.MaxOccurredAt != nil && watermark.MaxOccurredAt.After(boundary) {
-		boundary = *watermark.MaxOccurredAt
-	}
-	if watermark.MaxResetBoundaryAt != nil && watermark.MaxResetBoundaryAt.After(boundary) {
-		boundary = *watermark.MaxResetBoundaryAt
-	}
-	return boundary.UTC()
 }
 
 func resetUserUnitProgressMetadata(request dto.ResetUserUnitProgressRequest) ([]byte, error) {

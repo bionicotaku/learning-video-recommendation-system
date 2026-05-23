@@ -4,6 +4,24 @@ on learning.user_unit_states (user_id, is_target, status, next_review_at);
 create index if not exists idx_learning_states_user_updated_at
 on learning.user_unit_states (user_id, updated_at desc);
 
+create index if not exists idx_user_unit_states_active_unit_ids
+on learning.user_unit_states (user_id, coarse_unit_id)
+where is_target = true
+  and status in ('new', 'learning', 'reviewing');
+
+create index if not exists idx_user_unit_states_unmastered_progress
+on learning.user_unit_states (user_id, progress_percent desc, coarse_unit_id)
+where is_target = true
+  and status in ('new', 'learning', 'reviewing');
+
+create index if not exists idx_user_unit_states_mastered_progress
+on learning.user_unit_states (user_id, coarse_unit_id)
+where status = 'mastered';
+
+create index if not exists idx_user_unit_states_active_collection_targets
+on learning.user_unit_states (user_id, target_source, coarse_unit_id)
+where is_target = true;
+
 create unique index if not exists uq_unit_learning_events_ledger_seq
 on learning.unit_learning_events (ledger_seq);
 

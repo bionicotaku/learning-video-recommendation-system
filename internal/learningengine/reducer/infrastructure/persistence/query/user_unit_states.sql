@@ -46,6 +46,9 @@ insert into learning.user_unit_states (
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   updated_at
 ) values (
   sqlc.arg(user_id),
@@ -73,6 +76,9 @@ insert into learning.user_unit_states (
   sqlc.arg(schedule_interval_days),
   sqlc.arg(schedule_ease_factor),
   sqlc.narg(next_review_at),
+  sqlc.narg(latest_learning_event_occurred_at),
+  sqlc.narg(latest_reset_boundary_at),
+  sqlc.arg(latest_learning_event_ledger_seq),
   now()
 )
 on conflict (user_id, coarse_unit_id) do update
@@ -100,6 +106,9 @@ set
   schedule_interval_days = excluded.schedule_interval_days,
   schedule_ease_factor = excluded.schedule_ease_factor,
   next_review_at = excluded.next_review_at,
+  latest_learning_event_occurred_at = excluded.latest_learning_event_occurred_at,
+  latest_reset_boundary_at = excluded.latest_reset_boundary_at,
+  latest_learning_event_ledger_seq = excluded.latest_learning_event_ledger_seq,
   updated_at = now()
 returning *;
 
@@ -130,7 +139,10 @@ with input as (
     (item.value->>'schedule_repetition')::integer as schedule_repetition,
     (item.value->>'schedule_interval_days')::numeric as schedule_interval_days,
     (item.value->>'schedule_ease_factor')::numeric as schedule_ease_factor,
-    nullif(item.value->>'next_review_at', '')::timestamptz as next_review_at
+    nullif(item.value->>'next_review_at', '')::timestamptz as next_review_at,
+    nullif(item.value->>'latest_learning_event_occurred_at', '')::timestamptz as latest_learning_event_occurred_at,
+    nullif(item.value->>'latest_reset_boundary_at', '')::timestamptz as latest_reset_boundary_at,
+    coalesce((item.value->>'latest_learning_event_ledger_seq')::bigint, 0) as latest_learning_event_ledger_seq
   from jsonb_array_elements(sqlc.arg(states)::jsonb) as item(value)
 )
 insert into learning.user_unit_states (
@@ -159,6 +171,9 @@ insert into learning.user_unit_states (
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   updated_at
 )
 select
@@ -187,6 +202,9 @@ select
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   now()
 from input
 on conflict (user_id, coarse_unit_id) do update
@@ -214,6 +232,9 @@ set
   schedule_interval_days = excluded.schedule_interval_days,
   schedule_ease_factor = excluded.schedule_ease_factor,
   next_review_at = excluded.next_review_at,
+  latest_learning_event_occurred_at = excluded.latest_learning_event_occurred_at,
+  latest_reset_boundary_at = excluded.latest_reset_boundary_at,
+  latest_learning_event_ledger_seq = excluded.latest_learning_event_ledger_seq,
   updated_at = now()
 returning *;
 

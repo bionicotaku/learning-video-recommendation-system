@@ -148,7 +148,10 @@ with input as (
     (item.value->>'schedule_repetition')::integer as schedule_repetition,
     (item.value->>'schedule_interval_days')::numeric as schedule_interval_days,
     (item.value->>'schedule_ease_factor')::numeric as schedule_ease_factor,
-    nullif(item.value->>'next_review_at', '')::timestamptz as next_review_at
+    nullif(item.value->>'next_review_at', '')::timestamptz as next_review_at,
+    nullif(item.value->>'latest_learning_event_occurred_at', '')::timestamptz as latest_learning_event_occurred_at,
+    nullif(item.value->>'latest_reset_boundary_at', '')::timestamptz as latest_reset_boundary_at,
+    coalesce((item.value->>'latest_learning_event_ledger_seq')::bigint, 0) as latest_learning_event_ledger_seq
   from jsonb_array_elements($1::jsonb) as item(value)
 )
 insert into learning.user_unit_states (
@@ -177,6 +180,9 @@ insert into learning.user_unit_states (
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   updated_at
 )
 select
@@ -205,6 +211,9 @@ select
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   now()
 from input
 on conflict (user_id, coarse_unit_id) do update
@@ -232,8 +241,11 @@ set
   schedule_interval_days = excluded.schedule_interval_days,
   schedule_ease_factor = excluded.schedule_ease_factor,
   next_review_at = excluded.next_review_at,
+  latest_learning_event_occurred_at = excluded.latest_learning_event_occurred_at,
+  latest_reset_boundary_at = excluded.latest_reset_boundary_at,
+  latest_learning_event_ledger_seq = excluded.latest_learning_event_ledger_seq,
   updated_at = now()
-returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 `
 
 func (q *Queries) BatchUpsertUserUnitStates(ctx context.Context, states []byte) ([]LearningUserUnitState, error) {
@@ -271,6 +283,9 @@ func (q *Queries) BatchUpsertUserUnitStates(ctx context.Context, states []byte) 
 			&i.ScheduleIntervalDays,
 			&i.ScheduleEaseFactor,
 			&i.NextReviewAt,
+			&i.LatestLearningEventOccurredAt,
+			&i.LatestResetBoundaryAt,
+			&i.LatestLearningEventLedgerSeq,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -401,7 +416,7 @@ func (q *Queries) GetActiveUnitCollection(ctx context.Context, userID pgtype.UUI
 }
 
 const getUserUnitState = `-- name: GetUserUnitState :one
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and coarse_unit_id = $2
@@ -441,6 +456,9 @@ func (q *Queries) GetUserUnitState(ctx context.Context, arg GetUserUnitStatePara
 		&i.ScheduleIntervalDays,
 		&i.ScheduleEaseFactor,
 		&i.NextReviewAt,
+		&i.LatestLearningEventOccurredAt,
+		&i.LatestResetBoundaryAt,
+		&i.LatestLearningEventLedgerSeq,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -448,7 +466,7 @@ func (q *Queries) GetUserUnitState(ctx context.Context, arg GetUserUnitStatePara
 }
 
 const getUserUnitStateForUpdate = `-- name: GetUserUnitStateForUpdate :one
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and coarse_unit_id = $2
@@ -489,6 +507,9 @@ func (q *Queries) GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnit
 		&i.ScheduleIntervalDays,
 		&i.ScheduleEaseFactor,
 		&i.NextReviewAt,
+		&i.LatestLearningEventOccurredAt,
+		&i.LatestResetBoundaryAt,
+		&i.LatestLearningEventLedgerSeq,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -496,7 +517,7 @@ func (q *Queries) GetUserUnitStateForUpdate(ctx context.Context, arg GetUserUnit
 }
 
 const listUserUnitStates = `-- name: ListUserUnitStates :many
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and (not $2::boolean or is_target = true)
@@ -543,6 +564,9 @@ func (q *Queries) ListUserUnitStates(ctx context.Context, arg ListUserUnitStates
 			&i.ScheduleIntervalDays,
 			&i.ScheduleEaseFactor,
 			&i.NextReviewAt,
+			&i.LatestLearningEventOccurredAt,
+			&i.LatestResetBoundaryAt,
+			&i.LatestLearningEventLedgerSeq,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -557,7 +581,7 @@ func (q *Queries) ListUserUnitStates(ctx context.Context, arg ListUserUnitStates
 }
 
 const listUserUnitStatesForUpdateByUnitIDs = `-- name: ListUserUnitStatesForUpdateByUnitIDs :many
-select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+select user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 from learning.user_unit_states
 where user_id = $1
   and coarse_unit_id = any($2::bigint[])
@@ -605,6 +629,9 @@ func (q *Queries) ListUserUnitStatesForUpdateByUnitIDs(ctx context.Context, arg 
 			&i.ScheduleIntervalDays,
 			&i.ScheduleEaseFactor,
 			&i.NextReviewAt,
+			&i.LatestLearningEventOccurredAt,
+			&i.LatestResetBoundaryAt,
+			&i.LatestLearningEventLedgerSeq,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -664,6 +691,9 @@ insert into learning.user_unit_states (
   schedule_interval_days,
   schedule_ease_factor,
   next_review_at,
+  latest_learning_event_occurred_at,
+  latest_reset_boundary_at,
+  latest_learning_event_ledger_seq,
   updated_at
 ) values (
   $1,
@@ -691,6 +721,9 @@ insert into learning.user_unit_states (
   $23,
   $24,
   $25,
+  $26,
+  $27,
+  $28,
   now()
 )
 on conflict (user_id, coarse_unit_id) do update
@@ -718,36 +751,42 @@ set
   schedule_interval_days = excluded.schedule_interval_days,
   schedule_ease_factor = excluded.schedule_ease_factor,
   next_review_at = excluded.next_review_at,
+  latest_learning_event_occurred_at = excluded.latest_learning_event_occurred_at,
+  latest_reset_boundary_at = excluded.latest_reset_boundary_at,
+  latest_learning_event_ledger_seq = excluded.latest_learning_event_ledger_seq,
   updated_at = now()
-returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, created_at, updated_at
+returning user_id, coarse_unit_id, is_target, target_source, target_source_ref_id, target_priority, status, progress_percent, mastery_score, first_observed_at, last_observed_at, observation_count, progress_event_count, last_progress_at, last_progress_quality, recent_progress_qualities, recent_progress_passes, progress_success_count, progress_failure_count, consecutive_success_count, consecutive_failure_count, schedule_repetition, schedule_interval_days, schedule_ease_factor, next_review_at, latest_learning_event_occurred_at, latest_reset_boundary_at, latest_learning_event_ledger_seq, created_at, updated_at
 `
 
 type UpsertUserUnitStateParams struct {
-	UserID                  pgtype.UUID        `json:"user_id"`
-	CoarseUnitID            int64              `json:"coarse_unit_id"`
-	IsTarget                bool               `json:"is_target"`
-	TargetSource            pgtype.Text        `json:"target_source"`
-	TargetSourceRefID       pgtype.Text        `json:"target_source_ref_id"`
-	TargetPriority          pgtype.Numeric     `json:"target_priority"`
-	Status                  string             `json:"status"`
-	ProgressPercent         pgtype.Numeric     `json:"progress_percent"`
-	MasteryScore            pgtype.Numeric     `json:"mastery_score"`
-	FirstObservedAt         pgtype.Timestamptz `json:"first_observed_at"`
-	LastObservedAt          pgtype.Timestamptz `json:"last_observed_at"`
-	ObservationCount        int32              `json:"observation_count"`
-	ProgressEventCount      int32              `json:"progress_event_count"`
-	LastProgressAt          pgtype.Timestamptz `json:"last_progress_at"`
-	LastProgressQuality     pgtype.Int2        `json:"last_progress_quality"`
-	RecentProgressQualities []int16            `json:"recent_progress_qualities"`
-	RecentProgressPasses    []bool             `json:"recent_progress_passes"`
-	ProgressSuccessCount    int32              `json:"progress_success_count"`
-	ProgressFailureCount    int32              `json:"progress_failure_count"`
-	ConsecutiveSuccessCount int32              `json:"consecutive_success_count"`
-	ConsecutiveFailureCount int32              `json:"consecutive_failure_count"`
-	ScheduleRepetition      int32              `json:"schedule_repetition"`
-	ScheduleIntervalDays    pgtype.Numeric     `json:"schedule_interval_days"`
-	ScheduleEaseFactor      pgtype.Numeric     `json:"schedule_ease_factor"`
-	NextReviewAt            pgtype.Timestamptz `json:"next_review_at"`
+	UserID                        pgtype.UUID        `json:"user_id"`
+	CoarseUnitID                  int64              `json:"coarse_unit_id"`
+	IsTarget                      bool               `json:"is_target"`
+	TargetSource                  pgtype.Text        `json:"target_source"`
+	TargetSourceRefID             pgtype.Text        `json:"target_source_ref_id"`
+	TargetPriority                pgtype.Numeric     `json:"target_priority"`
+	Status                        string             `json:"status"`
+	ProgressPercent               pgtype.Numeric     `json:"progress_percent"`
+	MasteryScore                  pgtype.Numeric     `json:"mastery_score"`
+	FirstObservedAt               pgtype.Timestamptz `json:"first_observed_at"`
+	LastObservedAt                pgtype.Timestamptz `json:"last_observed_at"`
+	ObservationCount              int32              `json:"observation_count"`
+	ProgressEventCount            int32              `json:"progress_event_count"`
+	LastProgressAt                pgtype.Timestamptz `json:"last_progress_at"`
+	LastProgressQuality           pgtype.Int2        `json:"last_progress_quality"`
+	RecentProgressQualities       []int16            `json:"recent_progress_qualities"`
+	RecentProgressPasses          []bool             `json:"recent_progress_passes"`
+	ProgressSuccessCount          int32              `json:"progress_success_count"`
+	ProgressFailureCount          int32              `json:"progress_failure_count"`
+	ConsecutiveSuccessCount       int32              `json:"consecutive_success_count"`
+	ConsecutiveFailureCount       int32              `json:"consecutive_failure_count"`
+	ScheduleRepetition            int32              `json:"schedule_repetition"`
+	ScheduleIntervalDays          pgtype.Numeric     `json:"schedule_interval_days"`
+	ScheduleEaseFactor            pgtype.Numeric     `json:"schedule_ease_factor"`
+	NextReviewAt                  pgtype.Timestamptz `json:"next_review_at"`
+	LatestLearningEventOccurredAt pgtype.Timestamptz `json:"latest_learning_event_occurred_at"`
+	LatestResetBoundaryAt         pgtype.Timestamptz `json:"latest_reset_boundary_at"`
+	LatestLearningEventLedgerSeq  int64              `json:"latest_learning_event_ledger_seq"`
 }
 
 func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitStateParams) (LearningUserUnitState, error) {
@@ -777,6 +816,9 @@ func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitSta
 		arg.ScheduleIntervalDays,
 		arg.ScheduleEaseFactor,
 		arg.NextReviewAt,
+		arg.LatestLearningEventOccurredAt,
+		arg.LatestResetBoundaryAt,
+		arg.LatestLearningEventLedgerSeq,
 	)
 	var i LearningUserUnitState
 	err := row.Scan(
@@ -805,6 +847,9 @@ func (q *Queries) UpsertUserUnitState(ctx context.Context, arg UpsertUserUnitSta
 		&i.ScheduleIntervalDays,
 		&i.ScheduleEaseFactor,
 		&i.NextReviewAt,
+		&i.LatestLearningEventOccurredAt,
+		&i.LatestResetBoundaryAt,
+		&i.LatestLearningEventLedgerSeq,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

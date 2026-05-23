@@ -180,54 +180,6 @@ func (q *Queries) GetLearningEventByUserSourceRef(ctx context.Context, arg GetLe
 	return i, err
 }
 
-const listLearningEventWatermarksByUserUnits = `-- name: ListLearningEventWatermarksByUserUnits :many
-with unit_ids as (
-  select distinct (value)::bigint as coarse_unit_id
-  from jsonb_array_elements_text($2::jsonb)
-)
-select
-  u.coarse_unit_id,
-  max(e.occurred_at)::timestamptz as max_occurred_at,
-  max(e.reset_boundary_at)::timestamptz as max_reset_boundary_at
-from unit_ids u
-left join learning.unit_learning_events e
-  on e.user_id = $1
- and e.coarse_unit_id = u.coarse_unit_id
-group by u.coarse_unit_id
-order by u.coarse_unit_id asc
-`
-
-type ListLearningEventWatermarksByUserUnitsParams struct {
-	UserID        pgtype.UUID `json:"user_id"`
-	CoarseUnitIds []byte      `json:"coarse_unit_ids"`
-}
-
-type ListLearningEventWatermarksByUserUnitsRow struct {
-	CoarseUnitID       int64              `json:"coarse_unit_id"`
-	MaxOccurredAt      pgtype.Timestamptz `json:"max_occurred_at"`
-	MaxResetBoundaryAt pgtype.Timestamptz `json:"max_reset_boundary_at"`
-}
-
-func (q *Queries) ListLearningEventWatermarksByUserUnits(ctx context.Context, arg ListLearningEventWatermarksByUserUnitsParams) ([]ListLearningEventWatermarksByUserUnitsRow, error) {
-	rows, err := q.db.Query(ctx, listLearningEventWatermarksByUserUnits, arg.UserID, arg.CoarseUnitIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListLearningEventWatermarksByUserUnitsRow{}
-	for rows.Next() {
-		var i ListLearningEventWatermarksByUserUnitsRow
-		if err := rows.Scan(&i.CoarseUnitID, &i.MaxOccurredAt, &i.MaxResetBoundaryAt); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listLearningEventsByUserOrdered = `-- name: ListLearningEventsByUserOrdered :many
 select event_id, ledger_seq, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, reset_boundary_at, created_at
 from learning.unit_learning_events

@@ -165,7 +165,7 @@ Recommendation 不调用 normalizer，也不写 Learning Engine 表。
 
 Recommendation 只通过 `learning.user_unit_states` 消费归约后的学习状态。
 
-Recommendation 返回给前端的 `learning_units` 只表示本轮学习计划、字幕高亮和 end quiz 候选。前端 exposure 上报范围是当前用户所有 `is_target=true` 且 `status!='mastered'` 的 coarse units，不要求来自本次 Recommendation `learning_units`。
+Recommendation 返回给前端的 `learning_units` 只表示本轮学习计划、字幕高亮和 end quiz 候选。前端 exposure 上报范围是当前用户所有 `is_target=true` 且 `status in ('new','learning','reviewing')` 的 coarse units，不要求来自本次 Recommendation `learning_units`。
 
 ## 3. 设计目标
 
@@ -463,7 +463,7 @@ video_id is not null
 watch_session_id is not null
 ```
 
-它可以来自前端播放快照，也可以来自前端局部聚合结果。后端不校验它是否在本次 Recommendation `learning_units` 中；前端应只上报当前用户 `is_target=true` 且 `status!='mastered'` 的 coarse units。
+它可以来自前端播放快照，也可以来自前端局部聚合结果。后端不校验它是否在本次 Recommendation `learning_units` 中；前端应只上报当前用户 `is_target=true` 且 `status in ('new','learning','reviewing')` 的 coarse units。
 
 MVP 语义：
 
@@ -544,7 +544,7 @@ MVP 仍不做以下事情：
 
 - 不新增 rollup 表。
 - 不把它计入 `consecutive_success_count`。
-- 不修改 `learning.user_unit_states` schema。
+- 不为 exposure session3 新增专用 `learning.user_unit_states` 字段；session3 消费记录仍在 reducer ledger 的 `consumed_watch_session_ids`。
 
 如果未来需要使用，优先顺序是：
 

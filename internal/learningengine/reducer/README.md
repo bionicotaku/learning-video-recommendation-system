@@ -62,11 +62,12 @@ internal/learningengine/reducer/
 request
   -> validate normalized events
   -> group and preserve accepted ledger order
-  -> skip non-reset events at or before latest reset_boundary_at
+  -> lock affected user_unit_states in one query
+  -> skip non-reset events at or before state latest_reset_boundary_at
   -> batch append learning.unit_learning_events
   -> skip duplicate source events
-  -> lock affected user_unit_states in one query
   -> reduce only newly inserted events
+  -> update state projection watermarks
   -> batch upsert learning.user_unit_states
 ```
 
@@ -115,9 +116,13 @@ partial unique index on `learning.unit_learning_events` for
 `source_type = 'learning_unit_reset'`.
 
 `reset_boundary_at` is stored only on reset events. It is computed as the max of
-the request `occurred_at`, the current user+unit ledger max `occurred_at`, and
-the current user+unit max reset boundary. `RecordLearningEvents` skips later
-non-reset events whose business time is at or before that boundary.
+the request `occurred_at`,
+`learning.user_unit_states.latest_learning_event_occurred_at`, and
+`learning.user_unit_states.latest_reset_boundary_at`. `RecordLearningEvents`
+locks affected state rows first and skips later non-reset events whose business
+time is at or before the state projection boundary. The same state projection
+also stores `latest_learning_event_ledger_seq`; replay rebuilds these internal
+watermarks from the ledger.
 
 ### ListUserUnitProgress
 

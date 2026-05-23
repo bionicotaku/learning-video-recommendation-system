@@ -441,6 +441,77 @@ func TestResetUserUnitProgressExecuteWritesResetEventAndClearsState(t *testing.T
 	}
 }
 
+func TestResetUserUnitProgressExecuteUsesStateProjectionForBoundary(t *testing.T) {
+	clientOccurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	latestOccurredAt := clientOccurredAt.Add(2 * time.Hour)
+	latestResetBoundaryAt := clientOccurredAt.Add(time.Hour)
+	stateRepo := &fakeUserUnitStateRepository{
+		state: &model.UserUnitState{
+			UserID:                        "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:                  101,
+			IsTarget:                      true,
+			Status:                        enum.StatusReviewing,
+			ProgressPercent:               50,
+			MasteryScore:                  0.5,
+			ScheduleEaseFactor:            2.5,
+			LatestLearningEventOccurredAt: &latestOccurredAt,
+			LatestResetBoundaryAt:         &latestResetBoundaryAt,
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{
+		appendResult: applearningrepo.AppendLearningEventsResult{
+			InsertedEvents: []model.LearningEvent{{
+				EventID:         "55555555-5555-5555-5555-555555555555",
+				LedgerSeq:       77,
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventResetUnlearned,
+				ReducerEffect:   enum.ReducerEffectResetUnlearned,
+				SourceType:      "learning_unit_reset",
+				SourceRefID:     "reset-1",
+				Metadata:        []byte("{}"),
+				OccurredAt:      clientOccurredAt,
+				ResetBoundaryAt: &latestOccurredAt,
+			}},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewResetUserUnitProgressUsecase(txManager)
+
+	_, err := usecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    clientOccurredAt,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(eventRepo.appended) != 1 {
+		t.Fatalf("appended events = %d, want 1", len(eventRepo.appended))
+	}
+	if eventRepo.appended[0].ResetBoundaryAt == nil || !eventRepo.appended[0].ResetBoundaryAt.Equal(latestOccurredAt) {
+		t.Fatalf("reset boundary = %v, want %v", eventRepo.appended[0].ResetBoundaryAt, latestOccurredAt)
+	}
+	if len(stateRepo.batchUpserted) != 1 {
+		t.Fatalf("batch upserted states = %d, want 1", len(stateRepo.batchUpserted))
+	}
+	next := stateRepo.batchUpserted[0]
+	if next.LatestResetBoundaryAt == nil || !next.LatestResetBoundaryAt.Equal(latestOccurredAt) {
+		t.Fatalf("state latest reset boundary = %v, want %v", next.LatestResetBoundaryAt, latestOccurredAt)
+	}
+	if next.LatestLearningEventLedgerSeq != 77 {
+		t.Fatalf("state latest ledger seq = %d, want 77", next.LatestLearningEventLedgerSeq)
+	}
+}
+
 func TestResetUserUnitProgressExecuteTreatsClientEventIDAsUserScopedDuplicate(t *testing.T) {
 	occurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
 	stateRepo := &fakeUserUnitStateRepository{
@@ -713,6 +784,59 @@ func TestRecordLearningEventsExecuteSkipsDuplicateAppendRows(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsExecuteSkipsEventsBeforeStateResetBoundary(t *testing.T) {
+	boundary := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	beforeBoundary := boundary.Add(-time.Minute)
+	stateRepo := &fakeUserUnitStateRepository{
+		statesByUnit: map[int64]*model.UserUnitState{
+			101: {
+				UserID:                "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:          101,
+				IsTarget:              true,
+				Status:                enum.StatusNew,
+				ScheduleEaseFactor:    2.5,
+				LatestResetBoundaryAt: &boundary,
+			},
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	quality := int16(4)
+	usecase := service.NewRecordLearningEventsUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:              101,
+			EventType:                 enum.EventQuiz,
+			ReducerEffect:             enum.ReducerEffectAffectsProgress,
+			SourceType:                "quiz_event",
+			SourceRefID:               "quiz-before-reset",
+			ProgressQuality:           &quality,
+			CountsTowardSuccessStreak: true,
+			OccurredAt:                beforeBoundary,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if response.RecordedCount != 0 || response.SkippedBeforeResetCount != 1 {
+		t.Fatalf("response = %+v, want skipped before reset", response)
+	}
+	if len(eventRepo.appended) != 0 {
+		t.Fatalf("appended events = %d, want 0", len(eventRepo.appended))
+	}
+	if len(stateRepo.batchUpserted) != 0 {
+		t.Fatalf("batch upserted states = %d, want 0", len(stateRepo.batchUpserted))
+	}
+}
+
 func TestRecordLearningEventsExecuteIncrementsStartedUnitWhenProgressCrossesZero(t *testing.T) {
 	q4 := int16(4)
 	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
@@ -921,6 +1045,83 @@ func TestReplayUserStatesExecutePreservesSetMasteredInactiveTarget(t *testing.T)
 	}
 	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(eventTime) {
 		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, eventTime)
+	}
+}
+
+func TestReplayUserStatesExecuteRebuildsProjectionWatermarks(t *testing.T) {
+	t1 := time.Date(2026, 5, 21, 10, 0, 0, 0, time.UTC)
+	resetOccurredAt := t1.Add(-time.Hour)
+	resetBoundaryAt := t1.Add(time.Hour)
+	quality := int16(4)
+	stateRepo := &fakeUserUnitStateRepository{
+		listStates: []model.UserUnitState{{
+			UserID:             "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:       101,
+			IsTarget:           true,
+			TargetSource:       "unit_collection",
+			TargetSourceRefID:  "collection-1",
+			TargetPriority:     0.9,
+			Status:             enum.StatusReviewing,
+			ScheduleEaseFactor: 2.5,
+			CreatedAt:          t1.Add(-24 * time.Hour),
+		}},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{
+		listByUserOrdered: []model.LearningEvent{
+			{
+				EventID:         "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+				LedgerSeq:       10,
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventQuiz,
+				ReducerEffect:   enum.ReducerEffectAffectsProgress,
+				SourceType:      "quiz_event",
+				SourceRefID:     "quiz-1",
+				ProgressQuality: &quality,
+				OccurredAt:      t1,
+				Metadata:        []byte("{}"),
+			},
+			{
+				EventID:         "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+				LedgerSeq:       11,
+				UserID:          "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:    101,
+				EventType:       enum.EventResetUnlearned,
+				ReducerEffect:   enum.ReducerEffectResetUnlearned,
+				SourceType:      "learning_unit_reset",
+				SourceRefID:     "reset-1",
+				OccurredAt:      resetOccurredAt,
+				ResetBoundaryAt: &resetBoundaryAt,
+				Metadata:        []byte("{}"),
+			},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewReplayUserStatesUsecase(txManager)
+
+	if _, err := usecase.Execute(context.Background(), dto.ReplayUserStatesRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+	}); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if len(stateRepo.batchUpserted) != 1 {
+		t.Fatalf("upserted states = %d, want 1", len(stateRepo.batchUpserted))
+	}
+	state := stateRepo.batchUpserted[0]
+	if state.LatestLearningEventOccurredAt == nil || !state.LatestLearningEventOccurredAt.Equal(t1) {
+		t.Fatalf("latest occurred = %v, want %v", state.LatestLearningEventOccurredAt, t1)
+	}
+	if state.LatestResetBoundaryAt == nil || !state.LatestResetBoundaryAt.Equal(resetBoundaryAt) {
+		t.Fatalf("latest reset boundary = %v, want %v", state.LatestResetBoundaryAt, resetBoundaryAt)
+	}
+	if state.LatestLearningEventLedgerSeq != 11 {
+		t.Fatalf("latest ledger seq = %d, want 11", state.LatestLearningEventLedgerSeq)
 	}
 }
 
@@ -1197,7 +1398,6 @@ type fakeUnitLearningEventRepository struct {
 	eventBySourceResults []*model.LearningEvent
 	eventBySourceCalls   int
 	listByUserOrdered    []model.LearningEvent
-	watermarks           map[int64]model.UnitLearningEventWatermark
 }
 
 func (f *fakeUnitLearningEventRepository) Append(_ context.Context, events []model.LearningEvent) (applearningrepo.AppendLearningEventsResult, error) {
@@ -1229,20 +1429,6 @@ func (f *fakeUnitLearningEventRepository) ListByUserOrdered(_ context.Context, _
 
 func (f *fakeUnitLearningEventRepository) ListByUserAndUnitOrdered(_ context.Context, _ string, _ int64) ([]model.LearningEvent, error) {
 	return nil, nil
-}
-
-func (f *fakeUnitLearningEventRepository) ListWatermarksByUserUnits(_ context.Context, _ string, coarseUnitIDs []int64) (map[int64]model.UnitLearningEventWatermark, error) {
-	result := make(map[int64]model.UnitLearningEventWatermark, len(coarseUnitIDs))
-	for _, coarseUnitID := range coarseUnitIDs {
-		if f.watermarks != nil {
-			if watermark, ok := f.watermarks[coarseUnitID]; ok {
-				result[coarseUnitID] = watermark
-				continue
-			}
-		}
-		result[coarseUnitID] = model.UnitLearningEventWatermark{CoarseUnitID: coarseUnitID}
-	}
-	return result, nil
 }
 
 func int16Pointer(value int16) *int16 {

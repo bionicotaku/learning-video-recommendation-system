@@ -65,11 +65,12 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 	response := dto.RecordLearningEventsResponse{ReceivedCount: len(orderedEvents)}
 
 	err := u.txManager.WithinUserTx(ctx, request.UserID, func(ctx context.Context, repos TransactionalRepositories) error {
-		watermarks, err := repos.UnitLearningEvents().ListWatermarksByUserUnits(ctx, request.UserID, sortedCoarseUnitIDs(groupedEvents))
+		coarseUnitIDs := sortedCoarseUnitIDs(groupedEvents)
+		currentStates, err := repos.UserUnitStates().ListByUserAndUnitIDsForUpdate(ctx, request.UserID, coarseUnitIDs)
 		if err != nil {
 			return err
 		}
-		eventsToAppend := filterEventsAfterResetBoundary(orderedEvents, watermarks)
+		eventsToAppend := filterEventsAfterResetBoundary(orderedEvents, currentStates)
 		response.SkippedBeforeResetCount = len(orderedEvents) - len(eventsToAppend)
 		if len(eventsToAppend) == 0 {
 			return nil
@@ -87,11 +88,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 		}
 
 		groupedInsertedEvents := groupEventsPreserveOrder(appendResult.InsertedEvents)
-		coarseUnitIDs := sortedCoarseUnitIDs(groupedInsertedEvents)
-		currentStates, err := repos.UserUnitStates().ListByUserAndUnitIDsForUpdate(ctx, request.UserID, coarseUnitIDs)
-		if err != nil {
-			return err
-		}
+		coarseUnitIDs = sortedCoarseUnitIDs(groupedInsertedEvents)
 
 		nextStates := make([]*model.UserUnitState, 0, len(groupedInsertedEvents))
 		startedUnitCount := 0
@@ -110,6 +107,7 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 					}
 					return err
 				}
+				applyLearningEventProjection(nextState, event)
 				currentState = nextState
 			}
 
@@ -145,11 +143,11 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 	return response, nil
 }
 
-func filterEventsAfterResetBoundary(events []model.LearningEvent, watermarks map[int64]model.UnitLearningEventWatermark) []model.LearningEvent {
+func filterEventsAfterResetBoundary(events []model.LearningEvent, currentStates map[int64]*model.UserUnitState) []model.LearningEvent {
 	filtered := make([]model.LearningEvent, 0, len(events))
 	for _, event := range events {
 		if !policy.IsResetUnlearnedEffect(event.ReducerEffect) {
-			if boundary := watermarks[event.CoarseUnitID].MaxResetBoundaryAt; boundary != nil && !event.OccurredAt.After(*boundary) {
+			if state := currentStates[event.CoarseUnitID]; state != nil && state.LatestResetBoundaryAt != nil && !event.OccurredAt.After(*state.LatestResetBoundaryAt) {
 				continue
 			}
 		}

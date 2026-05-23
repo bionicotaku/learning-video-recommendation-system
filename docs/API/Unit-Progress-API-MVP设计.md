@@ -119,11 +119,7 @@ s.progress_percent = 100
 s.status in ('new', 'learning', 'reviewing')
 ```
 
-不要使用：
-
-```sql
-s.status <> 'mastered'
-```
+不要使用“只排除 mastered”的反选写法。
 
 原因是未来如果新增非学习状态，也不应自动混入正常未掌握学习列表。
 

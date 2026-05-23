@@ -68,10 +68,11 @@ analytics raw facts
 ```text
 RecordLearningEvents
   -> validate normalized events
-  -> skip non-reset events at or before latest reset_boundary_at
+  -> lock affected user_unit_states and read projection watermarks
+  -> skip non-reset events at or before state latest_reset_boundary_at
   -> append learning.unit_learning_events idempotently
   -> reduce only newly inserted events
-  -> upsert learning.user_unit_states
+  -> upsert learning.user_unit_states with updated projection watermarks
 ```
 
 `ReplayUserStates` 同样只从 `learning.unit_learning_events` 按 `ledger_seq` 重建状态，不重新解释 analytics raw facts。`occurred_at` 是业务时间，不是 replay 排序字段。

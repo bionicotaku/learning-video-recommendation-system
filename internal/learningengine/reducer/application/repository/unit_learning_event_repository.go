@@ -19,5 +19,4 @@ type UnitLearningEventRepository interface {
 	GetByUserSourceRef(ctx context.Context, userID string, sourceType string, sourceRefID string) (*model.LearningEvent, error)
 	ListByUserOrdered(ctx context.Context, userID string) ([]model.LearningEvent, error)
 	ListByUserAndUnitOrdered(ctx context.Context, userID string, coarseUnitID int64) ([]model.LearningEvent, error)
-	ListWatermarksByUserUnits(ctx context.Context, userID string, coarseUnitIDs []int64) (map[int64]model.UnitLearningEventWatermark, error)
 }

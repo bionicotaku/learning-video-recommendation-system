@@ -21,9 +21,3 @@ type LearningEvent struct {
 	ResetBoundaryAt           *time.Time
 	CreatedAt                 time.Time
 }
-
-type UnitLearningEventWatermark struct {
-	CoarseUnitID       int64
-	MaxOccurredAt      *time.Time
-	MaxResetBoundaryAt *time.Time
-}

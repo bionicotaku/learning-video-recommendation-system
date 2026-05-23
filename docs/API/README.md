@@ -47,7 +47,7 @@
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
 | `PATCH` | `/api/me/profile` | Me / 当前用户 | User | 修改当前用户可编辑 profile 字段，只返回更新后的 profile 子集，不返回 stats 或 activity calendar。 |
 | `GET` | `/api/unit-collections` | Unit Collections / 词书列表 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
-| `GET` | `/api/learning-targets/active-coarse-unit-ids` | Active Learning Targets / 学习目标读取 | Learning Engine reducer read model | 读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
+| `GET` | `/api/learning-targets/active-coarse-unit-ids` | Active Learning Targets / 学习目标读取 | Learning Engine reducer read model | 读取当前用户 `is_target=true AND status in ('new','learning','reviewing')` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | `PUT` | `/api/learning-targets/active-collection` | Learning Targets / 学习目标写入 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
 | `PUT` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等设置当前用户已点赞，并返回点赞状态和 `like_count`。 |
 | `DELETE` | `/api/videos/{video_id}/like` | Video Interactions / 视频互动 | Catalog | 幂等取消当前用户点赞，并返回点赞状态和 `like_count`。 |
@@ -161,7 +161,7 @@
 | [Video-History-API-MVP设计.md](Video-History-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/video-history`；Catalog 只读 keyset 分页返回当前用户观看历史 preview、`last_position_ms` 和 `last_watched_at`。 |
 | [End-Quiz-批量取题API-MVP设计.md](End-Quiz-批量取题API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/videos/end-quiz`；Catalog read usecase 批量读取 video-context / unit-generic quiz 候选并 fallback。 |
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 的词书列表契约，并记录 `PUT /api/learning-targets/active-collection` 的业务语义；代码层前者由 `unitcollections` handler 负责，后者由 `learningtargets` handler 负责。 |
-| [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
+| [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status in ('new','learning','reviewing')` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
 | [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PATCH /api/me/profile`；用于修改 `display_name`、`birth_date`、`gender`、`education_stage`、`timezone`，响应不包含 stats/calendar。 |
 | [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feedback`；由 User 模块写 `app_user.feedback_submissions` 与 `app_user.feedback_images`，总请求限制 5 MiB，图片以 `bytea` 存储。 |

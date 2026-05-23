@@ -88,19 +88,3 @@ where user_id = sqlc.arg(user_id)
   and source_ref_id = sqlc.arg(source_ref_id)
 order by ledger_seq asc
 limit 1;
-
--- name: ListLearningEventWatermarksByUserUnits :many
-with unit_ids as (
-  select distinct (value)::bigint as coarse_unit_id
-  from jsonb_array_elements_text(sqlc.arg(coarse_unit_ids)::jsonb)
-)
-select
-  u.coarse_unit_id,
-  max(e.occurred_at)::timestamptz as max_occurred_at,
-  max(e.reset_boundary_at)::timestamptz as max_reset_boundary_at
-from unit_ids u
-left join learning.unit_learning_events e
-  on e.user_id = sqlc.arg(user_id)
- and e.coarse_unit_id = u.coarse_unit_id
-group by u.coarse_unit_id
-order by u.coarse_unit_id asc;

@@ -36,6 +36,11 @@ create table if not exists learning.user_unit_states (
     check (schedule_ease_factor >= 1.3),
   next_review_at timestamptz,
 
+  latest_learning_event_occurred_at timestamptz,
+  latest_reset_boundary_at timestamptz,
+  latest_learning_event_ledger_seq bigint not null default 0
+    check (latest_learning_event_ledger_seq >= 0),
+
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 

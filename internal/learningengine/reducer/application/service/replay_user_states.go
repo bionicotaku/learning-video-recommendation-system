@@ -101,6 +101,7 @@ func replayStates(events []model.LearningEvent) (map[int64]*model.UserUnitState,
 		if err != nil {
 			return nil, err
 		}
+		applyLearningEventProjection(nextState, event)
 		rebuilt[event.CoarseUnitID] = nextState
 	}
 	return rebuilt, nil
