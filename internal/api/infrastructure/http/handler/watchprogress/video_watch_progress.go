@@ -13,8 +13,8 @@ import (
 type videoWatchProgressBody struct {
 	VideoID        string          `json:"video_id"`
 	WatchSessionID string          `json:"watch_session_id"`
-	PositionMS     int32           `json:"position_ms"`
-	ActiveWatchMS  int64           `json:"active_watch_ms"`
+	PositionMS     *int32          `json:"position_ms"`
+	ActiveWatchMS  *int64          `json:"active_watch_ms"`
 	OccurredAt     string          `json:"occurred_at"`
 	SourceSurface  string          `json:"source_surface"`
 	ClientContext  json.RawMessage `json:"client_context"`
@@ -59,10 +59,16 @@ func mapVideoWatchProgressBody(userID string, body videoWatchProgressBody) (cata
 	if err := request.ValidateRequiredUUID("watch_session_id", body.WatchSessionID); err != nil {
 		return catalogdto.RecordVideoWatchProgressRequest{}, invalidRequest(err)
 	}
-	if body.PositionMS < 0 {
+	if body.PositionMS == nil {
+		return catalogdto.RecordVideoWatchProgressRequest{}, apiservice.InvalidRequestError("position_ms is required")
+	}
+	if *body.PositionMS < 0 {
 		return catalogdto.RecordVideoWatchProgressRequest{}, apiservice.InvalidRequestError("position_ms must be non-negative")
 	}
-	if body.ActiveWatchMS < 0 {
+	if body.ActiveWatchMS == nil {
+		return catalogdto.RecordVideoWatchProgressRequest{}, apiservice.InvalidRequestError("active_watch_ms is required")
+	}
+	if *body.ActiveWatchMS < 0 {
 		return catalogdto.RecordVideoWatchProgressRequest{}, apiservice.InvalidRequestError("active_watch_ms must be non-negative")
 	}
 	occurredAt, err := request.ParseOptionalTime("occurred_at", body.OccurredAt)
@@ -86,8 +92,8 @@ func mapVideoWatchProgressBody(userID string, body videoWatchProgressBody) (cata
 		UserID:         userID,
 		VideoID:        body.VideoID,
 		WatchSessionID: body.WatchSessionID,
-		PositionMS:     body.PositionMS,
-		ActiveWatchMS:  body.ActiveWatchMS,
+		PositionMS:     *body.PositionMS,
+		ActiveWatchMS:  *body.ActiveWatchMS,
 		OccurredAt:     occurredAt,
 		SourceSurface:  body.SourceSurface,
 		ClientContext:  body.ClientContext,

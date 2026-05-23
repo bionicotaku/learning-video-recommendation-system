@@ -205,8 +205,8 @@ values pass through without using this prefix.
 
 Transport errors use the shared JSON error envelope. Decode, field validation,
 and known business validation failures map to `400 invalid_request`; missing
-principal maps to `401 unauthorized`; feedback request body overflow maps to
-`413 payload_too_large`; known owner errors can map to `404 not_found`, `409
-conflict`, or `422 unprocessable_entity`; timeouts or canceled contexts map to a
-request-id-bearing `503 service_unavailable`; unknown usecase failures map to
-`500 internal_error`.
+principal maps to `401 unauthorized`; request body overflow maps to
+`413 payload_too_large`; known owner errors can map to `404 not_found`,
+`409 conflict`, or `422 unprocessable_entity`; timeouts or canceled contexts map
+to a request-id-bearing `503 service_unavailable`; unknown usecase failures map
+to `500 internal_error`.

@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"image/jpeg"
 	"io"
 	"math"
@@ -17,11 +16,10 @@ import (
 
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
-	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/httperror"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/request"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
 	userdto "learning-video-recommendation-system/internal/user/application/dto"
-	userservice "learning-video-recommendation-system/internal/user/application/service"
 )
 
 const MaxRequestBytes int64 = 5 << 20
@@ -67,8 +65,8 @@ func (h *Handler) submitFeedback(w http.ResponseWriter, r *http.Request) {
 
 func decodeMultipartFeedback(r *http.Request, userID string) (userdto.SubmitFeedbackRequest, error) {
 	if err := r.ParseMultipartForm(MaxRequestBytes); err != nil {
-		if isPayloadTooLargeError(err) {
-			return userdto.SubmitFeedbackRequest{}, payloadTooLargeError()
+		if httperror.IsPayloadTooLarge(err) {
+			return userdto.SubmitFeedbackRequest{}, httperror.PayloadTooLarge("request body must not exceed 5 MiB")
 		}
 		return userdto.SubmitFeedbackRequest{}, apiservice.InvalidRequestError("invalid multipart form")
 	}
@@ -155,8 +153,8 @@ func decodeFeedbackImage(index int, fileHeader *multipart.FileHeader) (userdto.F
 	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(file)
 	if err != nil {
-		if isPayloadTooLargeError(err) {
-			return userdto.FeedbackImageInput{}, payloadTooLargeError()
+		if httperror.IsPayloadTooLarge(err) {
+			return userdto.FeedbackImageInput{}, httperror.PayloadTooLarge("request body must not exceed 5 MiB")
 		}
 		return userdto.FeedbackImageInput{}, apiservice.InvalidRequestError("image file is invalid")
 	}
@@ -206,37 +204,5 @@ func validateMultipartContentType(r *http.Request) error {
 }
 
 func writeHandlerError(w http.ResponseWriter, r *http.Request, err error) {
-	requestID := middleware.RequestIDFromContext(r.Context())
-	switch {
-	case errors.Is(err, auth.ErrMissingPrincipal):
-		response.WriteError(w, requestID, response.Unauthorized("trusted principal is required"))
-	case isPayloadTooLargeError(err):
-		response.WriteError(w, requestID, response.PayloadTooLarge("request body must not exceed 5 MiB"))
-	case apiservice.IsInvalidRequest(err), userservice.IsValidationError(err):
-		response.WriteError(w, requestID, response.InvalidRequest(err.Error()))
-	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled), apiservice.IsServiceUnavailable(err):
-		response.WriteError(w, requestID, response.ServiceUnavailable("request canceled or timed out"))
-	default:
-		response.WriteError(w, requestID, response.InternalError())
-	}
-}
-
-func payloadTooLargeError() error {
-	return response.PayloadTooLarge("request body must not exceed 5 MiB")
-}
-
-func isPayloadTooLargeError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var maxBytesError *http.MaxBytesError
-	return errors.As(err, &maxBytesError) ||
-		strings.Contains(strings.ToLower(err.Error()), "request body too large") ||
-		strings.Contains(strings.ToLower(err.Error()), "multipart: message too large") ||
-		isResponsePayloadTooLarge(err)
-}
-
-func isResponsePayloadTooLarge(err error) bool {
-	var responseError *response.Error
-	return errors.As(err, &responseError) && responseError.Code == "payload_too_large"
+	httperror.Write(w, r, err, httperror.UserValidation)
 }

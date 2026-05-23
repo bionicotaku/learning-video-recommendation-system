@@ -43,7 +43,7 @@ type FeedRequest = {
 
 | 字段 | 类型 | 必填 | 语义 |
 |---|---:|---:|---|
-| `target_video_count` | integer | 否 | 希望返回的视频数量。省略时后端默认 `8`；合法范围 `1..20`。 |
+| `target_video_count` | integer | 否 | 希望返回的视频数量。省略时后端默认 `8`；合法范围 `1..20`，显式传 `0` 返回 `400 invalid_request`。 |
 | `client_context` | object | 否 | 前端环境上下文。省略时按空 object 处理。 |
 
 Feed API 不接受 `preferred_duration_sec` 或 `session_hint`。请求 JSON 中出现未定义字段时返回 `400 invalid_request`。
@@ -115,7 +115,7 @@ POST /api/feed
 ## 6. 错误与一致性边界
 
 - 缺少 principal：`401 unauthorized`。
-- 非 JSON object、非法字段、`target_video_count` 越界：`400 invalid_request`。
+- 非 JSON object、非法字段、`target_video_count` 缺省以外的非 `1..20` 值：`400 invalid_request`。
 - Recommendation 或下游超时 / 取消：`503 service_unavailable`。
 - Recommendation 已写 audit / serving state 后，API facade 不静默丢弃 item。
 - 缺少视频 preview 数据、`duration_ms <= 0`、非空 learning unit evidence 不完整、非空 unit label 缺失，都是后端一致性错误，返回 `500 internal_error`。

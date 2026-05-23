@@ -437,9 +437,19 @@ target_priority = 0
 
 ## 6. 错误处理
 
+### 6.1 `GET /api/unit-collections`
+
 | HTTP | code | 场景 |
 |---|---|---|
-| `200 OK` | - | 列表读取成功，或 active collection 设置成功。 |
+| `200 OK` | - | 列表读取成功；没有 active profile 时也是成功。 |
+| `401 Unauthorized` | `unauthorized` | trusted principal 缺失。 |
+| `500 Internal Server Error` | `internal_error` | 数据库或未知服务端错误。 |
+
+### 6.2 `PUT /api/learning-targets/active-collection`
+
+| HTTP | code | 场景 |
+|---|---|---|
+| `200 OK` | - | active collection 设置成功。 |
 | `400 Bad Request` | `invalid_request` | JSON 非法、未知字段、`collection_slug` 缺失或格式非法。 |
 | `401 Unauthorized` | `unauthorized` | trusted principal 缺失。 |
 | `404 Not Found` | `not_found` | collection 不存在或 inactive。 |

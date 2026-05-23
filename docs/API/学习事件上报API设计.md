@@ -164,6 +164,7 @@ learning interaction batch 和 quiz attempt 的前端上传样例统一携带以
 - 同一次重试必须复用同一个 `client_event_id`。
 - 不同用户可以有相同 `client_event_id`。
 - 后端以 `(user_id, client_event_id)` 幂等写入 raw fact。
+- 同一 batch 请求内不能重复使用同一个 `client_event_id`；重复时整个 batch 返回 `invalid_request`，不写入 raw fact。
 
 推荐格式是 UUID / ULID / nanoid。后端不从 `client_event_id` 推断时间、用户或业务类型。
 
@@ -681,7 +682,9 @@ interaction batch 是整批拒绝，不 partial success。quiz attempt、self ma
 
 ### 10.2 Duplicate
 
-本 API 的幂等命中不是错误。前三条 raw API 返回已有 raw event ID；`reset-unlearned` 按 `(user_id, client_event_id)` 返回已有 `unit_learning_event_id`；都标记 `inserted=false`。
+本 API 的跨请求幂等命中不是错误。前三条 raw API 返回已有 raw event ID；`reset-unlearned` 按 `(user_id, client_event_id)` 返回已有 `unit_learning_event_id`；都标记 `inserted=false`。
+
+`POST /api/learning-interactions:batch` 额外要求同一 batch 内 `events[].client_event_id` 不重复；同批重复是当前请求自身非法，返回 `invalid_request`，整批不写入 raw fact。跨请求重试复用同一个 `client_event_id` 才是幂等命中。
 
 ### 10.3 Internal normalize failure
 

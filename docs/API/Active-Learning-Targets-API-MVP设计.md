@@ -43,7 +43,7 @@ Accept: application/json
 请求规则：
 
 - 不接受 request body。
-- 不接受 `user_id`、`collection_slug` 或分页参数。
+- 当前实现不读取 query string；`user_id`、`collection_slug` 或分页参数即使传入也会被忽略。
 - `user_id` 必须从 trusted principal 获取。
 
 ## 3. Response

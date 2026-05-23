@@ -137,13 +137,51 @@ func TestFeedRejectsRemovedRequestFields(t *testing.T) {
 }
 
 func TestFeedRejectsInvalidTransportRequest(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "zero target count", body: `{"target_video_count": 0}`},
+		{name: "too many target videos", body: `{"target_video_count": 21}`},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			service := &fakeFeedService{}
+			server := newServer(service)
+			t.Cleanup(server.Close)
+
+			response := postJSON(t, server, tt.body)
+			if response.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+			}
+			if service.called {
+				t.Fatal("service should not be called")
+			}
+		})
+	}
+}
+
+func TestFeedMapsOversizeJSONBodyToPayloadTooLarge(t *testing.T) {
 	service := &fakeFeedService{}
-	server := newServer(service)
+	server := newServerWithBodyLimit(service)
 	t.Cleanup(server.Close)
 
-	response := postJSON(t, server, `{"target_video_count": 21}`)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	body := append([]byte(`{"client_context":{"padding":"`), bytes.Repeat([]byte("x"), 1<<20)...)
+	body = append(body, []byte(`"}}`)...)
+	response := postJSONBytes(t, server, body)
+
+	if response.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	var payload struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decodeJSON(t, response, &payload)
+	if payload.Error.Code != "payload_too_large" {
+		t.Fatalf("code = %q, want payload_too_large", payload.Error.Code)
 	}
 	if service.called {
 		t.Fatal("service should not be called")
@@ -217,9 +255,23 @@ func newServerWithAuth(feedService *fakeFeedService, options auth.Options) *http
 	return httptest.NewServer(handler)
 }
 
+func newServerWithBodyLimit(feedService *fakeFeedService) *httptest.Server {
+	group := feed.NewHandler(feedService)
+	handler := router.New(router.Options{Feed: group})
+	handler = middleware.BodyLimitByPath(1<<20, nil)(handler)
+	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
+	handler = middleware.RequestID(handler)
+	return httptest.NewServer(handler)
+}
+
 func postJSON(t *testing.T, server *httptest.Server, body string) *http.Response {
 	t.Helper()
-	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/feed", bytes.NewBufferString(body))
+	return postJSONBytes(t, server, []byte(body))
+}
+
+func postJSONBytes(t *testing.T, server *httptest.Server, body []byte) *http.Response {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/feed", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}

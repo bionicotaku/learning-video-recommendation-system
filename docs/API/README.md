@@ -13,6 +13,7 @@
 ## 总体规范
 
 - [API模块总体设计规范.md](API模块总体设计规范.md)：`internal/api` 的统一入口规范。后续所有 API endpoint group 都必须遵守。
+- [API契约归总.md](API契约归总.md)：当前已实现 22 个业务 endpoint 的请求、响应、状态码、错误、validation、幂等和副作用归总。
 
 ## 业务 API 设计
 

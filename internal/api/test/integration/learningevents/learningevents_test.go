@@ -494,6 +494,31 @@ func TestQuizAttemptsRejectsUnsupportedTriggerType(t *testing.T) {
 	}
 }
 
+func TestQuizAttemptsRequiresTotalElapsedMS(t *testing.T) {
+	recorder := &fakeQuizAttemptRecorder{}
+	server := newTestServer(&fakeLearningInteractionRecorder{}, recorder, &fakeSelfMarkMasteredRecorder{})
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/quiz-attempts", `{
+		"client_event_id": "quiz-1",
+		"question_id": "44444444-4444-4444-4444-444444444444",
+		"coarse_unit_id": 101,
+		"trigger_type": "lookup_practice",
+		"selected_option_ids": ["correct"],
+		"selection_interval_ms": [1200],
+		"is_first_try_correct": true,
+		"shown_at": "2026-05-15T17:01:00Z",
+		"completed_at": "2026-05-15T17:01:04Z"
+	}`)
+
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if recorder.userID != "" {
+		t.Fatalf("expected quiz usecase not to be called")
+	}
+}
+
 func TestQuizAndSelfMarkRequirePositiveCoarseUnitID(t *testing.T) {
 	t.Run("quiz zero", func(t *testing.T) {
 		recorder := &fakeQuizAttemptRecorder{}

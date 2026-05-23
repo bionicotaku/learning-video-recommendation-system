@@ -2,15 +2,11 @@ package unitprogress
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
-	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
-	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
-	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/httperror"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
-	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 )
 
 type ListUserUnitProgressUsecase interface {
@@ -31,17 +27,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func writeHandlerError(w http.ResponseWriter, r *http.Request, err error) {
-	requestID := middleware.RequestIDFromContext(r.Context())
-	switch {
-	case errors.Is(err, auth.ErrMissingPrincipal):
-		response.WriteError(w, requestID, response.Unauthorized("trusted principal is required"))
-	case apiservice.IsInvalidRequest(err), learningservice.IsValidationError(err):
-		response.WriteError(w, requestID, response.InvalidRequest(err.Error()))
-	case apiservice.IsServiceUnavailable(err), errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
-		response.WriteError(w, requestID, response.ServiceUnavailable("request canceled or timed out"))
-	default:
-		response.WriteError(w, requestID, response.InternalError())
-	}
+	httperror.Write(w, r, err, httperror.LearningValidation)
 }
 
 func requiredPrincipal(r *http.Request) (auth.Principal, error) {

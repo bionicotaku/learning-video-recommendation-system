@@ -16,7 +16,7 @@ const (
 )
 
 type feedBody struct {
-	TargetVideoCount int             `json:"target_video_count"`
+	TargetVideoCount *int            `json:"target_video_count"`
 	ClientContext    json.RawMessage `json:"client_context"`
 }
 
@@ -52,11 +52,11 @@ func (h *Handler) getFeed(w http.ResponseWriter, r *http.Request) {
 }
 
 func mapFeedBody(userID string, body feedBody) (apvdto.GetFeedRequest, error) {
-	targetCount := body.TargetVideoCount
-	if targetCount == 0 {
-		targetCount = defaultTargetVideoCount
+	targetCount := defaultTargetVideoCount
+	if body.TargetVideoCount != nil {
+		targetCount = *body.TargetVideoCount
 	}
-	if targetCount < 0 || targetCount > maxTargetVideoCount {
+	if targetCount < 1 || targetCount > maxTargetVideoCount {
 		return apvdto.GetFeedRequest{}, apiservice.InvalidRequestError("target_video_count must be between 1 and 20")
 	}
 

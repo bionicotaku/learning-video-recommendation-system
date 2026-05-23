@@ -22,7 +22,7 @@ type quizAttemptBody struct {
 	SelectedOptionIDs   []string `json:"selected_option_ids"`
 	SelectionIntervalMS []int32  `json:"selection_interval_ms"`
 	IsFirstTryCorrect   *bool    `json:"is_first_try_correct"`
-	TotalElapsedMS      int32    `json:"total_elapsed_ms"`
+	TotalElapsedMS      *int32   `json:"total_elapsed_ms"`
 	ShownAt             string   `json:"shown_at"`
 	CompletedAt         string   `json:"completed_at"`
 }
@@ -95,7 +95,10 @@ func mapQuizAttemptBody(userID string, body quizAttemptBody) (apvdto.RecordQuizA
 	if body.IsFirstTryCorrect == nil {
 		return apvdto.RecordQuizAttemptRequest{}, apiservice.InvalidRequestError("is_first_try_correct is required")
 	}
-	if body.TotalElapsedMS < 0 {
+	if body.TotalElapsedMS == nil {
+		return apvdto.RecordQuizAttemptRequest{}, apiservice.InvalidRequestError("total_elapsed_ms is required")
+	}
+	if *body.TotalElapsedMS < 0 {
 		return apvdto.RecordQuizAttemptRequest{}, apiservice.InvalidRequestError("total_elapsed_ms must be non-negative")
 	}
 	shownAt, err := request.ParseRequiredTime("shown_at", body.ShownAt)
@@ -133,7 +136,7 @@ func mapQuizAttemptBody(userID string, body quizAttemptBody) (apvdto.RecordQuizA
 		SelectedOptionIDs:   body.SelectedOptionIDs,
 		SelectionIntervalMS: body.SelectionIntervalMS,
 		IsFirstTryCorrect:   *body.IsFirstTryCorrect,
-		TotalElapsedMS:      body.TotalElapsedMS,
+		TotalElapsedMS:      *body.TotalElapsedMS,
 		ShownAt:             shownAt,
 		CompletedAt:         completedAt,
 	}, nil

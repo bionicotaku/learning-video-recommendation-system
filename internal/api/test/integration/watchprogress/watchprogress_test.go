@@ -71,6 +71,47 @@ func TestWatchProgressRejectsInvalidTransportRequest(t *testing.T) {
 	}
 }
 
+func TestWatchProgressRequiresNumericFields(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "position_ms",
+			body: `{
+				"video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+				"watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+				"active_watch_ms": 2000
+			}`,
+		},
+		{
+			name: "active_watch_ms",
+			body: `{
+				"video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+				"watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+				"position_ms": 1000
+			}`,
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := &fakeRecorder{}
+			server := newServer(recorder)
+			t.Cleanup(server.Close)
+
+			response := postJSON(t, server, tt.body)
+
+			if response.StatusCode != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+			}
+			if recorder.called {
+				t.Fatal("recorder should not be called")
+			}
+		})
+	}
+}
+
 func TestWatchProgressRequiresContentType(t *testing.T) {
 	recorder := &fakeRecorder{}
 	server := newServer(recorder)

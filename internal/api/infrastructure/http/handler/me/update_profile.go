@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/httperror"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/request"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/response"
 	userdto "learning-video-recommendation-system/internal/user/application/dto"
@@ -132,5 +133,5 @@ func invalidRequest(err error) error {
 	if err == nil {
 		return nil
 	}
-	return apiservice.InvalidRequestError(err.Error())
+	return httperror.InvalidRequest(err)
 }
