@@ -29,6 +29,7 @@ GET /api/videos/{video_id}
 GET /api/video-favorites
 GET /api/video-history
 GET /api/me
+PATCH /api/me/profile
 POST /api/videos/end-quiz
 GET /api/unit-collections
 GET /api/learning-targets/active-coarse-unit-ids
@@ -83,6 +84,14 @@ contains a valid IANA timezone. The activity calendar returns today plus the
 previous six days in ascending date order and includes `current_streak_days`;
 day rows do not include an `is_active` boolean. It does not aggregate Catalog,
 Analytics, or Learning Engine tables at request time.
+
+`PATCH /api/me/profile` reads the trusted principal as `user_id`, requires a
+JSON object body, and updates only User-owned editable profile fields:
+`display_name`, `birth_date`, `gender`, `education_stage`, and `timezone`.
+It rejects unknown or non-editable fields such as `email`, `avatar_url`,
+`locale`, `onboarding_status`, `ip_region`, `stats`, and `activity_calendar`.
+The response returns the updated profile subset only, without stats or activity
+calendar.
 
 `POST /api/videos/end-quiz` is a read-only quiz lookup endpoint for the video
 ending experience. The handler validates `video_id`, de-duplicates up to eight

@@ -52,3 +52,10 @@ func timestamptzValue(value time.Time) pgtype.Timestamptz {
 func dateValue(value time.Time) pgtype.Date {
 	return pgtype.Date{Time: time.Date(value.Year(), value.Month(), value.Day(), 0, 0, 0, 0, time.UTC), Valid: true}
 }
+
+func datePointerValue(value *time.Time) pgtype.Date {
+	if value == nil {
+		return pgtype.Date{}
+	}
+	return dateValue(*value)
+}

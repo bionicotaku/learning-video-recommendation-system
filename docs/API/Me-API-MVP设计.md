@@ -496,7 +496,6 @@ PUT /api/learning-targets/active-collection
 MVP 不做：
 
 ```text
-PATCH /api/me/profile
 上传头像
 修改邮箱
 修改密码
@@ -508,7 +507,7 @@ activity calendar 自定义日期范围
 
 这些能力后续单独设计，避免 `/api/me` 变成过重的首页聚合接口。
 
-用户资料编辑已独立设计为 [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)，当前文档只描述 `GET /api/me`。
+用户资料编辑已独立实现为 [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)，当前文档只描述 `GET /api/me`。
 
 ## 13. 测试计划
 

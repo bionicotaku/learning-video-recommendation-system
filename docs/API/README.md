@@ -7,7 +7,7 @@
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
 - **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
-- **Feed、Video Detail、Video Favorites、Video History、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Active Learning Targets、Me API、User Feedback API 已落地。** Video Favorites / Video History 提供 Catalog 只读 keyset 分页列表；Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
+- **Feed、Video Detail、Video Favorites、Video History、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Active Learning Targets、Me API、Me Profile Update API、User Feedback API 已落地。** Video Favorites / Video History 提供 Catalog 只读 keyset 分页列表；Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
 
 ## 总体规范
@@ -28,14 +28,14 @@
 - [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md)：词书列表读取，以及学习目标激活接口的业务语义说明。
 - [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md)：当前用户 active learning target coarse unit id 列表读取。
 - [Me-API-MVP设计.md](Me-API-MVP设计.md)：当前用户 profile 读取、累计活动统计、activity calendar、profile lazy repair 和 timezone 顺手更新。
-- [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)：当前用户 profile 编辑接口设计，当前仅文档设计，尚未实现 handler。
+- [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md)：当前用户 profile 编辑接口。
 - [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md)：当前用户反馈上传，支持一个自定义 JSON payload 和最多 5 张 JPEG 图片。
 
 具体业务 API 文档只定义 endpoint 字段、业务语义、成功边界和前端样例；通用认证、错误 envelope、状态码、handler 结构和测试要求统一看总体规范。
 
 ## 已实现 API 总表
 
-当前 `internal/api` 已实现 20 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
+当前 `internal/api` 已实现 21 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
 
 | Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
 |---|---|---|---|---|
@@ -45,6 +45,7 @@
 | `GET` | `/api/video-history` | Video History / 视频观看历史 | Catalog | Keyset 分页读取当前用户最近观看且仍可展示的视频列表；只返回 preview、`last_position_ms` 和 `last_watched_at`。 |
 | `POST` | `/api/videos/end-quiz` | End Quiz / 视频末尾取题 | Catalog | 按 `video_id + coarse_unit_ids` 只读获取 quiz 候选；不写 quiz delivery、学习进度或统计。 |
 | `GET` | `/api/me` | Me / 当前用户 | User | 返回 profile、累计 stats、内嵌 7 天 activity calendar；必要时 lazy repair profile，并可用合法 timezone 更新 profile。 |
+| `PATCH` | `/api/me/profile` | Me / 当前用户 | User | 修改当前用户可编辑 profile 字段，只返回更新后的 profile 子集，不返回 stats 或 activity calendar。 |
 | `GET` | `/api/unit-collections` | Unit Collections / 词书列表 | API facade 编排 Semantic 与 Learning Engine | 读取 active 词书集合列表，并返回当前用户 `active_collection` slug / null。 |
 | `GET` | `/api/learning-targets/active-coarse-unit-ids` | Active Learning Targets / 学习目标读取 | Learning Engine reducer read model | 读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | `PUT` | `/api/learning-targets/active-collection` | Learning Targets / 学习目标写入 | API facade 同事务编排 Learning Engine 与 User | 同事务切换当前 active collection target projection，并把 onboarding 状态更新为 `collection_selected`。 |
@@ -92,6 +93,7 @@
 | Method | Path | 说明 |
 |---|---|---|
 | `GET` | `/api/me` | 读取当前用户基础 profile、累计活动统计和内嵌 7 天 activity calendar；可根据合法 `X-Client-Timezone` 顺手更新 timezone，并在 profile 缺失时 lazy repair。 |
+| `PATCH` | `/api/me/profile` | 修改当前用户 `display_name`、`birth_date`、`gender`、`education_stage`、`timezone`；非法输入返回 `400 invalid_request`。 |
 
 ### Unit Collections / 词书列表
 
@@ -159,14 +161,8 @@
 | [Unit-Collections-API-MVP设计.md](Unit-Collections-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/unit-collections` 的词书列表契约，并记录 `PUT /api/learning-targets/active-collection` 的业务语义；代码层前者由 `unitcollections` handler 负责，后者由 `learningtargets` handler 负责。 |
 | [Active-Learning-Targets-API-MVP设计.md](Active-Learning-Targets-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning-targets/active-coarse-unit-ids`；读取当前用户 `is_target=true AND status!='mastered'` 的 coarse unit ids，用于 fullscreen exposure 过滤。 |
 | [Me-API-MVP设计.md](Me-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/me`；User 模块读取 `app_user.user_profiles`、累计 stats 和 daily stats，必要时 lazy repair，并按合法 `X-Client-Timezone` 更新 timezone。`activity_calendar` 内嵌在 `/api/me` 响应中，返回 `current_streak_days`，不返回 `days[].is_active`。 |
-| [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 已写入 | 未实现 | 设计 `PATCH /api/me/profile`；用于后续修改 `display_name`、`birth_date`、`gender`、`education_stage`、`timezone`。 |
+| [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PATCH /api/me/profile`；用于修改 `display_name`、`birth_date`、`gender`、`education_stage`、`timezone`，响应不包含 stats/calendar。 |
 | [User-Feedback-API-MVP设计.md](User-Feedback-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/feedback`；由 User 模块写 `app_user.feedback_submissions` 与 `app_user.feedback_images`，总请求限制 5 MiB，图片以 `bytea` 存储。 |
-
-## 已设计未实现 Endpoint
-
-| Method | Path | 文档 | 状态 |
-|---|---|---|---|
-| `PATCH` | `/api/me/profile` | [Me-Profile-Update-API-MVP设计.md](Me-Profile-Update-API-MVP设计.md) | 仅设计；尚未注册 route，尚未实现 handler/usecase/repository query。 |
 
 ## 未开始范围
 

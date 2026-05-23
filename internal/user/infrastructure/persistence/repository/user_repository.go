@@ -76,6 +76,30 @@ func (r *Repository) RepairProfile(ctx context.Context, userID string) (model.Us
 	return toUserProfileFromInsert(row), nil
 }
 
+func (r *Repository) UpdateProfile(ctx context.Context, patch model.UserProfilePatch) (model.UserProfile, error) {
+	uuid, err := stringToUUID(patch.UserID)
+	if err != nil {
+		return model.UserProfile{}, err
+	}
+	row, err := r.queries.UpdateUserProfile(ctx, usersqlc.UpdateUserProfileParams{
+		UserID:            uuid,
+		SetDisplayName:    patch.SetDisplayName,
+		DisplayName:       patch.DisplayName,
+		SetBirthDate:      patch.SetBirthDate,
+		BirthDate:         datePointerValue(patch.BirthDate),
+		SetGender:         patch.SetGender,
+		Gender:            textValue(patch.Gender),
+		SetEducationStage: patch.SetEducationStage,
+		EducationStage:    textValue(patch.EducationStage),
+		SetTimezone:       patch.SetTimezone,
+		Timezone:          textValue(patch.Timezone),
+	})
+	if err != nil {
+		return model.UserProfile{}, err
+	}
+	return toUserProfileFromUpdate(row), nil
+}
+
 func (r *Repository) UpdateTimezone(ctx context.Context, userID string, timezone string) error {
 	uuid, err := stringToUUID(userID)
 	if err != nil {
@@ -253,6 +277,25 @@ func toUserProfileFromGet(row usersqlc.GetUserProfileRow) model.UserProfile {
 }
 
 func toUserProfileFromInsert(row usersqlc.InsertRepairedUserProfileRow) model.UserProfile {
+	return model.UserProfile{
+		UserID:           uuidToString(row.UserID),
+		Email:            textPointer(row.Email),
+		EmailConfirmedAt: timestamptzPointer(row.EmailConfirmedAt),
+		DisplayName:      row.DisplayName,
+		AvatarURL:        textPointer(row.AvatarUrl),
+		Locale:           row.Locale,
+		Timezone:         textPointer(row.Timezone),
+		OnboardingStatus: row.OnboardingStatus,
+		BirthDate:        datePointer(row.BirthDate),
+		Gender:           textPointer(row.Gender),
+		EducationStage:   textPointer(row.EducationStage),
+		IPRegion:         textPointer(row.IpRegion),
+		CreatedAt:        timeOrZero(row.CreatedAt),
+		UpdatedAt:        timeOrZero(row.UpdatedAt),
+	}
+}
+
+func toUserProfileFromUpdate(row usersqlc.UpdateUserProfileRow) model.UserProfile {
 	return model.UserProfile{
 		UserID:           uuidToString(row.UserID),
 		Email:            textPointer(row.Email),

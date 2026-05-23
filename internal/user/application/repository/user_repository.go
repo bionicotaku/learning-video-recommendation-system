@@ -13,6 +13,7 @@ var ErrAuthUserNotFound = errors.New("auth user not found")
 type ProfileRepository interface {
 	GetProfile(ctx context.Context, userID string) (model.UserProfile, bool, error)
 	RepairProfile(ctx context.Context, userID string) (model.UserProfile, error)
+	UpdateProfile(ctx context.Context, patch model.UserProfilePatch) (model.UserProfile, error)
 	UpdateTimezone(ctx context.Context, userID string, timezone string) error
 	UpdateOnboardingStatus(ctx context.Context, userID string, status string) error
 }

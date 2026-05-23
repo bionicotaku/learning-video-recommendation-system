@@ -12,7 +12,8 @@ import (
 func buildMeHandler(pool *pgxpool.Pool) *me.Handler {
 	repository := userrepo.NewRepository(pool)
 	getMe := userservice.NewGetMeUsecase(repository, repository)
-	return me.NewHandler(getMe)
+	updateProfile := userservice.NewUpdateMeProfileUsecase(repository)
+	return me.NewHandler(getMe, updateProfile)
 }
 
 func buildFeedbackHandler(pool *pgxpool.Pool) *feedback.Handler {

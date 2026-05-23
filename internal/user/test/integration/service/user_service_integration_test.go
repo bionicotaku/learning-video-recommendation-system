@@ -4,12 +4,14 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
 	userdto "learning-video-recommendation-system/internal/user/application/dto"
+	apprepo "learning-video-recommendation-system/internal/user/application/repository"
 	userservice "learning-video-recommendation-system/internal/user/application/service"
 	userrepo "learning-video-recommendation-system/internal/user/infrastructure/persistence/repository"
 	"learning-video-recommendation-system/internal/user/test/fixture"
@@ -136,6 +138,100 @@ func TestGetMeRepairsProfileWithDisplayNameFallback(t *testing.T) {
 	}
 }
 
+func TestUpdateMeProfileUpdatesAndClearsFields(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "22222222-2222-4222-8222-222222222224"
+	db.SeedAuthUser(t, userID, "patch@example.com")
+
+	repository := userrepo.NewRepository(db.Pool)
+	usecase := userservice.NewUpdateMeProfileUsecase(
+		repository,
+		userservice.WithUpdateMeProfileNow(func() time.Time {
+			return time.Date(2026, 5, 22, 12, 0, 0, 0, time.UTC)
+		}),
+	)
+	response, err := usecase.Execute(context.Background(), userdto.UpdateMeProfileRequest{
+		UserID:            userID,
+		SetDisplayName:    true,
+		DisplayName:       " Patched_1 ",
+		SetBirthDate:      true,
+		BirthDate:         stringPtr("2001-09-01"),
+		SetGender:         true,
+		Gender:            stringPtr("prefer_not_to_say"),
+		SetEducationStage: true,
+		EducationStage:    stringPtr("undergraduate"),
+		SetTimezone:       true,
+		Timezone:          stringPtr("Asia/Shanghai"),
+	})
+	if err != nil {
+		t.Fatalf("UpdateMeProfile Execute: %v", err)
+	}
+	if response.DisplayName != "Patched_1" ||
+		response.BirthDate == nil || *response.BirthDate != "2001-09-01" ||
+		response.Gender == nil || *response.Gender != "prefer_not_to_say" ||
+		response.EducationStage == nil || *response.EducationStage != "undergraduate" ||
+		response.Timezone == nil || *response.Timezone != "Asia/Shanghai" {
+		t.Fatalf("unexpected response: %+v", response)
+	}
+
+	response, err = usecase.Execute(context.Background(), userdto.UpdateMeProfileRequest{
+		UserID:            userID,
+		SetBirthDate:      true,
+		BirthDate:         nil,
+		SetGender:         true,
+		Gender:            nil,
+		SetEducationStage: true,
+		EducationStage:    nil,
+		SetTimezone:       true,
+		Timezone:          nil,
+	})
+	if err != nil {
+		t.Fatalf("clear profile Execute: %v", err)
+	}
+	if response.DisplayName != "Patched_1" || response.BirthDate != nil || response.Gender != nil || response.EducationStage != nil || response.Timezone != nil {
+		t.Fatalf("nullable fields not cleared: %+v", response)
+	}
+}
+
+func TestUpdateMeProfileRepairsMissingProfile(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "22222222-2222-4222-8222-222222222225"
+	db.SeedAuthUser(t, userID, "repairpatch@example.com")
+	if _, err := db.Pool.Exec(context.Background(), `delete from app_user.user_profiles where user_id = $1`, userID); err != nil {
+		t.Fatalf("delete profile: %v", err)
+	}
+
+	repository := userrepo.NewRepository(db.Pool)
+	usecase := userservice.NewUpdateMeProfileUsecase(repository)
+	response, err := usecase.Execute(context.Background(), userdto.UpdateMeProfileRequest{
+		UserID:         userID,
+		SetDisplayName: true,
+		DisplayName:    "repaired",
+	})
+	if err != nil {
+		t.Fatalf("UpdateMeProfile Execute: %v", err)
+	}
+	if response.DisplayName != "repaired" || response.Email == nil || *response.Email != "repairpatch@example.com" {
+		t.Fatalf("unexpected repaired response: %+v", response)
+	}
+}
+
+func TestUpdateMeProfileReturnsAuthUserNotFound(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	userID := "22222222-2222-4222-8222-222222222226"
+
+	repository := userrepo.NewRepository(db.Pool)
+	usecase := userservice.NewUpdateMeProfileUsecase(repository)
+	_, err := usecase.Execute(context.Background(), userdto.UpdateMeProfileRequest{
+		UserID:         userID,
+		SetDisplayName: true,
+		DisplayName:    "missing",
+	})
+	if !errors.Is(err, apprepo.ErrAuthUserNotFound) {
+		t.Fatalf("err = %v, want ErrAuthUserNotFound", err)
+	}
+}
+
 func TestActivityStatsRecorderAndCalendar(t *testing.T) {
 	db := suite.CreateTestDatabase(t)
 	userID := "33333333-3333-4333-8333-333333333333"
@@ -245,4 +341,8 @@ func TestActivityCalendarReturnsZeroStreakWhenTodayAndYesterdayInactive(t *testi
 
 func userdtoMeRequest(userID string, timezone string) userdto.MeRequest {
 	return userdto.MeRequest{UserID: userID, ClientTimezone: timezone}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

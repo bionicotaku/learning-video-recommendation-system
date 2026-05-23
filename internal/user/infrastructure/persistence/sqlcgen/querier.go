@@ -25,6 +25,7 @@ type Querier interface {
 	InsertRepairedUserProfile(ctx context.Context, arg InsertRepairedUserProfileParams) (InsertRepairedUserProfileRow, error)
 	ListDailyActivityStats(ctx context.Context, arg ListDailyActivityStatsParams) ([]AppUserUserDailyActivityStat, error)
 	UpdateOnboardingStatus(ctx context.Context, arg UpdateOnboardingStatusParams) error
+	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UpdateUserProfileRow, error)
 	UpdateUserTimezone(ctx context.Context, arg UpdateUserTimezoneParams) error
 	UpsertFeedbackSubmission(ctx context.Context, arg UpsertFeedbackSubmissionParams) (UpsertFeedbackSubmissionRow, error)
 }

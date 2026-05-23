@@ -27,6 +27,25 @@ type UserProfile struct {
 	UpdatedAt        time.Time
 }
 
+type UserProfilePatch struct {
+	UserID string
+
+	SetDisplayName bool
+	DisplayName    string
+
+	SetBirthDate bool
+	BirthDate    *time.Time
+
+	SetGender bool
+	Gender    *string
+
+	SetEducationStage bool
+	EducationStage    *string
+
+	SetTimezone bool
+	Timezone    *string
+}
+
 type ActivityStats struct {
 	UserID           string
 	TotalWatchMS     int64

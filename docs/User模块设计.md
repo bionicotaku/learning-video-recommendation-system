@@ -436,13 +436,11 @@ activity calendar 是 `GetMe` response 的内嵌字段，不再暴露独立 HTTP
 
 ### 7.3 `UpdateProfile`
 
-后续可新增：
-
 ```text
 UpdateProfile(ctx, user_id, patch)
 ```
 
-MVP 当前只设计 HTTP 契约，代码暂不实现 `PATCH /api/me/profile`。实现时不允许修改 email、email confirmation、avatar_url、locale、onboarding_status、ip_region 或活动统计。
+当前已由 `PATCH /api/me/profile` 暴露。该 usecase 只允许修改产品资料字段，不允许修改 email、email confirmation、avatar_url、locale、onboarding_status、ip_region 或活动统计。
 
 可修改字段：
 

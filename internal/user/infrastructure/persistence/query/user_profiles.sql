@@ -27,6 +27,33 @@ insert into app_user.user_profiles (
 on conflict (user_id) do nothing
 returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at;
 
+-- name: UpdateUserProfile :one
+update app_user.user_profiles
+set
+  display_name = case
+    when sqlc.arg(set_display_name)::boolean then sqlc.arg(display_name)::text
+    else display_name
+  end,
+  birth_date = case
+    when sqlc.arg(set_birth_date)::boolean then sqlc.narg(birth_date)::date
+    else birth_date
+  end,
+  gender = case
+    when sqlc.arg(set_gender)::boolean then sqlc.narg(gender)::text
+    else gender
+  end,
+  education_stage = case
+    when sqlc.arg(set_education_stage)::boolean then sqlc.narg(education_stage)::text
+    else education_stage
+  end,
+  timezone = case
+    when sqlc.arg(set_timezone)::boolean then sqlc.narg(timezone)::text
+    else timezone
+  end,
+  updated_at = now()
+where user_id = sqlc.arg(user_id)
+returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at;
+
 -- name: UpdateUserTimezone :exec
 update app_user.user_profiles
 set timezone = sqlc.arg(timezone),

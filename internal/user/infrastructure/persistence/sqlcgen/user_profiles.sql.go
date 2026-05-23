@@ -281,6 +281,99 @@ func (q *Queries) UpdateOnboardingStatus(ctx context.Context, arg UpdateOnboardi
 	return err
 }
 
+const updateUserProfile = `-- name: UpdateUserProfile :one
+update app_user.user_profiles
+set
+  display_name = case
+    when $1::boolean then $2::text
+    else display_name
+  end,
+  birth_date = case
+    when $3::boolean then $4::date
+    else birth_date
+  end,
+  gender = case
+    when $5::boolean then $6::text
+    else gender
+  end,
+  education_stage = case
+    when $7::boolean then $8::text
+    else education_stage
+  end,
+  timezone = case
+    when $9::boolean then $10::text
+    else timezone
+  end,
+  updated_at = now()
+where user_id = $11
+returning user_id, email, email_confirmed_at, display_name, avatar_url, locale, timezone, onboarding_status, birth_date, gender, education_stage, ip_region, created_at, updated_at
+`
+
+type UpdateUserProfileParams struct {
+	SetDisplayName    bool        `json:"set_display_name"`
+	DisplayName       string      `json:"display_name"`
+	SetBirthDate      bool        `json:"set_birth_date"`
+	BirthDate         pgtype.Date `json:"birth_date"`
+	SetGender         bool        `json:"set_gender"`
+	Gender            pgtype.Text `json:"gender"`
+	SetEducationStage bool        `json:"set_education_stage"`
+	EducationStage    pgtype.Text `json:"education_stage"`
+	SetTimezone       bool        `json:"set_timezone"`
+	Timezone          pgtype.Text `json:"timezone"`
+	UserID            pgtype.UUID `json:"user_id"`
+}
+
+type UpdateUserProfileRow struct {
+	UserID           pgtype.UUID        `json:"user_id"`
+	Email            pgtype.Text        `json:"email"`
+	EmailConfirmedAt pgtype.Timestamptz `json:"email_confirmed_at"`
+	DisplayName      string             `json:"display_name"`
+	AvatarUrl        pgtype.Text        `json:"avatar_url"`
+	Locale           string             `json:"locale"`
+	Timezone         pgtype.Text        `json:"timezone"`
+	OnboardingStatus string             `json:"onboarding_status"`
+	BirthDate        pgtype.Date        `json:"birth_date"`
+	Gender           pgtype.Text        `json:"gender"`
+	EducationStage   pgtype.Text        `json:"education_stage"`
+	IpRegion         pgtype.Text        `json:"ip_region"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UpdateUserProfileRow, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile,
+		arg.SetDisplayName,
+		arg.DisplayName,
+		arg.SetBirthDate,
+		arg.BirthDate,
+		arg.SetGender,
+		arg.Gender,
+		arg.SetEducationStage,
+		arg.EducationStage,
+		arg.SetTimezone,
+		arg.Timezone,
+		arg.UserID,
+	)
+	var i UpdateUserProfileRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Email,
+		&i.EmailConfirmedAt,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Locale,
+		&i.Timezone,
+		&i.OnboardingStatus,
+		&i.BirthDate,
+		&i.Gender,
+		&i.EducationStage,
+		&i.IpRegion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateUserTimezone = `-- name: UpdateUserTimezone :exec
 update app_user.user_profiles
 set timezone = $1,

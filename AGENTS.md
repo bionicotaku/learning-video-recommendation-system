@@ -1,8 +1,5 @@
 # Agents
 
-本文件定义本仓库内 agent 的默认执行规则。
-调用 Subagent 完全不允许自定义模型, 必须直接继承当前会话模型
-
 ## graphify
 
 This project has a graphify knowledge graph at graphify-out/.
@@ -33,6 +30,7 @@ Rules:
 6. 改动前先确认模块边界，不跨模块偷放职责
 7. 能删除的旧实现就直接删除，不留“后面再清理”
 8. migration 修改: 要先创建临时 migration 应用到 live DB, 然后清理中间过程, 保持 migration 干净
+9. code review 允许自主调用 subagent, 其他情况需要我像我申请得到允许. 调用 Subagent 完全不允许自定义模型, 必须直接继承当前会话模型
 
 ## 文档规则
 

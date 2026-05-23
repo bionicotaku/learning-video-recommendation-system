@@ -166,6 +166,14 @@ func (f *fakeProfileRepository) RepairProfile(_ context.Context, userID string) 
 	return profile, nil
 }
 
+func (f *fakeProfileRepository) UpdateProfile(_ context.Context, patch usermodel.UserProfilePatch) (usermodel.UserProfile, error) {
+	if f.profile == nil {
+		profile := usermodel.UserProfile{UserID: patch.UserID, OnboardingStatus: usermodel.OnboardingStatusNew}
+		f.profile = &profile
+	}
+	return *f.profile, nil
+}
+
 func (f *fakeProfileRepository) UpdateTimezone(_ context.Context, _ string, _ string) error {
 	return nil
 }

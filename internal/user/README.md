@@ -26,6 +26,10 @@ need to update projections inside an existing transaction.
   seven-day activity calendar. If the profile row is missing, it repairs it
   from `auth.users`. A valid `X-Client-Timezone` value updates the profile
   timezone before the activity calendar is computed.
+- `UpdateMeProfile`: updates current-user editable profile fields
+  (`display_name`, `birth_date`, `gender`, `education_stage`, `timezone`) after
+  validating display name, date range, enums, and IANA timezone values. Missing
+  profile rows are repaired from `auth.users` before applying the patch.
 - `UpdateOnboardingStatus`: updates the profile onboarding state after flows
   such as learning target collection selection.
 - `ActivityStatsRecorder`: transaction-aware projection writer for watch time,
@@ -56,4 +60,5 @@ The HTTP handlers live under `internal/api`; User only provides usecases. Curren
 API endpoints:
 
 - `GET /api/me`
+- `PATCH /api/me/profile`
 - `POST /api/feedback`

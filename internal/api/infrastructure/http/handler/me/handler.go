@@ -18,16 +18,22 @@ type GetMeUsecase interface {
 	Execute(ctx context.Context, request userdto.MeRequest) (userdto.MeResponse, error)
 }
 
-type Handler struct {
-	getMe GetMeUsecase
+type UpdateMeProfileUsecase interface {
+	Execute(ctx context.Context, request userdto.UpdateMeProfileRequest) (userdto.UpdateMeProfileResponse, error)
 }
 
-func NewHandler(getMe GetMeUsecase) *Handler {
-	return &Handler{getMe: getMe}
+type Handler struct {
+	getMe         GetMeUsecase
+	updateProfile UpdateMeProfileUsecase
+}
+
+func NewHandler(getMe GetMeUsecase, updateProfile UpdateMeProfileUsecase) *Handler {
+	return &Handler{getMe: getMe, updateProfile: updateProfile}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/me", h.handleGetMe)
+	mux.HandleFunc("PATCH /api/me/profile", h.handleUpdateProfile)
 }
 
 func (h *Handler) handleGetMe(w http.ResponseWriter, r *http.Request) {
