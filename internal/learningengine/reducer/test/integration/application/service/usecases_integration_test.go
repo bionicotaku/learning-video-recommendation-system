@@ -140,6 +140,153 @@ func TestRecordLearningEventsWithDatabase(t *testing.T) {
 	}
 }
 
+func TestRecordLearningEventsStoresConsumedWatchSessions(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	recordUsecase := service.NewRecordLearningEventsUsecase(persisttx.NewManager(db.Pool))
+	q4 := int16(4)
+	consumed := []string{
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001",
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002",
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003",
+	}
+
+	response, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:            101,
+			EventType:               "exposure",
+			ReducerEffect:           "affects_progress",
+			SourceType:              "exposure_session3_v1",
+			SourceRefID:             "exposure_session3:typed-consumed",
+			ProgressQuality:         &q4,
+			ConsumedWatchSessionIDs: consumed,
+			OccurredAt:              time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
+	}
+	if response.RecordedCount != 1 {
+		t.Fatalf("RecordedCount = %d, want 1", response.RecordedCount)
+	}
+
+	events, err := persistrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	if len(events[0].ConsumedWatchSessionIDs) != 3 {
+		t.Fatalf("consumed_watch_session_ids = %v, want %v", events[0].ConsumedWatchSessionIDs, consumed)
+	}
+	for index := range consumed {
+		if events[0].ConsumedWatchSessionIDs[index] != consumed[index] {
+			t.Fatalf("consumed_watch_session_ids = %v, want %v", events[0].ConsumedWatchSessionIDs, consumed)
+		}
+	}
+}
+
+func TestUnitLearningEventsRejectInvalidExposureSession3RowsAtDatabase(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	testCases := []struct {
+		name             string
+		eventType        string
+		sourceType       string
+		progressQuality  int
+		countsStreak     bool
+		consumedSessions string
+	}{
+		{
+			name:             "non session3 carries consumed sessions",
+			eventType:        "quiz",
+			sourceType:       "quiz_event",
+			progressQuality:  4,
+			countsStreak:     true,
+			consumedSessions: "array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001']::uuid[]",
+		},
+		{
+			name:             "session3 wrong event type",
+			eventType:        "quiz",
+			sourceType:       "exposure_session3_v1",
+			progressQuality:  4,
+			countsStreak:     false,
+			consumedSessions: "array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003']::uuid[]",
+		},
+		{
+			name:             "session3 wrong quality",
+			eventType:        "exposure",
+			sourceType:       "exposure_session3_v1",
+			progressQuality:  3,
+			countsStreak:     false,
+			consumedSessions: "array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003']::uuid[]",
+		},
+		{
+			name:             "session3 counts streak",
+			eventType:        "exposure",
+			sourceType:       "exposure_session3_v1",
+			progressQuality:  4,
+			countsStreak:     true,
+			consumedSessions: "array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003']::uuid[]",
+		},
+		{
+			name:             "session3 null consumed session",
+			eventType:        "exposure",
+			sourceType:       "exposure_session3_v1",
+			progressQuality:  4,
+			countsStreak:     false,
+			consumedSessions: "array['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001', null, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003']::uuid[]",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			query := `
+				insert into learning.unit_learning_events (
+					user_id,
+					coarse_unit_id,
+					event_type,
+					reducer_effect,
+					progress_quality,
+					source_type,
+					source_ref_id,
+					counts_toward_success_streak,
+					consumed_watch_session_ids,
+					occurred_at
+				)
+				values (
+					$1::uuid,
+					101,
+					$2,
+					'affects_progress',
+					$3,
+					$4,
+					$5,
+					$6,
+					` + testCase.consumedSessions + `,
+					now()
+				)
+			`
+			_, err := db.Pool.Exec(context.Background(), query, userID, testCase.eventType, testCase.progressQuality, testCase.sourceType, "invalid-"+testCase.name, testCase.countsStreak)
+			if err == nil {
+				t.Fatalf("insert invalid row error = nil, want db check violation")
+			}
+		})
+	}
+}
+
 func TestRecordLearningEventsDuplicateSourceIsIdempotent(t *testing.T) {
 	t.Parallel()
 
@@ -268,6 +415,199 @@ func TestRecordSelfMarkMasteredWithDatabase(t *testing.T) {
 		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
 	}
 	assertCompletedMasteredState(t, afterReplay.States[0], selfMarkOccurredAt)
+}
+
+func TestResetUserUnitProgressWithDatabaseAndReplay(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+
+	txManager := persisttx.NewManager(db.Pool)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
+	setInactiveUsecase := service.NewSetTargetInactiveUsecase(txManager)
+	resetUsecase := service.NewResetUserUnitProgressUsecase(txManager)
+	replayUsecase := service.NewReplayUserStatesUsecase(txManager)
+	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
+
+	if _, err := ensureUsecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
+		UserID: userID,
+		Targets: []dto.TargetUnitSpec{
+			{CoarseUnitID: 101, TargetSource: "curriculum", TargetSourceRefID: "lesson_1", TargetPriority: 0.9},
+		},
+	}); err != nil {
+		t.Fatalf("EnsureTargetUnits.Execute() error = %v", err)
+	}
+
+	q4 := int16(4)
+	occurredAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 101, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "progress-1", ProgressQuality: &q4, OccurredAt: occurredAt},
+		},
+	}); err != nil {
+		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
+	}
+
+	if _, err := setInactiveUsecase.Execute(context.Background(), dto.SetTargetInactiveRequest{
+		UserID:       userID,
+		CoarseUnitID: 101,
+	}); err != nil {
+		t.Fatalf("SetTargetInactive.Execute() error = %v", err)
+	}
+
+	resetOccurredAt := occurredAt.Add(time.Hour)
+	first, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        userID,
+		ClientContext: []byte(`{"platform":"ios"}`),
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		TokenText:     "apple",
+		OccurredAt:    resetOccurredAt,
+		EventPayload:  []byte(`{"origin":"manual"}`),
+	})
+	if err != nil {
+		t.Fatalf("ResetUserUnitProgress.Execute() error = %v", err)
+	}
+	if !first.Accepted || !first.Inserted || first.UnitLearningEventID == "" {
+		t.Fatalf("first reset response = %+v, want accepted inserted event id", first)
+	}
+
+	allStates, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(all) error = %v", err)
+	}
+	if len(allStates.States) != 1 {
+		t.Fatalf("all states len = %d, want 1", len(allStates.States))
+	}
+	assertResetUnlearnedState(t, allStates.States[0])
+
+	second, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        userID,
+		ClientContext: []byte(`{"platform":"ios"}`),
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    resetOccurredAt,
+		EventPayload:  []byte(`{"origin":"manual"}`),
+	})
+	if err != nil {
+		t.Fatalf("duplicate ResetUserUnitProgress.Execute() error = %v", err)
+	}
+	if !second.Accepted || second.Inserted || second.UnitLearningEventID != first.UnitLearningEventID {
+		t.Fatalf("second reset response = %+v, want accepted duplicate same event id %q", second, first.UnitLearningEventID)
+	}
+
+	if _, err := replayUsecase.Execute(context.Background(), dto.ReplayUserStatesRequest{UserID: userID}); err != nil {
+		t.Fatalf("ReplayUserStates.Execute() error = %v", err)
+	}
+	afterReplay, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(after replay) error = %v", err)
+	}
+	if len(afterReplay.States) != 1 {
+		t.Fatalf("after replay states len = %d, want 1", len(afterReplay.States))
+	}
+	assertResetUnlearnedState(t, afterReplay.States[0])
+}
+
+func TestResetUserUnitProgressDuplicateClientEventAcrossUnitsIsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
+
+	txManager := persisttx.NewManager(db.Pool)
+	ensureUsecase := service.NewEnsureTargetUnitsUsecase(txManager)
+	recordUsecase := service.NewRecordLearningEventsUsecase(txManager)
+	resetUsecase := service.NewResetUserUnitProgressUsecase(txManager)
+	listUsecase := service.NewListUserUnitStatesUsecase(persistrepo.NewUserUnitStateRepository(db.Pool))
+
+	if _, err := ensureUsecase.Execute(context.Background(), dto.EnsureTargetUnitsRequest{
+		UserID: userID,
+		Targets: []dto.TargetUnitSpec{
+			{CoarseUnitID: 101, TargetSource: "curriculum", TargetSourceRefID: "lesson_1", TargetPriority: 0.9},
+			{CoarseUnitID: 102, TargetSource: "curriculum", TargetSourceRefID: "lesson_1", TargetPriority: 0.8},
+		},
+	}); err != nil {
+		t.Fatalf("EnsureTargetUnits.Execute() error = %v", err)
+	}
+
+	q4 := int16(4)
+	occurredAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	if _, err := recordUsecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: userID,
+		Events: []dto.LearningEventInput{
+			{CoarseUnitID: 102, EventType: "quiz", ReducerEffect: "affects_progress", SourceType: "quiz_event", SourceRefID: "progress-102", ProgressQuality: &q4, OccurredAt: occurredAt},
+		},
+	}); err != nil {
+		t.Fatalf("RecordLearningEvents.Execute() error = %v", err)
+	}
+
+	first, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        userID,
+		ClientEventID: "reset-duplicate-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt.Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("first ResetUserUnitProgress.Execute() error = %v", err)
+	}
+	if !first.Accepted || !first.Inserted || first.UnitLearningEventID == "" {
+		t.Fatalf("first response = %+v, want inserted reset event", first)
+	}
+
+	second, err := resetUsecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        userID,
+		ClientEventID: "reset-duplicate-1",
+		CoarseUnitID:  102,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt.Add(2 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("second ResetUserUnitProgress.Execute() error = %v", err)
+	}
+	if !second.Accepted || second.Inserted || second.UnitLearningEventID != first.UnitLearningEventID {
+		t.Fatalf("second response = %+v, want duplicate same event id %q", second, first.UnitLearningEventID)
+	}
+
+	allStates, err := listUsecase.Execute(context.Background(), dto.ListUserUnitStatesRequest{UserID: userID})
+	if err != nil {
+		t.Fatalf("ListUserUnitStates(all) error = %v", err)
+	}
+	statesByUnit := indexStatesByUnit(allStates.States)
+	if statesByUnit[101].Status != "new" || statesByUnit[101].ProgressEventCount != 0 {
+		t.Fatalf("unit 101 state = %+v, want reset", statesByUnit[101])
+	}
+	if statesByUnit[102].ProgressEventCount != 1 || statesByUnit[102].ProgressPercent == 0 {
+		t.Fatalf("unit 102 state = %+v, want unchanged progress", statesByUnit[102])
+	}
+
+	events, err := persistrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	resetCount := 0
+	for _, event := range events {
+		if event.SourceType == "learning_unit_reset" && event.SourceRefID == "reset-duplicate-1" {
+			resetCount++
+			if event.CoarseUnitID != 101 {
+				t.Fatalf("reset duplicate event coarse_unit_id = %d, want 101", event.CoarseUnitID)
+			}
+		}
+	}
+	if resetCount != 1 {
+		t.Fatalf("reset event count = %d, want 1", resetCount)
+	}
 }
 
 func TestRecordLearningEventsRollsBackWhenStateWriteFails(t *testing.T) {
@@ -591,6 +931,38 @@ func assertCompletedMasteredState(t *testing.T, state model.UserUnitState, lastP
 	}
 	if state.LastProgressAt == nil || !state.LastProgressAt.Equal(lastProgressAt) {
 		t.Fatalf("last_progress_at = %v, want %v", state.LastProgressAt, lastProgressAt)
+	}
+}
+
+func assertResetUnlearnedState(t *testing.T, state model.UserUnitState) {
+	t.Helper()
+
+	if state.IsTarget {
+		t.Fatalf("is_target = true, want false")
+	}
+	if state.Status != "new" {
+		t.Fatalf("status = %q, want new", state.Status)
+	}
+	if state.ProgressPercent != 0 {
+		t.Fatalf("progress_percent = %v, want 0", state.ProgressPercent)
+	}
+	if state.MasteryScore != 0 {
+		t.Fatalf("mastery_score = %v, want 0", state.MasteryScore)
+	}
+	if state.ObservationCount != 0 || state.ProgressEventCount != 0 {
+		t.Fatalf("counts = observation:%d progress:%d, want 0", state.ObservationCount, state.ProgressEventCount)
+	}
+	if state.LastObservedAt != nil || state.LastProgressAt != nil {
+		t.Fatalf("observed/progress timestamps = %v/%v, want nil", state.LastObservedAt, state.LastProgressAt)
+	}
+	if state.NextReviewAt != nil {
+		t.Fatalf("next_review_at = %v, want nil", state.NextReviewAt)
+	}
+	if state.ScheduleRepetition != 0 || state.ScheduleIntervalDays != 0 || state.ScheduleEaseFactor != 2.5 {
+		t.Fatalf("schedule = repetition:%d interval:%v ease:%v, want reset defaults", state.ScheduleRepetition, state.ScheduleIntervalDays, state.ScheduleEaseFactor)
+	}
+	if state.SuspendedReason != "" {
+		t.Fatalf("suspended_reason = %q, want empty", state.SuspendedReason)
 	}
 }
 

@@ -18,6 +18,12 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 
 	state := initState(currentState, event)
 
+	if policy.IsResetUnlearnedEffect(event.ReducerEffect) {
+		applyResetUnlearnedState(state)
+		state.UpdatedAt = time.Now().UTC()
+		return state, nil
+	}
+
 	if isTerminalMastered(state) && !policy.IsSetMasteredEffect(event.ReducerEffect) {
 		return state, nil
 	}
@@ -51,13 +57,17 @@ func Reduce(currentState *model.UserUnitState, event model.LearningEvent) (*mode
 
 	if pass {
 		state.ProgressSuccessCount++
-		state.ConsecutiveSuccessCount++
-		state.ConsecutiveFailureCount = 0
+		if event.CountsTowardSuccessStreak {
+			state.ConsecutiveSuccessCount++
+			state.ConsecutiveFailureCount = 0
+		}
 		policy.ApplyProgressSuccessSchedule(state, quality)
 	} else {
 		state.ProgressFailureCount++
-		state.ConsecutiveFailureCount++
-		state.ConsecutiveSuccessCount = 0
+		if event.CountsTowardSuccessStreak {
+			state.ConsecutiveFailureCount++
+			state.ConsecutiveSuccessCount = 0
+		}
 		policy.ApplyProgressFailureSchedule(state)
 	}
 
@@ -106,9 +116,14 @@ func updateObservationFields(state *model.UserUnitState, occurredAt time.Time) {
 }
 
 func finalizeState(state *model.UserUnitState) {
-	activeStatus := policy.ComputeActiveStatus(*state)
 	state.ProgressPercent = policy.ComputeProgressPercent(*state)
 	state.MasteryScore = policy.ComputeMasteryScore(*state)
+	if state.ProgressPercent >= 100 {
+		applyCompletedMasteredState(state)
+		state.UpdatedAt = time.Now().UTC()
+		return
+	}
+	activeStatus := policy.ComputeActiveStatus(*state)
 	state.Status = activeStatus
 	if activeStatus == enum.StatusMastered {
 		applyCompletedMasteredState(state)
@@ -131,6 +146,29 @@ func applyCompletedMasteredState(state *model.UserUnitState) {
 	state.MasteryScore = 1
 	state.NextReviewAt = nil
 	state.IsTarget = false
+	state.SuspendedReason = ""
+}
+
+func applyResetUnlearnedState(state *model.UserUnitState) {
+	state.Status = enum.StatusNew
+	state.ProgressPercent = 0
+	state.MasteryScore = 0
+	state.FirstObservedAt = nil
+	state.LastObservedAt = nil
+	state.ObservationCount = 0
+	state.ProgressEventCount = 0
+	state.LastProgressAt = nil
+	state.LastProgressQuality = nil
+	state.RecentProgressQualities = nil
+	state.RecentProgressPasses = nil
+	state.ProgressSuccessCount = 0
+	state.ProgressFailureCount = 0
+	state.ConsecutiveSuccessCount = 0
+	state.ConsecutiveFailureCount = 0
+	state.ScheduleRepetition = 0
+	state.ScheduleIntervalDays = 0
+	state.ScheduleEaseFactor = 2.5
+	state.NextReviewAt = nil
 	state.SuspendedReason = ""
 }
 

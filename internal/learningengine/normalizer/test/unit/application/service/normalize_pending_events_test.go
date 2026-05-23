@@ -2,7 +2,10 @@ package service_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,6 +117,126 @@ func TestNormalizeLearningInteractionsByIDsReadsSelectedRowsAndRecords(t *testin
 	}
 	if len(recorder.requests[0].Events) != 1 {
 		t.Fatalf("recorded events = %d, want 1", len(recorder.requests[0].Events))
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDsAggregatesThreeExposureSessions(t *testing.T) {
+	t1 := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	userID := "11111111-1111-1111-1111-111111111111"
+	interactionReader := &fakeInteractionReader{
+		eventsByID: []model.RawLearningInteraction{
+			validRawInteraction(userID, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventExposure, t1),
+		},
+		windowsByIDs: []model.ExposureSession3Window{{
+			UserID:          userID,
+			CoarseUnitID:    102,
+			OccurredAt:      t1.Add(2 * time.Hour),
+			ThirdVideoID:    "33333333-3333-3333-3333-333333333333",
+			WatchSessionIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"},
+			VideoIDs:        []string{"33333333-3333-3333-3333-333333333331", "33333333-3333-3333-3333-333333333332", "33333333-3333-3333-3333-333333333333"},
+			RawEventCount:   5,
+		}},
+	}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !interactionReader.windowsByIDsCalled {
+		t.Fatalf("exposure session windows by IDs reader was not called")
+	}
+	if response.ReadRawCount != 1 || response.NormalizedEventCount != 1 || response.RecordedEventCount != 1 {
+		t.Fatalf("response = %+v, want read=1 normalized=1 recorded=1", response)
+	}
+	if len(recorder.requests) != 1 || len(recorder.requests[0].Events) != 1 {
+		t.Fatalf("recorder requests = %+v, want one request with one event", recorder.requests)
+	}
+	recorded := recorder.requests[0].Events[0]
+	wantSourceRef := expectedExposureSession3SourceRef([]string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"})
+	if recorded.SourceType != "exposure_session3_v1" || recorded.SourceRefID != wantSourceRef {
+		t.Fatalf("source = %s/%s, want %s", recorded.SourceType, recorded.SourceRefID, wantSourceRef)
+	}
+	if recorded.ReducerEffect != learningenum.ReducerEffectAffectsProgress || recorded.ProgressQuality == nil || *recorded.ProgressQuality != 4 {
+		t.Fatalf("recorded event = %+v, want q4 affects_progress", recorded)
+	}
+	if recorded.CountsTowardSuccessStreak {
+		t.Fatalf("counts_toward_success_streak = true, want false")
+	}
+	wantConsumedSessions := []string{
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001",
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002",
+		"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003",
+	}
+	if strings.Join(recorded.ConsumedWatchSessionIDs, ",") != strings.Join(wantConsumedSessions, ",") {
+		t.Fatalf("consumed_watch_session_ids = %v, want %v", recorded.ConsumedWatchSessionIDs, wantConsumedSessions)
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDsRejectsIncompleteExposureSessionWindow(t *testing.T) {
+	t1 := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	userID := "11111111-1111-1111-1111-111111111111"
+	interactionReader := &fakeInteractionReader{
+		eventsByID: []model.RawLearningInteraction{
+			validRawInteraction(userID, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventExposure, t1),
+		},
+		windowsByIDs: []model.ExposureSession3Window{{
+			UserID:          userID,
+			CoarseUnitID:    102,
+			OccurredAt:      t1.Add(time.Hour),
+			ThirdVideoID:    "33333333-3333-3333-3333-333333333332",
+			WatchSessionIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002"},
+			VideoIDs:        []string{"33333333-3333-3333-3333-333333333331", "33333333-3333-3333-3333-333333333332"},
+			RawEventCount:   2,
+		}},
+	}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want incomplete session window error")
+	}
+	if response.ErrorCount != 1 || response.RecordedEventCount != 0 {
+		t.Fatalf("response = %+v, want error=1 recorded=0", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDsDoesNotRecordRawExposureWithoutSession3Window(t *testing.T) {
+	t1 := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	userID := "11111111-1111-1111-1111-111111111111"
+	interactionReader := &fakeInteractionReader{
+		eventsByID: []model.RawLearningInteraction{
+			validRawInteraction(userID, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 102, learningenum.EventExposure, t1),
+		},
+	}
+	recorder := &fakeRecorder{}
+	usecase := service.NewNormalizeLearningInteractionsByIDsUsecase(interactionReader, recorder)
+
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if response.ReadRawCount != 1 || response.NormalizedEventCount != 0 || response.RecordedEventCount != 0 {
+		t.Fatalf("response = %+v, want raw exposure read but not normalized", response)
+	}
+	if len(recorder.requests) != 0 {
+		t.Fatalf("recorder requests = %d, want 0", len(recorder.requests))
 	}
 }
 
@@ -318,13 +441,17 @@ func (r *fakeQuizReader) ListQuizEventsByIDs(_ context.Context, userID string, e
 }
 
 type fakeInteractionReader struct {
-	events          []model.RawLearningInteraction
-	eventsByID      []model.RawLearningInteraction
-	called          bool
-	byIDsCalled     bool
-	lastFilter      normalizerrepo.PendingRawEventFilter
-	lastByIDsUserID string
-	lastByIDs       []string
+	events             []model.RawLearningInteraction
+	eventsByID         []model.RawLearningInteraction
+	windows            []model.ExposureSession3Window
+	windowsByIDs       []model.ExposureSession3Window
+	called             bool
+	byIDsCalled        bool
+	windowsCalled      bool
+	windowsByIDsCalled bool
+	lastFilter         normalizerrepo.PendingRawEventFilter
+	lastByIDsUserID    string
+	lastByIDs          []string
 }
 
 func (r *fakeInteractionReader) ListPendingLearningInteractions(_ context.Context, filter normalizerrepo.PendingRawEventFilter) ([]model.RawLearningInteraction, error) {
@@ -338,6 +465,19 @@ func (r *fakeInteractionReader) ListLearningInteractionsByIDs(_ context.Context,
 	r.lastByIDsUserID = userID
 	r.lastByIDs = append([]string(nil), eventIDs...)
 	return r.eventsByID, nil
+}
+
+func (r *fakeInteractionReader) ListPendingExposureSession3Windows(_ context.Context, filter normalizerrepo.PendingRawEventFilter) ([]model.ExposureSession3Window, error) {
+	r.windowsCalled = true
+	r.lastFilter = filter
+	return r.windows, nil
+}
+
+func (r *fakeInteractionReader) ListExposureSession3WindowsByIDs(_ context.Context, userID string, eventIDs []string) ([]model.ExposureSession3Window, error) {
+	r.windowsByIDsCalled = true
+	r.lastByIDsUserID = userID
+	r.lastByIDs = append([]string(nil), eventIDs...)
+	return r.windowsByIDs, nil
 }
 
 type fakeRecorder struct {
@@ -367,6 +507,11 @@ func validRawQuiz(userID, eventID string, unitID int64, completedAt time.Time) m
 		ShownAt:             completedAt.Add(-time.Second),
 		CompletedAt:         completedAt,
 	}
+}
+
+func expectedExposureSession3SourceRef(sessionIDs []string) string {
+	sum := sha256.Sum256([]byte(strings.Join(sessionIDs, "|")))
+	return "exposure_session3:" + hex.EncodeToString(sum[:])
 }
 
 func validRawInteraction(userID, eventID string, unitID int64, eventType string, occurredAt time.Time) model.RawLearningInteraction {

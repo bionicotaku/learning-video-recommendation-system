@@ -9,6 +9,8 @@
 - Validates normalized event contracts.
 - Appends normalized events idempotently.
 - Reduces newly inserted events into `learning.user_unit_states`.
+- Provides direct user-scoped commands that append reducer-owned events, such as
+  reset-unlearned.
 - Replays user state from `learning.unit_learning_events`.
 - Maintains target/control commands and state query usecases.
 - Provides the Unit Progress read usecase for frontend mastered/unmastered
@@ -83,6 +85,30 @@ request
 
 Replay never re-reads analytics raw facts. It only uses the reducer-owned normalized ledger.
 
+### ResetUserUnitProgress
+
+```text
+request
+  -> require existing learning.user_unit_states row for user_id + coarse_unit_id
+  -> lookup existing reset event by user_id + client_event_id
+  -> append reset_unlearned event to learning.unit_learning_events
+  -> reduce newly inserted event
+  -> upsert learning.user_unit_states
+```
+
+Reset is a reducer-owned direct command, not an Analytics raw fact and not a
+Normalizer repair target. It accepts any existing user-unit state row, including
+`is_target=false` and already mastered rows. The reducer resets progress,
+observation, recent quality, streak and schedule fields to unlearned defaults,
+while preserving target/control fields such as `is_target`,
+`target_source`, `target_source_ref_id` and `target_priority`.
+
+`client_event_id` is user-scoped for reset commands. A duplicate
+`user_id + client_event_id` returns the existing `reset_unlearned` event ID and
+does not reduce the request body unit again. The database enforces this with a
+partial unique index on `learning.unit_learning_events` for
+`source_type = 'learning_unit_reset'`.
+
 ### ListUserUnitProgress
 
 ```text
@@ -103,8 +129,21 @@ active targets with status `new`, `learning` or `reviewing`.
 - `observe_only`: updates observation fields only.
 - `affects_progress`: updates observation, progress, schedule, status and mastery fields.
 - `set_mastered`: updates observation and moves the unit to terminal mastered state.
+- `reset_unlearned`: clears observation/progress/schedule fields and moves the
+  unit back to `status = 'new'` without changing target/control fields.
 
 `event_type` describes the normalized business event. `reducer_effect` is the reducer dispatch field.
+
+`affects_progress` events also carry `counts_toward_success_streak`.
+Quiz progress events set it to `true`; passive exposure session3 events set it
+to `false`. Passive progress still advances progress/schedule, but it does not
+increase `consecutive_success_count`. After any progress event is reduced, a
+state with `progress_percent >= 100` is forced into terminal mastered state.
+
+Passive exposure session3 events also carry exactly three
+`consumed_watch_session_ids`. This typed column is the reducer ledger's source
+of truth for which watch sessions have already been consumed by a passive
+progress window; metadata only keeps an audit copy.
 
 ## Time Handling
 

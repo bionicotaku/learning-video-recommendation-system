@@ -19,6 +19,17 @@ func UUIDToString(value pgtype.UUID) string {
 	return pguuid.ToString(value)
 }
 
+func UUIDsToStrings(values []pgtype.UUID) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if !value.Valid {
+			continue
+		}
+		result = append(result, pguuid.ToString(value))
+	}
+	return result
+}
+
 func StringToText(value string) pgtype.Text {
 	return pgtext.FromString(value)
 }

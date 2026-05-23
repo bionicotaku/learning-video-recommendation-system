@@ -27,6 +27,7 @@ coverage.out
 .air.toml
 
 graphify-out/cache/
+graphify-out/.graphify_root
 .codex/**/__pycache__/
 .codex/**/*.py[cod]
 .codex/.graphify_pretool_state.json

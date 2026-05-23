@@ -215,6 +215,8 @@ func TestNormalizerPendingIndexesExist(t *testing.T) {
 	indexes := []string{
 		"idx_quiz_events_completed_at_event_id",
 		"idx_learning_interaction_events_pending_normalizer",
+		"idx_learning_interaction_events_exposure_session",
+		"idx_learning_interaction_events_lookup_unit_time",
 	}
 	for _, indexName := range indexes {
 		var exists bool

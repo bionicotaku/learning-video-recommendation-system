@@ -12,6 +12,7 @@ import (
 	normalizerdto "learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	normalizerusecase "learning-video-recommendation-system/internal/learningengine/normalizer/application/usecase"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 	learningusecase "learning-video-recommendation-system/internal/learningengine/reducer/application/usecase"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -145,6 +146,50 @@ type RecordSelfMarkMasteredService struct {
 	normalizer    normalizerusecase.NormalizeSelfMarkMasteredByIDUsecase
 	userUnitState learningusecase.GetUserUnitStateUsecase
 	logger        *slog.Logger
+}
+
+type ResetUserUnitProgressService struct {
+	reset learningusecase.ResetUserUnitProgressUsecase
+}
+
+func NewResetUserUnitProgressService(reset learningusecase.ResetUserUnitProgressUsecase) *ResetUserUnitProgressService {
+	return &ResetUserUnitProgressService{reset: reset}
+}
+
+func (s *ResetUserUnitProgressService) Execute(ctx context.Context, request apvdto.ResetUserUnitProgressRequest) (apvdto.ResetUserUnitProgressResponse, error) {
+	if s.reset == nil {
+		return apvdto.ResetUserUnitProgressResponse{}, errors.New("reset user unit progress usecase is required")
+	}
+	resetResponse, err := s.reset.Execute(ctx, learningdto.ResetUserUnitProgressRequest{
+		UserID:              request.UserID,
+		ClientContext:       request.ClientContext,
+		ClientEventID:       request.ClientEventID,
+		CoarseUnitID:        request.CoarseUnitID,
+		SourceSurface:       request.SourceSurface,
+		VideoID:             request.VideoID,
+		WatchSessionID:      request.WatchSessionID,
+		RecommendationRunID: request.RecommendationRunID,
+		RelatedQuizEventID:  request.RelatedQuizEventID,
+		TokenText:           request.TokenText,
+		SentenceIndex:       request.SentenceIndex,
+		SpanIndex:           request.SpanIndex,
+		OccurredAt:          request.OccurredAt,
+		EventPayload:        request.EventPayload,
+	})
+	if err != nil {
+		if errors.Is(err, learningservice.ErrUserUnitStateNotFound) {
+			return apvdto.ResetUserUnitProgressResponse{}, InvalidRequestError("user_unit_state is required for reset unlearned")
+		}
+		if learningservice.IsValidationError(err) {
+			return apvdto.ResetUserUnitProgressResponse{}, InvalidRequestError(err.Error())
+		}
+		return apvdto.ResetUserUnitProgressResponse{}, classifyOwnerError(err)
+	}
+	return apvdto.ResetUserUnitProgressResponse{
+		Accepted:            resetResponse.Accepted,
+		UnitLearningEventID: resetResponse.UnitLearningEventID,
+		Inserted:            resetResponse.Inserted,
+	}, nil
 }
 
 func NewRecordSelfMarkMasteredService(

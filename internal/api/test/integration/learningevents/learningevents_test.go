@@ -143,7 +143,7 @@ func TestQuizAttemptsMapsInternalErrorToInternalError(t *testing.T) {
 }
 
 func TestLearningInteractionsBatchRejectsMissingPrincipal(t *testing.T) {
-	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{})
+	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, &fakeResetUserUnitProgressRecorder{})
 	handler := router.New(router.Options{LearningEvents: group})
 	server := httptest.NewServer(middleware.RequestID(handler))
 	t.Cleanup(server.Close)
@@ -667,11 +667,119 @@ func TestSelfMarkMasteredMapsContextDeadlineToServiceUnavailable(t *testing.T) {
 	}
 }
 
+func TestResetUnlearnedPassesPrincipalAndBodyUnitAndReturnsAcceptedLearningEvent(t *testing.T) {
+	recorder := &fakeResetUserUnitProgressRecorder{
+		response: apvdto.ResetUserUnitProgressResponse{
+			Accepted:            true,
+			UnitLearningEventID: "22222222-2222-2222-2222-222222222222",
+			Inserted:            true,
+		},
+	}
+	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, recorder)
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/learning-units:reset-unlearned", `{
+		"client_context": {"platform": "ios"},
+		"client_event_id": "reset-1",
+		"coarse_unit_id": 101,
+		"source_surface": "word_detail",
+		"video_id": "33333333-3333-3333-3333-333333333333",
+		"occurred_at": "2026-05-15T17:02:00Z",
+		"event_payload": {"origin": "manual"}
+	}`)
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if recorder.userID != "user-1" {
+		t.Fatalf("expected principal user id to be passed, got %q", recorder.userID)
+	}
+	if recorder.coarseUnitID != 101 {
+		t.Fatalf("expected body coarse unit id 101, got %d", recorder.coarseUnitID)
+	}
+
+	var body struct {
+		Accepted            bool   `json:"accepted"`
+		UnitLearningEventID string `json:"unit_learning_event_id"`
+		Inserted            bool   `json:"inserted"`
+	}
+	decodeJSON(t, response, &body)
+	if !body.Accepted || body.UnitLearningEventID != "22222222-2222-2222-2222-222222222222" || !body.Inserted {
+		t.Fatalf("unexpected response body: %#v", body)
+	}
+}
+
+func TestResetUnlearnedRejectsMissingCoarseUnitID(t *testing.T) {
+	recorder := &fakeResetUserUnitProgressRecorder{}
+	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, recorder)
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/learning-units:reset-unlearned", `{
+		"client_event_id": "reset-1",
+		"source_surface": "word_detail",
+		"occurred_at": "2026-05-15T17:02:00Z"
+	}`)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if recorder.userID != "" {
+		t.Fatalf("expected reset usecase not to be called")
+	}
+}
+
+func TestResetUnlearnedRejectsNonObjectEventPayload(t *testing.T) {
+	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, &fakeResetUserUnitProgressRecorder{})
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/learning-units:reset-unlearned", `{
+		"client_event_id": "reset-1",
+		"coarse_unit_id": 101,
+		"source_surface": "word_detail",
+		"occurred_at": "2026-05-15T17:02:00Z",
+		"event_payload": []
+	}`)
+
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.StatusCode)
+	}
+}
+
+func TestResetUnlearnedMapsContextDeadlineToServiceUnavailable(t *testing.T) {
+	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, &fakeResetUserUnitProgressRecorder{
+		err: context.DeadlineExceeded,
+	})
+	t.Cleanup(server.Close)
+
+	response := postJSON(t, server, "/api/learning-units:reset-unlearned", `{
+		"client_event_id": "reset-1",
+		"coarse_unit_id": 101,
+		"source_surface": "word_detail",
+		"occurred_at": "2026-05-15T17:02:00Z"
+	}`)
+
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", response.StatusCode)
+	}
+	var body struct {
+		Error struct {
+			Code      string `json:"code"`
+			RequestID string `json:"request_id"`
+		} `json:"error"`
+	}
+	decodeJSON(t, response, &body)
+	if body.Error.Code != "service_unavailable" {
+		t.Fatalf("unexpected error code: %s", body.Error.Code)
+	}
+	if body.Error.RequestID == "" {
+		t.Fatalf("expected request id in error response")
+	}
+}
+
 func TestGatewayUserinfoPrincipalMiddlewareInjectsPrincipal(t *testing.T) {
 	recorder := &fakeSelfMarkMasteredRecorder{
 		response: apvdto.RecordSelfMarkMasteredResponse{Accepted: true, LearningInteractionEventID: "22222222-2222-2222-2222-222222222222", Inserted: false},
 	}
-	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder)
+	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder, &fakeResetUserUnitProgressRecorder{})
 	handler := router.New(router.Options{LearningEvents: group})
 	handler = middleware.RequestID(auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler))
 	server := httptest.NewServer(handler)
@@ -706,7 +814,7 @@ func TestDevModeAuthorizationFallbackInjectsPrincipal(t *testing.T) {
 	recorder := &fakeSelfMarkMasteredRecorder{
 		response: apvdto.RecordSelfMarkMasteredResponse{Accepted: true, LearningInteractionEventID: "22222222-2222-2222-2222-222222222222", Inserted: false},
 	}
-	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder)
+	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, recorder, &fakeResetUserUnitProgressRecorder{})
 	handler := router.New(router.Options{LearningEvents: group})
 	handler = middleware.RequestID(auth.PrincipalMiddleware(auth.Options{
 		DevMode:               true,
@@ -744,8 +852,13 @@ func newTestServer(
 	interactions learningevents.RecordLearningInteractionsBatchService,
 	quiz learningevents.RecordQuizAttemptService,
 	selfMark learningevents.RecordSelfMarkMasteredService,
+	reset ...learningevents.ResetUserUnitProgressService,
 ) *httptest.Server {
-	group := learningevents.NewHandler(interactions, quiz, selfMark)
+	resetService := learningevents.ResetUserUnitProgressService(&fakeResetUserUnitProgressRecorder{})
+	if len(reset) > 0 {
+		resetService = reset[0]
+	}
+	group := learningevents.NewHandler(interactions, quiz, selfMark, resetService)
 	handler := router.New(router.Options{LearningEvents: group})
 	handler = middleware.RequestID(auth.FakePrincipalMiddleware(auth.Principal{UserID: "user-1"})(handler))
 	return httptest.NewServer(handler)
@@ -824,6 +937,19 @@ type fakeSelfMarkMasteredRecorder struct {
 }
 
 func (f *fakeSelfMarkMasteredRecorder) Execute(ctx context.Context, request apvdto.RecordSelfMarkMasteredRequest) (apvdto.RecordSelfMarkMasteredResponse, error) {
+	f.userID = request.UserID
+	f.coarseUnitID = request.CoarseUnitID
+	return f.response, f.err
+}
+
+type fakeResetUserUnitProgressRecorder struct {
+	userID       string
+	coarseUnitID int64
+	response     apvdto.ResetUserUnitProgressResponse
+	err          error
+}
+
+func (f *fakeResetUserUnitProgressRecorder) Execute(ctx context.Context, request apvdto.ResetUserUnitProgressRequest) (apvdto.ResetUserUnitProgressResponse, error) {
 	f.userID = request.UserID
 	f.coarseUnitID = request.CoarseUnitID
 	return f.response, f.err

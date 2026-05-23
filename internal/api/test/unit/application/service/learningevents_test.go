@@ -14,6 +14,7 @@ import (
 	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	normalizerdto "learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
+	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
 )
 
 func TestRecordLearningInteractionsBatchReturnsRawAcceptedWhenNormalizerFails(t *testing.T) {
@@ -143,6 +144,53 @@ func TestRecordSelfMarkMasteredRejectsMissingUserUnitStateBeforeRawWrite(t *test
 	}
 }
 
+func TestResetUserUnitProgressMapsMissingStateToInvalidRequest(t *testing.T) {
+	reset := &fakeResetUserUnitProgress{
+		err: learningservice.ErrUserUnitStateNotFound,
+	}
+	service := apiservice.NewResetUserUnitProgressService(reset)
+
+	_, err := service.Execute(context.Background(), apvdto.ResetUserUnitProgressRequest{
+		UserID:        "user-1",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+	})
+	if !apiservice.IsInvalidRequest(err) {
+		t.Fatalf("Execute() error = %v, want invalid request", err)
+	}
+}
+
+func TestResetUserUnitProgressPassesThroughLearningUsecase(t *testing.T) {
+	reset := &fakeResetUserUnitProgress{
+		response: learningdto.ResetUserUnitProgressResponse{
+			Accepted:            true,
+			UnitLearningEventID: "66666666-6666-6666-6666-666666666666",
+			Inserted:            true,
+		},
+	}
+	service := apiservice.NewResetUserUnitProgressService(reset)
+
+	occurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	response, err := service.Execute(context.Background(), apvdto.ResetUserUnitProgressRequest{
+		UserID:        "user-1",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !response.Accepted || response.UnitLearningEventID != "66666666-6666-6666-6666-666666666666" || !response.Inserted {
+		t.Fatalf("response = %+v", response)
+	}
+	if reset.request.UserID != "user-1" || reset.request.ClientEventID != "reset-1" || reset.request.CoarseUnitID != 101 || reset.request.SourceSurface != "word_detail" || !reset.request.OccurredAt.Equal(occurredAt) {
+		t.Fatalf("reset request = %+v", reset.request)
+	}
+}
+
 func TestRecordQuizAttemptMapsAnalyticsValidationErrorToInvalidRequest(t *testing.T) {
 	rawWriter := &fakeQuizRawWriter{err: &analyticsservice.ValidationError{Message: "trigger_type is unsupported"}}
 	service := apiservice.NewRecordQuizAttemptService(rawWriter, nil, discardLogger())
@@ -245,4 +293,15 @@ type fakeSelfMarkNormalizer struct {
 func (f *fakeSelfMarkNormalizer) Execute(ctx context.Context, request normalizerdto.NormalizeSelfMarkMasteredByIDRequest) (normalizerdto.NormalizeSelfMarkMasteredByIDResponse, error) {
 	f.request = request
 	return normalizerdto.NormalizeSelfMarkMasteredByIDResponse{}, f.err
+}
+
+type fakeResetUserUnitProgress struct {
+	request  learningdto.ResetUserUnitProgressRequest
+	response learningdto.ResetUserUnitProgressResponse
+	err      error
+}
+
+func (f *fakeResetUserUnitProgress) Execute(ctx context.Context, request learningdto.ResetUserUnitProgressRequest) (learningdto.ResetUserUnitProgressResponse, error) {
+	f.request = request
+	return f.response, f.err
 }

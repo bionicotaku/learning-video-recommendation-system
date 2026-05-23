@@ -41,11 +41,13 @@ func buildLearningEventsHandler(pool *pgxpool.Pool, logger *slog.Logger) (*learn
 	normalizeQuiz := normalizerservice.NewNormalizeQuizAttemptByIDUsecase(quizReader, learningRecorder)
 	normalizeSelfMark := normalizerservice.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, learningRecorder)
 	userUnitStateReader := learningservice.NewGetUserUnitStateUsecase(learningrepo.NewUserUnitStateRepository(pool))
+	resetUserUnitProgress := learningservice.NewResetUserUnitProgressUsecase(learningtx.NewManager(pool))
 
 	interactionService := apiservice.NewRecordLearningInteractionsBatchService(recordInteractions, normalizeInteractions, logger)
 	quizService := apiservice.NewRecordQuizAttemptService(recordQuiz, normalizeQuiz, logger)
 	selfMarkService := apiservice.NewRecordSelfMarkMasteredService(recordSelfMark, normalizeSelfMark, userUnitStateReader, logger)
-	return learningevents.NewHandler(interactionService, quizService, selfMarkService), nil
+	resetService := apiservice.NewResetUserUnitProgressService(resetUserUnitProgress)
+	return learningevents.NewHandler(interactionService, quizService, selfMarkService, resetService), nil
 }
 
 func buildWatchProgressHandler(pool *pgxpool.Pool) *watchprogress.Handler {

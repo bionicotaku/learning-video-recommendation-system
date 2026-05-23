@@ -49,17 +49,18 @@ func MapQuizEvent(raw model.RawQuizEvent) (model.NormalizationResult, error) {
 	}
 
 	return model.Normalized(model.NormalizedLearningEvent{
-		UserID:          raw.UserID,
-		CoarseUnitID:    raw.CoarseUnitID,
-		VideoID:         raw.VideoID,
-		EventType:       learningenum.EventQuiz,
-		ReducerEffect:   learningenum.ReducerEffectAffectsProgress,
-		SourceType:      SourceTypeQuizEvent,
-		SourceRefID:     raw.EventID,
-		IsCorrect:       &isCorrect,
-		ProgressQuality: &quality,
-		Metadata:        metadata,
-		OccurredAt:      raw.CompletedAt,
+		UserID:                    raw.UserID,
+		CoarseUnitID:              raw.CoarseUnitID,
+		VideoID:                   raw.VideoID,
+		EventType:                 learningenum.EventQuiz,
+		ReducerEffect:             learningenum.ReducerEffectAffectsProgress,
+		SourceType:                SourceTypeQuizEvent,
+		SourceRefID:               raw.EventID,
+		IsCorrect:                 &isCorrect,
+		ProgressQuality:           &quality,
+		CountsTowardSuccessStreak: true,
+		Metadata:                  metadata,
+		OccurredAt:                raw.CompletedAt,
 	}), nil
 }
 

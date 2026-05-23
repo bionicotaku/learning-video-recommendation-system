@@ -462,6 +462,208 @@ func TestRecordLearningEventsExecuteSetMasteredTerminalState(t *testing.T) {
 	}
 }
 
+func TestResetUserUnitProgressExecuteWritesResetEventAndClearsState(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	lastProgressAt := occurredAt.Add(-24 * time.Hour)
+	lastQuality := int16(5)
+	stateRepo := &fakeUserUnitStateRepository{
+		state: &model.UserUnitState{
+			UserID:                  "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:            101,
+			IsTarget:                false,
+			TargetSource:            "unit_collection",
+			TargetSourceRefID:       "collection-1",
+			TargetPriority:          0.7,
+			Status:                  enum.StatusMastered,
+			ProgressPercent:         100,
+			MasteryScore:            1,
+			ObservationCount:        3,
+			ProgressEventCount:      2,
+			LastProgressAt:          &lastProgressAt,
+			LastProgressQuality:     &lastQuality,
+			RecentProgressQualities: []int16{4, 5},
+			RecentProgressPasses:    []bool{true, true},
+			ProgressSuccessCount:    2,
+			ConsecutiveSuccessCount: 2,
+			ScheduleRepetition:      2,
+			ScheduleIntervalDays:    1,
+			ScheduleEaseFactor:      2.6,
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{
+		appendResult: applearningrepo.AppendLearningEventsResult{
+			InsertedEvents: []model.LearningEvent{{
+				EventID:       "55555555-5555-5555-5555-555555555555",
+				UserID:        "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:  101,
+				EventType:     enum.EventResetUnlearned,
+				ReducerEffect: enum.ReducerEffectResetUnlearned,
+				SourceType:    "learning_unit_reset",
+				SourceRefID:   "reset-1",
+				Metadata:      []byte("{}"),
+				OccurredAt:    occurredAt,
+			}},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewResetUserUnitProgressUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  101,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !response.Accepted || !response.Inserted || response.UnitLearningEventID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("response = %+v", response)
+	}
+	if len(eventRepo.appended) != 1 {
+		t.Fatalf("appended events = %d, want 1", len(eventRepo.appended))
+	}
+	event := eventRepo.appended[0]
+	if event.EventType != enum.EventResetUnlearned || event.ReducerEffect != enum.ReducerEffectResetUnlearned || event.SourceType != "learning_unit_reset" || event.SourceRefID != "reset-1" {
+		t.Fatalf("reset event = %+v", event)
+	}
+	if len(stateRepo.batchUpserted) != 1 {
+		t.Fatalf("batch upserted states = %d, want 1", len(stateRepo.batchUpserted))
+	}
+	next := stateRepo.batchUpserted[0]
+	if next.IsTarget || next.TargetSource != "unit_collection" || next.TargetSourceRefID != "collection-1" || next.TargetPriority != 0.7 {
+		t.Fatalf("control fields not preserved: %+v", next)
+	}
+	if next.Status != enum.StatusNew || next.ProgressPercent != 0 || next.MasteryScore != 0 || next.ProgressEventCount != 0 || next.ObservationCount != 0 {
+		t.Fatalf("state not reset: %+v", next)
+	}
+}
+
+func TestResetUserUnitProgressExecuteTreatsClientEventIDAsUserScopedDuplicate(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	stateRepo := &fakeUserUnitStateRepository{
+		state: &model.UserUnitState{
+			UserID:             "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:       102,
+			IsTarget:           true,
+			Status:             enum.StatusReviewing,
+			ProgressPercent:    40,
+			MasteryScore:       0.4,
+			ProgressEventCount: 1,
+			ScheduleEaseFactor: 2.5,
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{
+		eventBySource: &model.LearningEvent{
+			EventID:       "55555555-5555-5555-5555-555555555555",
+			UserID:        "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:  101,
+			EventType:     enum.EventResetUnlearned,
+			ReducerEffect: enum.ReducerEffectResetUnlearned,
+			SourceType:    "learning_unit_reset",
+			SourceRefID:   "reset-1",
+			Metadata:      []byte("{}"),
+			OccurredAt:    occurredAt,
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewResetUserUnitProgressUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  102,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !response.Accepted || response.Inserted || response.UnitLearningEventID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("response = %+v, want duplicate existing event", response)
+	}
+	if len(eventRepo.appended) != 0 {
+		t.Fatalf("appended events = %d, want 0", len(eventRepo.appended))
+	}
+	if len(stateRepo.batchUpserted) != 0 {
+		t.Fatalf("batch upserted states = %d, want 0", len(stateRepo.batchUpserted))
+	}
+}
+
+func TestResetUserUnitProgressExecuteTreatsAppendDuplicateAsIdempotent(t *testing.T) {
+	occurredAt := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
+	stateRepo := &fakeUserUnitStateRepository{
+		state: &model.UserUnitState{
+			UserID:             "11111111-1111-1111-1111-111111111111",
+			CoarseUnitID:       102,
+			IsTarget:           true,
+			Status:             enum.StatusReviewing,
+			ProgressPercent:    40,
+			MasteryScore:       0.4,
+			ProgressEventCount: 1,
+			ScheduleEaseFactor: 2.5,
+		},
+	}
+	eventRepo := &fakeUnitLearningEventRepository{
+		appendErr: applearningrepo.ErrDuplicateResetClientEvent,
+		eventBySourceResults: []*model.LearningEvent{
+			nil,
+			{
+				EventID:       "55555555-5555-5555-5555-555555555555",
+				UserID:        "11111111-1111-1111-1111-111111111111",
+				CoarseUnitID:  101,
+				EventType:     enum.EventResetUnlearned,
+				ReducerEffect: enum.ReducerEffectResetUnlearned,
+				SourceType:    "learning_unit_reset",
+				SourceRefID:   "reset-1",
+				Metadata:      []byte("{}"),
+				OccurredAt:    occurredAt,
+			},
+		},
+	}
+	txManager := &fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			userUnitStates: stateRepo,
+			unitEvents:     eventRepo,
+		},
+	}
+	usecase := service.NewResetUserUnitProgressUsecase(txManager)
+
+	response, err := usecase.Execute(context.Background(), dto.ResetUserUnitProgressRequest{
+		UserID:        "11111111-1111-1111-1111-111111111111",
+		ClientEventID: "reset-1",
+		CoarseUnitID:  102,
+		SourceSurface: "word_detail",
+		OccurredAt:    occurredAt,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	if !response.Accepted || response.Inserted || response.UnitLearningEventID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("response = %+v, want duplicate existing event", response)
+	}
+	if len(eventRepo.appended) != 1 {
+		t.Fatalf("appended attempts = %d, want 1", len(eventRepo.appended))
+	}
+	if len(stateRepo.batchUpserted) != 0 {
+		t.Fatalf("batch upserted states = %d, want 0", len(stateRepo.batchUpserted))
+	}
+}
+
 func TestRecordLearningEventsExecuteRejectsLateProgressEvent(t *testing.T) {
 	lastProgressAt := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
 	q4 := int16(4)
@@ -655,6 +857,105 @@ func TestRecordLearningEventsExecuteIncrementsStartedUnitWhenProgressCrossesZero
 
 	if statsRecorder.startedUnitIncrements != 1 {
 		t.Fatalf("started unit increments = %d, want 1", statsRecorder.startedUnitIncrements)
+	}
+}
+
+func TestRecordLearningEventsExecuteValidatesConsumedWatchSessions(t *testing.T) {
+	q4 := int16(4)
+	t1 := time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC)
+	usecase := service.NewRecordLearningEventsUsecase(&fakeTxManager{
+		repositories: fakeTransactionalRepositories{
+			unitEvents:     &fakeUnitLearningEventRepository{},
+			userUnitStates: &fakeUserUnitStateRepository{},
+		},
+	})
+
+	_, err := usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:              101,
+			EventType:                 enum.EventQuiz,
+			ReducerEffect:             enum.ReducerEffectAffectsProgress,
+			SourceType:                "quiz_event",
+			SourceRefID:               "quiz-1",
+			ProgressQuality:           &q4,
+			CountsTowardSuccessStreak: true,
+			ConsumedWatchSessionIDs:   []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001"},
+			OccurredAt:                t1,
+		}},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want non-session3 consumed session validation error")
+	}
+
+	_, err = usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:            101,
+			EventType:               enum.EventExposure,
+			ReducerEffect:           enum.ReducerEffectAffectsProgress,
+			SourceType:              "exposure_session3_v1",
+			SourceRefID:             "exposure_session3:too-short",
+			ProgressQuality:         &q4,
+			ConsumedWatchSessionIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002"},
+			OccurredAt:              t1,
+		}},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want session3 consumed session count validation error")
+	}
+
+	_, err = usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:            101,
+			EventType:               enum.EventQuiz,
+			ReducerEffect:           enum.ReducerEffectAffectsProgress,
+			SourceType:              "exposure_session3_v1",
+			SourceRefID:             "exposure_session3:wrong-event-type",
+			ProgressQuality:         &q4,
+			ConsumedWatchSessionIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"},
+			OccurredAt:              t1,
+		}},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want session3 event_type validation error")
+	}
+
+	q3 := int16(3)
+	_, err = usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:            101,
+			EventType:               enum.EventExposure,
+			ReducerEffect:           enum.ReducerEffectAffectsProgress,
+			SourceType:              "exposure_session3_v1",
+			SourceRefID:             "exposure_session3:wrong-quality",
+			ProgressQuality:         &q3,
+			ConsumedWatchSessionIDs: []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"},
+			OccurredAt:              t1,
+		}},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want session3 quality validation error")
+	}
+
+	_, err = usecase.Execute(context.Background(), dto.RecordLearningEventsRequest{
+		UserID: "11111111-1111-1111-1111-111111111111",
+		Events: []dto.LearningEventInput{{
+			CoarseUnitID:              101,
+			EventType:                 enum.EventExposure,
+			ReducerEffect:             enum.ReducerEffectAffectsProgress,
+			SourceType:                "exposure_session3_v1",
+			SourceRefID:               "exposure_session3:wrong-streak",
+			ProgressQuality:           &q4,
+			CountsTowardSuccessStreak: true,
+			ConsumedWatchSessionIDs:   []string{"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0001", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0002", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa0003"},
+			OccurredAt:                t1,
+		}},
+	})
+	if err == nil {
+		t.Fatalf("Execute() error = nil, want session3 streak validation error")
 	}
 }
 
@@ -996,17 +1297,36 @@ func (f *fakeUserUnitStateRepository) ListByUser(_ context.Context, _ string, fi
 }
 
 type fakeUnitLearningEventRepository struct {
-	appended          []model.LearningEvent
-	appendResult      applearningrepo.AppendLearningEventsResult
-	listByUserOrdered []model.LearningEvent
+	appended             []model.LearningEvent
+	appendResult         applearningrepo.AppendLearningEventsResult
+	appendErr            error
+	eventBySource        *model.LearningEvent
+	eventBySourceResults []*model.LearningEvent
+	eventBySourceCalls   int
+	listByUserOrdered    []model.LearningEvent
 }
 
 func (f *fakeUnitLearningEventRepository) Append(_ context.Context, events []model.LearningEvent) (applearningrepo.AppendLearningEventsResult, error) {
 	f.appended = append(f.appended, events...)
+	if f.appendErr != nil {
+		return applearningrepo.AppendLearningEventsResult{}, f.appendErr
+	}
 	if f.appendResult.InsertedEvents != nil || f.appendResult.DuplicateCount != 0 {
 		return f.appendResult, nil
 	}
 	return applearningrepo.AppendLearningEventsResult{InsertedEvents: append([]model.LearningEvent(nil), events...)}, nil
+}
+
+func (f *fakeUnitLearningEventRepository) GetByUserSourceRef(_ context.Context, _ string, _ string, _ string) (*model.LearningEvent, error) {
+	if len(f.eventBySourceResults) > 0 {
+		index := f.eventBySourceCalls
+		f.eventBySourceCalls++
+		if index >= len(f.eventBySourceResults) {
+			index = len(f.eventBySourceResults) - 1
+		}
+		return f.eventBySourceResults[index], nil
+	}
+	return f.eventBySource, nil
 }
 
 func (f *fakeUnitLearningEventRepository) ListByUserOrdered(_ context.Context, _ string) ([]model.LearningEvent, error) {

@@ -11,6 +11,145 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const listExposureSession3WindowsByIDs = `-- name: ListExposureSession3WindowsByIDs :many
+with candidate_pairs as (
+  select distinct i.user_id, i.coarse_unit_id
+  from analytics.learning_interaction_events i
+  where i.user_id = $1
+    and i.event_type = 'exposure'
+    and i.coarse_unit_id is not null
+    and i.watch_session_id is not null
+    and i.event_id = any($2::uuid[])
+),
+latest_lookup as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    coalesce(max(l.occurred_at), '-infinity'::timestamptz) as latest_lookup_at
+  from candidate_pairs p
+  left join analytics.learning_interaction_events l
+    on l.user_id = p.user_id
+   and l.coarse_unit_id = p.coarse_unit_id
+   and l.event_type = 'lookup'
+  group by p.user_id, p.coarse_unit_id
+),
+consumed_sessions as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    consumed.watch_session_id
+  from candidate_pairs p
+  join learning.unit_learning_events e
+    on e.user_id = p.user_id
+   and e.coarse_unit_id = p.coarse_unit_id
+   and e.source_type = 'exposure_session3_v1'
+  cross join lateral unnest(e.consumed_watch_session_ids) as consumed(watch_session_id)
+),
+session_exposures as (
+  select
+    l.user_id,
+    l.coarse_unit_id,
+    i.watch_session_id,
+    (array_agg(i.video_id order by i.occurred_at asc, i.event_id asc))[1] as video_id,
+    min(i.occurred_at) as first_exposed_at,
+    count(*)::integer as raw_event_count
+  from latest_lookup l
+  join analytics.learning_interaction_events i
+    on i.user_id = l.user_id
+   and i.coarse_unit_id = l.coarse_unit_id
+   and i.event_type = 'exposure'
+   and i.watch_session_id is not null
+   and i.occurred_at > l.latest_lookup_at
+  left join consumed_sessions c
+    on c.user_id = l.user_id
+   and c.coarse_unit_id = l.coarse_unit_id
+   and c.watch_session_id = i.watch_session_id
+  where c.watch_session_id is null
+  group by l.user_id, l.coarse_unit_id, i.watch_session_id
+),
+ranked as (
+  select
+    s.user_id, s.coarse_unit_id, s.watch_session_id, s.video_id, s.first_exposed_at, s.raw_event_count,
+    row_number() over (
+      partition by s.user_id, s.coarse_unit_id
+      order by s.first_exposed_at asc, s.watch_session_id asc
+    ) as session_rank
+  from session_exposures s
+),
+windowed as (
+  select
+    r.user_id, r.coarse_unit_id, r.watch_session_id, r.video_id, r.first_exposed_at, r.raw_event_count, r.session_rank,
+    ((r.session_rank - 1) / 3)::integer as window_index
+  from ranked r
+),
+windows as (
+  select
+    w.user_id,
+    w.coarse_unit_id,
+    (array_agg(w.video_id::text order by w.session_rank asc))[3] as third_video_id,
+    max(w.first_exposed_at) as occurred_at,
+    array_agg(w.watch_session_id::text order by w.session_rank asc) as watch_session_ids,
+    array_agg(w.video_id::text order by w.session_rank asc) as video_ids,
+    sum(w.raw_event_count)::integer as raw_event_count
+  from windowed w
+  group by w.user_id, w.coarse_unit_id, w.window_index
+  having count(*) = 3
+)
+select
+  w.user_id,
+  w.coarse_unit_id,
+  w.occurred_at::timestamptz as occurred_at,
+  w.third_video_id::text as third_video_id,
+  w.watch_session_ids::text[] as watch_session_ids,
+  w.video_ids::text[] as video_ids,
+  w.raw_event_count
+from windows w
+order by w.occurred_at asc, w.user_id asc, w.coarse_unit_id asc
+`
+
+type ListExposureSession3WindowsByIDsParams struct {
+	UserID   pgtype.UUID   `json:"user_id"`
+	EventIds []pgtype.UUID `json:"event_ids"`
+}
+
+type ListExposureSession3WindowsByIDsRow struct {
+	UserID          pgtype.UUID        `json:"user_id"`
+	CoarseUnitID    pgtype.Int8        `json:"coarse_unit_id"`
+	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
+	ThirdVideoID    string             `json:"third_video_id"`
+	WatchSessionIds []string           `json:"watch_session_ids"`
+	VideoIds        []string           `json:"video_ids"`
+	RawEventCount   int32              `json:"raw_event_count"`
+}
+
+func (q *Queries) ListExposureSession3WindowsByIDs(ctx context.Context, arg ListExposureSession3WindowsByIDsParams) ([]ListExposureSession3WindowsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, listExposureSession3WindowsByIDs, arg.UserID, arg.EventIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListExposureSession3WindowsByIDsRow{}
+	for rows.Next() {
+		var i ListExposureSession3WindowsByIDsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.OccurredAt,
+			&i.ThirdVideoID,
+			&i.WatchSessionIds,
+			&i.VideoIds,
+			&i.RawEventCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLearningInteractionsByIDs = `-- name: ListLearningInteractionsByIDs :many
 select
   i.event_id,
@@ -112,6 +251,148 @@ func (q *Queries) ListLearningInteractionsByIDs(ctx context.Context, arg ListLea
 	return items, nil
 }
 
+const listPendingExposureSession3Windows = `-- name: ListPendingExposureSession3Windows :many
+with candidate_pairs as (
+  select distinct i.user_id, i.coarse_unit_id
+  from analytics.learning_interaction_events i
+  where i.event_type = 'exposure'
+    and i.coarse_unit_id is not null
+    and i.watch_session_id is not null
+    and ($2::uuid is null or i.user_id = $2::uuid)
+    and ($3::timestamptz is null or i.occurred_at < $3::timestamptz)
+),
+latest_lookup as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    coalesce(max(l.occurred_at), '-infinity'::timestamptz) as latest_lookup_at
+  from candidate_pairs p
+  left join analytics.learning_interaction_events l
+    on l.user_id = p.user_id
+   and l.coarse_unit_id = p.coarse_unit_id
+   and l.event_type = 'lookup'
+  group by p.user_id, p.coarse_unit_id
+),
+consumed_sessions as (
+  select
+    p.user_id,
+    p.coarse_unit_id,
+    consumed.watch_session_id
+  from candidate_pairs p
+  join learning.unit_learning_events e
+    on e.user_id = p.user_id
+   and e.coarse_unit_id = p.coarse_unit_id
+   and e.source_type = 'exposure_session3_v1'
+  cross join lateral unnest(e.consumed_watch_session_ids) as consumed(watch_session_id)
+),
+session_exposures as (
+  select
+    l.user_id,
+    l.coarse_unit_id,
+    i.watch_session_id,
+    (array_agg(i.video_id order by i.occurred_at asc, i.event_id asc))[1] as video_id,
+    min(i.occurred_at) as first_exposed_at,
+    count(*)::integer as raw_event_count
+  from latest_lookup l
+  join analytics.learning_interaction_events i
+    on i.user_id = l.user_id
+   and i.coarse_unit_id = l.coarse_unit_id
+   and i.event_type = 'exposure'
+   and i.watch_session_id is not null
+   and i.occurred_at > l.latest_lookup_at
+   and ($3::timestamptz is null or i.occurred_at < $3::timestamptz)
+  left join consumed_sessions c
+    on c.user_id = l.user_id
+   and c.coarse_unit_id = l.coarse_unit_id
+   and c.watch_session_id = i.watch_session_id
+  where c.watch_session_id is null
+  group by l.user_id, l.coarse_unit_id, i.watch_session_id
+),
+ranked as (
+  select
+    s.user_id, s.coarse_unit_id, s.watch_session_id, s.video_id, s.first_exposed_at, s.raw_event_count,
+    row_number() over (
+      partition by s.user_id, s.coarse_unit_id
+      order by s.first_exposed_at asc, s.watch_session_id asc
+    ) as session_rank
+  from session_exposures s
+),
+windowed as (
+  select
+    r.user_id, r.coarse_unit_id, r.watch_session_id, r.video_id, r.first_exposed_at, r.raw_event_count, r.session_rank,
+    ((r.session_rank - 1) / 3)::integer as window_index
+  from ranked r
+),
+windows as (
+  select
+    w.user_id,
+    w.coarse_unit_id,
+    (array_agg(w.video_id::text order by w.session_rank asc))[3] as third_video_id,
+    max(w.first_exposed_at) as occurred_at,
+    array_agg(w.watch_session_id::text order by w.session_rank asc) as watch_session_ids,
+    array_agg(w.video_id::text order by w.session_rank asc) as video_ids,
+    sum(w.raw_event_count)::integer as raw_event_count
+  from windowed w
+  group by w.user_id, w.coarse_unit_id, w.window_index
+  having count(*) = 3
+)
+select
+  w.user_id,
+  w.coarse_unit_id,
+  w.occurred_at::timestamptz as occurred_at,
+  w.third_video_id::text as third_video_id,
+  w.watch_session_ids::text[] as watch_session_ids,
+  w.video_ids::text[] as video_ids,
+  w.raw_event_count
+from windows w
+order by w.occurred_at asc, w.user_id asc, w.coarse_unit_id asc
+limit $1::int
+`
+
+type ListPendingExposureSession3WindowsParams struct {
+	LimitCount     int32              `json:"limit_count"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	OccurredBefore pgtype.Timestamptz `json:"occurred_before"`
+}
+
+type ListPendingExposureSession3WindowsRow struct {
+	UserID          pgtype.UUID        `json:"user_id"`
+	CoarseUnitID    pgtype.Int8        `json:"coarse_unit_id"`
+	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
+	ThirdVideoID    string             `json:"third_video_id"`
+	WatchSessionIds []string           `json:"watch_session_ids"`
+	VideoIds        []string           `json:"video_ids"`
+	RawEventCount   int32              `json:"raw_event_count"`
+}
+
+func (q *Queries) ListPendingExposureSession3Windows(ctx context.Context, arg ListPendingExposureSession3WindowsParams) ([]ListPendingExposureSession3WindowsRow, error) {
+	rows, err := q.db.Query(ctx, listPendingExposureSession3Windows, arg.LimitCount, arg.UserID, arg.OccurredBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPendingExposureSession3WindowsRow{}
+	for rows.Next() {
+		var i ListPendingExposureSession3WindowsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.CoarseUnitID,
+			&i.OccurredAt,
+			&i.ThirdVideoID,
+			&i.WatchSessionIds,
+			&i.VideoIds,
+			&i.RawEventCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPendingLearningInteractions = `-- name: ListPendingLearningInteractions :many
 select
   i.event_id,
@@ -137,7 +418,7 @@ select
   i.event_payload
 from analytics.learning_interaction_events i
 where i.coarse_unit_id is not null
-  and i.event_type in ('exposure', 'lookup', 'self_mark_mastered')
+  and i.event_type in ('lookup', 'self_mark_mastered')
   and ($1::uuid is null or i.user_id = $1::uuid)
   and ($2::timestamptz is null or i.occurred_at < $2::timestamptz)
   and not exists (

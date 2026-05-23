@@ -4,9 +4,11 @@ package repository_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
 	persistrepo "learning-video-recommendation-system/internal/learningengine/reducer/infrastructure/persistence/repository"
 )
@@ -91,6 +93,38 @@ func TestUnitLearningEventRepositoryAppendDuplicateReturnsDuplicateCount(t *test
 	}
 	if len(result.InsertedEvents) != 0 || result.DuplicateCount != 1 {
 		t.Fatalf("second Append() result = %+v, want one duplicate", result)
+	}
+}
+
+func TestUnitLearningEventRepositoryRejectsResetDuplicateClientEventAcrossUnits(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedCoarseUnit(t, 102)
+
+	repo := persistrepo.NewUnitLearningEventRepository(db.Pool)
+	first := model.LearningEvent{
+		UserID:        userID,
+		CoarseUnitID:  101,
+		EventType:     "reset_unlearned",
+		ReducerEffect: "reset_unlearned",
+		SourceType:    "learning_unit_reset",
+		SourceRefID:   "reset-client-event-1",
+		Metadata:      []byte("{}"),
+		OccurredAt:    time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+	}
+	if _, err := repo.Append(context.Background(), []model.LearningEvent{first}); err != nil {
+		t.Fatalf("first Append() error = %v", err)
+	}
+
+	second := first
+	second.CoarseUnitID = 102
+	second.OccurredAt = first.OccurredAt.Add(time.Hour)
+	if _, err := repo.Append(context.Background(), []model.LearningEvent{second}); !errors.Is(err, apprepo.ErrDuplicateResetClientEvent) {
+		t.Fatalf("second Append() error = %v, want ErrDuplicateResetClientEvent", err)
 	}
 }
 

@@ -4,6 +4,9 @@ package application_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
 	"testing"
 	"time"
 
@@ -82,7 +85,7 @@ func TestNormalizePendingEventsSelfMarkSetsTerminalMastered(t *testing.T) {
 	}
 }
 
-func TestNormalizePendingEventsLookupAndExposureOnlyUpdateObservation(t *testing.T) {
+func TestNormalizePendingEventsLookupUpdatesObservationAndRawExposureDoesNotNormalizeDirectly(t *testing.T) {
 	t.Parallel()
 
 	db := testDB(t)
@@ -97,19 +100,308 @@ func TestNormalizePendingEventsLookupAndExposureOnlyUpdateObservation(t *testing
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if response.RecordedEventCount != 2 {
-		t.Fatalf("RecordedEventCount = %d, want 2", response.RecordedEventCount)
+	if response.RecordedEventCount != 1 {
+		t.Fatalf("RecordedEventCount = %d, want 1", response.RecordedEventCount)
 	}
 
 	state := readState(t, db, userID, 101)
 	if state.status != "new" {
 		t.Fatalf("status = %q, want new", state.status)
 	}
-	if state.observationCount != 2 || state.progressEventCount != 0 {
-		t.Fatalf("observation/progress count = %d/%d, want 2/0", state.observationCount, state.progressEventCount)
+	if state.observationCount != 1 || state.progressEventCount != 0 {
+		t.Fatalf("observation/progress count = %d/%d, want 1/0", state.observationCount, state.progressEventCount)
 	}
 	if state.lastProgressQuality != nil {
 		t.Fatalf("last_progress_quality = %v, want nil", state.lastProgressQuality)
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDCreatesPassiveProgressAfterThreeExposureSessions(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoA := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	videoB := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"
+	videoC := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3"
+	s1 := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01"
+	s2 := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02"
+	s3 := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoA)
+	db.SeedVideo(t, videoB)
+	db.SeedVideo(t, videoC)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	seedWatchSession(t, db, s1, userID, videoA, base)
+	seedWatchSession(t, db, s2, userID, videoB, base.Add(time.Hour))
+	seedWatchSession(t, db, s3, userID, videoC, base.Add(2*time.Hour))
+	seedExposureInteraction(t, db, "55555555-5555-5555-5555-555555555551", userID, videoA, s1, 101, base)
+	seedExposureInteraction(t, db, "55555555-5555-5555-5555-555555555552", userID, videoA, s1, 101, base.Add(15*time.Second))
+	seedExposureInteraction(t, db, "55555555-5555-5555-5555-555555555553", userID, videoB, s2, 101, base.Add(time.Hour))
+	thirdEventID := "55555555-5555-5555-5555-555555555554"
+	seedExposureInteraction(t, db, thirdEventID, userID, videoC, s3, 101, base.Add(2*time.Hour))
+
+	usecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{thirdEventID},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.RecordedEventCount != 1 {
+		t.Fatalf("RecordedEventCount = %d, want 1", response.RecordedEventCount)
+	}
+
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1", len(events))
+	}
+	event := events[0]
+	wantSourceRef := expectedExposureSession3SourceRef([]string{s1, s2, s3})
+	if event.SourceType != "exposure_session3_v1" || event.SourceRefID != wantSourceRef {
+		t.Fatalf("source = %s/%s, want %s", event.SourceType, event.SourceRefID, wantSourceRef)
+	}
+	if event.ProgressQuality == nil || *event.ProgressQuality != 4 || event.CountsTowardSuccessStreak {
+		t.Fatalf("quality/streak = %v/%v, want q4 false", event.ProgressQuality, event.CountsTowardSuccessStreak)
+	}
+	wantConsumedSessions := []string{s1, s2, s3}
+	if len(event.ConsumedWatchSessionIDs) != len(wantConsumedSessions) {
+		t.Fatalf("consumed_watch_session_ids = %v, want %v", event.ConsumedWatchSessionIDs, wantConsumedSessions)
+	}
+	for index := range wantConsumedSessions {
+		if event.ConsumedWatchSessionIDs[index] != wantConsumedSessions[index] {
+			t.Fatalf("consumed_watch_session_ids = %v, want %v", event.ConsumedWatchSessionIDs, wantConsumedSessions)
+		}
+	}
+
+	state := readState(t, db, userID, 101)
+	if state.progressEventCount != 1 || state.lastProgressQuality == nil || *state.lastProgressQuality != 4 {
+		t.Fatalf("state progress count/quality = %d/%v, want 1/4", state.progressEventCount, state.lastProgressQuality)
+	}
+	if state.consecutiveSuccessCount != 0 {
+		t.Fatalf("consecutive_success_count = %d, want 0", state.consecutiveSuccessCount)
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDDoesNotReuseConsumedSessionAfterLateFlush(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoID)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sessionIDs := []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb05",
+	}
+	eventIDs := []string{
+		"55555555-5555-5555-5555-555555555551",
+		"55555555-5555-5555-5555-555555555552",
+		"55555555-5555-5555-5555-555555555553",
+		"55555555-5555-5555-5555-555555555554",
+		"55555555-5555-5555-5555-555555555555",
+	}
+	for index, sessionID := range sessionIDs {
+		occurredAt := base.Add(time.Duration(index) * time.Hour)
+		seedWatchSession(t, db, sessionID, userID, videoID, occurredAt)
+		seedExposureInteraction(t, db, eventIDs[index], userID, videoID, sessionID, 101, occurredAt)
+	}
+
+	usecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	firstResponse, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{eventIDs[2]},
+	})
+	if err != nil {
+		t.Fatalf("first Execute() error = %v", err)
+	}
+	if firstResponse.RecordedEventCount != 1 {
+		t.Fatalf("first RecordedEventCount = %d, want 1", firstResponse.RecordedEventCount)
+	}
+
+	lateFlushID := "55555555-5555-5555-5555-555555555556"
+	seedExposureInteraction(t, db, lateFlushID, userID, videoID, sessionIDs[2], 101, base.Add(2*time.Hour+15*time.Second))
+
+	secondResponse, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{lateFlushID, eventIDs[3], eventIDs[4]},
+	})
+	if err != nil {
+		t.Fatalf("second Execute() error = %v", err)
+	}
+	if secondResponse.RecordedEventCount != 0 {
+		t.Fatalf("second RecordedEventCount = %d, want 0 because session 3 was already consumed", secondResponse.RecordedEventCount)
+	}
+
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want only the first passive progress", len(events))
+	}
+}
+
+func TestNormalizePendingEventsCreatesMultiplePassiveProgressWindows(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoID)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sessionIDs := []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb05",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb06",
+	}
+	eventIDs := []string{
+		"55555555-5555-5555-5555-555555555551",
+		"55555555-5555-5555-5555-555555555552",
+		"55555555-5555-5555-5555-555555555553",
+		"55555555-5555-5555-5555-555555555554",
+		"55555555-5555-5555-5555-555555555555",
+		"55555555-5555-5555-5555-555555555556",
+	}
+	for index, sessionID := range sessionIDs {
+		occurredAt := base.Add(time.Duration(index) * time.Hour)
+		seedWatchSession(t, db, sessionID, userID, videoID, occurredAt)
+		seedExposureInteraction(t, db, eventIDs[index], userID, videoID, sessionID, 101, occurredAt)
+	}
+
+	usecase := newNormalizerUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizePendingEventsRequest{SourceKind: dto.SourceKindLearningInteraction})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.RecordedEventCount != 2 {
+		t.Fatalf("RecordedEventCount = %d, want 2", response.RecordedEventCount)
+	}
+
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2", len(events))
+	}
+	wantSourceRefs := map[string]bool{
+		expectedExposureSession3SourceRef(sessionIDs[:3]): true,
+		expectedExposureSession3SourceRef(sessionIDs[3:]): true,
+	}
+	for _, event := range events {
+		if !wantSourceRefs[event.SourceRefID] {
+			t.Fatalf("unexpected source_ref_id = %s", event.SourceRefID)
+		}
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDLookupResetsExposureSession3Window(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoID)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sessionIDs := []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04",
+	}
+	eventIDs := []string{
+		"55555555-5555-5555-5555-555555555551",
+		"55555555-5555-5555-5555-555555555552",
+		"55555555-5555-5555-5555-555555555553",
+		"55555555-5555-5555-5555-555555555554",
+	}
+	for index, sessionID := range sessionIDs {
+		occurredAt := base.Add(time.Duration(index) * time.Hour)
+		seedWatchSession(t, db, sessionID, userID, videoID, occurredAt)
+		seedExposureInteraction(t, db, eventIDs[index], userID, videoID, sessionID, 101, occurredAt)
+	}
+	seedLearningInteraction(t, db, "66666666-6666-6666-6666-666666666666", userID, 101, learningenum.EventLookup, base.Add(90*time.Minute))
+
+	usecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{eventIDs[3]},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.RecordedEventCount != 0 {
+		t.Fatalf("RecordedEventCount = %d, want 0 because only two sessions after lookup", response.RecordedEventCount)
+	}
+}
+
+func TestNormalizeLearningInteractionsByIDCreatesPassiveProgressAfterLookupReset(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111111"
+	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, 101)
+	db.SeedVideo(t, videoID)
+	base := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	sessionIDs := []string{
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb01",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb02",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb03",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb04",
+		"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbb05",
+	}
+	eventIDs := []string{
+		"55555555-5555-5555-5555-555555555551",
+		"55555555-5555-5555-5555-555555555552",
+		"55555555-5555-5555-5555-555555555553",
+		"55555555-5555-5555-5555-555555555554",
+		"55555555-5555-5555-5555-555555555555",
+	}
+	for index, sessionID := range sessionIDs {
+		occurredAt := base.Add(time.Duration(index) * time.Hour)
+		seedWatchSession(t, db, sessionID, userID, videoID, occurredAt)
+		seedExposureInteraction(t, db, eventIDs[index], userID, videoID, sessionID, 101, occurredAt)
+	}
+	seedLearningInteraction(t, db, "66666666-6666-6666-6666-666666666666", userID, 101, learningenum.EventLookup, base.Add(90*time.Minute))
+
+	usecase := newNormalizeLearningInteractionsByIDsUsecase(db)
+	response, err := usecase.Execute(context.Background(), dto.NormalizeLearningInteractionsByIDsRequest{
+		UserID:                      userID,
+		LearningInteractionEventIDs: []string{eventIDs[4]},
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if response.RecordedEventCount != 1 {
+		t.Fatalf("RecordedEventCount = %d, want 1 from sessions after lookup", response.RecordedEventCount)
+	}
+	events, err := learningrepo.NewUnitLearningEventRepository(db.Pool).ListByUserOrdered(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("ListByUserOrdered() error = %v", err)
+	}
+	if len(events) != 1 || events[0].SourceRefID != expectedExposureSession3SourceRef(sessionIDs[2:]) {
+		t.Fatalf("events = %+v, want one session3 event from sessions 3-5", events)
 	}
 }
 
@@ -310,14 +602,15 @@ func newNormalizeSelfMarkMasteredByIDUsecase(db *fixture.TestDatabase) *normaliz
 }
 
 type stateRow struct {
-	status              string
-	isTarget            bool
-	progressPercent     float64
-	masteryScore        float64
-	observationCount    int32
-	progressEventCount  int32
-	lastProgressQuality *int16
-	nextReviewIsNull    bool
+	status                  string
+	isTarget                bool
+	progressPercent         float64
+	masteryScore            float64
+	observationCount        int32
+	progressEventCount      int32
+	consecutiveSuccessCount int32
+	lastProgressQuality     *int16
+	nextReviewIsNull        bool
 }
 
 func readState(t *testing.T, db *fixture.TestDatabase, userID string, unitID int64) stateRow {
@@ -332,6 +625,7 @@ func readState(t *testing.T, db *fixture.TestDatabase, userID string, unitID int
 			mastery_score::float8,
 			observation_count,
 			progress_event_count,
+			consecutive_success_count,
 			last_progress_quality,
 			next_review_at is null
 		from learning.user_unit_states
@@ -343,12 +637,75 @@ func readState(t *testing.T, db *fixture.TestDatabase, userID string, unitID int
 		&row.masteryScore,
 		&row.observationCount,
 		&row.progressEventCount,
+		&row.consecutiveSuccessCount,
 		&row.lastProgressQuality,
 		&row.nextReviewIsNull,
 	); err != nil {
 		t.Fatalf("read learning.user_unit_states: %v", err)
 	}
 	return row
+}
+
+func seedWatchSession(t *testing.T, db *fixture.TestDatabase, sessionID, userID, videoID string, startedAt time.Time) {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `
+		insert into analytics.video_watch_events (
+			watch_session_id,
+			user_id,
+			video_id,
+			started_at,
+			last_seen_at
+		) values (
+			$1::uuid,
+			$2::uuid,
+			$3::uuid,
+			$4,
+			$4
+		)`, sessionID, userID, videoID, startedAt); err != nil {
+		t.Fatalf("seed analytics.video_watch_events: %v", err)
+	}
+}
+
+func seedExposureInteraction(t *testing.T, db *fixture.TestDatabase, eventID, userID, videoID, watchSessionID string, unitID int64, occurredAt time.Time) {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `
+		insert into analytics.learning_interaction_events (
+			event_id,
+			client_event_id,
+			user_id,
+			event_type,
+			source_surface,
+			video_id,
+			watch_session_id,
+			coarse_unit_id,
+			token_text,
+			sentence_index,
+			span_index,
+			occurred_at,
+			exposure_start_ms,
+			exposure_end_ms,
+			exposure_count,
+			event_payload
+		) values (
+			$1::uuid,
+			'client-' || $1::text,
+			$2::uuid,
+			'exposure',
+			'video_subtitle',
+			$3::uuid,
+			$4::uuid,
+			$5,
+			'example',
+			1,
+			1,
+			$6,
+			100,
+			1200,
+			1,
+			'{}'::jsonb
+		)`, eventID, userID, videoID, watchSessionID, unitID, occurredAt); err != nil {
+		t.Fatalf("seed exposure interaction: %v", err)
+	}
 }
 
 func seedQuizEvent(t *testing.T, db *fixture.TestDatabase, eventID, userID, questionID string, unitID int64, correct bool, elapsedMS int32, completedAt time.Time) {
@@ -425,4 +782,9 @@ func seedLearningInteraction(t *testing.T, db *fixture.TestDatabase, eventID, us
 		)`, eventID, userID, eventType, unitID, occurredAt); err != nil {
 		t.Fatalf("seed analytics.learning_interaction_events: %v", err)
 	}
+}
+
+func expectedExposureSession3SourceRef(sessionIDs []string) string {
+	sum := sha256.Sum256([]byte(strings.Join(sessionIDs, "|")))
+	return "exposure_session3:" + hex.EncodeToString(sum[:])
 }

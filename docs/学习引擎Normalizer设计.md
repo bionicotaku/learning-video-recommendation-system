@@ -5,7 +5,7 @@
 文档状态：MVP 当前实现说明
 目标读者：后端、数据、前端、后续接手维护的人
 当前范围：定义 Learning Engine normalizer 的模块边界、输入输出、映射规则、质量分语义、split by-ID API 主路径和 repair/backfill 路径。
-当前明确不做：不新增 checkpoint 表，不新增跨视频 exposure rollup 表，不让弱互动直接推进 progress。
+当前明确不做：不新增 checkpoint 表，不新增跨视频 exposure rollup 表，不把单条 exposure raw fact 直接推进 progress。
 
 本文承接：
 
@@ -58,7 +58,19 @@ learning.unit_learning_events
 reducer
         ↓
 learning.user_unit_states
+
+POST /api/learning-units:reset-unlearned
+        ↓
+reducer.ResetUserUnitProgress
+        ↓
+learning.unit_learning_events(event_type = reset_unlearned)
+        ↓
+reducer
+        ↓
+learning.user_unit_states
 ```
+
+`reset-unlearned` 不是 raw fact 归一化链路，不进入 Normalizer pending repair/backfill；它由 API 直接调用 reducer，在 `learning.unit_learning_events` 中持久化 `reset_unlearned` normalized event。
 
 后台补偿路径是 pending scan：
 
@@ -153,23 +165,24 @@ Recommendation 不调用 normalizer，也不写 Learning Engine 表。
 
 Recommendation 只通过 `learning.user_unit_states` 消费归约后的学习状态。
 
-Recommendation 返回给前端的 `learning_units` 会影响前端产生哪些 exposure 候选，但 Recommendation 不负责解释 exposure 是否推进学习进度。
+Recommendation 返回给前端的 `learning_units` 只表示本轮学习计划、字幕高亮和 end quiz 候选。前端 exposure 上报范围是当前用户所有 `is_target=true` 且 `status!='mastered'` 的 coarse units，不要求来自本次 Recommendation `learning_units`。
 
 ## 3. 设计目标
 
 1. 让 raw fact 到 Learning Engine event 的解释规则有唯一 owner。
 2. 保持 `learning.unit_learning_events` 仍然是 replay 的唯一事实来源。
 3. 让所有 normalized event 写入都复用 `RecordLearningEvents`。
-4. 让 quiz 成为 MVP 主要 progress 信号。
-5. 让 lookup / exposure 保守地只更新 observation。
-6. 让 self mark 使用 `set_mastered`，不伪装成 quality 5。
-7. MVP 不引入 checkpoint 表，API 主路径使用 raw IDs，repair/backfill 依赖 source 幂等约束和可重扫查询。
+4. 让 quiz 成为显性 progress 信号。
+5. 让 lookup 保守地只更新 observation。
+6. 让 3 个不同 watch session 且最近无 lookup 的 exposure 聚合成 passive progress。
+7. 让 self mark 使用 `set_mastered`，不伪装成 quality 5。
+8. MVP 不引入 checkpoint 表，API 主路径使用 raw IDs，repair/backfill 依赖 source 幂等约束和可重扫查询。
 
 ## 4. 非目标
 
 MVP 不做：
 
-- 不按跨视频 exposure 自动推进 progress。
+- 不新增 exposure projection / rollup 表；session3 直接从 raw events 聚合。
 - 不新增 `learning.user_unit_states.exposure_without_lookup_count`。
 - 不新增 `analytics.user_unit_signal_rollups`。
 - 不新增 `learning.normalization_checkpoints`。
@@ -266,9 +279,9 @@ unique (user_id, source_type, source_ref_id, coarse_unit_id)
 | quiz 超时 / 跳过 / 放弃 | 当前 schema 暂不支持 | `quiz` | `affects_progress` | `0` | `false` | 未来有明确字段后再启用。 |
 | mapped lookup | 是 | `lookup` | `observe_only` | `null` | `null` | 只要 lookup 能绑定 `coarse_unit_id` 就生成一条 observe-only event；停留、音频、练一下等附加字段只进 metadata，不改变入库判断。 |
 | unmapped lookup | 否 | - | - | - | - | 只保留 analytics raw fact。 |
-| 推荐目标 unit 的有效 exposure | 是 | `exposure` | `observe_only` | `null` | `null` | 只表示用户可能接触过。 |
-| 非推荐目标 unit 的普通 exposure | MVP 不生成 | - | - | - | - | 避免全视频词表污染学习状态。 |
-| 跨视频多次 exposure 且从未 lookup | MVP 不进 | - | - | - | - | 语义上是 passive familiarity candidate，MVP 不推进 progress。 |
+| 单条 raw exposure | 否 | - | - | - | - | raw 表保留原始快照；normalizer 不再逐条生成 observe-only event。 |
+| 同一 unit 满 3 个未消费过的不同 watch session exposure，且最近无 lookup reset | 是 | `exposure` | `affects_progress` | `4` | `null` | 生成 synthetic `exposure_session3_v1` passive progress，`source_ref_id` 为三 session hash，`counts_toward_success_streak=false`。 |
+| 非 target / 已 mastered unit 的普通 exposure | 后端不额外校验 | - | - | - | - | 前端负责只上报当前 target/unmastered coarse units；后端第一版只做字段合法性和 FK 级校验。 |
 
 ## 8. Quiz quality policy
 
@@ -437,13 +450,7 @@ Exposure 的语义是“用户可能接触过这个 unit”。
 
 单次 exposure 不能证明用户注意到了，也不能证明用户理解了。
 
-MVP 中 exposure 只写 observation：
-
-```text
-event_type = exposure
-reducer_effect = observe_only
-progress_quality = null
-```
+MVP 中 exposure raw fact 不再逐条写 normalized observe-only event。Normalizer 只把 exposure raw row 当作 session3 聚合输入。
 
 ### 10.1 有效 exposure
 
@@ -456,19 +463,32 @@ video_id is not null
 watch_session_id is not null
 ```
 
-并且它应该来自前端或后端 watch session aggregator 对当前 `learning_units` 的聚合结果。
+它可以来自前端播放快照，也可以来自前端局部聚合结果。后端不校验它是否在本次 Recommendation `learning_units` 中；前端应只上报当前用户 `is_target=true` 且 `status!='mastered'` 的 coarse units。
 
 MVP 语义：
 
 ```text
-一次 watch session 中，一个 video + coarse_unit_id 最多形成一次 exposure 候选。
+同一个 user + coarse_unit_id + watch_session_id 最多计为一次 session exposure。
 ```
 
-### 10.2 非推荐目标 unit 的 exposure
+### 10.2 session3 passive progress
 
-MVP 不对视频中所有 token 做全量 exposure。
+当同一个 `user_id + coarse_unit_id` 在最近一次 lookup 之后，累计到 3 个尚未被 `exposure_session3_v1` 消费过的不同 `watch_session_id` exposure，normalizer 生成一条 synthetic event：
 
-只有当前视频推荐返回的 `learning_units` 才应该形成 exposure 候选。普通非目标 token 即使在字幕中出现，也不生成 Learning Engine exposure。
+```text
+event_type = exposure
+reducer_effect = affects_progress
+progress_quality = 4
+source_type = exposure_session3_v1
+source_ref_id = exposure_session3:<sha256(session1|session2|session3)>
+counts_toward_success_streak = false
+consumed_watch_session_ids = [session1, session2, session3]
+occurred_at = 第 3 个 session exposure 的 first_exposed_at
+```
+
+同一个 session 内 15 秒一次的多条 exposure raw row 仍只算 1 个 session exposure。视频 A session 1、视频 B session 2、再次观看视频 A 形成的新 session 3，可以算 3 次。被某条 session3 event 消费过的 session 会记录在 `learning.unit_learning_events.consumed_watch_session_ids` typed 列中，后续窗口按该列排除这些 session；metadata 中的 `watch_session_ids` 只是审计副本。
+
+lookup 是 reset 信号。`exposure -> exposure -> lookup -> exposure` 不触发；lookup 后需要重新累计 3 个不同 watch session。
 
 ## 11. Self mark policy
 
@@ -499,28 +519,27 @@ suspended_reason = ''
 
 ## 12. 跨视频 exposure 语义
 
-跨视频 exposure 是一个未来可用的解释上下文，不是 MVP progress 输入。
+跨 session exposure 已经是 MVP passive progress 输入，但不新增 projection 表。
 
-语义上可以定义：
+当前定义：
 
 ```text
-passive_familiarity_candidate:
+exposure_session3_v1:
   user_id + coarse_unit_id
-  distinct_video_exposure_count >= 3
-  lookup_count = 0
-  quiz_failure_count = 0
-  self_mark_mastered does not exist
+  unconsumed distinct_watch_session_id_count >= 3 since latest lookup
+  source_ref_id = exposure_session3:<sha256(session1|session2|session3)>
+  consumed_watch_session_ids = [session1, session2, session3]
+  metadata.watch_session_ids = consumed sessions audit copy
+  progress_quality = 4
+  counts_toward_success_streak = false
 ```
 
-含义：
+含义：用户在多个观看 session 中自然接触过这个 unit，并且没有主动 lookup，可能已经有被动熟悉度。它推进 progress / schedule，但不计入 quiz-style 连续成功 streak。
 
-用户在多个视频中自然接触过这个 unit，并且没有主动 lookup 或失败反馈，可能已经有被动熟悉度。
-
-但 MVP 不做以下事情：
+MVP 仍不做以下事情：
 
 - 不新增 rollup 表。
-- 不把它转成 `progress_quality = 3`。
-- 不进入 SM-2 schedule path。
+- 不把它计入 `consecutive_success_count`。
 - 不修改 `learning.user_unit_states` schema。
 
 如果未来需要使用，优先顺序是：
@@ -528,7 +547,7 @@ passive_familiarity_candidate:
 1. normalizer 或分析任务直接查询 `analytics.learning_interaction_events`。
 2. 如果查询成本或一致性成为问题，再建立 rollup 表。
 3. rollup 表优先服务 normalizer 或 analytics，不污染 `learning.user_unit_states`。
-4. 真要影响学习状态，应新增明确语义，而不是把 passive familiarity 伪装成 quiz pass。
+4. 如果后续要改变权重，应新增明确的 `source_type` / quality 版本，而不是把 passive familiarity 伪装成 quiz pass。
 
 未来可能的 rollup 字段：
 
@@ -747,7 +766,7 @@ recorded_user_batch_count
 
 ### 14.3 API 主路径：`NormalizeSelfMarkMasteredByID`
 
-未来 `POST /api/learning-units:mark-mastered` 写 raw 成功后同步调用：
+`POST /api/learning-units:mark-mastered` 写 raw 成功后同步调用：
 
 ```text
 NormalizeSelfMarkMasteredByID
@@ -1132,7 +1151,8 @@ Learning interaction:
 - mapped lookup -> observe_only。
 - unmapped lookup -> skipped。
 - lookup 附加字段不改变 reducer_effect。
-- valid exposure -> observe_only。
+- single raw exposure -> no direct normalized event。
+- session3 exposure window -> q4 passive affects_progress, `counts_toward_success_streak=false`。
 - self_mark_mastered -> set_mastered。
 - validation 失败的 raw fact 不调用 mapper。
 
@@ -1150,7 +1170,9 @@ Learning interaction:
 - anti-join 能排除已经写入的 learning interaction raw fact。
 - real Postgres 下 quiz -> Learning Engine state 更新成功。
 - self_mark -> terminal mastered 成功。
-- lookup/exposure 只更新 observation，不更新 progress fields。
+- lookup 只更新 observation，不更新 progress fields。
+- 同一 watch session 内多条 exposure 只算一次 session exposure。
+- 3 个不同 watch session 的 exposure 且最近无 lookup 时生成一条 passive progress。
 
 ## 22. MVP 实施顺序
 
@@ -1186,18 +1208,17 @@ integration tests
 - checkpoint；
 - async worker；
 - retry table；
-- rollup table；
-- exposure-based progress。
+- rollup table。
 
 ## 23. 当前设计决策
 
 1. Normalizer 是 `internal/learningengine/normalizer` 子模块。
 2. Analytics 表只读，不由 normalizer 修改。
 3. Normalizer 不直接写 Learning Engine 表，只调用 `RecordLearningEvents`。
-4. Quiz 是 MVP 唯一普通 progress 信号。
+4. Quiz 是显性 progress 信号；`exposure_session3_v1` 是 passive progress 信号。
 5. `self_mark_mastered` 走 `set_mastered`，不使用 quality。
-6. Lookup 和 exposure 只写 `observe_only`。
+6. Lookup 只写 `observe_only`；exposure raw 不逐条写 normalized event。
 7. Quiz 快慢阈值固定为 `5000ms`。
 8. Quiz 首次快速答对给 `5`，首次慢速答对给 `4`，首次快速答错给 `2`，首次慢速答错给 `1`。
-9. 跨视频 exposure 只保留语义，不在 MVP 推进 progress。
+9. 3 个未消费过的不同 watch session exposure 且最近无 lookup 会生成 q4 passive progress，但不计连续成功 streak。
 10. 暂不新增 checkpoint 表，依赖 source 幂等约束和 anti-join 查询。

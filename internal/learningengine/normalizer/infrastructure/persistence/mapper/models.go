@@ -92,3 +92,27 @@ func ToRawLearningInteractionByID(row normalizersqlc.ListLearningInteractionsByI
 		EventPayload:                   row.EventPayload,
 	}
 }
+
+func ToExposureSession3Window(row normalizersqlc.ListPendingExposureSession3WindowsRow) model.ExposureSession3Window {
+	return model.ExposureSession3Window{
+		UserID:          UUIDToString(row.UserID),
+		CoarseUnitID:    Int64FromPG(row.CoarseUnitID),
+		OccurredAt:      TimeFromPG(row.OccurredAt),
+		ThirdVideoID:    row.ThirdVideoID,
+		WatchSessionIDs: row.WatchSessionIds,
+		VideoIDs:        row.VideoIds,
+		RawEventCount:   row.RawEventCount,
+	}
+}
+
+func ToExposureSession3WindowByID(row normalizersqlc.ListExposureSession3WindowsByIDsRow) model.ExposureSession3Window {
+	return model.ExposureSession3Window{
+		UserID:          UUIDToString(row.UserID),
+		CoarseUnitID:    Int64FromPG(row.CoarseUnitID),
+		OccurredAt:      TimeFromPG(row.OccurredAt),
+		ThirdVideoID:    row.ThirdVideoID,
+		WatchSessionIDs: row.WatchSessionIds,
+		VideoIDs:        row.VideoIds,
+		RawEventCount:   row.RawEventCount,
+	}
+}

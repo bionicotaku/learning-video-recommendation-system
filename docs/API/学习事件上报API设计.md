@@ -4,8 +4,8 @@
 
 文档状态：MVP 当前实现说明
 目标读者：前端、后端、数据、后续接手维护的人
-当前范围：定义已落地学习事件上报 API 的前端上传契约、字段语义、raw fact 落库语义、幂等响应、业务成功边界和后端内部归一化链路。
-当前明确不做：不引入 queue / checkpoint / dead-letter / `normalized_at`，不让 HTTP success 承诺 Learning Engine 已完成归约。
+当前范围：定义已落地学习事件上报 API 的前端上传契约、字段语义、raw fact / normalized ledger 落库语义、幂等响应、业务成功边界和后端内部归一化链路。
+当前明确不做：不引入 queue / checkpoint / dead-letter / `normalized_at`；除 reset-unlearned 这类 reducer 直接命令外，不让 HTTP success 承诺 Learning Engine 已完成归约。
 
 关联文档：
 
@@ -16,15 +16,16 @@
 
 ## 1. 一句话结论
 
-学习事件上报当前拆成三条 API，HTTP 层已落在 `internal/api`：
+学习事件上报当前拆成四条 API，HTTP 层已落在 `internal/api`：
 
 ```http
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
+POST /api/learning-units:reset-unlearned
 ```
 
-前端只上传 raw fact，不上传学习结论。后端先把 raw fact 幂等写入 Analytics，再在请求内同步尝试归一化本批 raw IDs：
+前三条是 raw fact 写入入口：前端只上传 raw fact，不上传学习结论；后端先把 raw fact 幂等写入 Analytics，再在请求内同步尝试归一化本批 raw IDs。`reset-unlearned` 是 Learning Engine reducer 直接命令，用于把已有 user-unit 状态重置为未学习；它不写 Analytics，也不经过 Normalizer。
 
 ```text
 POST /api/learning-interactions:batch
@@ -41,9 +42,14 @@ POST /api/learning-units:mark-mastered
   -> internal/analytics RecordSelfMarkMastered
   -> internal/learningengine/normalizer NormalizeSelfMarkMasteredByID
   -> internal/learningengine/reducer RecordLearningEvents
+
+POST /api/learning-units:reset-unlearned
+  -> internal/learningengine/reducer ResetUserUnitProgress
+  -> append learning.unit_learning_events(reset_unlearned)
+  -> reduce learning.user_unit_states in the same user transaction
 ```
 
-API 成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, client_event_id)` 已存在而幂等存在。Learning Engine 是否已经更新学习状态是后端内部状态，不暴露为前端成功条件。
+前三条 raw API 的成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, client_event_id)` 已存在而幂等存在。Learning Engine 是否已经更新学习状态是后端内部状态，不暴露为前端成功条件。`reset-unlearned` 成功响应承诺 reset normalized event 已在 `learning.unit_learning_events` 幂等存在，且新插入时对应 `learning.user_unit_states` 已同步归约。
 
 ## 2. API 定位
 
@@ -55,7 +61,7 @@ API 成功响应只承诺 raw fact 已接收并持久化，或因 `(user_id, cli
 
 ### 2.2 成功语义
 
-成功只表示：
+前三条 raw API 成功只表示：
 
 ```text
 raw fact accepted = 已新插入 analytics raw row 或已幂等存在
@@ -71,6 +77,14 @@ raw fact accepted = 已新插入 analytics raw row 或已幂等存在
 
 后端会同步尝试归一化本次 raw IDs。若内部归一化失败，repair/backfill 会通过 `NormalizePendingEvents` 补偿。
 
+`POST /api/learning-units:reset-unlearned` 不写 raw fact。成功表示：
+
+```text
+reset normalized event accepted = 已新插入 learning.unit_learning_events 或已幂等存在
+```
+
+新插入时，reducer 会在同一个 user-scoped transaction 内把 `learning.user_unit_states` 重置为未学习状态。
+
 ### 2.3 学习事件专属链路
 
 ```text
@@ -84,14 +98,26 @@ Analytics 只保存 raw fact，不生成 `reducer_effect`，不计算 `progress_
 
 Learning Engine normalizer 不写 Analytics，不直接写 `learning.*`，只调用 reducer 的 `RecordLearningEvents`。
 
+`reset-unlearned` 是本 API 分组中的 reducer 直接命令：
+
+```text
+internal/api
+  -> internal/learningengine/reducer ResetUserUnitProgress
+  -> learning.unit_learning_events
+  -> learning.user_unit_states
+```
+
+它的业务前置条件是当前用户必须已经存在对应 `learning.user_unit_states` 行；不要求 `is_target=true`，也不要求当前状态不是 `mastered`。
+
 ## 3. 支持的事件范围
 
 | API | 写入表 | 事件类型 | 是否可能进入 Learning Engine |
 | --- | --- | --- | --- |
-| `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `exposure` | 是，observe-only。 |
+| `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `exposure` | raw 保留；满 3 个不同 watch session 且最近无 lookup 时生成 passive affects-progress。 |
 | `POST /api/learning-interactions:batch` | `analytics.learning_interaction_events` | `lookup` | mapped lookup 是，observe-only；unmapped lookup 只留 Analytics。 |
 | `POST /api/quiz-attempts` | `analytics.quiz_events` | completed quiz attempt | 是，affects-progress。 |
 | `POST /api/learning-units:mark-mastered` | `analytics.learning_interaction_events` | `self_mark_mastered` | 是，set-mastered。 |
+| `POST /api/learning-units:reset-unlearned` | `learning.unit_learning_events` | `reset_unlearned` | 是，reset-unlearned；不写 Analytics，不经 Normalizer。 |
 
 明确不属于本 API 的事件：
 
@@ -184,7 +210,7 @@ Content-Type: application/json
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
 | `event_type` | string | 是 | `exposure` / `lookup`。`self_mark_mastered` 不允许放入 batch，必须调用单点 mark-mastered API。 |
 | `source_surface` | string | 是 | 事件发生的业务界面，例如 `video_subtitle`、`word_detail`。 |
-| `coarse_unit_id` | integer | `exposure` 必需；mapped `lookup` 必需 | 学习单元 ID。填写时必须为正整数。unmapped lookup 可以为空，只留 Analytics。 |
+| `coarse_unit_id` | integer | `exposure` 必需；mapped `lookup` 必需 | 学习单元 ID。填写时必须为正整数。exposure 不要求它来自本次 Recommendation `learning_units`，但前端应只上报当前用户未 mastered 且 target 的 coarse unit。unmapped lookup 可以为空，只留 Analytics。 |
 | `token_text` | string | `lookup` 必需 | 用户 lookup 的原始 token 文本。 |
 | `sentence_index` | integer | `exposure` / `lookup` 必需 | 字幕句子 index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
 | `span_index` | integer | `exposure` / `lookup` 必需 | token/span index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
@@ -487,9 +513,83 @@ Content-Type: application/json
 
 Self mark 的 API 成功语义仍然只是 raw accepted。raw 写入前会先校验该用户已有对应 `learning.user_unit_states` 行；缺失时返回 `invalid_request`，且不写入 raw fact。后端会同步尝试 `NormalizeSelfMarkMasteredByID`；即使同步归一化失败，也由 pending repair/backfill 最终补偿。
 
-## 8. Normalizer 语义
+## 8. Reset Unlearned 单点 API
 
-### 8.1 Learning Interaction
+### 8.1 Endpoint
+
+```http
+POST /api/learning-units:reset-unlearned
+Content-Type: application/json
+```
+
+`coarse_unit_id` 放在 body 中，表示用户明确要求把该学习单元重置为未学习。后端只接受当前用户已经存在 `learning.user_unit_states` 行的 unit；该行可以是 `is_target=false`，也可以已经是 `status=mastered`。缺少对应 state row 时返回 `400 invalid_request`，不写 `learning.unit_learning_events`。
+
+`client_event_id` 对 reset-unlearned 也是当前用户维度的幂等键，而不是当前 user-unit 维度的幂等键。若同一用户同一 `client_event_id` 已经写过 reset event，后端返回已有 `unit_learning_event_id` 和 `inserted=false`，不会对本次 body 中的另一个 `coarse_unit_id` 再执行 reset。即使是 duplicate request，后端仍会先校验本次 body 的 `coarse_unit_id` 已存在对应 state row；缺失时仍返回 `invalid_request`。
+
+### 8.2 请求结构
+
+请求结构与 `POST /api/learning-units:mark-mastered` 完全一致：
+
+```json
+{
+  "client_context": {
+    "platform": "ios",
+    "app_version": "1.3.0",
+    "os_version": "18.5",
+    "device_model": "iPhone16,2"
+  },
+  "client_event_id": "01JY_RESET_UNLEARNED_0001",
+  "coarse_unit_id": 103,
+  "source_surface": "word_detail",
+  "video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "recommendation_run_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  "related_quiz_event_id": "66666666-6666-6666-6666-666666666666",
+  "token_text": "trivial",
+  "sentence_index": 12,
+  "span_index": 4,
+  "occurred_at": "2026-05-15T17:04:00Z",
+  "event_payload": {
+    "entry": "word_detail"
+  }
+}
+```
+
+字段要求同 self mark mastered：`client_event_id`、`coarse_unit_id`、`source_surface`、`occurred_at` 必填；`client_context` 和 `event_payload` 必须是 JSON object，缺省按 `{}` 处理；可选 UUID 字段必须是合法 UUID。
+
+### 8.3 响应结构
+
+```json
+{
+  "accepted": true,
+  "unit_learning_event_id": "33333333-3333-3333-3333-333333333333",
+  "inserted": true
+}
+```
+
+响应字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `accepted` | boolean | 成功时固定 `true`。 |
+| `unit_learning_event_id` | string UUID | `learning.unit_learning_events.event_id`。 |
+| `inserted` | boolean | `true` 表示新插入并同步 reducer；`false` 表示同一用户同一 `client_event_id` 幂等命中已有 reset event。 |
+
+`reset-unlearned` 直接写 reducer normalized ledger：
+
+```text
+event_type = reset_unlearned
+reducer_effect = reset_unlearned
+progress_quality = null
+source_type = learning_unit_reset
+source_ref_id = client_event_id
+```
+
+reducer 新插入时把状态重置为未学习：`status = new`、`progress_percent = 0`、`mastery_score = 0`，清空观察、进度、最近质量、成功/失败计数、schedule 和 `next_review_at`。它不改变 target/control 字段本身；因此如果 reset 前该 row 是 `is_target=false`，reset 后仍是 `is_target=false`。该事件会进入 `learning.unit_learning_events`，后续 `ReplayUserStates` 会重放并得到一致结果。重复 `client_event_id` 只返回已有 event，不重新 reduce。
+
+## 9. Normalizer 语义
+
+### 9.1 Learning Interaction
 
 ```text
 NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
@@ -497,12 +597,13 @@ NormalizeLearningInteractionsByIDs(user_id, learning_interaction_event_ids)
 
 | raw `event_type` | normalized `event_type` | `reducer_effect` | `progress_quality` | 说明 |
 | --- | --- | --- | --- | --- |
-| `exposure` | `exposure` | `observe_only` | `null` | 只更新 observation，不推进 progress。 |
+| `exposure` | - | - | - | raw exposure 不再逐条写 normalized observe-only event；normalizer 只提取受影响的 `user_id + coarse_unit_id` 执行 session3 聚合检查。 |
+| 3 个未消费过的不同 watch session exposure，且最近无 lookup reset | `exposure` | `affects_progress` | `4` | 生成一条 synthetic `exposure_session3_v1` passive progress；`source_ref_id` 是三 session 组合 hash，typed `consumed_watch_session_ids` 记录被消费的 3 个 session，`counts_toward_success_streak=false`。 |
 | `lookup` | `lookup` | `observe_only` | `null` | mapped lookup 进入 Learning Engine；unmapped lookup skipped。 |
 
-`NormalizeLearningInteractionsByIDs` 是 batch API 专属入口，只允许 exposure / lookup raw row。self mark raw row 必须走 `NormalizeSelfMarkMasteredByID`。
+`NormalizeLearningInteractionsByIDs` 是 batch API 专属入口，只允许 exposure / lookup raw row。self mark raw row 必须走 `NormalizeSelfMarkMasteredByID`。同一 `watch_session_id` 内同一个 `coarse_unit_id` 的多条 exposure raw row 只计为一次 session exposure；已被 session3 event 的 typed `consumed_watch_session_ids` 消费的 `watch_session_id` 不会再次计入后续 window；lookup 会重置之后的 session3 计数窗口。
 
-### 8.2 Quiz Attempt
+### 9.2 Quiz Attempt
 
 ```text
 NormalizeQuizAttemptByID(user_id, quiz_event_id)
@@ -524,7 +625,7 @@ source_type = quiz_event
 source_ref_id = analytics.quiz_events.event_id
 ```
 
-### 8.3 Self Mark Mastered
+### 9.3 Self Mark Mastered
 
 ```text
 NormalizeSelfMarkMasteredByID(user_id, learning_interaction_event_id)
@@ -544,13 +645,15 @@ source_type = learning_interaction_event
 source_ref_id = analytics.learning_interaction_events.event_id
 ```
 
-## 9. 错误与补偿语义
+`reset-unlearned` 不属于 Normalizer 职责，不会出现在 `NormalizePendingEvents` repair/backfill 中；它已直接持久化为 reducer normalized event。
 
-### 9.1 Validation error
+## 10. 错误与补偿语义
+
+### 10.1 Validation error
 
 任意 validation 失败都不入库。
 
-interaction batch 是整批拒绝，不 partial success。quiz attempt 和 self mark mastered 是单条拒绝。
+interaction batch 是整批拒绝，不 partial success。quiz attempt、self mark mastered 和 reset-unlearned 是单条拒绝。
 
 错误 envelope、状态码、`request_id` 遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。示例：
 
@@ -570,19 +673,21 @@ interaction batch 是整批拒绝，不 partial success。quiz attempt 和 self 
 }
 ```
 
-### 9.2 Duplicate
+### 10.2 Duplicate
 
-本 API 的幂等命中不是错误。后端返回已有 raw event ID，并标记 `inserted=false`。
+本 API 的幂等命中不是错误。前三条 raw API 返回已有 raw event ID；`reset-unlearned` 按 `(user_id, client_event_id)` 返回已有 `unit_learning_event_id`；都标记 `inserted=false`。
 
-### 9.3 Internal normalize failure
+### 10.3 Internal normalize failure
 
 如果 raw write 成功，但同步 normalizer 失败，HTTP 仍可以返回 raw accepted。后端需要记录错误日志，后续由 `NormalizePendingEvents` 修复。
 
 前端不需要因为 Learning Engine 内部归约失败而重试；如果前端因网络失败无法确认 raw accepted，才使用同一个 `client_event_id` 重试。
 
-## 10. 前端队列建议
+`reset-unlearned` 不走 Normalizer；如果返回 200，新插入时 ledger 和 state 已经在同一事务提交。网络失败无法确认时，前端仍使用同一个 `client_event_id` 重试。
 
-### 10.1 Interaction queue
+## 11. 前端队列建议
+
+### 11.1 Interaction queue
 
 learning interaction 可以本地排队并批量 flush：
 
@@ -592,19 +697,25 @@ learning interaction 可以本地排队并批量 flush：
 - 不同事件不能共享 `client_event_id`。
 - 失败重试时保持原始 `occurred_at`，不要改成重试时间。
 
-### 10.2 Quiz submit
+### 11.2 Quiz submit
 
 quiz 不进入 interaction batch。完成一道题后直接调用 `POST /api/quiz-attempts`。
 
 如果网络失败，使用同一个 `client_event_id` 重试同一 completed attempt。不要把每次选项点击拆成单独事件上传。
 
-### 10.3 Self mark submit
+### 11.3 Self mark submit
 
 self mark 不进入 interaction batch。用户点击“已学会”后直接调用 `POST /api/learning-units:mark-mastered`。
 
 前端可以做乐观 UI 更新，但服务端响应只表示 raw fact accepted；最终状态由同步 best-effort normalize 加 pending repair/backfill 保证。
 
-## 11. TypeScript 契约草稿
+### 11.4 Reset unlearned submit
+
+reset-unlearned 不进入 interaction batch。用户点击“重置为未学习”后直接调用 `POST /api/learning-units:reset-unlearned`。
+
+前端可以做乐观 UI 更新；服务端 200 表示 reset event 已幂等存在。若该用户没有对应 `learning.user_unit_states` 行，服务端返回 `400 invalid_request`，前端应回滚本次乐观状态。
+
+## 12. TypeScript 契约草稿
 
 ```ts
 export type ClientContext = {
@@ -714,17 +825,27 @@ export type RecordSelfMarkMasteredResponse = {
   learning_interaction_event_id: string;
   inserted: boolean;
 };
+
+export type ResetUserUnitProgressRequest = RecordSelfMarkMasteredRequest;
+
+export type ResetUserUnitProgressResponse = {
+  accepted: true;
+  unit_learning_event_id: string;
+  inserted: boolean;
+};
 ```
 
-## 12. 当前实现映射
+## 13. 当前实现映射
 
-当前已落 `internal/api` HTTP handler、API application service、Analytics raw write 与 normalizer by-ID 调用链。
+当前已落 `internal/api` HTTP handler、API application service、Analytics raw write、normalizer by-ID 调用链，以及 reset-unlearned 的 reducer 直接写入链路。
 
 `internal/api` 的学习事件 handler 只做该 API 的薄适配：
 
 - 从可信 principal 取 `user_id`。
-- 把 JSON request 映射到 `internal/analytics` DTO。
-- raw write 成功后，把 raw event IDs 传给 `internal/learningengine/normalizer`。
-- 返回 raw accepted response。
+- 把 JSON request 映射到对应 application DTO。
+- 对 raw API，raw write 成功后把 raw event IDs 传给 `internal/learningengine/normalizer`，并返回 raw accepted response。
+- 对 reset-unlearned，直接调用 `internal/learningengine/reducer`，并返回 reducer event accepted response。
+
+`reset-unlearned` handler 同样只做 HTTP 薄适配，但 API application service 会直接调用 reducer `ResetUserUnitProgress`，由 reducer 在 user-scoped transaction 内写 `learning.unit_learning_events` 并归约 `learning.user_unit_states`。
 
 通用认证、错误 envelope、状态码、request id、body size、日志和 handler 目录规则不在本文重复定义，统一遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。不要在 HTTP 层生成 `progress_quality`、`reducer_effect` 或直接写 `learning.*`。

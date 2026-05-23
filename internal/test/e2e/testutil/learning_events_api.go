@@ -59,12 +59,14 @@ func (h *Harness) LearningEventsAPIServer(t *testing.T, userID string) *httptest
 	normalizeQuiz := normalizerservice.NewNormalizeQuizAttemptByIDUsecase(quizReader, learningRecorder)
 	normalizeSelfMark := normalizerservice.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, learningRecorder)
 	userUnitStateReader := learningservice.NewGetUserUnitStateUsecase(learningrepo.NewUserUnitStateRepository(h.Pool))
+	resetUserUnitProgress := learningservice.NewResetUserUnitProgressUsecase(learningtx.NewManager(h.Pool))
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	learningEvents := learningevents.NewHandler(
 		apiservice.NewRecordLearningInteractionsBatchService(recordInteractions, normalizeInteractions, logger),
 		apiservice.NewRecordQuizAttemptService(recordQuiz, normalizeQuiz, logger),
 		apiservice.NewRecordSelfMarkMasteredService(recordSelfMark, normalizeSelfMark, userUnitStateReader, logger),
+		apiservice.NewResetUserUnitProgressService(resetUserUnitProgress),
 	)
 
 	handler := router.New(router.Options{LearningEvents: learningEvents})
@@ -197,11 +199,13 @@ func (h *Harness) learningEventsHandler(logger *slog.Logger) *learningevents.Han
 	normalizeQuiz := normalizerservice.NewNormalizeQuizAttemptByIDUsecase(quizReader, learningRecorder)
 	normalizeSelfMark := normalizerservice.NewNormalizeSelfMarkMasteredByIDUsecase(interactionReader, learningRecorder)
 	userUnitStateReader := learningservice.NewGetUserUnitStateUsecase(learningrepo.NewUserUnitStateRepository(h.Pool))
+	resetUserUnitProgress := learningservice.NewResetUserUnitProgressUsecase(learningtx.NewManager(h.Pool))
 
 	return learningevents.NewHandler(
 		apiservice.NewRecordLearningInteractionsBatchService(recordInteractions, normalizeInteractions, logger),
 		apiservice.NewRecordQuizAttemptService(recordQuiz, normalizeQuiz, logger),
 		apiservice.NewRecordSelfMarkMasteredService(recordSelfMark, normalizeSelfMark, userUnitStateReader, logger),
+		apiservice.NewResetUserUnitProgressService(resetUserUnitProgress),
 	)
 }
 

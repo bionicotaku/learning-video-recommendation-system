@@ -33,3 +33,7 @@ type SuspendTargetUnitUsecase interface {
 type ResumeTargetUnitUsecase interface {
 	Execute(ctx context.Context, request dto.ResumeTargetUnitRequest) (dto.ResumeTargetUnitResponse, error)
 }
+
+type ResetUserUnitProgressUsecase interface {
+	Execute(ctx context.Context, request dto.ResetUserUnitProgressRequest) (dto.ResetUserUnitProgressResponse, error)
+}

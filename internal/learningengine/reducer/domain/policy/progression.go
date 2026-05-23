@@ -50,14 +50,15 @@ func ComputeProgressPercent(state model.UserUnitState) float64 {
 	if state.ProgressEventCount == 0 {
 		return 0
 	}
-	if ComputeActiveStatus(state) == enum.StatusMastered {
-		return 100
-	}
 
 	intervalComponent := minFloat(state.ScheduleIntervalDays/targetCompletionIntervalDays, 1)
 	accuracyComponent := averageBoolWindow(state.RecentProgressPasses)
 	repetitionComponent := minFloat(float64(state.ScheduleRepetition)/targetCompletionSuccessStreak, 1)
 	qualityComponent := averageInt16Window(state.RecentProgressQualities) / 5
+
+	if intervalComponent >= 1 && accuracyComponent >= 1 && repetitionComponent >= 1 && qualityComponent >= 0.8 {
+		return 100
+	}
 
 	score := 100 * clamp01(
 		0.45*intervalComponent+

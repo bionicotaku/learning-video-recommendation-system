@@ -122,3 +122,50 @@ func (r *RawLearningInteractionReader) ListLearningInteractionsByIDs(ctx context
 	}
 	return result, nil
 }
+
+func (r *RawLearningInteractionReader) ListPendingExposureSession3Windows(ctx context.Context, filter apprepo.PendingRawEventFilter) ([]model.ExposureSession3Window, error) {
+	userID, err := mapper.StringToUUID(filter.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListPendingExposureSession3Windows(ctx, normalizersqlc.ListPendingExposureSession3WindowsParams{
+		UserID:         userID,
+		OccurredBefore: mapper.TimePointerToPG(filter.OccurredBefore),
+		LimitCount:     int32(filter.Limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.ExposureSession3Window, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapper.ToExposureSession3Window(row))
+	}
+	return result, nil
+}
+
+func (r *RawLearningInteractionReader) ListExposureSession3WindowsByIDs(ctx context.Context, userID string, eventIDs []string) ([]model.ExposureSession3Window, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+	pgEventIDs, err := mapper.StringsToUUIDs(eventIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListExposureSession3WindowsByIDs(ctx, normalizersqlc.ListExposureSession3WindowsByIDsParams{
+		UserID:   pgUserID,
+		EventIds: pgEventIDs,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.ExposureSession3Window, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapper.ToExposureSession3WindowByID(row))
+	}
+	return result, nil
+}

@@ -22,6 +22,8 @@ type RawQuizEventReader interface {
 type RawLearningInteractionReader interface {
 	ListPendingLearningInteractions(ctx context.Context, filter PendingRawEventFilter) ([]model.RawLearningInteraction, error)
 	ListLearningInteractionsByIDs(ctx context.Context, userID string, eventIDs []string) ([]model.RawLearningInteraction, error)
+	ListPendingExposureSession3Windows(ctx context.Context, filter PendingRawEventFilter) ([]model.ExposureSession3Window, error)
+	ListExposureSession3WindowsByIDs(ctx context.Context, userID string, eventIDs []string) ([]model.ExposureSession3Window, error)
 }
 
 type LearningEventRecorder interface {

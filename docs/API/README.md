@@ -5,7 +5,7 @@
 重要状态说明：
 
 - **API 基座已落地。** 当前仓库已有 `internal/api` 目录、HTTP server bootstrap、router、middleware、handler、API DTO mapper 和 API 层测试。
-- **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered 三条写入 endpoint。
+- **学习事件上报 API 已实现写入入口。** 当前已包含 learning interaction batch、quiz attempt、self mark mastered、reset unlearned 四条写入 endpoint。
 - **移动端 MVP 不实现 CORS。** 当前入口面向原生客户端；如未来增加 Web 前端，再单独增加 CORS middleware 与 allowlist 配置。
 - **Feed、Video Detail、Video Favorites、Video History、End Quiz、Catalog watch-progress、Video Interactions、Unit Progress、Unit Collections、Active Learning Targets、Me API、Me Profile Update API、User Feedback API 已落地。** Video Favorites / Video History 提供 Catalog 只读 keyset 分页列表；Unit Progress 提供 mastered / unmastered 两个分页读取 endpoint；Me API 提供 profile、累计活动统计和 7 天 activity calendar；User Feedback API 提供 5 MiB multipart 反馈上传。
 - **认证 principal adapter 已支持 GCP API Gateway userinfo。** 后端仍不自行验证 JWT 签名；生产由 Gateway 验证 JWT，后端解析 `X-Apigateway-Api-Userinfo`。
@@ -16,7 +16,7 @@
 
 ## 业务 API 设计
 
-- [学习事件上报API设计.md](学习事件上报API设计.md)：learning interactions batch 与 quiz attempt 单点上报。
+- [学习事件上报API设计.md](学习事件上报API设计.md)：learning interactions batch、quiz attempt、self mark mastered 与 reset unlearned 上报。
 - [Unit-Progress-API-MVP设计.md](Unit-Progress-API-MVP设计.md)：用户学习单元进度分页读取。
 - [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md)：视频观看进度上报。
 - [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md)：视频点赞/取消点赞、收藏/取消收藏。
@@ -35,7 +35,7 @@
 
 ## 已实现 API 总表
 
-当前 `internal/api` 已实现 21 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
+当前 `internal/api` 已实现 22 个业务 HTTP endpoint。实现口径以 handler route registration 为准：
 
 | Method | Path | 业务分组 | 主要 owner / 编排 | 成功边界 |
 |---|---|---|---|---|
@@ -57,6 +57,7 @@
 | `POST` | `/api/learning-interactions:batch` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User daily stats | 写入 exposure / lookup raw facts；HTTP success 只承诺 raw accepted，normalization 是同步 best-effort。 |
 | `POST` | `/api/quiz-attempts` | Learning Events / 学习事件写入 | Analytics，Learning Engine best-effort normalizer，User stats projection | 写入 quiz attempt raw fact；duplicate 不重复增加 stats；HTTP success 只承诺 raw accepted。 |
 | `POST` | `/api/learning-units:mark-mastered` | Learning Events / 学习事件写入 | Analytics，Learning Engine self-mark normalizer | 写入 self-mark mastered raw fact，并走 dedicated normalizer path。 |
+| `POST` | `/api/learning-units:reset-unlearned` | Learning Events / 学习事件写入 | Learning Engine reducer | 当前用户已有 `learning.user_unit_states` 行时，直接写 reset normalized event 并同步重置状态；`client_event_id` 是用户维度幂等键；不写 Analytics。 |
 | `GET` | `/api/learning/unit-progress/mastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户已掌握学习单元。 |
 | `GET` | `/api/learning/unit-progress/unmastered` | Unit Progress / 学习单元进度读取 | Learning Engine reducer read model，Semantic 展示字段 | 分页读取当前用户尚未掌握的目标学习单元。 |
 | `POST` | `/api/feedback` | User Feedback / 用户反馈上传 | User | 接收当前用户 multipart feedback，校验 JSON object payload 与最多 5 张 JPEG 图片，在 5 MiB 总请求限制内把 submission 与图片二进制原子写入 `app_user.feedback_*`。 |
@@ -130,6 +131,7 @@
 | `POST` | `/api/learning-interactions:batch` | 批量写入 exposure / lookup raw learning interactions；HTTP success 只承诺 raw fact accepted。 |
 | `POST` | `/api/quiz-attempts` | 写入一次 quiz attempt raw fact；Learning Engine normalization 作为 best-effort 同步尝试；duplicate 不重复增加 User stats。 |
 | `POST` | `/api/learning-units:mark-mastered` | 写入 self-mark mastered raw fact；走 dedicated Analytics writer 和 self-mark normalizer path。 |
+| `POST` | `/api/learning-units:reset-unlearned` | 当前用户已有 user-unit state row 时，把该学习单元重置为未学习；接受 `is_target=false` 或已 mastered 的已有 row，按当前用户 + `client_event_id` 幂等写 Learning Engine reducer ledger。 |
 
 ### Unit Progress / 学习单元进度读取
 
@@ -149,7 +151,7 @@
 | 文档 | 设计文档状态 | API 实现状态 | 说明 |
 |---|---|---|---|
 | [API模块总体设计规范.md](API模块总体设计规范.md) | 已写入 | 已实现基座 | `internal/api` 基座、server bootstrap、router、middleware、错误响应、测试底座已落地。 |
-| [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`；HTTP success 只承诺 raw accepted。 |
+| [学习事件上报API设计.md](学习事件上报API设计.md) | 已写入 | 已实现基础入口 | 已包含 `POST /api/learning-interactions:batch`、`POST /api/quiz-attempts`、`POST /api/learning-units:mark-mastered`、`POST /api/learning-units:reset-unlearned`；前三条 HTTP success 只承诺 raw accepted，reset 直接承诺 reducer event accepted。 |
 | [Unit-Progress-API-MVP设计.md](Unit-Progress-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `GET /api/learning/unit-progress/mastered`、`GET /api/learning/unit-progress/unmastered`；API handler 从 principal 取 `user_id`，Learning Engine reducer read usecase join `semantic.coarse_unit` 返回展示字段。 |
 | [Catalog-观看进度上报MVP设计.md](Catalog-观看进度上报MVP设计.md) | 已写入 | 已实现 | 已包含 `POST /api/video-watch-progress`；Catalog 同事务维护 watch session ledger 与视频消费投影。 |
 | [Video-Interactions-API-MVP设计.md](Video-Interactions-API-MVP设计.md) | 已写入 | 已实现 | 已包含 `PUT/DELETE /api/videos/{video_id}/like` 与 `PUT/DELETE /api/videos/{video_id}/favorite`；Catalog 同事务维护用户状态与互动计数。 |

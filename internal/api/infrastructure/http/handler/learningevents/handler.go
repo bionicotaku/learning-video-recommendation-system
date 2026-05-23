@@ -25,21 +25,28 @@ type RecordSelfMarkMasteredService interface {
 	Execute(ctx context.Context, request apvdto.RecordSelfMarkMasteredRequest) (apvdto.RecordSelfMarkMasteredResponse, error)
 }
 
+type ResetUserUnitProgressService interface {
+	Execute(ctx context.Context, request apvdto.ResetUserUnitProgressRequest) (apvdto.ResetUserUnitProgressResponse, error)
+}
+
 type Handler struct {
 	learningInteractions RecordLearningInteractionsBatchService
 	quizAttempts         RecordQuizAttemptService
 	selfMarkMastered     RecordSelfMarkMasteredService
+	resetProgress        ResetUserUnitProgressService
 }
 
 func NewHandler(
 	learningInteractions RecordLearningInteractionsBatchService,
 	quizAttempts RecordQuizAttemptService,
 	selfMarkMastered RecordSelfMarkMasteredService,
+	resetUserUnitProgress ResetUserUnitProgressService,
 ) *Handler {
 	return &Handler{
 		learningInteractions: learningInteractions,
 		quizAttempts:         quizAttempts,
 		selfMarkMastered:     selfMarkMastered,
+		resetProgress:        resetUserUnitProgress,
 	}
 }
 
@@ -47,6 +54,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/learning-interactions:batch", h.recordLearningInteractionsBatch)
 	mux.HandleFunc("POST /api/quiz-attempts", h.recordQuizAttempt)
 	mux.HandleFunc("POST /api/learning-units:mark-mastered", h.recordSelfMarkMastered)
+	mux.HandleFunc("POST /api/learning-units:reset-unlearned", h.resetUserUnitProgress)
 }
 
 func writeHandlerError(w http.ResponseWriter, r *http.Request, err error) {

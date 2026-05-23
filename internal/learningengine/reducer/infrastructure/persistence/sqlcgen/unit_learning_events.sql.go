@@ -24,6 +24,16 @@ with input as (
     item.value->>'source_type' as source_type,
     item.value->>'source_ref_id' as source_ref_id,
     nullif(item.value->>'is_correct', '')::boolean as is_correct,
+    coalesce((item.value->>'counts_toward_success_streak')::boolean, false) as counts_toward_success_streak,
+    array(
+      select jsonb_array_elements_text(
+        case
+          when jsonb_typeof(item.value->'consumed_watch_session_ids') = 'array'
+            then item.value->'consumed_watch_session_ids'
+          else '[]'::jsonb
+        end
+      )::uuid
+    ) as consumed_watch_session_ids,
     coalesce(item.value->'metadata', '{}'::jsonb) as metadata,
     (item.value->>'occurred_at')::timestamptz as occurred_at
   from jsonb_array_elements($1::jsonb) as item(value)
@@ -39,6 +49,8 @@ insert into learning.unit_learning_events (
   source_type,
   source_ref_id,
   is_correct,
+  counts_toward_success_streak,
+  consumed_watch_session_ids,
   metadata,
   occurred_at
 )
@@ -52,32 +64,36 @@ select
   source_type,
   source_ref_id,
   is_correct,
+  counts_toward_success_streak,
+  consumed_watch_session_ids,
   coalesce(metadata, '{}'::jsonb),
   occurred_at
 from input
 order by input_index asc
 on conflict (user_id, source_type, source_ref_id, coarse_unit_id) do nothing
-returning event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
+returning event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
 )
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
 from inserted
 order by coarse_unit_id asc, occurred_at asc, event_id asc
 `
 
 type AppendLearningEventsRow struct {
-	EventID         pgtype.UUID        `json:"event_id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	CoarseUnitID    int64              `json:"coarse_unit_id"`
-	VideoID         pgtype.UUID        `json:"video_id"`
-	EventType       string             `json:"event_type"`
-	ReducerEffect   string             `json:"reducer_effect"`
-	ProgressQuality pgtype.Int2        `json:"progress_quality"`
-	SourceType      string             `json:"source_type"`
-	SourceRefID     string             `json:"source_ref_id"`
-	IsCorrect       pgtype.Bool        `json:"is_correct"`
-	Metadata        []byte             `json:"metadata"`
-	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	EventID                   pgtype.UUID        `json:"event_id"`
+	UserID                    pgtype.UUID        `json:"user_id"`
+	CoarseUnitID              int64              `json:"coarse_unit_id"`
+	VideoID                   pgtype.UUID        `json:"video_id"`
+	EventType                 string             `json:"event_type"`
+	ReducerEffect             string             `json:"reducer_effect"`
+	ProgressQuality           pgtype.Int2        `json:"progress_quality"`
+	SourceType                string             `json:"source_type"`
+	SourceRefID               string             `json:"source_ref_id"`
+	IsCorrect                 pgtype.Bool        `json:"is_correct"`
+	CountsTowardSuccessStreak bool               `json:"counts_toward_success_streak"`
+	ConsumedWatchSessionIds   []pgtype.UUID      `json:"consumed_watch_session_ids"`
+	Metadata                  []byte             `json:"metadata"`
+	OccurredAt                pgtype.Timestamptz `json:"occurred_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 }
 
 func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]AppendLearningEventsRow, error) {
@@ -100,6 +116,8 @@ func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]Ap
 			&i.SourceType,
 			&i.SourceRefID,
 			&i.IsCorrect,
+			&i.CountsTowardSuccessStreak,
+			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
 			&i.CreatedAt,
@@ -114,8 +132,47 @@ func (q *Queries) AppendLearningEvents(ctx context.Context, events []byte) ([]Ap
 	return items, nil
 }
 
+const getLearningEventByUserSourceRef = `-- name: GetLearningEventByUserSourceRef :one
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
+from learning.unit_learning_events
+where user_id = $1
+  and source_type = $2
+  and source_ref_id = $3
+order by created_at asc, event_id asc
+limit 1
+`
+
+type GetLearningEventByUserSourceRefParams struct {
+	UserID      pgtype.UUID `json:"user_id"`
+	SourceType  string      `json:"source_type"`
+	SourceRefID string      `json:"source_ref_id"`
+}
+
+func (q *Queries) GetLearningEventByUserSourceRef(ctx context.Context, arg GetLearningEventByUserSourceRefParams) (LearningUnitLearningEvent, error) {
+	row := q.db.QueryRow(ctx, getLearningEventByUserSourceRef, arg.UserID, arg.SourceType, arg.SourceRefID)
+	var i LearningUnitLearningEvent
+	err := row.Scan(
+		&i.EventID,
+		&i.UserID,
+		&i.CoarseUnitID,
+		&i.VideoID,
+		&i.EventType,
+		&i.ReducerEffect,
+		&i.ProgressQuality,
+		&i.SourceType,
+		&i.SourceRefID,
+		&i.IsCorrect,
+		&i.CountsTowardSuccessStreak,
+		&i.ConsumedWatchSessionIds,
+		&i.Metadata,
+		&i.OccurredAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listLearningEventsByUserOrdered = `-- name: ListLearningEventsByUserOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
 from learning.unit_learning_events
 where user_id = $1
 order by occurred_at asc, event_id asc
@@ -141,6 +198,8 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 			&i.SourceType,
 			&i.SourceRefID,
 			&i.IsCorrect,
+			&i.CountsTowardSuccessStreak,
+			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
 			&i.CreatedAt,
@@ -156,7 +215,7 @@ func (q *Queries) ListLearningEventsByUserOrdered(ctx context.Context, userID pg
 }
 
 const listLearningEventsByUserUnitOrdered = `-- name: ListLearningEventsByUserUnitOrdered :many
-select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, metadata, occurred_at, created_at
+select event_id, user_id, coarse_unit_id, video_id, event_type, reducer_effect, progress_quality, source_type, source_ref_id, is_correct, counts_toward_success_streak, consumed_watch_session_ids, metadata, occurred_at, created_at
 from learning.unit_learning_events
 where user_id = $1
   and coarse_unit_id = $2
@@ -188,6 +247,8 @@ func (q *Queries) ListLearningEventsByUserUnitOrdered(ctx context.Context, arg L
 			&i.SourceType,
 			&i.SourceRefID,
 			&i.IsCorrect,
+			&i.CountsTowardSuccessStreak,
+			&i.ConsumedWatchSessionIds,
 			&i.Metadata,
 			&i.OccurredAt,
 			&i.CreatedAt,

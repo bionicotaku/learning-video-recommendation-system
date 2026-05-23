@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	"learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	normalizerrepo "learning-video-recommendation-system/internal/learningengine/normalizer/application/repository"
@@ -107,6 +111,7 @@ func (u *NormalizePendingEventsUsecase) Execute(ctx context.Context, request dto
 	response := dto.NormalizePendingEventsResponse{}
 	quizEvents := make([]model.RawQuizEvent, 0)
 	interactions := make([]model.RawLearningInteraction, 0)
+	exposureWindows := make([]model.ExposureSession3Window, 0)
 
 	if sourceKind == dto.SourceKindAll || sourceKind == dto.SourceKindQuiz {
 		readQuizEvents, err := u.quizReader.ListPendingQuizEvents(ctx, filter)
@@ -126,6 +131,13 @@ func (u *NormalizePendingEventsUsecase) Execute(ctx context.Context, request dto
 		}
 		response.ReadRawCount += len(readInteractions)
 		interactions = append(interactions, readInteractions...)
+
+		readExposureWindows, err := u.interactionReader.ListPendingExposureSession3Windows(ctx, filter)
+		if err != nil {
+			response.ErrorCount++
+			return response, err
+		}
+		exposureWindows = append(exposureWindows, readExposureWindows...)
 	}
 
 	normalizedEvents, skippedCount, err := mapRawEvents(quizEvents, interactions)
@@ -133,6 +145,12 @@ func (u *NormalizePendingEventsUsecase) Execute(ctx context.Context, request dto
 		response.ErrorCount++
 		return response, err
 	}
+	exposureEvents, err := mapExposureSession3Windows(exposureWindows)
+	if err != nil {
+		response.ErrorCount++
+		return response, err
+	}
+	normalizedEvents = append(normalizedEvents, exposureEvents...)
 	response.SkippedCount += skippedCount
 	response.NormalizedEventCount += len(normalizedEvents)
 
@@ -170,17 +188,37 @@ func (u *NormalizeLearningInteractionsByIDsUsecase) Execute(ctx context.Context,
 	}
 	response.ReadRawCount += len(readInteractions)
 	interactions = append(interactions, readInteractions...)
+	exposureEventIDs := make([]string, 0)
+	directInteractions := make([]model.RawLearningInteraction, 0, len(interactions))
 	for _, raw := range interactions {
-		if raw.EventType != learningenum.EventExposure && raw.EventType != learningenum.EventLookup {
+		switch raw.EventType {
+		case learningenum.EventExposure:
+			exposureEventIDs = append(exposureEventIDs, raw.EventID)
+		case learningenum.EventLookup:
+			directInteractions = append(directInteractions, raw)
+		default:
 			response.ErrorCount++
 			return response, fmt.Errorf("learning interaction event %s is %s, want exposure or lookup", raw.EventID, raw.EventType)
 		}
 	}
 
-	normalizedEvents, skippedCount, err := mapRawEvents(nil, interactions)
+	normalizedEvents, skippedCount, err := mapRawEvents(nil, directInteractions)
 	if err != nil {
 		response.ErrorCount++
 		return response, err
+	}
+	if len(exposureEventIDs) > 0 {
+		exposureWindows, err := u.interactionReader.ListExposureSession3WindowsByIDs(ctx, request.UserID, exposureEventIDs)
+		if err != nil {
+			response.ErrorCount++
+			return response, err
+		}
+		exposureEvents, err := mapExposureSession3Windows(exposureWindows)
+		if err != nil {
+			response.ErrorCount++
+			return response, err
+		}
+		normalizedEvents = append(normalizedEvents, exposureEvents...)
 	}
 	response.SkippedCount += skippedCount
 	response.NormalizedEventCount += len(normalizedEvents)
@@ -319,6 +357,60 @@ func mapRawEvents(quizEvents []model.RawQuizEvent, interactions []model.RawLearn
 	return normalizedEvents, skippedCount, nil
 }
 
+func mapExposureSession3Windows(windows []model.ExposureSession3Window) ([]model.NormalizedLearningEvent, error) {
+	if len(windows) == 0 {
+		return nil, nil
+	}
+
+	events := make([]model.NormalizedLearningEvent, 0, len(windows))
+	quality := int16(4)
+	for _, window := range windows {
+		sourceRefID, err := exposureSession3SourceRefID(window.WatchSessionIDs)
+		if err != nil {
+			return nil, err
+		}
+		metadata, err := json.Marshal(map[string]any{
+			"rule":              "exposure_session3_no_lookup_v1",
+			"source_ref_policy": "sha256_watch_session_trio_v1",
+			"window_size":       3,
+			"watch_session_ids": window.WatchSessionIDs,
+			"video_ids":         window.VideoIDs,
+			"raw_event_count":   window.RawEventCount,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("build exposure session3 metadata: %w", err)
+		}
+		events = append(events, model.NormalizedLearningEvent{
+			UserID:                    window.UserID,
+			CoarseUnitID:              window.CoarseUnitID,
+			VideoID:                   window.ThirdVideoID,
+			EventType:                 learningenum.EventExposure,
+			ReducerEffect:             learningenum.ReducerEffectAffectsProgress,
+			SourceType:                "exposure_session3_v1",
+			SourceRefID:               sourceRefID,
+			ProgressQuality:           &quality,
+			CountsTowardSuccessStreak: false,
+			ConsumedWatchSessionIDs:   append([]string(nil), window.WatchSessionIDs...),
+			Metadata:                  metadata,
+			OccurredAt:                window.OccurredAt,
+		})
+	}
+	return events, nil
+}
+
+func exposureSession3SourceRefID(watchSessionIDs []string) (string, error) {
+	if len(watchSessionIDs) != 3 {
+		return "", fmt.Errorf("exposure_session3 window must contain exactly 3 watch sessions, got %d", len(watchSessionIDs))
+	}
+	for index, watchSessionID := range watchSessionIDs {
+		if strings.TrimSpace(watchSessionID) == "" {
+			return "", fmt.Errorf("exposure_session3 window watch_session_ids[%d] is empty", index)
+		}
+	}
+	sum := sha256.Sum256([]byte(strings.Join(watchSessionIDs, "|")))
+	return "exposure_session3:" + hex.EncodeToString(sum[:]), nil
+}
+
 func recordNormalizedEvents(ctx context.Context, recorder normalizerrepo.LearningEventRecorder, normalizedEvents []model.NormalizedLearningEvent) (recordResult, error) {
 	if len(normalizedEvents) == 0 {
 		return recordResult{}, nil
@@ -382,16 +474,18 @@ func toLearningInputs(events []model.NormalizedLearningEvent) []learningdto.Lear
 	inputs := make([]learningdto.LearningEventInput, 0, len(events))
 	for _, event := range events {
 		inputs = append(inputs, learningdto.LearningEventInput{
-			CoarseUnitID:    event.CoarseUnitID,
-			VideoID:         event.VideoID,
-			EventType:       event.EventType,
-			ReducerEffect:   event.ReducerEffect,
-			SourceType:      event.SourceType,
-			SourceRefID:     event.SourceRefID,
-			IsCorrect:       event.IsCorrect,
-			ProgressQuality: event.ProgressQuality,
-			Metadata:        event.Metadata,
-			OccurredAt:      event.OccurredAt,
+			CoarseUnitID:              event.CoarseUnitID,
+			VideoID:                   event.VideoID,
+			EventType:                 event.EventType,
+			ReducerEffect:             event.ReducerEffect,
+			SourceType:                event.SourceType,
+			SourceRefID:               event.SourceRefID,
+			IsCorrect:                 event.IsCorrect,
+			ProgressQuality:           event.ProgressQuality,
+			CountsTowardSuccessStreak: event.CountsTowardSuccessStreak,
+			ConsumedWatchSessionIDs:   append([]string(nil), event.ConsumedWatchSessionIDs...),
+			Metadata:                  event.Metadata,
+			OccurredAt:                event.OccurredAt,
 		})
 	}
 	return inputs

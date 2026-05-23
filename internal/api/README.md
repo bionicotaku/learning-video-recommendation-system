@@ -41,6 +41,7 @@ DELETE /api/videos/{video_id}/favorite
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
+POST /api/learning-units:reset-unlearned
 POST /api/video-watch-progress
 GET /api/learning/unit-progress/mastered
 GET /api/learning/unit-progress/unmastered
@@ -133,9 +134,10 @@ counts and current user state. Video Favorites / Video History list endpoints
 only provide navigation previews. Click writes still use the single-purpose
 Video Interactions endpoints above.
 
-The learning-event endpoints return only raw Analytics acceptance results.
+The raw learning-event endpoints return only Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is
-not exposed as the HTTP success boundary.
+not exposed as the HTTP success boundary. Reducer direct endpoints such as
+reset-unlearned return reducer event acceptance instead.
 
 `POST /api/learning-interactions:batch` accepts only exposure and lookup raw
 interactions. Self-mark mastered is intentionally a separate endpoint so it can
@@ -144,6 +146,17 @@ normalizer path. Before writing the raw fact, self-mark mastered requires an
 existing `learning.user_unit_states` row for the current user and
 `coarse_unit_id`; existing inactive or already mastered states are still
 accepted and reduced to terminal mastered with `is_target=false`.
+
+`POST /api/learning-units:reset-unlearned` uses the same request shape as
+self-mark mastered but calls the Learning Engine reducer directly. It requires
+the current user to already have a `learning.user_unit_states` row for the
+`coarse_unit_id`; `is_target=false` and already mastered rows are still
+accepted. The endpoint appends a `reset_unlearned` normalized event to
+`learning.unit_learning_events` and, when newly inserted, synchronously resets
+the projection to unlearned state in the same user-scoped transaction. It does
+not write Analytics and is not handled by Normalizer repair/backfill. Its
+`client_event_id` is user-scoped: duplicate `user_id + client_event_id`
+requests return the existing reset event and do not reduce another body unit.
 
 `POST /api/video-watch-progress` calls the Catalog `RecordVideoWatchProgress`
 usecase. It returns only `{ "accepted": true }` after the watch session ledger

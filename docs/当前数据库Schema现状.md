@@ -63,12 +63,13 @@
 
 ## 3. Analytics Migration 状态
 
-`analytics_schema_migrations` 当前有 4 条记录，对应仓库内 4 个 Analytics migration：
+`analytics_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Analytics migration：
 
 - `000001_create_analytics_schema`
 - `000002_create_quiz_events`
 - `000003_create_video_watch_events`
 - `000004_create_learning_interaction_events`
+- `000005_create_normalizer_pending_indexes`
 
 当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
 
@@ -99,6 +100,9 @@
 - `idx_learning_interaction_events_video_occurred_at`
 - `idx_learning_interaction_events_watch_session`
 - `idx_learning_interaction_events_related_quiz`
+- `idx_learning_interaction_events_pending_normalizer`
+- `idx_learning_interaction_events_exposure_session`
+- `idx_learning_interaction_events_lookup_unit_time`
 
 `analytics.learning_interaction_events` 已包含 `client_context jsonb not null default '{}'::jsonb` 与 `event_payload jsonb not null default '{}'::jsonb`，并对两者都有 JSON object 约束。
 
@@ -116,26 +120,30 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 
 ## 4.1 Learning Engine Migration 状态
 
-仓库内 Learning Engine migration 当前已清理为 4 个 clean baseline migration，代码路径为
+仓库内 Learning Engine migration 代码路径为
 `internal/learningengine/reducer/infrastructure/migration`：
 
 - `000001_create_learning_schema`
 - `000002_create_user_unit_states`
 - `000003_create_unit_learning_events`
 - `000004_create_learning_indexes`
+- `000005_create_user_learning_profiles`
+- `000006_create_recommendation_target_indexes`
 
-`set_mastered`、`progress_quality` 和 self mark 相关约束已经直接折叠进 `000003_create_unit_learning_events`，不再保留历史 patch migration。
-
-当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。只读核对显示该表有 13 个字段，并包含以下关键约束与索引：
+当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。clean baseline 中该表包含 15 个字段，并包含以下关键约束与索引：
 
 - `unit_learning_events_pkey`
 - `uq_unit_learning_events_source_unit`
+- `uq_unit_learning_events_reset_client_event`：仅用于 `source_type = 'learning_unit_reset'`，约束 reset-unlearned 的 `(user_id, source_type, source_ref_id)` 唯一，即同一用户同一 `client_event_id` 只对应一条 reset event
 - `idx_learning_events_user_time`
 - `idx_learning_events_user_unit_time`
-- `event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mastered')`
-- `reducer_effect in ('observe_only', 'affects_progress', 'set_mastered')`
-- `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`；`observe_only` 和 `set_mastered` 必须为空
+- `event_type in ('exposure', 'lookup', 'quiz', 'self_mark_mastered', 'reset_unlearned')`
+- `reducer_effect in ('observe_only', 'affects_progress', 'set_mastered', 'reset_unlearned')`
+- `progress_quality` 仅在 `affects_progress` 时必填，范围 `0..5`；`observe_only`、`set_mastered` 和 `reset_unlearned` 必须为空
 - `set_mastered` 只能与 `event_type = 'self_mark_mastered'` 一起使用
+- `reset_unlearned` 只能与 `event_type = 'reset_unlearned'` 一起使用
+- `counts_toward_success_streak=true` 只能用于 `affects_progress`
+- `source_type = 'exposure_session3_v1'` 固定要求 `event_type = exposure`、`reducer_effect = affects_progress`、`progress_quality = 4`、`counts_toward_success_streak = false`，并且 `consumed_watch_session_ids` 必须是 3 个非空 UUID；其他事件必须为空数组
 - `metadata` 必须为 JSON object
 
 当前 `learning.user_unit_states` 已是 progress / schedule 语义的状态投影表。只读核对显示该表有 28 个字段，并包含以下索引：

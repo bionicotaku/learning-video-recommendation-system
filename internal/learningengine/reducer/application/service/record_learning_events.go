@@ -39,17 +39,19 @@ func (u *RecordLearningEventsUsecase) Execute(ctx context.Context, request dto.R
 		}
 
 		event := model.LearningEvent{
-			UserID:          request.UserID,
-			CoarseUnitID:    input.CoarseUnitID,
-			VideoID:         input.VideoID,
-			EventType:       input.EventType,
-			ReducerEffect:   input.ReducerEffect,
-			SourceType:      input.SourceType,
-			SourceRefID:     input.SourceRefID,
-			IsCorrect:       input.IsCorrect,
-			ProgressQuality: input.ProgressQuality,
-			Metadata:        metadata,
-			OccurredAt:      input.OccurredAt.UTC(),
+			UserID:                    request.UserID,
+			CoarseUnitID:              input.CoarseUnitID,
+			VideoID:                   input.VideoID,
+			EventType:                 input.EventType,
+			ReducerEffect:             input.ReducerEffect,
+			SourceType:                input.SourceType,
+			SourceRefID:               input.SourceRefID,
+			IsCorrect:                 input.IsCorrect,
+			ProgressQuality:           input.ProgressQuality,
+			CountsTowardSuccessStreak: input.CountsTowardSuccessStreak,
+			ConsumedWatchSessionIDs:   append([]string(nil), input.ConsumedWatchSessionIDs...),
+			Metadata:                  metadata,
+			OccurredAt:                input.OccurredAt.UTC(),
 		}
 		if err := policy.ValidateEvent(event); err != nil {
 			return dto.RecordLearningEventsResponse{}, err

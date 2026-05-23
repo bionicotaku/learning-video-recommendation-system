@@ -9,7 +9,9 @@ import (
 )
 
 type Querier interface {
+	ListExposureSession3WindowsByIDs(ctx context.Context, arg ListExposureSession3WindowsByIDsParams) ([]ListExposureSession3WindowsByIDsRow, error)
 	ListLearningInteractionsByIDs(ctx context.Context, arg ListLearningInteractionsByIDsParams) ([]ListLearningInteractionsByIDsRow, error)
+	ListPendingExposureSession3Windows(ctx context.Context, arg ListPendingExposureSession3WindowsParams) ([]ListPendingExposureSession3WindowsRow, error)
 	ListPendingLearningInteractions(ctx context.Context, arg ListPendingLearningInteractionsParams) ([]ListPendingLearningInteractionsRow, error)
 	ListPendingQuizEvents(ctx context.Context, arg ListPendingQuizEventsParams) ([]ListPendingQuizEventsRow, error)
 	ListQuizEventsByIDs(ctx context.Context, arg ListQuizEventsByIDsParams) ([]ListQuizEventsByIDsRow, error)

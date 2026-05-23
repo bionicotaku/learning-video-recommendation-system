@@ -94,3 +94,27 @@ type RecordSelfMarkMasteredResponse struct {
 	LearningInteractionEventID string `json:"learning_interaction_event_id"`
 	Inserted                   bool   `json:"inserted"`
 }
+
+type ResetUserUnitProgressRequest struct {
+	UserID        string
+	ClientContext []byte
+
+	ClientEventID       string
+	CoarseUnitID        int64
+	SourceSurface       string
+	VideoID             string
+	WatchSessionID      string
+	RecommendationRunID string
+	RelatedQuizEventID  string
+	TokenText           string
+	SentenceIndex       *int32
+	SpanIndex           *int32
+	OccurredAt          time.Time
+	EventPayload        []byte
+}
+
+type ResetUserUnitProgressResponse struct {
+	Accepted            bool   `json:"accepted"`
+	UnitLearningEventID string `json:"unit_learning_event_id"`
+	Inserted            bool   `json:"inserted"`
+}

@@ -3,7 +3,11 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	apprepo "learning-video-recommendation-system/internal/learningengine/reducer/application/repository"
 	"learning-video-recommendation-system/internal/learningengine/reducer/domain/model"
@@ -37,18 +41,20 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 		}
 
 		payload = append(payload, appendLearningEventPayload{
-			InputIndex:      len(payload),
-			UserID:          event.UserID,
-			CoarseUnitID:    event.CoarseUnitID,
-			VideoID:         event.VideoID,
-			EventType:       event.EventType,
-			ReducerEffect:   event.ReducerEffect,
-			ProgressQuality: event.ProgressQuality,
-			SourceType:      event.SourceType,
-			SourceRefID:     event.SourceRefID,
-			IsCorrect:       event.IsCorrect,
-			Metadata:        metadata,
-			OccurredAt:      event.OccurredAt.UTC(),
+			InputIndex:                len(payload),
+			UserID:                    event.UserID,
+			CoarseUnitID:              event.CoarseUnitID,
+			VideoID:                   event.VideoID,
+			EventType:                 event.EventType,
+			ReducerEffect:             event.ReducerEffect,
+			ProgressQuality:           event.ProgressQuality,
+			SourceType:                event.SourceType,
+			SourceRefID:               event.SourceRefID,
+			IsCorrect:                 event.IsCorrect,
+			CountsTowardSuccessStreak: event.CountsTowardSuccessStreak,
+			ConsumedWatchSessionIDs:   append([]string(nil), event.ConsumedWatchSessionIDs...),
+			Metadata:                  metadata,
+			OccurredAt:                event.OccurredAt.UTC(),
 		})
 	}
 
@@ -59,6 +65,9 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 
 	rows, err := r.queries.AppendLearningEvents(ctx, encoded)
 	if err != nil {
+		if isResetClientEventDuplicate(err) {
+			return apprepo.AppendLearningEventsResult{}, apprepo.ErrDuplicateResetClientEvent
+		}
 		return apprepo.AppendLearningEventsResult{}, err
 	}
 
@@ -70,19 +79,49 @@ func (r *UnitLearningEventRepository) Append(ctx context.Context, events []model
 	return result, nil
 }
 
+func isResetClientEventDuplicate(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) &&
+		pgErr.Code == "23505" &&
+		pgErr.ConstraintName == "uq_unit_learning_events_reset_client_event"
+}
+
 type appendLearningEventPayload struct {
-	InputIndex      int             `json:"input_index"`
-	UserID          string          `json:"user_id"`
-	CoarseUnitID    int64           `json:"coarse_unit_id"`
-	VideoID         string          `json:"video_id,omitempty"`
-	EventType       string          `json:"event_type"`
-	ReducerEffect   string          `json:"reducer_effect"`
-	ProgressQuality *int16          `json:"progress_quality"`
-	SourceType      string          `json:"source_type"`
-	SourceRefID     string          `json:"source_ref_id"`
-	IsCorrect       *bool           `json:"is_correct"`
-	Metadata        json.RawMessage `json:"metadata"`
-	OccurredAt      time.Time       `json:"occurred_at"`
+	InputIndex                int             `json:"input_index"`
+	UserID                    string          `json:"user_id"`
+	CoarseUnitID              int64           `json:"coarse_unit_id"`
+	VideoID                   string          `json:"video_id,omitempty"`
+	EventType                 string          `json:"event_type"`
+	ReducerEffect             string          `json:"reducer_effect"`
+	ProgressQuality           *int16          `json:"progress_quality"`
+	SourceType                string          `json:"source_type"`
+	SourceRefID               string          `json:"source_ref_id"`
+	IsCorrect                 *bool           `json:"is_correct"`
+	CountsTowardSuccessStreak bool            `json:"counts_toward_success_streak"`
+	ConsumedWatchSessionIDs   []string        `json:"consumed_watch_session_ids"`
+	Metadata                  json.RawMessage `json:"metadata"`
+	OccurredAt                time.Time       `json:"occurred_at"`
+}
+
+func (r *UnitLearningEventRepository) GetByUserSourceRef(ctx context.Context, userID string, sourceType string, sourceRefID string) (*model.LearningEvent, error) {
+	pgUserID, err := mapper.StringToUUID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	row, err := r.queries.GetLearningEventByUserSourceRef(ctx, learningenginesqlc.GetLearningEventByUserSourceRefParams{
+		UserID:      pgUserID,
+		SourceType:  sourceType,
+		SourceRefID: sourceRefID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	event := mapper.ToLearningEvent(row)
+	return &event, nil
 }
 
 func (r *UnitLearningEventRepository) ListByUserOrdered(ctx context.Context, userID string) ([]model.LearningEvent, error) {

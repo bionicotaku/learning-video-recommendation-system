@@ -87,19 +87,21 @@ type CatalogVideo struct {
 }
 
 type LearningUnitLearningEvent struct {
-	EventID         pgtype.UUID        `json:"event_id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	CoarseUnitID    int64              `json:"coarse_unit_id"`
-	VideoID         pgtype.UUID        `json:"video_id"`
-	EventType       string             `json:"event_type"`
-	ReducerEffect   string             `json:"reducer_effect"`
-	ProgressQuality pgtype.Int2        `json:"progress_quality"`
-	SourceType      string             `json:"source_type"`
-	SourceRefID     string             `json:"source_ref_id"`
-	IsCorrect       pgtype.Bool        `json:"is_correct"`
-	Metadata        []byte             `json:"metadata"`
-	OccurredAt      pgtype.Timestamptz `json:"occurred_at"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	EventID                   pgtype.UUID        `json:"event_id"`
+	UserID                    pgtype.UUID        `json:"user_id"`
+	CoarseUnitID              int64              `json:"coarse_unit_id"`
+	VideoID                   pgtype.UUID        `json:"video_id"`
+	EventType                 string             `json:"event_type"`
+	ReducerEffect             string             `json:"reducer_effect"`
+	ProgressQuality           pgtype.Int2        `json:"progress_quality"`
+	SourceType                string             `json:"source_type"`
+	SourceRefID               string             `json:"source_ref_id"`
+	IsCorrect                 pgtype.Bool        `json:"is_correct"`
+	CountsTowardSuccessStreak bool               `json:"counts_toward_success_streak"`
+	ConsumedWatchSessionIds   []pgtype.UUID      `json:"consumed_watch_session_ids"`
+	Metadata                  []byte             `json:"metadata"`
+	OccurredAt                pgtype.Timestamptz `json:"occurred_at"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 }
 
 type LearningUserLearningProfile struct {
