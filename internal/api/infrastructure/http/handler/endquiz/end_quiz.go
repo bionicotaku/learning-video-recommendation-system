@@ -20,7 +20,8 @@ type endQuizBody struct {
 }
 
 func (h *Handler) getEndQuiz(w http.ResponseWriter, r *http.Request) {
-	if _, err := requiredPrincipal(r); err != nil {
+	_, err := requiredPrincipal(r)
+	if err != nil {
 		writeHandlerError(w, r, err)
 		return
 	}

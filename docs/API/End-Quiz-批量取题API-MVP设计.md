@@ -36,7 +36,7 @@ video_id + coarse_unit_ids[]
 3. 仍没有则跳过该 unit
 ```
 
-`recommendation_run_id` 可以作为可选字段传入，HTTP 层只校验 UUID 格式；当前实现不写取题日志、不参与取题选择。后续 quiz attempt 上报时建议继续带上做推荐归因。
+`recommendation_run_id` 可以作为可选字段传入。HTTP 层只校验 UUID 格式；不存在或不属于当前用户不影响取题。当前实现不写取题日志、不参与取题选择。后续 quiz attempt 上报时建议继续带上做 best-effort 推荐归因。
 
 ## 2. API 定位
 
@@ -94,7 +94,7 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `video_id` | string UUID | 是 | 当前视频 ID。 |
 | `coarse_unit_ids` | integer[] | 是 | 本次视频末尾要测试的学习单元列表。通常来自 Feed API 返回的 `learning_units[].coarse_unit_id`。 |
-| `recommendation_run_id` | string UUID | 否 | 本视频来自推荐 feed 时可带上。取题不依赖该字段；后续 quiz attempt 上报时建议继续带上做推荐归因。 |
+| `recommendation_run_id` | string UUID | 否 | 本视频来自推荐 feed 时可带上。只校验 UUID；取题不依赖该字段；后续 quiz attempt 上报时建议继续带上做 best-effort 推荐归因。 |
 | `client_context` | object | 否 | 客户端环境上下文。当前实现只做 JSON object 校验，不写入数据库。 |
 
 `coarse_unit_ids` 规则：
@@ -320,7 +320,7 @@ Catalog 当前提供批量 read usecase：
 EndQuizQuestionLookupUsecase.Execute(video_id, coarse_unit_ids) -> EndQuizQuestionLookupResponse
 ```
 
-API 层调用该 usecase 后直接返回 HTTP response。`recommendation_run_id` 与 `client_context` 不传入 Catalog，因为当前取题不依赖这些字段。
+API 层只校验 `recommendation_run_id` 的 UUID 格式，再调用 Catalog usecase。`recommendation_run_id` 与 `client_context` 不传入 Catalog，因为当前取题不依赖这些字段。
 
 ### 9.2 查询策略
 
@@ -353,7 +353,7 @@ payload 不合法的题目不返回给前端；服务端继续尝试同一 unit 
 实现本 API 时至少满足：
 
 1. 请求只依赖 `video_id + coarse_unit_ids[]` 完成取题。
-2. `recommendation_run_id` 不参与取题选择。
+2. `recommendation_run_id` 只校验 UUID，不参与取题选择。
 3. 每个 unit 最多返回一道题。
 4. 优先返回视频上下文题，没有再 fallback 通用题。
 5. 部分缺题不失败，统一通过 `missing_coarse_unit_ids` 表达。

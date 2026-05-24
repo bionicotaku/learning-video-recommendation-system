@@ -6,6 +6,7 @@ type ErrorCode string
 
 const (
 	ErrorCodeInvalidRequest     ErrorCode = "invalid_request"
+	ErrorCodeUnprocessable      ErrorCode = "unprocessable_entity"
 	ErrorCodeServiceUnavailable ErrorCode = "service_unavailable"
 )
 
@@ -36,6 +37,15 @@ func InvalidRequestError(message string) error {
 func IsInvalidRequest(err error) bool {
 	var appErr *Error
 	return errors.As(err, &appErr) && appErr.Code == ErrorCodeInvalidRequest
+}
+
+func UnprocessableEntityError(message string) error {
+	return &Error{Code: ErrorCodeUnprocessable, Message: message}
+}
+
+func IsUnprocessableEntity(err error) bool {
+	var appErr *Error
+	return errors.As(err, &appErr) && appErr.Code == ErrorCodeUnprocessable
 }
 
 func ServiceUnavailableError(message string) error {

@@ -100,7 +100,7 @@ calendar.
 
 `POST /api/videos/end-quiz` is a read-only quiz lookup endpoint for the video
 ending experience. The handler validates `video_id`, de-duplicates up to eight
-`coarse_unit_ids`, validates optional `recommendation_run_id` and
+`coarse_unit_ids`, validates UUID syntax for optional `recommendation_run_id` and
 `client_context`, then calls Catalog. It does not write quiz delivery/session
 state and does not participate in Learning Engine progress updates; completed
 answers still go through `POST /api/quiz-attempts`.
@@ -159,6 +159,12 @@ Learning Engine normalization is attempted synchronously as best effort and is
 not exposed as the HTTP success boundary. Reducer direct endpoints such as
 reset-unlearned return reducer event acceptance instead.
 
+For learning events and end quiz, `recommendation_run_id` is optional weak
+attribution context. API validates UUID syntax only; it does not require the run
+to exist in Recommendation audit state or belong to the current user, and it is
+not enforced with database foreign keys from Analytics or Learning Engine
+tables.
+
 `POST /api/learning-interactions:batch` accepts only exposure and lookup raw
 interactions. Self-mark mastered is intentionally a separate endpoint so it can
 use the dedicated Analytics writer and `NormalizeSelfMarkMasteredByID`
@@ -168,6 +174,13 @@ existing `learning.user_unit_states` row for the current user and
 accepted and reduced to terminal mastered while preserving target/control
 fields. `mark-mastered` sets learning state; it does not remove a unit from the
 current target set.
+
+`watch_session_id`, `recommendation_run_id`, and `related_quiz_event_id` are
+weak context fields in learning-event requests: API validates UUID syntax, but
+does not require the referenced watch, recommendation, or quiz rows to already
+exist. `video_id`, `coarse_unit_id`, and `question_id` remain strong backend
+identifiers; known FK failures for those fields are mapped to
+`422 unprocessable_entity` instead of leaking as internal server errors.
 
 `POST /api/learning-units:reset-unlearned` uses the same request shape as
 self-mark mastered but calls the Learning Engine reducer directly. It requires

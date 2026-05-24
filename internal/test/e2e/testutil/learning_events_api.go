@@ -124,7 +124,8 @@ func (h *Harness) apiHandler(t *testing.T, principalMiddleware func(http.Handler
 		catalogservice.NewSetVideoLikeUsecase(catalogrepo.NewVideoInteractionWriter(h.Pool)),
 		catalogservice.NewSetVideoFavoriteUsecase(catalogrepo.NewVideoInteractionWriter(h.Pool)),
 	)
-	endQuiz := endquiz.NewHandler(catalogservice.NewEndQuizQuestionLookupUsecase(catalogrepo.NewEndQuizQuestionReader(h.Pool)))
+	endQuizLookup := catalogservice.NewEndQuizQuestionLookupUsecase(catalogrepo.NewEndQuizQuestionReader(h.Pool))
+	endQuiz := endquiz.NewHandler(endQuizLookup)
 	unitProgress := unitprogress.NewHandler(learningservice.NewListUserUnitProgressUsecase(learningrepo.NewUserUnitProgressReader(h.Pool)))
 	activeCollectionReader := learningrepo.NewActiveUnitCollectionReader(h.Pool)
 	unitCollections := unitcollections.NewHandler(
@@ -229,7 +230,7 @@ func (h *Harness) SeedVideoWatchSession(t *testing.T, userID string, videoID str
 			$4,
 			'{}'::jsonb,
 			'{}'::jsonb
-		) on conflict (watch_session_id) do nothing`,
+		) on conflict (user_id, watch_session_id) do nothing`,
 		watchSessionID,
 		userID,
 		videoID,

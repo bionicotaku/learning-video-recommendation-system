@@ -135,6 +135,42 @@ func TestRawEventWriterUpsertsLearningInteractionBatchInInputOrder(t *testing.T)
 	}
 }
 
+func TestRawEventWriterAllowsLearningInteractionWeakContextIDsWithoutParentRows(t *testing.T) {
+	t.Parallel()
+
+	db := testDB(t)
+	userID := "11111111-1111-1111-1111-111111111118"
+	unitID := int64(108)
+	now := time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC)
+	db.SeedUser(t, userID)
+	db.SeedCoarseUnit(t, unitID)
+
+	writer := analyticsrepo.NewRawEventWriter(db.Pool)
+	events := []model.RawLearningInteractionEvent{
+		{
+			ClientEventID:      "client-interaction-weak-context",
+			UserID:             userID,
+			ClientContext:      []byte(`{"platform":"ios"}`),
+			EventType:          "self_mark_mastered",
+			SourceSurface:      "quiz_result",
+			WatchSessionID:     "44444444-4444-4444-4444-444444444448",
+			RelatedQuizEventID: "55555555-5555-5555-5555-555555555558",
+			CoarseUnitID:       &unitID,
+			TokenText:          "example",
+			OccurredAt:         now,
+			EventPayload:       []byte(`{}`),
+		},
+	}
+
+	results, err := writer.UpsertLearningInteractions(context.Background(), events)
+	if err != nil {
+		t.Fatalf("UpsertLearningInteractions() error = %v", err)
+	}
+	if len(results) != 1 || !results[0].Inserted || results[0].EventID == "" {
+		t.Fatalf("results = %+v, want one inserted event", results)
+	}
+}
+
 func TestRawEventWriterWithActivityStatsIncrementsOnlyInsertedEvents(t *testing.T) {
 	t.Parallel()
 

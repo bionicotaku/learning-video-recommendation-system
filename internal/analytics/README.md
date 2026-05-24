@@ -46,6 +46,9 @@ internal/analytics/
 - 真实 repository 分别写入 quiz 与 learning interaction raw facts；两类事件由未来不同 API 调用，不再混入同一事务。
 - `user_id` 来自 usecase request；未来 HTTP 层必须从认证上下文传入，不能信任事件 payload。
 - `client_context` 只要求是 JSON object，不固定字段集合；当前 API 样例推荐四个基础字段，但后端不拒绝扩展字段。
+- `watch_session_id` 在 learning interaction raw fact 中只是前端生成的观看 session correlation key；Analytics 不要求它已存在于 `analytics.video_watch_events`。
+- `related_quiz_event_id` 在 self-mark raw fact 中只是可选来源上下文；Analytics 不要求它已存在于 `analytics.quiz_events`。
+- `video_id`、`coarse_unit_id`、`question_id` 是真实业务主键，仍通过数据库 FK 保持存在性要求；API 层会把这些 FK 失败映射为 `422 unprocessable_entity`。
 - `shown_at`、`completed_at`、`occurred_at` 在 application/service 边界会归一化为 UTC instant；persistence mapper 通过 `internal/platform/postgres/pgtime` 统一写入 `timestamptz`。
 - UUID、nullable text 等纯 Postgres 类型转换委托 `internal/platform/postgres/*`；Analytics 仍保留本地 mapper 函数作为模块边界。
 - Integration fixture 使用 `internal/platform/postgres/pgtest` 管理 embedded Postgres 和 template database；Analytics 自己的 `test/fixture` 只声明 Analytics schema plan 与 seed helper。

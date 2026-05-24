@@ -29,6 +29,7 @@
 - 只写 `recommendation.*`
 - 不回写 Learning engine 或 Catalog owner 对象
 - 不包含 HTTP API、worker、自动刷新任务
+- 不通过 DB FK 把 Analytics raw events 或 API command 写入生命周期硬耦合到 Recommendation audit retention
 
 补充说明：
 

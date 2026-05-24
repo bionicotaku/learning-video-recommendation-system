@@ -38,6 +38,8 @@ func Map(err error, mappers ...Mapper) *response.Error {
 		return response.Unauthorized("trusted principal is required")
 	case apiservice.IsInvalidRequest(err):
 		return response.InvalidRequest(err.Error())
+	case apiservice.IsUnprocessableEntity(err):
+		return response.UnprocessableEntity(err.Error())
 	case apiservice.IsServiceUnavailable(err), errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		return response.ServiceUnavailable("request canceled or timed out")
 	}

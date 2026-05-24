@@ -310,7 +310,25 @@ func classifyOwnerError(err error) error {
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
+		if isUnprocessableForeignKeyConstraint(pgErr.ConstraintName) {
+			return UnprocessableEntityError("referenced resource not found")
+		}
 		return err
 	}
 	return err
+}
+
+func isUnprocessableForeignKeyConstraint(name string) bool {
+	switch name {
+	case "learning_interaction_events_video_id_fkey",
+		"learning_interaction_events_coarse_unit_id_fkey",
+		"quiz_events_question_id_fkey",
+		"quiz_events_coarse_unit_id_fkey",
+		"quiz_events_video_id_fkey",
+		"unit_learning_events_video_id_fkey",
+		"unit_learning_events_coarse_unit_id_fkey":
+		return true
+	default:
+		return false
+	}
 }

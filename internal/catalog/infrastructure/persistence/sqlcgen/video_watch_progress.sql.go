@@ -145,9 +145,10 @@ with input as (
     $9::jsonb as metadata
 ),
 existing as (
-  select e.watch_session_id, e.user_id, e.video_id, e.started_at, e.last_seen_at, e.completed_at, e.last_position_ms, e.max_position_ms, e.active_watch_ms, e.is_completed, e.progress_report_count, e.client_context, e.metadata, e.created_at, e.updated_at
+  select e.watch_event_id, e.watch_session_id, e.user_id, e.video_id, e.started_at, e.last_seen_at, e.completed_at, e.last_position_ms, e.max_position_ms, e.active_watch_ms, e.is_completed, e.progress_report_count, e.client_context, e.metadata, e.created_at, e.updated_at
   from analytics.video_watch_events e
   join input i on i.watch_session_id = e.watch_session_id
+   and i.user_id = e.user_id
   for update
 ),
 computed_update as (
@@ -218,7 +219,7 @@ inserted as (
     i.metadata
   from input i
   where not exists (select 1 from existing)
-  on conflict (watch_session_id) do nothing
+  on conflict (user_id, watch_session_id) do nothing
   returning
     true::boolean as created_session,
     is_completed as completed_session,
@@ -253,7 +254,9 @@ updated as (
     metadata = c.metadata,
     updated_at = now()
   from computed_update c
-  where e.watch_session_id = c.watch_session_id
+  where e.user_id = c.user_id
+    and e.watch_session_id = c.watch_session_id
+    and e.video_id = c.video_id
   returning
     false::boolean as created_session,
     (not c.old_is_completed and c.computed_completed)::boolean as completed_session,

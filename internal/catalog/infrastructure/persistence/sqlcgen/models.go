@@ -9,6 +9,7 @@ import (
 )
 
 type AnalyticsVideoWatchEvent struct {
+	WatchEventID        pgtype.UUID        `json:"watch_event_id"`
 	WatchSessionID      pgtype.UUID        `json:"watch_session_id"`
 	UserID              pgtype.UUID        `json:"user_id"`
 	VideoID             pgtype.UUID        `json:"video_id"`

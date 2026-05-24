@@ -199,9 +199,9 @@ Content-Type: application/json
 | 字段 | 类型 | 必需 | 说明 |
 | --- | --- | --- | --- |
 | `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
-| `video_id` | string UUID | 是 | 当前 batch 所属视频。 |
-| `watch_session_id` | string UUID | 是 | 当前 batch 所属观看 session。 |
-| `recommendation_run_id` | string UUID | 否 | 如果本次视频来自推荐结果，记录对应 run。 |
+| `video_id` | string UUID | 是 | 当前 batch 所属视频。它是后端真实业务主键，必须存在。 |
+| `watch_session_id` | string UUID | 是 | 前端生成的观看 session correlation key，只校验 UUID，不要求 `analytics.video_watch_events` 已存在。 |
+| `recommendation_run_id` | string UUID | 否 | 如果本次视频来自推荐结果，记录对应 run 作为 best-effort 归因上下文；只校验 UUID，不要求 run 已存在或属于当前用户。 |
 | `events` | array | 是 | interaction 事件数组。整批先 validation，任意一条非法则整批拒绝。 |
 
 `events[]` 通用字段：
@@ -211,7 +211,7 @@ Content-Type: application/json
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
 | `event_type` | string | 是 | `exposure` / `lookup`。`self_mark_mastered` 不允许放入 batch，必须调用单点 mark-mastered API。 |
 | `source_surface` | string | 是 | 事件发生的业务界面，例如 `video_subtitle`、`word_detail`。 |
-| `coarse_unit_id` | integer | `exposure` 必需；mapped `lookup` 必需 | 学习单元 ID。填写时必须为正整数。exposure 不要求它来自本次 Recommendation `learning_units`，但前端应只上报当前用户未 mastered 且 target 的 coarse unit。unmapped lookup 可以为空，只留 Analytics。 |
+| `coarse_unit_id` | integer | `exposure` 必需；mapped `lookup` 必需 | 学习单元 ID。填写时必须为正整数。exposure 的 `coarse_unit_id` 是后端真实业务主键，必须存在；它不要求来自本次 Recommendation `learning_units`，但前端应只上报当前用户未 mastered 且 target 的 coarse unit。unmapped lookup 可以为空，只留 Analytics。 |
 | `token_text` | string | `lookup` 必需 | 用户 lookup 的原始 token 文本。 |
 | `sentence_index` | integer | `exposure` / `lookup` 必需 | 字幕句子 index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
 | `span_index` | integer | `exposure` / `lookup` 必需 | token/span index。当前 batch 只支持 `exposure` / `lookup`，所以必须提供；未来新增其他 `event_type` 时可按类型单独定义是否必需。 |
@@ -355,10 +355,10 @@ Content-Type: application/json
 | --- | --- | --- | --- |
 | `client_context` | object | 否 | 请求级客户端环境上下文。建议使用当前四个基础字段；缺省按 `{}` 处理。 |
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
-| `question_id` | string UUID | 是 | `catalog.questions.question_id`。 |
-| `coarse_unit_id` | integer | 是 | 本题对应学习单元，必须为正整数。 |
-| `video_id` | string UUID | 否 | 触发题目的视频。 |
-| `recommendation_run_id` | string UUID | 否 | 触发题目的推荐 run。 |
+| `question_id` | string UUID | 是 | `catalog.questions.question_id`，是后端真实业务主键，必须存在。 |
+| `coarse_unit_id` | integer | 是 | 本题对应学习单元，必须为正整数且必须存在。 |
+| `video_id` | string UUID | 否 | 触发题目的视频；提供时必须存在。 |
+| `recommendation_run_id` | string UUID | 否 | 触发题目的推荐 run，作为 best-effort 归因上下文；只校验 UUID。 |
 | `trigger_type` | string | 是 | 触发来源，必须使用 DB 枚举：`video_end` / `lookup_practice` / `feed_review` / `mid_video` / `manual`。 |
 | `selected_option_ids` | string[] | 是 | 用户选择过的 option ID 列表。最后一项必须表示正确答案。 |
 | `selection_interval_ms` | integer[] | 是 | 每次选择前的耗时，长度必须等于 `selected_option_ids`。每项非负。 |
@@ -484,10 +484,10 @@ Content-Type: application/json
 | `client_event_id` | string | 是 | 前端生成的幂等 ID。 |
 | `coarse_unit_id` | integer | 是 | 要标记为已掌握的学习单元 ID，必须为正整数，且当前用户必须已经存在对应 `learning.user_unit_states` 行。 |
 | `source_surface` | string | 是 | 用户点击“已学会”的界面，例如 `word_detail`、`quiz_result`。 |
-| `video_id` | string UUID | 否 | 关联视频。 |
-| `watch_session_id` | string UUID | 否 | 关联观看 session。 |
-| `recommendation_run_id` | string UUID | 否 | 关联推荐 run。 |
-| `related_quiz_event_id` | string UUID | 否 | 如果按钮出现在 quiz 页面，可关联刚写入的 `analytics.quiz_events.event_id`。 |
+| `video_id` | string UUID | 否 | 关联视频；提供时必须存在。 |
+| `watch_session_id` | string UUID | 否 | 前端生成的观看 session correlation key，只校验 UUID，不要求 `analytics.video_watch_events` 已存在。 |
+| `recommendation_run_id` | string UUID | 否 | 关联推荐 run，作为 best-effort 归因上下文；只校验 UUID。 |
+| `related_quiz_event_id` | string UUID | 否 | 可选来源上下文，只校验 UUID，不要求 `analytics.quiz_events` 已存在。 |
 | `token_text` | string | 否 | 用户看到或点击的原始 token 文本。 |
 | `sentence_index` | integer | 否 | 字幕句子 index。 |
 | `span_index` | integer | 否 | token/span index。 |
@@ -558,7 +558,7 @@ Content-Type: application/json
 }
 ```
 
-字段要求同 self mark mastered：`client_event_id`、`coarse_unit_id`、`source_surface`、`occurred_at` 必填；`client_context` 和 `event_payload` 必须是 JSON object，缺省按 `{}` 处理；可选 UUID 字段必须是合法 UUID。
+字段要求同 self mark mastered：`client_event_id`、`coarse_unit_id`、`source_surface`、`occurred_at` 必填；`client_context` 和 `event_payload` 必须是 JSON object，缺省按 `{}` 处理；`video_id` 提供时必须存在；`watch_session_id`、`recommendation_run_id` 和 `related_quiz_event_id` 只校验 UUID，不要求关联行已存在。
 
 ### 8.3 响应结构
 
@@ -661,6 +661,12 @@ source_ref_id = analytics.learning_interaction_events.event_id
 任意 validation 失败都不入库。
 
 interaction batch 是整批拒绝，不 partial success。quiz attempt、self mark mastered 和 reset-unlearned 是单条拒绝。
+
+`watch_session_id` 和 `related_quiz_event_id` 是弱关联上下文：UUID 格式非法返回 `400 invalid_request`，但对应 `analytics.video_watch_events` 或 `analytics.quiz_events` 行不存在不是错误。
+
+`recommendation_run_id` 是弱推荐归因上下文：字段为空允许；UUID 格式非法返回 `400 invalid_request`；UUID 格式合法但不存在或不属于当前用户不是错误。后续归因质量可以离线 join `recommendation.video_recommendation_runs` 标记 orphan run，不阻塞在线学习事件上报。
+
+`video_id`、`coarse_unit_id`、`question_id` 是后端真实业务主键：字段格式或必填 validation 失败返回 `400 invalid_request`；格式正确但引用对象不存在时返回 `422 unprocessable_entity`，不是 `500 internal_error`。
 
 错误 envelope、状态码、`request_id` 遵守 [API模块总体设计规范.md](API模块总体设计规范.md)。示例：
 

@@ -50,7 +50,8 @@ catalog.video_engagement_stats -- 视频级全局互动统计投影
 
 ```sql
 create table analytics.video_watch_events (
-  watch_session_id uuid primary key,
+  watch_event_id uuid primary key default gen_random_uuid(),
+  watch_session_id uuid not null,
 
   user_id uuid not null references auth.users(id) on delete cascade,
   video_id uuid not null references catalog.videos(video_id) on delete cascade,
@@ -78,13 +79,17 @@ create table analytics.video_watch_events (
   check (jsonb_typeof(client_context) = 'object'),
   check (jsonb_typeof(metadata) = 'object')
 );
+
+create unique index uq_video_watch_events_user_session
+on analytics.video_watch_events (user_id, watch_session_id);
 ```
 
 字段说明：
 
 | 字段 | 含义 | 维护规则 |
 | --- | --- | --- |
-| `watch_session_id` | 一次播放会话 ID。 | 主键；同一个 session 重复上报走 upsert。 |
+| `watch_event_id` | 服务端观看事实 ID。 | 主键；服务端生成，不接受前端传入。 |
+| `watch_session_id` | 前端生成的一次播放会话 ID。 | 与 `user_id` 组成唯一幂等键；同一用户同一个 session 重复上报走 upsert，不同用户可复用同一个 session ID。 |
 | `user_id` | 当前登录用户。 | 从认证上下文获取，不接受前端传入。 |
 | `video_id` | 被观看的视频。 | 从请求 body 获取，必须存在于 `catalog.videos`。 |
 | `started_at` | 该 session 第一次上报时间。 | 首次 insert 时写入；后续不覆盖。 |

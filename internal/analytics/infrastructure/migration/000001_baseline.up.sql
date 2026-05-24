@@ -67,7 +67,8 @@ on analytics.quiz_events (video_id, completed_at desc)
 where video_id is not null;
 
 create table if not exists analytics.video_watch_events (
-  watch_session_id uuid primary key,
+  watch_event_id uuid primary key default gen_random_uuid(),
+  watch_session_id uuid not null,
 
   user_id uuid not null references auth.users(id) on delete cascade,
   video_id uuid not null references catalog.videos(video_id) on delete cascade,
@@ -96,6 +97,9 @@ create table if not exists analytics.video_watch_events (
   check (jsonb_typeof(metadata) = 'object')
 );
 
+create unique index if not exists uq_video_watch_events_user_watch_session
+on analytics.video_watch_events (user_id, watch_session_id);
+
 create index if not exists idx_video_watch_events_user_video_updated_at
 on analytics.video_watch_events (user_id, video_id, updated_at desc);
 
@@ -123,13 +127,11 @@ create table if not exists analytics.learning_interaction_events (
   video_id uuid
     references catalog.videos(video_id) on delete set null,
 
-  watch_session_id uuid
-    references analytics.video_watch_events(watch_session_id) on delete set null,
+  watch_session_id uuid,
 
   recommendation_run_id uuid,
 
-  related_quiz_event_id uuid
-    references analytics.quiz_events(event_id) on delete set null,
+  related_quiz_event_id uuid,
 
   coarse_unit_id bigint
     references semantic.coarse_unit(id) on delete set null,

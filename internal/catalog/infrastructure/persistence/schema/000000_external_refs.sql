@@ -21,7 +21,8 @@ create table if not exists semantic.coarse_unit (
 );
 
 create table if not exists analytics.video_watch_events (
-  watch_session_id uuid primary key,
+  watch_event_id uuid primary key default gen_random_uuid(),
+  watch_session_id uuid not null,
   user_id uuid not null references auth.users(id) on delete cascade,
   video_id uuid not null,
   started_at timestamptz not null,
@@ -44,3 +45,6 @@ create table if not exists analytics.video_watch_events (
   check (jsonb_typeof(client_context) = 'object'),
   check (jsonb_typeof(metadata) = 'object')
 );
+
+create unique index if not exists uq_video_watch_events_user_watch_session
+on analytics.video_watch_events (user_id, watch_session_id);

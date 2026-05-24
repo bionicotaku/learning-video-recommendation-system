@@ -161,6 +161,7 @@ func TestVideoWatchProgressRejectsConflictingSessionAndMissingVideo(t *testing.T
 	db.SeedUser(t, userID)
 	db.SeedUser(t, otherUserID)
 	db.SeedVideo(t, videoID, 100000)
+	db.SeedVideo(t, otherVideoID, 100000)
 	writer := catalogrepo.NewVideoWatchProgressWriter(db.Pool)
 
 	if _, err := writer.RecordVideoWatchProgress(context.Background(), progressRequest(watchSessionID, 1000, 1000, at(0))); err != nil {
@@ -168,7 +169,7 @@ func TestVideoWatchProgressRejectsConflictingSessionAndMissingVideo(t *testing.T
 	}
 
 	conflict := progressRequest(watchSessionID, 2000, 2000, at(1))
-	conflict.UserID = otherUserID
+	conflict.VideoID = otherVideoID
 	_, err := writer.RecordVideoWatchProgress(context.Background(), conflict)
 	if !errors.Is(err, apprepo.ErrWatchSessionConflict) {
 		t.Fatalf("expected conflict, got %v", err)
@@ -179,6 +180,68 @@ func TestVideoWatchProgressRejectsConflictingSessionAndMissingVideo(t *testing.T
 	_, err = writer.RecordVideoWatchProgress(context.Background(), missing)
 	if !errors.Is(err, apprepo.ErrVideoNotFound) {
 		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+func TestVideoWatchProgressAllowsDifferentUsersToReuseClientSessionID(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedUser(t, otherUserID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoWatchProgressWriter(db.Pool)
+
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), progressRequest(watchSessionID, 1000, 1000, at(0))); err != nil {
+		t.Fatalf("record first user progress: %v", err)
+	}
+
+	other := progressRequest(watchSessionID, 2000, 2000, at(1))
+	other.UserID = otherUserID
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), other); err != nil {
+		t.Fatalf("record second user progress with same client session id: %v", err)
+	}
+
+	var count int
+	if err := db.Pool.QueryRow(context.Background(), `
+		select count(*)
+		from analytics.video_watch_events
+		where watch_session_id = $1`, watchSessionID).Scan(&count); err != nil {
+		t.Fatalf("count watch events: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("watch event count = %d, want 2", count)
+	}
+}
+
+func TestVideoWatchProgressUpdateDoesNotModifyOtherUserWithSameClientSessionID(t *testing.T) {
+	db := suite.CreateTestDatabase(t)
+	db.SeedUser(t, userID)
+	db.SeedUser(t, otherUserID)
+	db.SeedVideo(t, videoID, 100000)
+	writer := catalogrepo.NewVideoWatchProgressWriter(db.Pool)
+
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), progressRequest(watchSessionID, 1000, 1000, at(0))); err != nil {
+		t.Fatalf("record first user progress: %v", err)
+	}
+	other := progressRequest(watchSessionID, 2000, 2000, at(1))
+	other.UserID = otherUserID
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), other); err != nil {
+		t.Fatalf("record second user progress: %v", err)
+	}
+
+	other.PositionMS = 3000
+	other.ActiveWatchMS = 3000
+	other.OccurredAt = at(2)
+	if _, err := writer.RecordVideoWatchProgress(context.Background(), other); err != nil {
+		t.Fatalf("update second user progress: %v", err)
+	}
+
+	first := readWatchEvent(t, db, userID)
+	if first.LastPositionMS != 1000 || first.MaxPositionMS != 1000 || first.ActiveWatchMS != 1000 {
+		t.Fatalf("first user watch event was modified: %+v", first)
+	}
+	second := readWatchEvent(t, db, otherUserID)
+	if second.LastPositionMS != 3000 || second.MaxPositionMS != 3000 || second.ActiveWatchMS != 3000 {
+		t.Fatalf("second user watch event = %+v, want updated progress", second)
 	}
 }
 
@@ -288,9 +351,32 @@ func readStats(t *testing.T, db *fixture.TestDatabase) statsRow {
 	return row
 }
 
+type watchEventRow struct {
+	LastPositionMS int32
+	MaxPositionMS  int32
+	ActiveWatchMS  int64
+}
+
+func readWatchEvent(t *testing.T, db *fixture.TestDatabase, targetUserID string) watchEventRow {
+	t.Helper()
+	var row watchEventRow
+	if err := db.Pool.QueryRow(context.Background(), `
+		select last_position_ms, max_position_ms, active_watch_ms
+		from analytics.video_watch_events
+		where user_id = $1 and watch_session_id = $2`, targetUserID, watchSessionID).Scan(
+		&row.LastPositionMS,
+		&row.MaxPositionMS,
+		&row.ActiveWatchMS,
+	); err != nil {
+		t.Fatalf("read watch event: %v", err)
+	}
+	return row
+}
+
 const (
 	userID         = "11111111-1111-1111-1111-111111111111"
 	otherUserID    = "22222222-2222-2222-2222-222222222222"
 	videoID        = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	otherVideoID   = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
 	watchSessionID = "33333333-3333-3333-3333-333333333333"
 )

@@ -15,6 +15,8 @@ import (
 	normalizerdto "learning-video-recommendation-system/internal/learningengine/normalizer/application/dto"
 	learningdto "learning-video-recommendation-system/internal/learningengine/reducer/application/dto"
 	learningservice "learning-video-recommendation-system/internal/learningengine/reducer/application/service"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestRecordLearningInteractionsBatchReturnsRawAcceptedWhenNormalizerFails(t *testing.T) {
@@ -144,6 +146,89 @@ func TestRecordSelfMarkMasteredRejectsMissingUserUnitStateBeforeRawWrite(t *test
 	}
 }
 
+func TestLearningEventServicesTreatRecommendationRunIDAsWeakAttribution(t *testing.T) {
+	rawWriter := &fakeQuizRawWriter{
+		response: analyticsdto.RecordQuizAttemptResponse{
+			Accepted:    true,
+			QuizEventID: "33333333-3333-3333-3333-333333333333",
+			Inserted:    true,
+		},
+	}
+	service := apiservice.NewRecordQuizAttemptService(rawWriter, nil, discardLogger())
+
+	_, err := service.Execute(context.Background(), apvdto.RecordQuizAttemptRequest{
+		UserID:              "user-1",
+		ClientEventID:       "quiz-1",
+		QuestionID:          "44444444-4444-4444-4444-444444444444",
+		CoarseUnitID:        101,
+		RecommendationRunID: "55555555-5555-5555-5555-555555555555",
+		TriggerType:         "manual",
+		SelectedOptionIDs:   []string{"correct"},
+		SelectionIntervalMS: []int32{1000},
+		IsFirstTryCorrect:   true,
+		TotalElapsedMS:      1000,
+		ShownAt:             time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+		CompletedAt:         time.Date(2026, 5, 15, 10, 0, 1, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if rawWriter.request.RecommendationRunID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("raw writer request = %+v", rawWriter.request)
+	}
+}
+
+func TestSelfMarkAndResetTreatRecommendationRunIDAsWeakAttribution(t *testing.T) {
+	selfMarkRawWriter := &fakeSelfMarkRawWriter{
+		response: analyticsdto.RecordSelfMarkMasteredResponse{
+			Accepted:                   true,
+			LearningInteractionEventID: "55555555-5555-5555-5555-555555555555",
+			Inserted:                   true,
+		},
+	}
+	stateReader := &fakeUserUnitStateReader{response: learningdto.GetUserUnitStateResponse{Found: true}}
+	selfMarkService := apiservice.NewRecordSelfMarkMasteredService(selfMarkRawWriter, nil, stateReader, discardLogger())
+
+	_, err := selfMarkService.Execute(context.Background(), apvdto.RecordSelfMarkMasteredRequest{
+		UserID:              "user-1",
+		ClientEventID:       "self-mark-1",
+		CoarseUnitID:        101,
+		SourceSurface:       "word_detail",
+		RecommendationRunID: "55555555-5555-5555-5555-555555555555",
+		OccurredAt:          time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("self mark Execute() error = %v", err)
+	}
+	if selfMarkRawWriter.request.RecommendationRunID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("self mark raw request = %+v", selfMarkRawWriter.request)
+	}
+
+	reset := &fakeResetUserUnitProgress{
+		response: learningdto.ResetUserUnitProgressResponse{
+			Accepted:            true,
+			UnitLearningEventID: "66666666-6666-6666-6666-666666666666",
+			Inserted:            true,
+		},
+	}
+	resetService := apiservice.NewResetUserUnitProgressService(reset)
+
+	_, err = resetService.Execute(context.Background(), apvdto.ResetUserUnitProgressRequest{
+		UserID:              "user-1",
+		ClientEventID:       "reset-1",
+		CoarseUnitID:        101,
+		SourceSurface:       "word_detail",
+		RecommendationRunID: "55555555-5555-5555-5555-555555555555",
+		OccurredAt:          time.Date(2026, 5, 15, 10, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("reset Execute() error = %v", err)
+	}
+	if reset.request.RecommendationRunID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("reset request = %+v", reset.request)
+	}
+}
+
 func TestResetUserUnitProgressMapsMissingStateToInvalidRequest(t *testing.T) {
 	reset := &fakeResetUserUnitProgress{
 		err: learningservice.ErrUserUnitStateNotFound,
@@ -198,6 +283,75 @@ func TestRecordQuizAttemptMapsAnalyticsValidationErrorToInvalidRequest(t *testin
 	_, err := service.Execute(context.Background(), apvdto.RecordQuizAttemptRequest{UserID: "user-1"})
 	if !apiservice.IsInvalidRequest(err) {
 		t.Fatalf("Execute() error = %v, want invalid request", err)
+	}
+}
+
+func TestLearningEventServicesMapKnownForeignKeyFailuresToUnprocessable(t *testing.T) {
+	cases := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "learning interaction video",
+			run: func() error {
+				rawWriter := &fakeInteractionRawWriter{err: &pgconn.PgError{ConstraintName: "learning_interaction_events_video_id_fkey"}}
+				service := apiservice.NewRecordLearningInteractionsBatchService(rawWriter, nil, discardLogger())
+				_, err := service.Execute(context.Background(), apvdto.RecordLearningInteractionsBatchRequest{
+					UserID: "user-1",
+					Events: []apvdto.LearningInteractionEvent{
+						{ClientEventID: "event-1"},
+					},
+				})
+				return err
+			},
+		},
+		{
+			name: "quiz question",
+			run: func() error {
+				rawWriter := &fakeQuizRawWriter{err: &pgconn.PgError{ConstraintName: "quiz_events_question_id_fkey"}}
+				service := apiservice.NewRecordQuizAttemptService(rawWriter, nil, discardLogger())
+				_, err := service.Execute(context.Background(), apvdto.RecordQuizAttemptRequest{UserID: "user-1"})
+				return err
+			},
+		},
+		{
+			name: "reset video",
+			run: func() error {
+				reset := &fakeResetUserUnitProgress{err: &pgconn.PgError{ConstraintName: "unit_learning_events_video_id_fkey"}}
+				service := apiservice.NewResetUserUnitProgressService(reset)
+				_, err := service.Execute(context.Background(), apvdto.ResetUserUnitProgressRequest{
+					UserID:        "user-1",
+					ClientEventID: "reset-1",
+					CoarseUnitID:  101,
+					SourceSurface: "word_detail",
+					OccurredAt:    time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+				})
+				return err
+			},
+		},
+		{
+			name: "reset coarse unit",
+			run: func() error {
+				reset := &fakeResetUserUnitProgress{err: &pgconn.PgError{ConstraintName: "unit_learning_events_coarse_unit_id_fkey"}}
+				service := apiservice.NewResetUserUnitProgressService(reset)
+				_, err := service.Execute(context.Background(), apvdto.ResetUserUnitProgressRequest{
+					UserID:        "user-1",
+					ClientEventID: "reset-1",
+					CoarseUnitID:  101,
+					SourceSurface: "word_detail",
+					OccurredAt:    time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC),
+				})
+				return err
+			},
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.run(); !apiservice.IsUnprocessableEntity(err) {
+				t.Fatalf("error = %v, want unprocessable", err)
+			}
+		})
 	}
 }
 

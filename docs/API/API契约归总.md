@@ -108,7 +108,7 @@ Content-Type: multipart/form-data
 | 404 | `not_found` | 资源不存在或业务文档要求隐藏不可访问资源。 |
 | 409 | `conflict` | 请求与当前资源状态冲突，原样重试不会自然成功。 |
 | 413 | `payload_too_large` | request body 超过当前 endpoint 限制；`/api/feedback` 是 5 MiB，其他当前 API 是 1 MiB。 |
-| 422 | `unprocessable_entity` | 请求格式正确，但业务状态拒绝；当前主要用于 Catalog 的时间异常等。 |
+| 422 | `unprocessable_entity` | 请求格式正确，但业务状态或引用对象拒绝；包括真实业务主键不存在、Catalog 时间异常等。 |
 | 500 | `internal_error` | 数据库、URL 组装、数据一致性或未知服务端错误。 |
 | 503 | `service_unavailable` | request context 取消 / 超时，或 API application service 明确返回依赖不可用。 |
 
@@ -345,7 +345,7 @@ Request body：
 |---|---|---:|---|---|
 | `video_id` | string UUID | 是 | 无 | 当前视频 ID；必须可展示，否则 `404 not_found`。 |
 | `coarse_unit_ids` | integer[] | 是 | 无 | 非空；每项正整数；按首次出现顺序去重；去重后最多 8 个。 |
-| `recommendation_run_id` | string UUID | 否 | 空 | 当前实现只校验 UUID 格式，不参与取题选择、不写日志。 |
+| `recommendation_run_id` | string UUID | 否 | 空 | 可选推荐归因上下文；只校验 UUID，不要求 run 已存在或属于当前用户；不参与取题选择、不写取题日志。 |
 | `client_context` | object | 否 | `{}` | 只校验 JSON object。 |
 
 Response `200 OK`：
@@ -739,7 +739,7 @@ Request body：
 | 字段 | 类型 | 必需 | 默认值 | 规则 |
 |---|---|---:|---|---|
 | `video_id` | string UUID | 是 | 无 | 视频必须存在。 |
-| `watch_session_id` | string UUID | 是 | 无 | 同一 session 后续上报必须绑定同一 `user_id + video_id`。 |
+| `watch_session_id` | string UUID | 是 | 无 | 前端生成的观看 session correlation key；同一用户同一 session 后续上报必须绑定同一 `video_id`，不同用户可复用同一个客户端 session key。 |
 | `position_ms` | integer | 是 | 无 | 必须非负；可小于历史最大位置。 |
 | `active_watch_ms` | integer | 是 | 无 | 必须非负；重复上报按 delta 去重。 |
 | `occurred_at` | RFC3339 datetime | 否 | 服务端当前时间 | 提供时必须带 offset；不能超过当前时间太多，也不能过早。 |
@@ -760,7 +760,7 @@ Errors：
 | 400 | `invalid_request` | Content-Type / JSON / unknown field 错误；UUID 非法；`position_ms` 或 `active_watch_ms` 缺失 / 为负；`client_context` 或 `metadata` 不是 object。 |
 | 401 | `unauthorized` | principal 缺失。 |
 | 404 | `not_found` | `video_id` 不存在。 |
-| 409 | `conflict` | `watch_session_id` 已存在，但绑定的 `user_id` 或 `video_id` 与本次请求不一致。 |
+| 409 | `conflict` | 当前用户的 `watch_session_id` 已存在，但绑定的 `video_id` 与本次请求不一致。 |
 | 422 | `unprocessable_entity` | `occurred_at` 明显异常，例如超过当前时间太多或过早。 |
 | 500 | `internal_error` | 数据库或未知错误。 |
 | 503 | `service_unavailable` | request 取消 / 超时。 |
@@ -785,8 +785,8 @@ Request body：
 |---|---|---:|---|---|
 | `client_context` | object | 否 | `{}` | 请求级客户端环境上下文。 |
 | `video_id` | string UUID | 是 | 无 | 当前 batch 所属视频。 |
-| `watch_session_id` | string UUID | 是 | 无 | 当前 batch 所属观看 session。 |
-| `recommendation_run_id` | string UUID | 否 | 空 | 推荐 run。 |
+| `watch_session_id` | string UUID | 是 | 无 | 前端生成的观看 session correlation key；只校验 UUID，不要求 `analytics.video_watch_events` 已存在。 |
+| `recommendation_run_id` | string UUID | 否 | 空 | 推荐归因上下文；只校验 UUID，不要求 run 已存在或属于当前用户。 |
 | `events` | array | 是 | 无 | 必须非空；实现确认当前 handler 未设置最大 batch size。 |
 
 `events[]`：
@@ -827,6 +827,7 @@ Errors：
 |---:|---|---|
 | 400 | `invalid_request` | 任意 transport validation 或 owner validation 失败。 |
 | 401 | `unauthorized` | principal 缺失。 |
+| 422 | `unprocessable_entity` | `video_id`、exposure `coarse_unit_id` 这类真实业务主键不存在。 |
 | 500 | `internal_error` | raw write、数据库或未知错误。 |
 | 503 | `service_unavailable` | request 取消 / 超时。 |
 
@@ -853,7 +854,7 @@ Request body：
 | `question_id` | string UUID | 是 | `catalog.questions.question_id`。 |
 | `coarse_unit_id` | integer | 是 | 必须正整数。 |
 | `video_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `recommendation_run_id` | string UUID | 否 | 提供时必须 UUID。 |
+| `recommendation_run_id` | string UUID | 否 | 推荐归因上下文；提供时只校验 UUID。 |
 | `trigger_type` | string | 是 | `video_end` / `lookup_practice` / `feed_review` / `mid_video` / `manual`。 |
 | `selected_option_ids` | string[] | 是 | 非空；最后一项必须是 `correct`。 |
 | `selection_interval_ms` | integer[] | 是 | 长度必须等于 `selected_option_ids`；每项非负。 |
@@ -876,6 +877,7 @@ Errors：
 |---:|---|---|
 | 400 | `invalid_request` | transport validation、枚举、时间顺序、选择序列一致性或 owner validation 失败。 |
 | 401 | `unauthorized` | principal 缺失。 |
+| 422 | `unprocessable_entity` | `question_id`、`coarse_unit_id`、`video_id` 这类真实业务主键不存在。 |
 | 500 | `internal_error` | raw write、数据库或未知错误。 |
 | 503 | `service_unavailable` | request 取消 / 超时。 |
 
@@ -901,10 +903,10 @@ Request body：
 | `client_event_id` | string | 是 | 当前用户维度幂等 ID。 |
 | `coarse_unit_id` | integer | 是 | 必须正整数，且当前用户必须已有对应 `learning.user_unit_states` 行。 |
 | `source_surface` | string | 是 | 触发界面；当前不校验枚举。 |
-| `video_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `watch_session_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `recommendation_run_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `related_quiz_event_id` | string UUID | 否 | 提供时必须 UUID。 |
+| `video_id` | string UUID | 否 | 提供时必须 UUID；作为真实业务主键，提供时必须存在。 |
+| `watch_session_id` | string UUID | 否 | 前端生成的观看 session correlation key；只校验 UUID，不要求 `analytics.video_watch_events` 已存在。 |
+| `recommendation_run_id` | string UUID | 否 | 推荐归因上下文；提供时只校验 UUID。 |
+| `related_quiz_event_id` | string UUID | 否 | 可选来源上下文；只校验 UUID，不要求 `analytics.quiz_events` 已存在。 |
 | `token_text` | string | 否 | 原始 token 文本。 |
 | `sentence_index` | integer | 否 | 字幕句索引。 |
 | `span_index` | integer | 否 | span 索引。 |
@@ -925,6 +927,7 @@ Errors：
 |---:|---|---|
 | 400 | `invalid_request` | 请求字段非法，或当前用户没有对应 `user_unit_state`。 |
 | 401 | `unauthorized` | principal 缺失。 |
+| 422 | `unprocessable_entity` | `video_id` / `coarse_unit_id` 这类真实业务主键不存在。 |
 | 500 | `internal_error` | raw write、数据库或未知错误。 |
 | 503 | `service_unavailable` | request 取消 / 超时。 |
 
@@ -950,10 +953,10 @@ Request body：字段结构与 mark-mastered 相同：
 | `client_event_id` | string | 是 | 当前用户维度幂等 ID，不是 user-unit 维度。 |
 | `coarse_unit_id` | integer | 是 | 必须正整数，且当前用户必须已有对应 `learning.user_unit_states` 行。 |
 | `source_surface` | string | 是 | 触发界面。 |
-| `video_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `watch_session_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `recommendation_run_id` | string UUID | 否 | 提供时必须 UUID。 |
-| `related_quiz_event_id` | string UUID | 否 | 提供时必须 UUID。 |
+| `video_id` | string UUID | 否 | 提供时必须 UUID；作为真实业务主键，提供时必须存在。 |
+| `watch_session_id` | string UUID | 否 | 前端生成的观看 session correlation key；只校验 UUID，不要求 `analytics.video_watch_events` 已存在。 |
+| `recommendation_run_id` | string UUID | 否 | 推荐归因上下文；提供时只校验 UUID。 |
+| `related_quiz_event_id` | string UUID | 否 | 可选来源上下文；只校验 UUID，不要求 `analytics.quiz_events` 已存在。 |
 | `token_text` | string | 否 | 原始 token 文本。 |
 | `sentence_index` | integer | 否 | 字幕句索引。 |
 | `span_index` | integer | 否 | span 索引。 |
@@ -974,6 +977,7 @@ Errors：
 |---:|---|---|
 | 400 | `invalid_request` | 请求字段非法，或当前用户没有对应 `user_unit_state`。 |
 | 401 | `unauthorized` | principal 缺失。 |
+| 422 | `unprocessable_entity` | `video_id` / `coarse_unit_id` 这类真实业务主键不存在。 |
 | 500 | `internal_error` | reducer write、数据库或未知错误。 |
 | 503 | `service_unavailable` | request 取消 / 超时。 |
 
