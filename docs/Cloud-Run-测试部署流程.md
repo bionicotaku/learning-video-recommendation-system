@@ -78,11 +78,12 @@ memory: 512Mi
 gcloud run deploy <cloud-run-service-name> --source .
 ```
 
-但本轮实际部署中，Cloud Run source deploy / buildpack 构建失败，且 Cloud Build 日志没有提供足够的 buildpack stderr。为了得到可重复、可排障的部署路径，当前采用：
+但本轮实际部署中，Cloud Run source deploy / buildpack 构建失败，且 Cloud Build 日志没有提供足够的 buildpack stderr。为了得到可重复、可排障的部署路径，当前采用显式镜像构建：
 
 1. `Dockerfile` 多阶段构建 Go server。
-2. `gcloud builds submit --tag ...` 构建并推送镜像到 Artifact Registry。
-3. `gcloud run deploy --image ...` 部署镜像。
+2. 本地手动部署可用 `gcloud builds submit --tag ...` 构建并推送镜像到 Artifact Registry。
+3. GitHub Actions 自动部署在 GitHub runner 上执行 `docker build` / `docker push`，不再依赖 Cloud Build。
+4. 使用镜像部署 Cloud Run。
 
 这条路径已经验证成功。
 
@@ -246,7 +247,7 @@ done
 
 ## 7. Cloud Build 权限
 
-本项目当前 Cloud Build 使用默认 Compute service account 执行构建。为了能读取源码包、写日志、推送 Artifact Registry，需要以下权限：
+本地手动构建路径仍可使用 Cloud Build。Cloud Build 使用默认 Compute service account 执行构建。为了能读取源码包、写日志、推送 Artifact Registry，需要以下权限：
 
 ```bash
 PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
@@ -772,6 +773,7 @@ Proxy status: DNS only
 GitHub Actions 只负责构建镜像和部署镜像。
 Cloud Run 运行时配置全部来自 Secret Manager。
 GitHub 不保存 DATABASE_URL 或其他业务 secret 明文。
+GitHub Actions 不使用 Cloud Build；镜像在 GitHub runner 上用 Docker 构建并推送到 Artifact Registry。
 ```
 
 因此，GitHub Actions 触发前如果运行时配置有变化，先在本地更新 `.env`，再执行第 6 节同步到 Secret Manager。workflow 本身不会读取 `.env`，也不会把 `.env` 推送或上传。当前测试环境的 `DEV_MODE=true` 由 `<dev-mode-secret-name>:latest` 控制。
@@ -799,11 +801,7 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
-  --role="roles/cloudbuild.builds.editor"
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
-  --role="roles/storage.admin"
+  --role="roles/artifactregistry.writer"
 
 gcloud iam service-accounts add-iam-policy-binding "$RUN_SERVICE_ACCOUNT" \
   --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
@@ -813,8 +811,7 @@ gcloud iam service-accounts add-iam-policy-binding "$RUN_SERVICE_ACCOUNT" \
 说明：
 
 - `roles/run.admin` 用于创建 Cloud Run revision 和切流量。
-- `roles/cloudbuild.builds.editor` 用于提交 Cloud Build。
-- `roles/storage.admin` 用于 `gcloud builds submit` 上传源码包。
+- `roles/artifactregistry.writer` 用于从 GitHub Actions 推送 Docker 镜像到 Artifact Registry。
 - `roles/iam.serviceAccountUser` 允许部署时使用 Cloud Run runtime service account。
 
 ### 14.2 Workload Identity Federation
@@ -879,12 +876,14 @@ printf '%s' '<cloud-run-service-name>' | \
 
 1. `make check`
 2. 使用 GitHub OIDC 通过 Workload Identity Federation 登录 GCP
-3. `gcloud builds submit` 构建镜像
-4. `gcloud run deploy` 部署镜像并保留 autoscaling 参数
+3. `gcloud auth configure-docker` 配置 Artifact Registry Docker auth
+4. `docker build` 构建镜像
+5. `docker push` 推送镜像到 Artifact Registry
+6. `google-github-actions/deploy-cloudrun@v3` 部署镜像并保留 autoscaling 参数
 
 workflow 不读取 `.env`，不传 `--env-vars-file`，不保存业务配置。Cloud Run env 由 Secret Manager 引用保持。
 
-workflow 中的 `gcloud builds submit` 使用 `--suppress-logs`。原因是 GitHub Actions deploy service account 只负责提交构建和部署，不授予项目级 Viewer/Owner 来 stream Cloud Build logs；这样可以减少 GitHub Actions 日志里暴露的 GCP 细节。若 Cloud Build 失败，用本地已授权账号或 GCP Console 查看对应 build logs。
+自动部署不再使用 `gcloud builds submit`，所以不需要给 GitHub Actions deploy service account 授予项目级 Viewer/Owner 来 stream Cloud Build logs，也不需要 `roles/cloudbuild.builds.editor` 或 `roles/storage.admin`。
 
 ### 14.5 自动部署验证
 
