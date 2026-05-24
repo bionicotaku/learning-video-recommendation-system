@@ -70,7 +70,7 @@ User 模块的 MVP 设计与当前实现边界。它定义 `internal/user`、`ap
 
 ### [Cloud-Run-测试部署流程.md](Cloud-Run-测试部署流程.md)
 
-Cloud Run 测试部署 runbook。记录当前 `DEV_MODE=true`、Supabase `DATABASE_URL` secret、Dockerfile + Cloud Build + Artifact Registry + Cloud Run 的可重复部署流程、IAM 权限、验证命令和生产化前必须调整的边界。
+Cloud Run 测试部署 runbook。记录当前 `DEV_MODE=true`、Supabase `DATABASE_URL` secret、Dockerfile + Cloud Build + Artifact Registry + Cloud Run 的可重复部署流程、Load Balancer + Cloudflare 自定义域名入口、IAM 权限、验证命令和生产化前必须调整的边界。
 
 ## 运行时现状参考
 

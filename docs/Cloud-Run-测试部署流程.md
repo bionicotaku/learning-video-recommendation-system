@@ -29,6 +29,9 @@ service_url: <cloud-run-service-url>
 ```text
 artifactregistry.googleapis.com
 cloudbuild.googleapis.com
+compute.googleapis.com
+certificatemanager.googleapis.com
+networkservices.googleapis.com
 run.googleapis.com
 secretmanager.googleapis.com
 ```
@@ -423,7 +426,7 @@ gcloud run deploy <cloud-run-service-name> \
 rm -f "$runtime_env_file"
 ```
 
-## 13. 绑定 Cloudflare 域名
+## 13. 绑定 Cloudflare 域名到 Load Balancer
 
 当前 `<root-domain>` 已经在 Cloudflare 账号 `<cloudflare-account-name>` 中接入，且同一个域名已经承载：
 
@@ -439,6 +442,18 @@ MX / TXT / DKIM         -> <email-provider> 邮箱
 <api-domain>
 ```
 
+当前推荐链路：
+
+```text
+<api-domain>
+  -> Cloudflare DNS only
+  -> Google external Application Load Balancer
+  -> Serverless NEG
+  -> Cloud Run <cloud-run-service-name>
+```
+
+这条链路比 Cloud Run direct domain mapping 多一层入口，但后续切到 API Gateway、接 Cloud Armor、固定 IP、按路径路由和回滚都更方便。
+
 ### 13.1 当前 Cloudflare DNS 保护边界
 
 绑定 API 域名时不要修改以下记录：
@@ -451,10 +466,11 @@ www.<root-domain> CNAME
 sig1._domainkey.<root-domain> CNAME
 ```
 
-本轮只新增了：
+当前 API 只需要维护两条 DNS 记录：
 
 ```text
-<api-domain> CNAME ghs.googlehosted.com
+<api-domain> A <lb-static-ip>
+_acme-challenge.<api-domain> CNAME <certificate-manager-dns-auth-target>
 ```
 
 并且保持：
@@ -466,134 +482,219 @@ DNS only / 灰云
 
 证书签发完成前不要打开 Cloudflare 代理。Cloudflare 代理可能影响 Google managed certificate 的验证和续期。
 
-### 13.2 GCP 创建 Cloud Run domain mapping
+### 13.2 一次性启用 API
 
-Cloud Run fully managed domain mapping 需要 `gcloud beta`：
-
-```bash
-gcloud components install beta --quiet
-```
-
-创建 mapping：
+Load Balancer + Certificate Manager 至少需要：
 
 ```bash
-gcloud beta run domain-mappings create \
-  --service <cloud-run-service-name> \
-  --domain <api-domain> \
-  --region <gcp-region>
+gcloud services enable \
+  compute.googleapis.com \
+  certificatemanager.googleapis.com \
+  networkservices.googleapis.com
 ```
 
-本轮创建成功后，GCP 返回的 DNS 要求是：
+### 13.3 创建 Certificate Manager DNS authorization
+
+用 DNS authorization 可以先签发证书，再切正式 `A` 记录，避免直接改流量后等待证书。
+
+```bash
+gcloud certificate-manager dns-authorizations create <certificate-dns-authorization-name> \
+  --location=global \
+  --domain=<api-domain>
+
+gcloud certificate-manager dns-authorizations describe <certificate-dns-authorization-name> \
+  --location=global \
+  --format='yaml(dnsResourceRecord)'
+```
+
+把返回的 DNS 记录加到 Cloudflare：
 
 ```text
-NAME  RECORD TYPE  CONTENTS
-api   CNAME        ghs.googlehosted.com.
+Type: CNAME
+Name: _acme-challenge.api
+Target: <certificate-manager-dns-auth-target>
+Proxy status: DNS only
+TTL: Auto
 ```
 
-查看 mapping 状态：
+确认解析：
 
 ```bash
-gcloud beta run domain-mappings describe \
-  --domain <api-domain> \
-  --region <gcp-region> \
-  --format='yaml(status.resourceRecords,status.conditions,metadata.name)'
+dig +short _acme-challenge.<api-domain> CNAME
 ```
 
-本轮当前状态：
+### 13.4 创建证书和 certificate map
+
+```bash
+gcloud certificate-manager certificates create <certificate-name> \
+  --location=global \
+  --domains=<api-domain> \
+  --dns-authorizations=<certificate-dns-authorization-name>
+
+gcloud certificate-manager maps create <certificate-map-name> \
+  --location=global
+
+gcloud certificate-manager maps entries create <certificate-map-entry-name> \
+  --location=global \
+  --map=<certificate-map-name> \
+  --hostname=<api-domain> \
+  --certificates=<certificate-name>
+```
+
+检查证书状态：
+
+```bash
+gcloud certificate-manager certificates describe <certificate-name> \
+  --location=global \
+  --format='yaml(managed.state,managed.authorizationAttemptInfo)'
+```
+
+等到：
 
 ```text
-DomainRoutable: True
-CertificateProvisioned: Unknown
-Ready: CertificatePending
+managed.state: ACTIVE
+authorizationAttemptInfo.state: AUTHORIZED
 ```
 
-这表示 DNS 已经可路由，但 Google managed certificate 仍在自动签发。证书未完成前，`https://<api-domain>` 可能出现 SSL 连接错误，这是预期状态。
+### 13.5 创建 Load Balancer 到 Cloud Run
 
-### 13.3 Cloudflare 添加 DNS 记录
+```bash
+PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
+CERT_MAP_PATH="projects/${PROJECT_ID}/locations/global/certificateMaps/<certificate-map-name>"
 
-在 Cloudflare 的 `<root-domain>` zone 中添加：
+gcloud compute addresses create <lb-ip-name> \
+  --global \
+  --ip-version=IPV4
+
+gcloud compute network-endpoint-groups create <serverless-neg-name> \
+  --region=<gcp-region> \
+  --network-endpoint-type=serverless \
+  --cloud-run-service=<cloud-run-service-name>
+
+gcloud compute backend-services create <backend-service-name> \
+  --global \
+  --load-balancing-scheme=EXTERNAL_MANAGED \
+  --protocol=HTTP
+
+gcloud compute backend-services add-backend <backend-service-name> \
+  --global \
+  --network-endpoint-group=<serverless-neg-name> \
+  --network-endpoint-group-region=<gcp-region>
+
+gcloud compute url-maps create <url-map-name> \
+  --default-service=<backend-service-name>
+
+gcloud compute target-https-proxies create <https-proxy-name> \
+  --global \
+  --url-map=<url-map-name> \
+  --certificate-map="$CERT_MAP_PATH"
+
+gcloud compute forwarding-rules create <https-forwarding-rule-name> \
+  --global \
+  --load-balancing-scheme=EXTERNAL_MANAGED \
+  --network-tier=PREMIUM \
+  --address=<lb-ip-name> \
+  --target-https-proxy=<https-proxy-name> \
+  --ports=443
+```
+
+取静态 IP：
+
+```bash
+gcloud compute addresses describe <lb-ip-name> \
+  --global \
+  --format='value(address)'
+```
+
+### 13.6 切 Cloudflare 正式 DNS
+
+证书 `ACTIVE` 后，先用 `curl --resolve` 预验证 LB：
+
+```bash
+curl -i \
+  --resolve <api-domain>:443:<lb-static-ip> \
+  https://<api-domain>/api/me
+```
+
+预期未带 token 返回：
+
+```text
+401 unauthorized
+```
+
+确认后，把 Cloudflare 的 API 记录切成：
+
+```text
+Type: A
+Name: api
+Content: <lb-static-ip>
+Proxy status: DNS only
+TTL: Auto
+Comment: Google external Application Load Balancer for Cloud Run API
+```
+
+保留 `_acme-challenge.<api-domain>` CNAME。它用于 Google managed certificate 的授权和续期。
+
+DNS 验证：
+
+```bash
+dig +short <api-domain> A
+dig +short _acme-challenge.<api-domain> CNAME
+```
+
+最终链路验证：
+
+```bash
+curl -i https://<api-domain>/api/me
+```
+
+预期：
+
+```text
+HTTP/2 401
+via: 1.1 google
+```
+
+`via: 1.1 google` 说明请求经过 Google Load Balancer。
+
+### 13.7 状态检查和回滚
+
+查看 LB 入口：
+
+```bash
+gcloud compute forwarding-rules describe <https-forwarding-rule-name> \
+  --global \
+  --format='yaml(IPAddress,loadBalancingScheme,portRange,target)'
+```
+
+查看证书：
+
+```bash
+gcloud certificate-manager certificates describe <certificate-name> \
+  --location=global \
+  --format='yaml(managed.state,managed.authorizationAttemptInfo)'
+```
+
+如果需要回滚到 Cloud Run direct domain mapping，前提是原 Cloud Run domain mapping 仍然存在且 Ready。把 Cloudflare API 记录改回：
 
 ```text
 Type: CNAME
 Name: api
 Target: ghs.googlehosted.com
 Proxy status: DNS only
-TTL: Auto
-Comment: Cloud Run <cloud-run-service-name>
 ```
 
-本轮通过 Cloudflare API 创建的记录为：
+也可以临时直接使用 Cloud Run 默认 `run.app` HTTPS endpoint 绕过自定义域名。
 
-```text
-type: CNAME
-name: <api-domain>
-content: ghs.googlehosted.com
-proxied: false
-ttl: 1
-comment: Cloud Run <cloud-run-service-name>
-```
-
-DNS 验证：
-
-```bash
-dig +short <api-domain> CNAME
-dig +short <api-domain> A
-```
-
-本轮已验证：
-
-```text
-<api-domain> CNAME -> ghs.googlehosted.com.
-```
-
-### 13.4 等待证书完成
-
-重复检查：
-
-```bash
-gcloud beta run domain-mappings describe \
-  --domain <api-domain> \
-  --region <gcp-region> \
-  --format='yaml(status.conditions)'
-```
-
-当看到：
-
-```text
-Ready: True
-CertificateProvisioned: True
-```
-
-再验证 HTTPS：
-
-```bash
-curl -i https://<api-domain>/api/me
-```
-
-未带 token 时预期返回：
-
-```text
-401 unauthorized
-```
-
-这表示完整链路成功：
-
-```text
-<api-domain>
-  -> Cloudflare DNS only
-  -> ghs.googlehosted.com
-  -> Cloud Run domain mapping
-  -> <cloud-run-service-name>
-```
-
-### 13.5 以后是否打开 Cloudflare 代理
+### 13.8 以后是否打开 Cloudflare 代理
 
 测试阶段建议继续保持 DNS only。
 
-如果之后要打开 Cloudflare 橙云代理，先确认 Cloud Run domain mapping 已经 `Ready=True`，然后：
+如果之后要打开 Cloudflare 橙云代理，先确认 Load Balancer 链路可用且 Certificate Manager 证书已经 `ACTIVE`，然后：
 
 - Cloudflare DNS record 改为 proxied。
 - Cloudflare SSL/TLS mode 使用 `Full (strict)`。
+- 保留 `_acme-challenge.<api-domain>` DNS only。
 - 避免启用会干扰 Google certificate renewal 的强制跳转规则，尤其是证书验证路径相关规则。
 
 ## 14. 生产化前必须调整
