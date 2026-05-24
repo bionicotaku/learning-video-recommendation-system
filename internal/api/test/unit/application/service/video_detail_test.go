@@ -15,7 +15,7 @@ func TestVideoDetailServiceBuildsPublicDetailResponse(t *testing.T) {
 			VideoID:              "11111111-1111-1111-1111-111111111111",
 			Title:                "Visible title",
 			Description:          "Visible description",
-			VideoObjectPath:      "hls/111/master.m3u8",
+			VideoObjectPath:      "portrait_videos/111.mp4",
 			CoverImageURL:        stringPtr("covers/111.webp"),
 			TranscriptObjectPath: stringPtr("transcripts/111.json"),
 			DurationMS:           90500,
@@ -39,7 +39,7 @@ func TestVideoDetailServiceBuildsPublicDetailResponse(t *testing.T) {
 	if lookup.request.UserID != "user-1" || lookup.request.VideoID != "11111111-1111-1111-1111-111111111111" {
 		t.Fatalf("lookup request = %+v", lookup.request)
 	}
-	if response.VideoURL != "https://cdn.example.com/assets/hls/111/master.m3u8" {
+	if response.VideoURL != "https://cdn.example.com/assets/portrait_videos/111.mp4" {
 		t.Fatalf("video_url = %q", response.VideoURL)
 	}
 	if response.CoverImageURL == nil || *response.CoverImageURL != "https://cdn.example.com/assets/covers/111.webp" {
@@ -61,7 +61,7 @@ func TestVideoDetailServiceAllowsMissingTranscript(t *testing.T) {
 		response: catalogdto.VideoDetailResponse{
 			VideoID:         "22222222-2222-2222-2222-222222222222",
 			Title:           "No transcript",
-			VideoObjectPath: "https://cdn.example.com/hls/222/master.m3u8",
+			VideoObjectPath: "https://cdn.example.com/videos/222.mp4",
 			DurationMS:      61000,
 		},
 	}

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
+import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
 if __package__ in (None, ""):
-    import sys
-
     # 允许直接用 `python scripts/catalog_ingest/main.py` 运行。
     # 这里把项目根目录压入 sys.path，然后改走绝对导入路径。
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -47,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=0,
         help="transcript 时间轴允许偏离 buffered 区间的毫秒数，默认 0",
+    )
+    parser.add_argument(
+        "--skip-recommendation-refresh",
+        action="store_true",
+        help="跳过导入成功后的 Recommendation recall projection 刷新",
     )
     return parser
 
@@ -115,8 +120,28 @@ def main(argv: list[str] | None = None) -> int:
             repository.write_terminal_records(pending_terminal_records)
             pending_terminal_records.clear()
 
+        refresh_error: CatalogIngestError | None = None
+        if _should_refresh_recommendation(
+            results=results,
+            dry_run=args.dry_run,
+            skip_recommendation_refresh=args.skip_recommendation_refresh,
+        ):
+            print("")
+            print("开始刷新 Recommendation recall projection...")
+            try:
+                run_recommendation_refresh()
+                print("Recommendation recall projection 刷新完成。")
+            except CatalogIngestError as error:
+                refresh_error = error
+
         _print_summary(results, dry_run=args.dry_run)
         exit_code = 1 if any(result.status == "failed" for result in results) else 0
+        if refresh_error is not None:
+            print(
+                f"[failed] code={refresh_error.code} "
+                f"stage={refresh_error.stage} message={refresh_error.message}"
+            )
+            exit_code = 1
     except CatalogIngestError as error:
         fatal_error = error
         exit_code = 1
@@ -143,6 +168,57 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[failed] code={fatal_error.code} stage={fatal_error.stage} message={fatal_error.message}")
         return 1
     return exit_code
+
+
+def run_recommendation_refresh() -> None:
+    """调用 Recommendation owner 命令刷新 recall projection。"""
+
+    project_root = Path(__file__).resolve().parents[2]
+    command = ("go", "run", "./cmd/dbtool", "refresh", "recommendation")
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=project_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError as error:
+        raise CatalogIngestError(
+            code="recommendation_refresh_failed",
+            stage="recommendation_refresh",
+            message=f"无法执行 Recommendation projection 刷新命令: {error}",
+            context={"command": list(command)},
+        ) from error
+
+    if completed.stdout:
+        print(completed.stdout, end="")
+    if completed.stderr:
+        print(completed.stderr, end="", file=sys.stderr)
+    if completed.returncode != 0:
+        raise CatalogIngestError(
+            code="recommendation_refresh_failed",
+            stage="recommendation_refresh",
+            message=f"Recommendation projection 刷新命令退出码为 {completed.returncode}",
+            context={
+                "command": list(command),
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            },
+        )
+
+
+def _should_refresh_recommendation(
+    results: list[ClipProcessResult],
+    dry_run: bool,
+    skip_recommendation_refresh: bool,
+) -> bool:
+    """只有本次 batch 真实写入过 clip 时才刷新推荐投影。"""
+
+    if dry_run or skip_recommendation_refresh:
+        return False
+    return any(result.status == "succeeded" for result in results)
 
 
 def _process_single_clip(

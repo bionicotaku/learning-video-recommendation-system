@@ -46,7 +46,8 @@ def normalize_clip_input(clip_input: LoadedClipInput) -> NormalizedCoreRows:
     span_rows: list[VideoSemanticSpanRow] = []
 
     for sentence in clip_input.transcript_sentences:
-        # sentence 行直接沿用 transcript 的绝对时间轴，不做 clip 内归零。
+        # sentence/span 行直接沿用 transcript 的 clip-local 绝对毫秒时间轴；
+        # 它已相对 buffered_start_time 归零，不是父视频全局时间。
         sentence_rows.append(
             VideoTranscriptSentenceRow(
                 sentence_index=sentence.index,

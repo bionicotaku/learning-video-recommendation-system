@@ -114,6 +114,7 @@ normal learning recommendations
 在线推荐不再对所有未 mastered target units 读取 recall rows。`DefaultContextAssembler` 先使用 Recommendation-owned `user_unit_recall_queue` projection：
 
 - queue 缺失、Learning state 版本变化、或 `dbtool refresh recommendation` 更新了 recall projection metadata 时，当前用户 queue 会 lazy rebuild。
+- `scripts/catalog_ingest` 在本次 batch 有成功 Catalog 写入时默认调用同一个 refresh 命令；这只是 ingest 后置同步，Recommendation projection 的 owner 仍在本模块。
 - 本轮 `planner_scope` 限制为 `min(max(target_video_count * 12, 64), 200)` 个 units。
 - active target 数量变化也会触发 queue rebuild；用户级 rebuild 通过事务锁和 upsert 保持并发幂等。
 - `RecallQueueService` 返回显式 `planner_scope` 和 `recall_fetch_scope`：前者进入 Demand Planner，后者读取 `v_video_unit_recall_index`。

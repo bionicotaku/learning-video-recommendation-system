@@ -23,7 +23,7 @@ func TestVideoDetailReturnsDetailAndPassesPrincipalUserID(t *testing.T) {
 			VideoID:         "11111111-1111-1111-1111-111111111111",
 			Title:           "Title",
 			Description:     "Description",
-			VideoURL:        "https://cdn.example.com/hls/master.m3u8",
+			VideoURL:        "https://cdn.example.com/videos/master.mp4",
 			CoverImageURL:   stringPtr("https://cdn.example.com/covers/111.webp"),
 			TranscriptURL:   stringPtr("https://cdn.example.com/transcripts/111.json"),
 			DurationSeconds: 91,

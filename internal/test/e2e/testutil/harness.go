@@ -351,7 +351,7 @@ func (h *Harness) SeedCatalogVideo(t *testing.T, fixture CatalogVideoFixture) {
 			video_object_path,
 			thumbnail_url
 		)
-		 values ($1::uuid, $2, $3, $4, $5, 'E2E Video ' || $1::text, 'E2E description', 'videos/' || $1::text || '/master.m3u8', 'covers/' || $1::text || '.webp')
+		 values ($1::uuid, $2, $3, $4, $5, 'E2E Video ' || $1::text, 'E2E description', 'portrait_videos/' || $1::text || '.mp4', 'covers/' || $1::text || '.webp')
 		 on conflict (video_id) do update
 		 set duration_ms = excluded.duration_ms,
 		     status = excluded.status,
@@ -791,7 +791,7 @@ alter table if exists catalog.videos add column if not exists visibility_status 
 alter table if exists catalog.videos add column if not exists publish_at timestamptz;
 alter table if exists catalog.videos add column if not exists title text not null default 'E2E Video';
 alter table if exists catalog.videos add column if not exists description text;
-alter table if exists catalog.videos add column if not exists video_object_path text not null default 'videos/e2e/master.m3u8';
+alter table if exists catalog.videos add column if not exists video_object_path text not null default 'portrait_videos/e2e.mp4';
 alter table if exists catalog.videos add column if not exists thumbnail_url text;
 
 alter table if exists catalog.questions add column if not exists scope_type text not null default 'unit';

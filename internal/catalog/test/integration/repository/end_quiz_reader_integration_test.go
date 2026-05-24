@@ -17,8 +17,8 @@ func TestEndQuizQuestionReaderSelectsVisibleVideoAndQuestionCandidates(t *testin
 
 	videoID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 	inactiveVideoID := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-	seedFeedVideo(t, db.Pool, videoID, "Visible", "", "hls/visible/master.m3u8", "", "active", "public", nil)
-	seedFeedVideo(t, db.Pool, inactiveVideoID, "Inactive", "", "hls/inactive/master.m3u8", "", "inactive", "public", nil)
+	seedFeedVideo(t, db.Pool, videoID, "Visible", "", "portrait_videos/visible.mp4", "", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, inactiveVideoID, "Inactive", "", "portrait_videos/inactive.mp4", "", "inactive", "public", nil)
 	seedQuizUnit(t, db, 101, "alpha")
 	seedQuizUnit(t, db, 102, "beta")
 	seedQuizQuestion(t, db, "11111111-1111-1111-1111-111111111111", "video_unit", "context_meaning_choice", 101, videoID, "older", "active", time.Now().UTC().Add(-time.Hour))

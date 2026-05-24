@@ -36,7 +36,7 @@ func (db *TestDatabase) SeedVideo(t *testing.T, videoID string, durationMS int32
 			'Video ' || $1::text,
 			'en',
 			$2,
-			'hls/' || $1::text || '/master.m3u8',
+			'portrait_videos/' || $1::text || '.mp4',
 			'active',
 			'public'
 		) on conflict (video_id) do nothing`, videoID, durationMS); err != nil {

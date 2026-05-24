@@ -6,10 +6,13 @@ import unittest
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
+from scripts.catalog_ingest import main as ingest_main
 from scripts.catalog_ingest.index_builder import build_normalized_clip_data
 from scripts.catalog_ingest.manifest_loader import load_clip_inputs
 from scripts.catalog_ingest.models import (
+    CatalogIngestError,
     ClipMetadata,
     LoadedClipInput,
     NormalizedCoreRows,
@@ -623,6 +626,119 @@ class CatalogIngestAlignmentTest(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].code, "token_time_outside_sentence")
 
+    def test_main_refreshes_recommendation_projection_after_successful_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            transcripts_dir = root / "transcripts"
+            questions_dir = root / "questions"
+            transcripts_dir.mkdir()
+            questions_dir.mkdir()
+            _write_transcript_file(transcripts_dir / "demo-clip1.json", coarse_unit_id=7)
+            (questions_dir / "demo-clip1.json").write_text(
+                json.dumps(_question_payload(7, 0, 0)),
+                encoding="utf-8",
+            )
+
+            fake_repo = _FakeMainRepository()
+            refresh = mock.Mock()
+            with (
+                mock.patch.object(ingest_main, "load_database_url", return_value="postgresql://unused"),
+                mock.patch.object(ingest_main, "CatalogRepository", return_value=fake_repo),
+                mock.patch.object(ingest_main, "run_recommendation_refresh", refresh),
+            ):
+                exit_code = ingest_main.main(
+                    [
+                        "--transcripts-dir",
+                        str(transcripts_dir),
+                        "--questions-dir",
+                        str(questions_dir),
+                        "--source-name",
+                        "local-json",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(fake_repo.persist_count, 1)
+        refresh.assert_called_once_with()
+
+    def test_main_skips_recommendation_refresh_for_dry_run_and_skip_flag(self) -> None:
+        for extra_args in (("--dry-run",), ("--skip-recommendation-refresh",)):
+            with self.subTest(extra_args=extra_args):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    transcripts_dir = root / "transcripts"
+                    questions_dir = root / "questions"
+                    transcripts_dir.mkdir()
+                    questions_dir.mkdir()
+                    _write_transcript_file(transcripts_dir / "demo-clip1.json", coarse_unit_id=7)
+                    (questions_dir / "demo-clip1.json").write_text(
+                        json.dumps(_question_payload(7, 0, 0)),
+                        encoding="utf-8",
+                    )
+
+                    fake_repo = _FakeMainRepository()
+                    refresh = mock.Mock()
+                    with (
+                        mock.patch.object(ingest_main, "load_database_url", return_value="postgresql://unused"),
+                        mock.patch.object(ingest_main, "CatalogRepository", return_value=fake_repo),
+                        mock.patch.object(ingest_main, "run_recommendation_refresh", refresh),
+                    ):
+                        exit_code = ingest_main.main(
+                            [
+                                "--transcripts-dir",
+                                str(transcripts_dir),
+                                "--questions-dir",
+                                str(questions_dir),
+                                "--source-name",
+                                "local-json",
+                                *extra_args,
+                            ]
+                        )
+
+                self.assertEqual(exit_code, 0)
+                refresh.assert_not_called()
+
+    def test_main_returns_nonzero_when_recommendation_refresh_fails_after_write(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            transcripts_dir = root / "transcripts"
+            questions_dir = root / "questions"
+            transcripts_dir.mkdir()
+            questions_dir.mkdir()
+            _write_transcript_file(transcripts_dir / "demo-clip1.json", coarse_unit_id=7)
+            (questions_dir / "demo-clip1.json").write_text(
+                json.dumps(_question_payload(7, 0, 0)),
+                encoding="utf-8",
+            )
+
+            fake_repo = _FakeMainRepository()
+            with (
+                mock.patch.object(ingest_main, "load_database_url", return_value="postgresql://unused"),
+                mock.patch.object(ingest_main, "CatalogRepository", return_value=fake_repo),
+                mock.patch.object(
+                    ingest_main,
+                    "run_recommendation_refresh",
+                    side_effect=CatalogIngestError(
+                        code="recommendation_refresh_failed",
+                        stage="recommendation_refresh",
+                        message="refresh failed",
+                    ),
+                ),
+            ):
+                exit_code = ingest_main.main(
+                    [
+                        "--transcripts-dir",
+                        str(transcripts_dir),
+                        "--questions-dir",
+                        str(questions_dir),
+                        "--source-name",
+                        "local-json",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(fake_repo.persist_count, 1)
+
 
 def _build_clip_input(
     transcript_sentences: tuple[TranscriptSentence, ...] | None = None,
@@ -662,7 +778,7 @@ def _build_clip_input(
         clip_reason=None,
         language="en",
         duration_ms=1000,
-        video_object_path="hls/master.m3u8",
+        video_object_path="https://storage.googleapis.com/videos2077/test-video/portrait_videos/parent-clip1.mp4",
         thumbnail_url=None,
         publish_at=None,
         transcript_object_path="transcript.json",
@@ -734,10 +850,10 @@ def _write_transcript_file(path: Path, coarse_unit_id: int) -> None:
                 "start_index": 0,
                 "end_index": 0,
                 "start_time": 100,
-                "end_time": 200,
+                "end_time": 250,
                 "buffered_start_time": 100,
-                "buffered_end_time": 200,
-                "duration_time": 100,
+                "buffered_end_time": 300,
+                "duration_time": 200,
                 "reasoning": "demo",
                 "sentences": [
                     {
@@ -870,6 +986,28 @@ class _FakeCursor:
 
     def fetchone(self) -> dict[str, object] | None:
         return self.fetchone_result
+
+
+class _FakeMainRepository:
+    def __init__(self) -> None:
+        self.persist_count = 0
+        self.closed = False
+
+    def load_known_coarse_unit_ids(self) -> set[int]:
+        return {7}
+
+    def load_existing_clip_states(self, source_clip_keys: list[str]) -> dict[str, object]:
+        return {}
+
+    def persist_clip(self, **kwargs: object) -> str:
+        self.persist_count += 1
+        return "11111111-1111-4111-8111-111111111111"
+
+    def write_terminal_records(self, records: list[object]) -> None:
+        return None
+
+    def close(self) -> None:
+        self.closed = True
 
 
 if __name__ == "__main__":

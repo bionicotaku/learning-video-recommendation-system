@@ -24,12 +24,12 @@ func TestVideoPresentationReaderListFeedVideosByIDs(t *testing.T) {
 	privateID := "44444444-4444-4444-4444-444444444444"
 	futureID := "55555555-5555-5555-5555-555555555555"
 
-	seedFeedVideo(t, db.Pool, visibleID, "Visible title", "Visible description", "hls/visible/master.m3u8", "covers/visible.webp", "active", "public", nil)
-	seedFeedVideo(t, db.Pool, noStatsID, "No stats title", "", "https://cdn.example.com/hls/no-stats/master.m3u8", "", "active", "public", nil)
-	seedFeedVideo(t, db.Pool, inactiveID, "Inactive", "", "hls/inactive/master.m3u8", "", "inactive", "public", nil)
-	seedFeedVideo(t, db.Pool, privateID, "Private", "", "hls/private/master.m3u8", "", "active", "private", nil)
+	seedFeedVideo(t, db.Pool, visibleID, "Visible title", "Visible description", "portrait_videos/visible.mp4", "covers/visible.webp", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, noStatsID, "No stats title", "", "https://cdn.example.com/videos/no-stats.mp4", "", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, inactiveID, "Inactive", "", "portrait_videos/inactive.mp4", "", "inactive", "public", nil)
+	seedFeedVideo(t, db.Pool, privateID, "Private", "", "portrait_videos/private.mp4", "", "active", "private", nil)
 	future := time.Now().UTC().Add(24 * time.Hour)
-	seedFeedVideo(t, db.Pool, futureID, "Future", "", "hls/future/master.m3u8", "", "active", "public", &future)
+	seedFeedVideo(t, db.Pool, futureID, "Future", "", "portrait_videos/future.mp4", "", "active", "public", &future)
 
 	if _, err := db.Pool.Exec(ctx, `
 		insert into auth.users (id, email)
@@ -111,9 +111,9 @@ func TestVideoPresentationReaderGetVideoDetailByID(t *testing.T) {
 	noStatsID := "22222222-2222-2222-2222-222222222222"
 	inactiveID := "33333333-3333-3333-3333-333333333333"
 
-	seedFeedVideo(t, db.Pool, visibleID, "Visible title", "Visible description", "hls/visible/master.m3u8", "covers/visible.webp", "active", "public", nil)
-	seedFeedVideo(t, db.Pool, noStatsID, "No stats title", "", "https://cdn.example.com/hls/no-stats/master.m3u8", "", "active", "public", nil)
-	seedFeedVideo(t, db.Pool, inactiveID, "Inactive", "", "hls/inactive/master.m3u8", "", "inactive", "public", nil)
+	seedFeedVideo(t, db.Pool, visibleID, "Visible title", "Visible description", "portrait_videos/visible.mp4", "covers/visible.webp", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, noStatsID, "No stats title", "", "https://cdn.example.com/videos/no-stats.mp4", "", "active", "public", nil)
+	seedFeedVideo(t, db.Pool, inactiveID, "Inactive", "", "portrait_videos/inactive.mp4", "", "inactive", "public", nil)
 
 	if _, err := db.Pool.Exec(ctx, `
 		insert into auth.users (id, email)
@@ -153,7 +153,7 @@ func TestVideoPresentationReaderGetVideoDetailByID(t *testing.T) {
 	if detail.VideoID != visibleID || detail.Title != "Visible title" || detail.Description != "Visible description" {
 		t.Fatalf("unexpected detail metadata: %+v", detail)
 	}
-	if detail.VideoObjectPath != "hls/visible/master.m3u8" || detail.CoverImageURL == nil || *detail.CoverImageURL != "covers/visible.webp" {
+	if detail.VideoObjectPath != "portrait_videos/visible.mp4" || detail.CoverImageURL == nil || *detail.CoverImageURL != "covers/visible.webp" {
 		t.Fatalf("unexpected media paths: %+v", detail)
 	}
 	if detail.TranscriptObjectPath == nil || *detail.TranscriptObjectPath != "transcripts/visible.json" {

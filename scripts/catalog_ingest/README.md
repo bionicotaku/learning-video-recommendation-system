@@ -118,8 +118,8 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 每个 sentence 映射为一行：
 
 - `sentence_index`：`sentence.index`
-- `start_ms`：`sentence.start`，当前 clip 内的相对毫秒
-- `end_ms`：`sentence.end`，当前 clip 内的相对毫秒
+- `start_ms`：`sentence.start`，clip-local 绝对毫秒；已相对 `buffered_start_time` 归零，不是父视频全局时间
+- `end_ms`：`sentence.end`，clip-local 绝对毫秒；已相对 `buffered_start_time` 归零，不是父视频全局时间
 - `text`：`sentence.text`
 - `translation`：`sentence.translation`
 
@@ -129,8 +129,8 @@ question 文件必须与 mapped transcript 同名。顶层必须包含：
 
 - `sentence_index`：所属 sentence 的 `index`
 - `span_index`：`token.index`
-- `start_ms`：`token.start`，当前 clip 内的相对毫秒
-- `end_ms`：`token.end`，当前 clip 内的相对毫秒
+- `start_ms`：`token.start`，clip-local 绝对毫秒；已相对 `buffered_start_time` 归零，不是父视频全局时间
+- `end_ms`：`token.end`，clip-local 绝对毫秒；已相对 `buffered_start_time` 归零，不是父视频全局时间
 - `coarse_unit_id`：`token.semantic_element.coarse_id`
 - `surface_text`：`token.text`
 - `explanation`：`token.explanation`
@@ -211,6 +211,14 @@ question 文件缺失时，该 clip 记为 `skipped / question_missing`，不写
 
 如果 question JSON 存在，脚本不会走 unchanged skip 优化，确保题目和 selected refs 的变更能被写入。
 
+整批处理结束后，只要本次至少有一个 clip 成功写入，脚本会调用 Recommendation owner 命令刷新 recall projection：
+
+```bash
+go run ./cmd/dbtool refresh recommendation
+```
+
+该步骤刷新 `recommendation.v_video_unit_recall_index`、`recommendation.v_unit_video_inventory` 和 `recommendation.recall_projection_metadata`。Catalog 入库不直接写 Recommendation schema；刷新失败不会回滚已经提交的 Catalog clip 事务，但脚本最终返回非零，调用方应视为需要处理的后置失败。
+
 ## 运行
 
 ```bash
@@ -226,5 +234,6 @@ question 文件缺失时，该 clip 记为 `skipped / question_missing`，不写
 - `--limit N`：最多处理 N 个 clip
 - `--clip-key <source_clip_key>`：只处理指定 clip
 - `--time-tolerance-ms N`：允许 transcript 时间轴偏离 buffered 区间 N 毫秒
+- `--skip-recommendation-refresh`：跳过成功写入后的 Recommendation recall projection 刷新
 
 数据库连接从环境变量 `DATABASE_URL` 读取；如果环境变量不存在，则读取项目根目录 `.env`。
