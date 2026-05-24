@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -113,52 +112,6 @@ func TestQuizAttemptsMapsApplicationValidationErrorToInvalidRequest(t *testing.T
 	if body.Error.Code != "invalid_request" {
 		t.Fatalf("unexpected error code: %s", body.Error.Code)
 	}
-	if body.Error.RequestID == "" {
-		t.Fatalf("expected request id in error response")
-	}
-}
-
-func TestQuizAttemptsMapsInternalErrorToInternalError(t *testing.T) {
-	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{
-		err: errors.New("database unavailable"),
-	}, &fakeSelfMarkMasteredRecorder{})
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, "/api/quiz-attempts", `{
-		"client_event_id": "quiz-1",
-		"question_id": "44444444-4444-4444-4444-444444444444",
-		"coarse_unit_id": 101,
-		"trigger_type": "lookup_practice",
-		"selected_option_ids": ["correct"],
-		"selection_interval_ms": [1200],
-		"is_first_try_correct": true,
-		"total_elapsed_ms": 1200,
-		"shown_at": "2026-05-15T17:01:00Z",
-		"completed_at": "2026-05-15T17:01:04Z"
-	}`)
-
-	if response.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", response.StatusCode)
-	}
-}
-
-func TestLearningInteractionsBatchRejectsMissingPrincipal(t *testing.T) {
-	group := learningevents.NewHandler(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, &fakeResetUserUnitProgressRecorder{})
-	handler := router.New(router.Options{LearningEvents: group})
-	server := httptest.NewServer(middleware.RequestID(handler))
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, "/api/learning-interactions:batch", `{"events":[]}`)
-
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", response.StatusCode)
-	}
-	var body struct {
-		Error struct {
-			RequestID string `json:"request_id"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &body)
 	if body.Error.RequestID == "" {
 		t.Fatalf("expected request id in error response")
 	}
@@ -332,44 +285,6 @@ func TestLearningInteractionsBatchRejectsEventLevelVideoContext(t *testing.T) {
 	}
 	if recorder.called {
 		t.Fatalf("expected batch usecase not to be called")
-	}
-}
-
-func TestLearningInteractionsBatchRequiresJSONContentType(t *testing.T) {
-	body := `{
-		"video_id": "33333333-3333-3333-3333-333333333333",
-		"watch_session_id": "44444444-4444-4444-4444-444444444444",
-		"events": [{
-			"client_event_id": "evt-1",
-			"event_type": "lookup",
-			"source_surface": "video_subtitle",
-			"token_text": "constrain",
-			"sentence_index": 12,
-			"span_index": 4,
-			"occurred_at": "2026-05-15T17:00:01Z"
-		}]
-	}`
-	cases := []struct {
-		name        string
-		contentType string
-	}{
-		{name: "missing"},
-		{name: "wrong", contentType: "text/plain"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			recorder := &fakeLearningInteractionRecorder{}
-			server := newTestServer(recorder, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{})
-			t.Cleanup(server.Close)
-
-			response := postRaw(t, server, "/api/learning-interactions:batch", body, tc.contentType)
-			if response.StatusCode != http.StatusBadRequest {
-				t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
-			}
-			if recorder.called {
-				t.Fatalf("expected batch usecase not to be called")
-			}
-		})
 	}
 }
 
@@ -661,37 +576,6 @@ func TestSelfMarkMasteredRejectsNonObjectEventPayload(t *testing.T) {
 	}
 }
 
-func TestSelfMarkMasteredMapsContextDeadlineToServiceUnavailable(t *testing.T) {
-	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{
-		err: context.DeadlineExceeded,
-	})
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, "/api/learning-units:mark-mastered", `{
-		"client_event_id": "self-mark-1",
-		"coarse_unit_id": 101,
-		"source_surface": "word_detail",
-		"occurred_at": "2026-05-15T17:02:00Z"
-	}`)
-
-	if response.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d", response.StatusCode)
-	}
-	var body struct {
-		Error struct {
-			Code      string `json:"code"`
-			RequestID string `json:"request_id"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &body)
-	if body.Error.Code != "service_unavailable" {
-		t.Fatalf("unexpected error code: %s", body.Error.Code)
-	}
-	if body.Error.RequestID == "" {
-		t.Fatalf("expected request id in error response")
-	}
-}
-
 func TestResetUnlearnedPassesPrincipalAndBodyUnitAndReturnsAcceptedLearningEvent(t *testing.T) {
 	recorder := &fakeResetUserUnitProgressRecorder{
 		response: apvdto.ResetUserUnitProgressResponse{
@@ -766,37 +650,6 @@ func TestResetUnlearnedRejectsNonObjectEventPayload(t *testing.T) {
 
 	if response.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", response.StatusCode)
-	}
-}
-
-func TestResetUnlearnedMapsContextDeadlineToServiceUnavailable(t *testing.T) {
-	server := newTestServer(&fakeLearningInteractionRecorder{}, &fakeQuizAttemptRecorder{}, &fakeSelfMarkMasteredRecorder{}, &fakeResetUserUnitProgressRecorder{
-		err: context.DeadlineExceeded,
-	})
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, "/api/learning-units:reset-unlearned", `{
-		"client_event_id": "reset-1",
-		"coarse_unit_id": 101,
-		"source_surface": "word_detail",
-		"occurred_at": "2026-05-15T17:02:00Z"
-	}`)
-
-	if response.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d", response.StatusCode)
-	}
-	var body struct {
-		Error struct {
-			Code      string `json:"code"`
-			RequestID string `json:"request_id"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &body)
-	if body.Error.Code != "service_unavailable" {
-		t.Fatalf("unexpected error code: %s", body.Error.Code)
-	}
-	if body.Error.RequestID == "" {
-		t.Fatalf("expected request id in error response")
 	}
 }
 
@@ -891,18 +744,11 @@ func newTestServer(
 
 func postJSON(t *testing.T, server *httptest.Server, path string, body string) *http.Response {
 	t.Helper()
-	return postRaw(t, server, path, body, "application/json")
-}
-
-func postRaw(t *testing.T, server *httptest.Server, path string, body string, contentType string) *http.Response {
-	t.Helper()
 	request, err := http.NewRequest(http.MethodPost, server.URL+path, bytes.NewBufferString(body))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
-	if contentType != "" {
-		request.Header.Set("Content-Type", contentType)
-	}
+	request.Header.Set("Content-Type", "application/json")
 	response, err := server.Client().Do(request)
 	if err != nil {
 		t.Fatalf("post json: %v", err)

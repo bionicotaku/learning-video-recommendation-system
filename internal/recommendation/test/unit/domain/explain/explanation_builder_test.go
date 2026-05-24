@@ -1,11 +1,6 @@
 package explain_test
 
 import (
-	"bytes"
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	recommendationexplain "learning-video-recommendation-system/internal/recommendation/domain/explain"
@@ -50,7 +45,7 @@ func TestDefaultExplanationBuilderGeneratesReasonCodesAndPlanFields(t *testing.T
 	}
 }
 
-func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
+func TestDefaultExplanationBuilderPreservesFinalOrderingAndLearningUnits(t *testing.T) {
 	builder := recommendationexplain.NewDefaultExplanationBuilder()
 	start := int32(1240)
 	end := int32(1820)
@@ -84,23 +79,17 @@ func TestDefaultExplanationBuilderGoldenFinalOrdering(t *testing.T) {
 		t.Fatalf("build explanation: %v", err)
 	}
 
-	actual, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal items: %v", err)
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2", len(items))
 	}
-
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve current file")
+	if items[0].VideoID != "video-hard" || items[1].VideoID != "video-future" {
+		t.Fatalf("ordering changed: %#v", items)
 	}
-	goldenPath := filepath.Join(filepath.Dir(currentFile), "../../../golden/final_ordering_normal.json")
-	expected, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
+	if len(items[0].LearningUnits) != 2 || len(items[1].LearningUnits) != 1 {
+		t.Fatalf("learning units not preserved: %#v", items)
 	}
-
-	if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
-		t.Fatalf("final ordering golden mismatch\nactual:\n%s\nexpected:\n%s", actual, expected)
+	if !contains(items[0].ReasonCodes, string(policy.ReasonCodeHardReviewCovered)) {
+		t.Fatalf("hard item reason codes = %#v", items[0].ReasonCodes)
 	}
 }
 

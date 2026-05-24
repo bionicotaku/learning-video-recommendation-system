@@ -32,6 +32,7 @@ Rules:
 8. migration 修改: 要先创建临时 migration 应用到 live DB, 然后清理中间过程, 保持 migration 干净
 9. 较大的重构或功能实现, 以及长任务, 需要在标准验收后额外进行 code review, 允许自主调用 subagent, 最后根据 review 结果给出推荐优化/修复方案, 但不主动修
 10. 其他情况调用 subagent 需要向我申请得到允许, 调用 Subagent 完全不允许自定义模型, 必须直接继承当前会话模型
+11. TDD 的测试不要过度绑定细节
 
 ## 文档规则
 

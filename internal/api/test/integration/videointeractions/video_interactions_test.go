@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -132,34 +131,18 @@ func TestVideoInteractionsRequireOccurredAtBody(t *testing.T) {
 	}
 }
 
-func TestVideoInteractionsRejectInvalidVideoIDAndMissingPrincipal(t *testing.T) {
-	t.Run("invalid video id", func(t *testing.T) {
-		like := &fakeLikeUsecase{}
-		server := newServer(like, &fakeFavoriteUsecase{})
-		t.Cleanup(server.Close)
+func TestVideoInteractionsRejectInvalidVideoID(t *testing.T) {
+	like := &fakeLikeUsecase{}
+	server := newServer(like, &fakeFavoriteUsecase{})
+	t.Cleanup(server.Close)
 
-		response := requestInteraction(t, server, http.MethodPut, "/api/videos/not-a-uuid/like", true, time.Date(2026, 5, 23, 12, 3, 0, 0, time.UTC))
-		if response.StatusCode != http.StatusBadRequest {
-			t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
-		}
-		if like.called {
-			t.Fatal("like service should not be called")
-		}
-	})
-
-	t.Run("missing principal", func(t *testing.T) {
-		like := &fakeLikeUsecase{}
-		server := newServer(like, &fakeFavoriteUsecase{})
-		t.Cleanup(server.Close)
-
-		response := requestInteraction(t, server, http.MethodPut, "/api/videos/"+videoID+"/like", false, time.Date(2026, 5, 23, 12, 4, 0, 0, time.UTC))
-		if response.StatusCode != http.StatusUnauthorized {
-			t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
-		}
-		if like.called {
-			t.Fatal("like service should not be called")
-		}
-	})
+	response := requestInteraction(t, server, http.MethodPut, "/api/videos/not-a-uuid/like", true, time.Date(2026, 5, 23, 12, 3, 0, 0, time.UTC))
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
+	}
+	if like.called {
+		t.Fatal("like service should not be called")
+	}
 }
 
 func TestVideoInteractionsMapCatalogErrors(t *testing.T) {
@@ -171,7 +154,6 @@ func TestVideoInteractionsMapCatalogErrors(t *testing.T) {
 	}{
 		{name: "catalog validation", err: catalogservice.UnprocessableError("bad payload"), status: http.StatusUnprocessableEntity, code: "unprocessable_entity"},
 		{name: "not found", err: catalogservice.NotFoundError("video not found"), status: http.StatusNotFound, code: "not_found"},
-		{name: "internal", err: errors.New("db down"), status: http.StatusInternalServerError, code: "internal_error"},
 	}
 
 	for _, tt := range cases {

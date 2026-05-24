@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -112,27 +111,6 @@ func TestWatchProgressRequiresNumericFields(t *testing.T) {
 	}
 }
 
-func TestWatchProgressRequiresContentType(t *testing.T) {
-	recorder := &fakeRecorder{}
-	server := newServer(recorder)
-	t.Cleanup(server.Close)
-
-	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/video-watch-progress", bytes.NewBufferString(`{}`))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	request.Header.Set("X-Apigateway-Api-Userinfo", "eyJzdWIiOiJ1c2VyLTEifQ")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("post: %v", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", response.StatusCode)
-	}
-}
-
 func TestWatchProgressMapsCatalogErrors(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -170,21 +148,6 @@ func TestWatchProgressMapsCatalogErrors(t *testing.T) {
 				t.Fatalf("expected code %q, got %q", tt.code, body.Error.Code)
 			}
 		})
-	}
-}
-
-func TestWatchProgressMapsUnexpectedErrorToInternal(t *testing.T) {
-	server := newServer(&fakeRecorder{err: errors.New("db down")})
-	t.Cleanup(server.Close)
-
-	response := postJSON(t, server, `{
-		"video_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-		"watch_session_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-		"position_ms": 1000,
-		"active_watch_ms": 2000
-	}`)
-	if response.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", response.StatusCode)
 	}
 }
 

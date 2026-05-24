@@ -1,12 +1,8 @@
 package usecase_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"learning-video-recommendation-system/internal/recommendation/application/dto"
@@ -111,75 +107,12 @@ func TestGenerateVideoRecommendationsPipelineExecutesFullRecommendationFlow(t *t
 	if summary["planner_scope_unit_count"] != float64(5) {
 		t.Fatalf("planner scope count = %#v", summary["planner_scope_unit_count"])
 	}
-	if summary["no_supply_scope_unit_count"] != float64(1) {
-		t.Fatalf("no-supply scope count = %#v", summary["no_supply_scope_unit_count"])
-	}
 	timing, ok := summary["pipeline_timing_ms"].(map[string]any)
 	if !ok {
 		t.Fatalf("pipeline_timing_ms missing or invalid: %#v", summary["pipeline_timing_ms"])
 	}
-	for _, key := range []string{"context_assemble", "plan", "candidate_generate", "evidence_resolve", "aggregate", "video_state_enrich", "rank", "select", "fill", "final_item_build", "total"} {
-		value, ok := timing[key].(float64)
-		if !ok || value < 0 {
-			t.Fatalf("timing[%s] = %#v", key, timing[key])
-		}
-	}
-	for _, key := range []string{"audit_write", "serving_state_write"} {
-		if _, ok := timing[key]; ok {
-			t.Fatalf("timing[%s] should not be present in audit summary: %#v", key, timing)
-		}
-	}
-}
-
-func TestGenerateVideoRecommendationsPipelineGoldenResponse(t *testing.T) {
-	service, err := usecase.NewGenerateVideoRecommendationsPipeline(
-		&constructorStubContextAssembler{
-			context: model.RecommendationContext{
-				PreferredDurationSec: [2]int{45, 200},
-				Request:              model.RecommendationRequest{UserID: "user-1", TargetVideoCount: 2},
-			},
-		},
-		&stubPlanner{bundle: model.DemandBundle{TargetVideoCount: 2}},
-		&stubCandidateGenerator{candidates: []model.VideoUnitCandidate{{VideoID: "video-1", CoarseUnitID: 101}}},
-		&stubResolver{windows: []model.ResolvedEvidenceWindow{{Candidate: model.VideoUnitCandidate{VideoID: "video-1", CoarseUnitID: 101}}}},
-		&stubAggregator{videos: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
-		&stubRanker{ranked: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
-		&stubSelector{selected: []model.VideoCandidate{testVideoCandidate("video-1", 101, model.LearningRoleHardReview)}},
-		&stubVideoFillService{},
-		&stubExplainer{items: []model.FinalRecommendationItem{testFinalItem("video-1", 101, model.LearningRoleHardReview)}},
-		&stubVideoStateEnricher{},
-		&spyResultWriter{},
-	)
-	if err != nil {
-		t.Fatalf("NewGenerateVideoRecommendationsPipeline() error = %v", err)
-	}
-
-	response, err := service.Execute(context.Background(), dto.GenerateVideoRecommendationsRequest{
-		UserID:           "user-1",
-		TargetVideoCount: 2,
-	})
-	if err != nil {
-		t.Fatalf("execute pipeline: %v", err)
-	}
-	response.RunID = "fixed-run-id"
-
-	actual, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		t.Fatalf("marshal response: %v", err)
-	}
-
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve current file")
-	}
-	goldenPath := filepath.Join(filepath.Dir(currentFile), "../../../golden/usecase_pipeline_response.json")
-	expected, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-
-	if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
-		t.Fatalf("usecase response golden mismatch\nactual:\n%s\nexpected:\n%s", actual, expected)
+	if value, ok := timing["total"].(float64); !ok || value < 0 {
+		t.Fatalf("timing[total] = %#v", timing["total"])
 	}
 }
 

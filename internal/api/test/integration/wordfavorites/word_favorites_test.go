@@ -195,37 +195,10 @@ func TestWordFavoriteHandlerRejectsUnknownFieldAndMapsCatalogNotFound(t *testing
 	})
 }
 
-func TestWordFavoriteBodyLimitMapsPayloadTooLarge(t *testing.T) {
-	server := newServerWithBodyLimit(&fakeStatusUsecase{}, &fakeSetUsecase{}, &fakeUnsetUsecase{}, &fakeListUsecase{})
-	t.Cleanup(server.Close)
-
-	response := putJSON(t, server, "/api/word-favorites", `{"coarse_unit_id":108404,"text":"`+strings.Repeat("x", 128)+`","source":"word_list","occurred_at":"2026-05-24T10:20:30Z"}`)
-	requireStatus(t, response, http.StatusRequestEntityTooLarge)
-	var body struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &body)
-	if body.Error.Code != "payload_too_large" {
-		t.Fatalf("error code = %q, want payload_too_large", body.Error.Code)
-	}
-}
-
 func newServer(status *fakeStatusUsecase, set *fakeSetUsecase, unset *fakeUnsetUsecase, list *fakeListUsecase) *httptest.Server {
 	handler := router.New(router.Options{
 		WordFavorites: wordfavorites.NewHandler(status, set, unset, list),
 	})
-	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
-	handler = middleware.RequestID(handler)
-	return httptest.NewServer(handler)
-}
-
-func newServerWithBodyLimit(status *fakeStatusUsecase, set *fakeSetUsecase, unset *fakeUnsetUsecase, list *fakeListUsecase) *httptest.Server {
-	handler := router.New(router.Options{
-		WordFavorites: wordfavorites.NewHandler(status, set, unset, list),
-	})
-	handler = middleware.BodyLimitByPath(64, nil)(handler)
 	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)

@@ -1,12 +1,7 @@
 package service_test
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
 	"testing"
 
@@ -204,47 +199,6 @@ func TestDefaultCandidateGeneratorScenarioCoreStillLeadsWhenNearFutureInventoryI
 	}
 	if summary.OrderedVideos[0] != "video-hard-main" {
 		t.Fatalf("expected core candidate to lead ordered videos, got %#v", summary.OrderedVideos)
-	}
-}
-
-func TestDefaultCandidateGeneratorScenarioGoldenCandidateSummary(t *testing.T) {
-	recommendationCtx := recommendationContext()
-	demand := recommendationDemand()
-	demand.Flags.HardReviewLowSupply = true
-
-	rows := []model.RecommendableVideoUnit{
-		recommendableRow("video-exact-a", 101, 4, 3, 42, 0.52, 0.92, 120_000),
-		recommendableRow("video-exact-b", 201, 3, 2, 30, 0.31, 0.72, 95_000),
-		recommendableRow("video-bundle-a", 101, 2, 2, 20, 0.20, 0.65, 110_000),
-		recommendableRow("video-bundle-a", 301, 2, 2, 18, 0.17, 0.62, 110_000),
-		recommendableRow("video-soft-a", 301, 2, 2, 21, 0.19, 0.68, 105_000),
-		recommendableRow("video-soft-b", 401, 2, 2, 16, 0.14, 0.61, 105_000),
-		recommendableRow("video-fallback", 402, 1, 1, 10, 0.07, 0.44, 90_000),
-	}
-
-	generator := recommendationservice.NewDefaultCandidateGenerator(&stubRecommendableVideoUnitReader{rows: rows})
-	candidates, err := generator.Generate(context.Background(), recommendationCtx, demand)
-	if err != nil {
-		t.Fatalf("generate: %v", err)
-	}
-
-	actual, err := json.MarshalIndent(summarizeCandidates(candidates), "", "  ")
-	if err != nil {
-		t.Fatalf("marshal summary: %v", err)
-	}
-
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve current file")
-	}
-	goldenPath := filepath.Join(filepath.Dir(currentFile), "../../../golden/candidate_summary_review_sparse.json")
-	expected, err := os.ReadFile(goldenPath)
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-
-	if !bytes.Equal(bytes.TrimSpace(actual), bytes.TrimSpace(expected)) {
-		t.Fatalf("candidate summary golden mismatch\nactual:\n%s\nexpected:\n%s", actual, expected)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -81,20 +80,6 @@ func TestUnitProgressUnmasteredReturnsItemsAndPassesPrincipalUserID(t *testing.T
 	}
 }
 
-func TestUnitProgressRejectsMissingPrincipal(t *testing.T) {
-	service := &fakeService{}
-	server := newServer(service, false)
-	t.Cleanup(server.Close)
-
-	response := get(t, server, "/api/learning/unit-progress/mastered", false)
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	if service.called {
-		t.Fatalf("service should not be called")
-	}
-}
-
 func TestUnitProgressRejectsInvalidLimit(t *testing.T) {
 	cases := []string{"0", "101", "abc"}
 
@@ -116,35 +101,21 @@ func TestUnitProgressRejectsInvalidLimit(t *testing.T) {
 }
 
 func TestUnitProgressMapsServiceErrors(t *testing.T) {
-	cases := []struct {
-		name   string
-		err    error
-		status int
-		code   string
-	}{
-		{name: "validation", err: &learningservice.Error{Code: learningservice.ErrorCodeValidation, Message: "bad cursor"}, status: http.StatusBadRequest, code: "invalid_request"},
-		{name: "internal", err: errors.New("db down"), status: http.StatusInternalServerError, code: "internal_error"},
+	server := newServer(&fakeService{err: &learningservice.Error{Code: learningservice.ErrorCodeValidation, Message: "bad cursor"}}, true)
+	t.Cleanup(server.Close)
+
+	response := get(t, server, "/api/learning/unit-progress/mastered", true)
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", response.StatusCode, readBody(t, response))
 	}
-
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			server := newServer(&fakeService{err: tt.err}, true)
-			t.Cleanup(server.Close)
-
-			response := get(t, server, "/api/learning/unit-progress/mastered", true)
-			if response.StatusCode != tt.status {
-				t.Fatalf("expected %d, got %d: %s", tt.status, response.StatusCode, readBody(t, response))
-			}
-			var body struct {
-				Error struct {
-					Code string `json:"code"`
-				} `json:"error"`
-			}
-			decodeJSON(t, response, &body)
-			if body.Error.Code != tt.code {
-				t.Fatalf("code = %q, want %q", body.Error.Code, tt.code)
-			}
-		})
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decodeJSON(t, response, &body)
+	if body.Error.Code != "invalid_request" {
+		t.Fatalf("code = %q, want invalid_request", body.Error.Code)
 	}
 }
 

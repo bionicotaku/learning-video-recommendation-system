@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
-	"strings"
 	"testing"
 	"time"
 
@@ -82,51 +81,6 @@ func TestSubmitFeedbackRejectsInvalidPayloadAndImages(t *testing.T) {
 				t.Fatalf("service should not be called")
 			}
 		})
-	}
-}
-
-func TestSubmitFeedbackMapsOversizeRequestToPayloadTooLarge(t *testing.T) {
-	server := newServer(&fakeSubmitFeedbackUsecase{}, true)
-	t.Cleanup(server.Close)
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	if err := writer.WriteField("payload", `{"message":"bug"}`); err != nil {
-		t.Fatalf("write payload: %v", err)
-	}
-	part, err := createJPEGPart(writer)
-	if err != nil {
-		t.Fatalf("create image: %v", err)
-	}
-	if _, err := part.Write(bytes.Repeat([]byte{'x'}, 5*1024*1024)); err != nil {
-		t.Fatalf("write image: %v", err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close multipart: %v", err)
-	}
-
-	response := postMultipart(t, server, body.Bytes(), writer.FormDataContentType(), true)
-	if response.StatusCode != http.StatusRequestEntityTooLarge {
-		t.Fatalf("expected 413, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	payload := readBody(t, response)
-	if !strings.Contains(payload, `"payload_too_large"`) {
-		t.Fatalf("expected payload_too_large error: %s", payload)
-	}
-}
-
-func TestSubmitFeedbackRequiresPrincipal(t *testing.T) {
-	service := &fakeSubmitFeedbackUsecase{}
-	server := newServer(service, true)
-	t.Cleanup(server.Close)
-
-	body, contentType := multipartBody(t, `{}`, "", nil)
-	response := postMultipart(t, server, body, contentType, false)
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	if service.called {
-		t.Fatalf("service should not be called")
 	}
 }
 

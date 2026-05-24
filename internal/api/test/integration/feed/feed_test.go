@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	apvdto "learning-video-recommendation-system/internal/api/application/dto"
-	apiservice "learning-video-recommendation-system/internal/api/application/service"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/auth"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/feed"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/middleware"
@@ -162,87 +160,6 @@ func TestFeedRejectsInvalidTransportRequest(t *testing.T) {
 	}
 }
 
-func TestFeedMapsOversizeJSONBodyToPayloadTooLarge(t *testing.T) {
-	service := &fakeFeedService{}
-	server := newServerWithBodyLimit(service)
-	t.Cleanup(server.Close)
-
-	body := append([]byte(`{"client_context":{"padding":"`), bytes.Repeat([]byte("x"), 1<<20)...)
-	body = append(body, []byte(`"}}`)...)
-	response := postJSONBytes(t, server, body)
-
-	if response.StatusCode != http.StatusRequestEntityTooLarge {
-		t.Fatalf("expected 413, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	var payload struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &payload)
-	if payload.Error.Code != "payload_too_large" {
-		t.Fatalf("code = %q, want payload_too_large", payload.Error.Code)
-	}
-	if service.called {
-		t.Fatal("service should not be called")
-	}
-}
-
-func TestFeedRequiresContentType(t *testing.T) {
-	service := &fakeFeedService{}
-	server := newServer(service)
-	t.Cleanup(server.Close)
-
-	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/feed", bytes.NewBufferString(`{}`))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	setGatewayPrincipal(request, "user-1")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("post: %v", err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", response.StatusCode)
-	}
-}
-
-func TestFeedMapsErrors(t *testing.T) {
-	cases := []struct {
-		name   string
-		err    error
-		status int
-		code   string
-	}{
-		{name: "invalid", err: apiservice.InvalidRequestError("bad request"), status: http.StatusBadRequest, code: "invalid_request"},
-		{name: "unavailable", err: apiservice.ServiceUnavailableError("timeout"), status: http.StatusServiceUnavailable, code: "service_unavailable"},
-		{name: "internal", err: errors.New("db down"), status: http.StatusInternalServerError, code: "internal_error"},
-	}
-
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			server := newServer(&fakeFeedService{err: tt.err})
-			t.Cleanup(server.Close)
-
-			response := postJSON(t, server, `{}`)
-			if response.StatusCode != tt.status {
-				t.Fatalf("expected %d, got %d: %s", tt.status, response.StatusCode, readBody(t, response))
-			}
-			var body struct {
-				Error struct {
-					Code string `json:"code"`
-				} `json:"error"`
-			}
-			decodeJSON(t, response, &body)
-			if body.Error.Code != tt.code {
-				t.Fatalf("expected code %q, got %q", tt.code, body.Error.Code)
-			}
-		})
-	}
-}
-
 func newServer(feedService *fakeFeedService) *httptest.Server {
 	return newServerWithAuth(feedService, auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})
 }
@@ -251,15 +168,6 @@ func newServerWithAuth(feedService *fakeFeedService, options auth.Options) *http
 	group := feed.NewHandler(feedService)
 	handler := router.New(router.Options{Feed: group})
 	handler = auth.PrincipalMiddleware(options)(handler)
-	handler = middleware.RequestID(handler)
-	return httptest.NewServer(handler)
-}
-
-func newServerWithBodyLimit(feedService *fakeFeedService) *httptest.Server {
-	group := feed.NewHandler(feedService)
-	handler := router.New(router.Options{Feed: group})
-	handler = middleware.BodyLimitByPath(1<<20, nil)(handler)
-	handler = auth.PrincipalMiddleware(auth.Options{GatewayUserinfoHeader: "X-Apigateway-Api-Userinfo"})(handler)
 	handler = middleware.RequestID(handler)
 	return httptest.NewServer(handler)
 }

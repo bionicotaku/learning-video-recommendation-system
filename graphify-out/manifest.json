@@ -90,8 +90,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/application/service/candidate_generator_test.go": {
-    "mtime": 1779354880.0633993,
-    "ast_hash": "5e616ab79b27ed376e4fa5870927e65d",
+    "mtime": 1779626160.1157637,
+    "ast_hash": "7d1b27e858a5f86176f1ee27a5c5a3d3",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/application/service/context_assembler_test.go": {
@@ -115,8 +115,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/application/usecase/generate_video_recommendations_pipeline_test.go": {
-    "mtime": 1779358342.398162,
-    "ast_hash": "5a11951d786451264513bba3e12d4a71",
+    "mtime": 1779626160.1166968,
+    "ast_hash": "29e9a595f6c062ebac62e01dd1d3ab36",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/infrastructure/persistence/mapper/pgtypes_test.go": {
@@ -130,18 +130,18 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/domain/ranking/video_ranker_test.go": {
-    "mtime": 1779408379.4484143,
-    "ast_hash": "32c2b63d7cc62fe72d476b880de94c41",
+    "mtime": 1779626160.1176455,
+    "ast_hash": "3c2561687150caef760ffaff335a38cb",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/domain/explain/explanation_builder_test.go": {
-    "mtime": 1779334540.4369564,
-    "ast_hash": "ab1993c835d2a7d9d8b101c2e8729b2a",
+    "mtime": 1779626160.1184788,
+    "ast_hash": "48429b8bcae0cd1cf9d5062e451ef6ba",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/domain/planner/default_demand_planner_test.go": {
-    "mtime": 1779263330.1197076,
-    "ast_hash": "c53ae44ee0c57a0c24055c23ae54b9e8",
+    "mtime": 1779626160.1147861,
+    "ast_hash": "e22f0fd5a307b8b2bd8a9e0b749a56ce",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/unit/domain/aggregator/video_evidence_aggregator_test.go": {
@@ -177,26 +177,6 @@
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/integration/suite_test.go": {
     "mtime": 1776471718.9732866,
     "ast_hash": "a6ae2f69315d451b030fb37f38ff6a18",
-    "semantic_hash": ""
-  },
-  "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/golden/candidate_summary_review_sparse.json": {
-    "mtime": 1779351819.4972045,
-    "ast_hash": "b19af96636a477bbca081693e9f1f2a3",
-    "semantic_hash": ""
-  },
-  "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/golden/usecase_pipeline_response.json": {
-    "mtime": 1778954859.5083306,
-    "ast_hash": "c893f6a39249efcf8643b402ab4cef08",
-    "semantic_hash": ""
-  },
-  "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/golden/planner_review_heavy.json": {
-    "mtime": 1779263334.2745938,
-    "ast_hash": "049595a529cf29317e78d84d7aa26c68",
-    "semantic_hash": ""
-  },
-  "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/test/golden/final_ordering_normal.json": {
-    "mtime": 1778954864.9846041,
-    "ast_hash": "633068da58226c35921f2f029371ed7a",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/recommendation/application/dto/generate_video_recommendations.go": {
@@ -1095,8 +1075,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/learningengine/reducer/test/unit/application/service/usecases_test.go": {
-    "mtime": 1779520515.1976545,
-    "ast_hash": "fa7f97ba3cc557ececddae26ea7f7728",
+    "mtime": 1779626282.9639385,
+    "ast_hash": "ba9cd83ec8a0bfe8747dd8a411dce9d9",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/learningengine/reducer/test/unit/application/service/unit_progress_test.go": {
@@ -1450,8 +1430,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/learningengine/normalizer/test/unit/application/service/normalize_pending_events_test.go": {
-    "mtime": 1779511874.328929,
-    "ast_hash": "70989766f33c730497793d007a1266ec",
+    "mtime": 1779626282.965115,
+    "ast_hash": "db2b93c9d7db0f643e4ff2fa6d8218d1",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/learningengine/normalizer/test/unit/infrastructure/persistence/mapper/pgtypes_test.go": {
@@ -1925,23 +1905,23 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/videodetail/video_detail_test.go": {
-    "mtime": 1779606335.0020769,
-    "ast_hash": "a96388f815ad7f62c7fd7e7f870f80ff",
+    "mtime": 1779626593.6428115,
+    "ast_hash": "c62bbb2d40c236ff16aa0e70e506a6e1",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/watchprogress/watchprogress_test.go": {
-    "mtime": 1779531199.1847584,
-    "ast_hash": "9f8af6ea478b896aafbe9a466e889300",
+    "mtime": 1779626593.643993,
+    "ast_hash": "3d22e1b063770bfe98dfa544f773683d",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/endquiz/end_quiz_test.go": {
-    "mtime": 1779611869.9273102,
-    "ast_hash": "64e6ecd9af55c491535f0246b709b748",
+    "mtime": 1779626593.641879,
+    "ast_hash": "ac15a262daac91be027364099ef041f2",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/learningevents/learningevents_test.go": {
-    "mtime": 1779531208.9146724,
-    "ast_hash": "98341a7cceb852d80edc5dd85ecfadab",
+    "mtime": 1779626789.7805967,
+    "ast_hash": "b5f14e4b73c1ec7a497fab95de9d2791",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/unitcollections/unit_collections_test.go": {
@@ -1955,18 +1935,18 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/feedback/feedback_test.go": {
-    "mtime": 1779416813.0249238,
-    "ast_hash": "80065517cb0101a99865db5dde16f42f",
+    "mtime": 1779626638.5374055,
+    "ast_hash": "63cd63ec3f48489c9e931becb2c13950",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/unitprogress/unit_progress_test.go": {
-    "mtime": 1779260533.273443,
-    "ast_hash": "b4abe46bc0e3cdc3d3c14342bc553d94",
+    "mtime": 1779626593.64354,
+    "ast_hash": "ee7869cc09488c862269c7e3acb091a8",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/feed/feed_test.go": {
-    "mtime": 1779531928.4243906,
-    "ast_hash": "51bbef88b4050b70117a0ad569d96d5f",
+    "mtime": 1779626207.6569374,
+    "ast_hash": "4ea18321c57613783bae1d3edfedd470",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/me/me_test.go": {
@@ -1975,8 +1955,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/videointeractions/video_interactions_test.go": {
-    "mtime": 1779525011.7798314,
-    "ast_hash": "78d7735eb2f82dac6580333a74baebee",
+    "mtime": 1779626593.644515,
+    "ast_hash": "c353278562e1fcc0a8f9c0212de22fdb",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/application/dto/video_detail.go": {
@@ -2920,8 +2900,8 @@
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/test/integration/wordfavorites/word_favorites_test.go": {
-    "mtime": 1779591589.344308,
-    "ast_hash": "6f4cc69a3d71695ef8939b872e17391f",
+    "mtime": 1779626638.538225,
+    "ast_hash": "61d7d96f34182c9bf439a11f15aa0fca",
     "semantic_hash": ""
   },
   "/Users/evan/Code/learning-app/learning-video-recommendation-system/internal/api/infrastructure/http/handler/wordfavorites/handler.go": {

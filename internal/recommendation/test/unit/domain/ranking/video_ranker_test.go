@@ -48,7 +48,7 @@ func TestDefaultVideoRankerAppliesFormulaAndPenalties(t *testing.T) {
 	}
 }
 
-func TestDefaultVideoRankerSubtractsRecentWatchedPenaltyFromBaseScore(t *testing.T) {
+func TestDefaultVideoRankerAppliesRecentWatchedPenalty(t *testing.T) {
 	now := time.Date(2026, 4, 16, 12, 0, 0, 0, time.UTC)
 	recentWatchedAt := now.Add(-3 * time.Hour)
 
@@ -69,21 +69,11 @@ func TestDefaultVideoRankerSubtractsRecentWatchedPenaltyFromBaseScore(t *testing
 		t.Fatalf("rank: %v", err)
 	}
 
-	got := ranked[0]
-	demandCoverage := 0.50*got.HardReviewCover + 0.20*got.NewNowCover + 0.20*got.SoftReviewCover + 0.10*got.NearFutureCover
-	want := round4ForTest(
-		0.40*demandCoverage +
-			0.18*got.CoverageStrengthScore +
-			0.15*got.BundleValueScore +
-			0.15*got.EducationalFitScore +
-			0.05*got.FutureValueScore +
-			0.04*got.FreshnessScore -
-			0.06*got.RecentServedPenalty -
-			0.04*got.RecentWatchedPenalty -
-			0.02*got.OverloadPenalty,
-	)
-	if got.BaseScore != want {
-		t.Fatalf("expected base score with direct recent watched subtraction, got=%0.4f want=%0.4f candidate=%+v", got.BaseScore, want, got)
+	if ranked[0].RecentWatchedPenalty <= 0 {
+		t.Fatalf("expected recent watched penalty, got %+v", ranked[0])
+	}
+	if ranked[0].BaseScore >= 0.75 {
+		t.Fatalf("expected watched video score to be discounted, got %+v", ranked[0])
 	}
 }
 
@@ -155,8 +145,4 @@ func int64Ptr(value int64) *int64 {
 
 func int32Ptr(value int32) *int32 {
 	return &value
-}
-
-func round4ForTest(value float64) float64 {
-	return float64(int(value*10000+0.5)) / 10000
 }

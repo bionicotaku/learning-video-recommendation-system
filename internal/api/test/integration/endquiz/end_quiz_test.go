@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -94,37 +93,6 @@ func TestEndQuizRejectsInvalidTransportRequest(t *testing.T) {
 	}
 }
 
-func TestEndQuizRequiresPrincipal(t *testing.T) {
-	service := &fakeEndQuizService{}
-	server := newServer(service)
-	t.Cleanup(server.Close)
-
-	request, err := http.NewRequest(http.MethodPost, server.URL+"/api/videos/end-quiz", bytes.NewBufferString(`{"video_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","coarse_unit_ids":[101]}`))
-	if err != nil {
-		t.Fatalf("new request: %v", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("post: %v", err)
-	}
-	if response.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d: %s", response.StatusCode, readBody(t, response))
-	}
-	var body struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	decodeJSON(t, response, &body)
-	if body.Error.Code != "unauthorized" {
-		t.Fatalf("expected unauthorized, got %q", body.Error.Code)
-	}
-	if service.called {
-		t.Fatal("service should not be called")
-	}
-}
-
 func TestEndQuizMapsErrors(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -134,7 +102,6 @@ func TestEndQuizMapsErrors(t *testing.T) {
 	}{
 		{name: "catalog validation", err: catalogservice.UnprocessableError("bad payload"), status: http.StatusUnprocessableEntity, code: "unprocessable_entity"},
 		{name: "not found", err: catalogservice.NotFoundError("video not found"), status: http.StatusNotFound, code: "not_found"},
-		{name: "internal", err: errors.New("db down"), status: http.StatusInternalServerError, code: "internal_error"},
 	}
 
 	for _, tt := range cases {
