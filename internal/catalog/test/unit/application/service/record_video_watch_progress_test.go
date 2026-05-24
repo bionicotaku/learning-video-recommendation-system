@@ -2,10 +2,12 @@ package service_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"learning-video-recommendation-system/internal/catalog/application/dto"
+	"learning-video-recommendation-system/internal/catalog/application/repository"
 	"learning-video-recommendation-system/internal/catalog/application/service"
 	"learning-video-recommendation-system/internal/catalog/domain/model"
 )
@@ -84,6 +86,22 @@ func TestRecordVideoWatchProgressMapsRepositoryErrors(t *testing.T) {
 	}
 	if !service.IsNotFoundError(err) {
 		t.Fatalf("expected not found error, got %T %v", err, err)
+	}
+}
+
+func TestRecordVideoWatchProgressConflictMessageIsUserScoped(t *testing.T) {
+	recorder := &fakeWatchProgressRecorder{err: repository.ErrWatchSessionConflict}
+	usecase := service.NewRecordVideoWatchProgressUsecase(recorder)
+
+	_, err := usecase.Execute(context.Background(), validRequest())
+	if err == nil {
+		t.Fatal("expected conflict error")
+	}
+	if !service.IsConflictError(err) {
+		t.Fatalf("expected conflict error, got %T %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "another video for this user") {
+		t.Fatalf("expected user-scoped conflict message, got %q", err.Error())
 	}
 }
 

@@ -100,7 +100,7 @@ func (u *RecordVideoWatchProgressUsecase) Execute(ctx context.Context, request d
 		case errors.Is(err, repository.ErrVideoNotFound):
 			return dto.RecordVideoWatchProgressResponse{}, NotFoundError("video not found")
 		case errors.Is(err, repository.ErrWatchSessionConflict):
-			return dto.RecordVideoWatchProgressResponse{}, ConflictError("watch_session_id is already bound to another user or video")
+			return dto.RecordVideoWatchProgressResponse{}, ConflictError("watch_session_id is already bound to another video for this user")
 		default:
 			return dto.RecordVideoWatchProgressResponse{}, err
 		}

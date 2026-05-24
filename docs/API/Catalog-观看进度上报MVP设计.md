@@ -212,7 +212,7 @@ POST /api/video-watch-progress
 | 字段 | 必填 | 含义 | 服务端规则 |
 | --- | --- | --- | --- |
 | `video_id` | 是 | 被观看的视频 ID。 | 必须是 UUID；必须存在于 `catalog.videos`。 |
-| `watch_session_id` | 是 | 一次播放会话 ID。 | 必须是 UUID；同一 session 后续上报必须指向同一 `user_id + video_id`。 |
+| `watch_session_id` | 是 | 一次播放会话 ID。 | 必须是 UUID；同一用户的同一 session 后续上报必须指向同一 `video_id`；不同用户可复用同一个客户端 session ID。 |
 | `position_ms` | 是 | 当前播放位置，毫秒。 | 必须大于等于 0；可小于历史最大位置。 |
 | `active_watch_ms` | 是 | 本 session 累计有效播放时长。 | 必须大于等于 0；重复上报用 delta 去重。 |
 | `occurred_at` | 否 | 客户端事件发生时间。 | RFC3339 datetime with explicit offset。可用于 `started_at / last_seen_at`，但服务端应限制不能离当前时间过远。 |
@@ -239,7 +239,7 @@ POST /api/video-watch-progress
 | `400 Bad Request` | 请求 JSON 格式错误、字段类型错误、`position_ms < 0`、`active_watch_ms < 0`。 |
 | `401 Unauthorized` | 未登录或认证失效。 |
 | `404 Not Found` | `video_id` 不存在。 |
-| `409 Conflict` | `watch_session_id` 已存在，但绑定的 `user_id` 或 `video_id` 与本次请求不一致。 |
+| `409 Conflict` | 当前用户的 `watch_session_id` 已存在，但绑定的 `video_id` 与本次请求不一致。 |
 | `422 Unprocessable Entity` | `occurred_at` 明显异常，例如过早或超过当前时间太多。 |
 
 ### 4.2 给前端的接口说明
@@ -390,7 +390,7 @@ updated_at = now()
 
 注意事项：
 
-1. 同一个 `watch_session_id` 不允许跨用户或跨视频复用。
+1. 同一个用户的同一个 `watch_session_id` 不允许跨视频复用；不同用户可复用同一个客户端 session ID。
 2. session 完成状态由服务端计算，不能由前端请求直接指定。
 3. seek 回退只影响 `last_position_ms`，不降低 `max_position_ms`。
 4. 前端重复上报同一 session 不会重复增加 `watch_count` 或 `view_count`。
@@ -400,13 +400,13 @@ updated_at = now()
 
 数据库层应验证：
 
-1. `video_watch_events` 可以创建、重复 upsert，并保持 `watch_session_id` 唯一。
+1. `video_watch_events` 可以创建、重复 upsert，并保持 `user_id + watch_session_id` 唯一。
 2. `position_ms` 回退不会降低 `max_position_ms`。
 3. `active_watch_ms` 重复上报不会重复累计。
 4. `active_watch_ms <= 10_000` 时不会完成，即使播放位置达到 90%。
 5. `new_max_position_ms / duration_ms < 0.9` 时不会完成，即使 `active_watch_ms` 足够。
 6. 两个完成条件都满足时首次完成会设置 `completed_at`，后续上报不重复计数。
-7. 同一个 `watch_session_id` 绑定不同用户或不同视频时返回冲突。
+7. 当前用户的同一个 `watch_session_id` 绑定不同视频时返回冲突；不同用户复用同一个客户端 session ID 不冲突。
 8. session 状态更新使用条件 upsert 原子完成，应用层不对 `analytics.video_watch_events` 做 pre-read。
 
 API / usecase 层应验证：
