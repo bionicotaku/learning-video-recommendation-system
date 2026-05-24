@@ -11,6 +11,7 @@ import (
 )
 
 const defaultAPIGatewayUserinfoHeader = "X-Apigateway-Api-Userinfo"
+const defaultPGMaxConns = 5
 
 type config struct {
 	Addr                     string
@@ -18,6 +19,7 @@ type config struct {
 	PublicAssetBaseURL       string
 	DevMode                  bool
 	APIGatewayUserinfoHeader string
+	PGMaxConns               int
 }
 
 func loadConfig() (config, error) {
@@ -59,11 +61,21 @@ func loadConfigFromEnv(getenv func(string) string) (config, error) {
 		gatewayUserinfoHeader = defaultAPIGatewayUserinfoHeader
 	}
 
+	pgMaxConns := defaultPGMaxConns
+	if rawPGMaxConns := strings.TrimSpace(getenv("PG_MAX_CONNS")); rawPGMaxConns != "" {
+		parsed, err := strconv.ParseInt(rawPGMaxConns, 10, 32)
+		if err != nil || parsed < 1 {
+			return config{}, fmt.Errorf("PG_MAX_CONNS must be a positive integer")
+		}
+		pgMaxConns = int(parsed)
+	}
+
 	return config{
 		Addr:                     addr,
 		DatabaseURL:              databaseURL,
 		PublicAssetBaseURL:       publicAssetBaseURL,
 		DevMode:                  devMode,
 		APIGatewayUserinfoHeader: gatewayUserinfoHeader,
+		PGMaxConns:               pgMaxConns,
 	}, nil
 }

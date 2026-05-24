@@ -213,6 +213,9 @@ The module never trusts `user_id` from the body or query string.
 Relevant environment variables are documented in `.env.example`. `DATABASE_URL`
 and `PUBLIC_ASSET_BASE_URL` are required. `DEV_MODE` defaults to `false`, and
 `API_GATEWAY_USERINFO_HEADER` defaults to `X-Apigateway-Api-Userinfo`.
+`PG_MAX_CONNS` defaults to `5` and caps PostgreSQL connections per server
+instance so Cloud Run horizontal scaling cannot multiply database connections
+without an explicit budget.
 
 `cmd/server` also requires `PUBLIC_ASSET_BASE_URL` for feed media URL assembly.
 Catalog paths that are already absolute `http://` or `https://` URLs pass

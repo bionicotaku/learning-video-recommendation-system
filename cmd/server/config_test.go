@@ -23,6 +23,9 @@ func TestLoadConfigFromEnvDefaultsAuthConfig(t *testing.T) {
 	if config.APIGatewayUserinfoHeader != "X-Apigateway-Api-Userinfo" {
 		t.Fatalf("unexpected gateway userinfo header: %s", config.APIGatewayUserinfoHeader)
 	}
+	if config.PGMaxConns != 5 {
+		t.Fatalf("unexpected default PG max conns: %d", config.PGMaxConns)
+	}
 }
 
 func TestLoadConfigFromEnvReadsOptionalAuthConfig(t *testing.T) {
@@ -36,6 +39,8 @@ func TestLoadConfigFromEnvReadsOptionalAuthConfig(t *testing.T) {
 			return "true"
 		case "API_GATEWAY_USERINFO_HEADER":
 			return "X-Custom-Userinfo"
+		case "PG_MAX_CONNS":
+			return "7"
 		default:
 			return ""
 		}
@@ -56,6 +61,9 @@ func TestLoadConfigFromEnvReadsOptionalAuthConfig(t *testing.T) {
 	if config.PublicAssetBaseURL != "https://cdn.example.com/assets" {
 		t.Fatalf("unexpected public asset base url: %s", config.PublicAssetBaseURL)
 	}
+	if config.PGMaxConns != 7 {
+		t.Fatalf("unexpected PG max conns: %d", config.PGMaxConns)
+	}
 }
 
 func TestLoadConfigFromEnvRejectsInvalidDevMode(t *testing.T) {
@@ -74,5 +82,28 @@ func TestLoadConfigFromEnvRejectsInvalidDevMode(t *testing.T) {
 
 	if err == nil {
 		t.Fatalf("expected invalid DEV_MODE to fail")
+	}
+}
+
+func TestLoadConfigFromEnvRejectsInvalidPGMaxConns(t *testing.T) {
+	for _, value := range []string{"0", "-1", "many"} {
+		t.Run(value, func(t *testing.T) {
+			_, err := loadConfigFromEnv(func(key string) string {
+				switch key {
+				case "DATABASE_URL":
+					return "postgres://example"
+				case "PUBLIC_ASSET_BASE_URL":
+					return "https://cdn.example.com"
+				case "PG_MAX_CONNS":
+					return value
+				default:
+					return ""
+				}
+			})
+
+			if err == nil {
+				t.Fatalf("expected invalid PG_MAX_CONNS %q to fail", value)
+			}
+		})
 	}
 }

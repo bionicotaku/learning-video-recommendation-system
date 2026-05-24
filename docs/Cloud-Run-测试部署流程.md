@@ -45,12 +45,30 @@ secretmanager.googleapis.com
 当前 Cloud Run 环境变量：
 
 ```text
-API_ADDR=<from .env>
-DEV_MODE=<from .env>
-API_GATEWAY_USERINFO_HEADER=<from .env>
-PUBLIC_ASSET_BASE_URL=<from .env>
 DATABASE_URL=<database-url-secret-name>:latest
+PUBLIC_ASSET_BASE_URL=<public-asset-base-url-secret-name>:latest
+API_ADDR=<api-addr-secret-name>:latest
+DEV_MODE=<dev-mode-secret-name>:latest
+API_GATEWAY_USERINFO_HEADER=<api-gateway-userinfo-header-secret-name>:latest
+PG_MAX_CONNS=<pg-max-conns-secret-name>:latest
 ```
+
+当前 Cloud Run 自动扩展配置：
+
+```text
+min-instances: 1
+max-instances: 10
+concurrency: 40
+cpu: 1
+memory: 512Mi
+```
+
+说明：
+
+- `min-instances=1` 保留一个热实例，减少冷启动，但会产生固定运行成本。
+- `max-instances=10` 控制成本并保护 Supabase 连接数。
+- `concurrency=40` 比默认值更保守，让服务在单实例压力过高前更早横向扩展。
+- 数据库连接预算约等于 `max-instances * PG_MAX_CONNS`。当前建议值是 `10 * 5 = 50`。
 
 ## 2. 为什么使用 Dockerfile
 
@@ -130,7 +148,9 @@ gcloud billing projects describe <gcp-project-id> \
 
 ## 5. 本地 `.env` 准备
 
-部署命令严格从本地 `.env` 读取运行时配置。当前 `cmd/server` 读取以下字段：
+本地 `.env` 只用于本地运行和初始化 / 更新 Secret Manager。Cloud Run 当前不直接读取 `.env`，也不通过 `--env-vars-file` 写入明文 env。
+
+当前 `cmd/server` 读取以下字段：
 
 ```text
 DATABASE_URL
@@ -138,9 +158,10 @@ PUBLIC_ASSET_BASE_URL
 API_ADDR
 DEV_MODE
 API_GATEWAY_USERINFO_HEADER
+PG_MAX_CONNS
 ```
 
-测试部署建议 `.env` 显式包含：
+测试部署建议本地 `.env` 显式包含：
 
 ```dotenv
 DATABASE_URL=postgresql://...
@@ -148,18 +169,21 @@ PUBLIC_ASSET_BASE_URL=<public-asset-base-url>
 API_ADDR=:8080
 DEV_MODE=true
 API_GATEWAY_USERINFO_HEADER=X-Apigateway-Api-Userinfo
+PG_MAX_CONNS=5
 ```
 
 说明：
 
-- `DATABASE_URL` 只用于创建 / 更新 Secret Manager，不直接写入 Cloud Run 明文 env。
-- 其他字段会从 dotenv 格式的 `.env` 派生成临时 YAML 文件，再通过 `--env-vars-file` 写入 Cloud Run revision。`gcloud run deploy --env-vars-file` 不接受 `KEY=value` dotenv 文件。
-- 如果 `.env` 没有 `DEV_MODE=true`，部署出来的服务就不应是 DEV_MODE。
+- `.env` 中的所有运行时字段都只用于创建 / 更新 Secret Manager，不直接写入 Cloud Run 明文 env。
+- 当前测试部署仍然是 `DEV_MODE=true`；该值应写入 `<dev-mode-secret-name>` 的 latest 版本。
+- 如果 `.env` 没有 `DEV_MODE=true`，或 `<dev-mode-secret-name>` latest 不是 `true`，部署出来的服务就不应是 DEV_MODE。
+- `PG_MAX_CONNS` 是单个 Cloud Run 实例的 PostgreSQL 连接池上限。数据库连接预算约等于 `max-instances * PG_MAX_CONNS`。
+- 每次重走部署流程、改 `.env`、或要让 GitHub Actions 使用新的运行时配置时，都必须先执行下一节的 `.env` -> Secret Manager 同步。GitHub Actions 不读取 `.env`，只保留 Cloud Run 对 Secret Manager 的引用。
 
 部署前可用下面命令只检查 key 是否存在：
 
 ```bash
-for key in DATABASE_URL PUBLIC_ASSET_BASE_URL API_ADDR DEV_MODE API_GATEWAY_USERINFO_HEADER; do
+for key in DATABASE_URL PUBLIC_ASSET_BASE_URL API_ADDR DEV_MODE API_GATEWAY_USERINFO_HEADER PG_MAX_CONNS; do
   awk -F= -v key="$key" '$1==key && substr($0,index($0,"=")+1)!="" { found=1 } END { exit found ? 0 : 1 }' .env \
     || { echo "$key missing in .env"; exit 1; }
 done
@@ -167,32 +191,57 @@ done
 
 ## 6. Secret 准备
 
-不要把 `DATABASE_URL` 明文写进部署命令。用本地 `.env` 创建或更新 Secret Manager：
+不要把运行时配置明文写进部署命令。用本地 `.env` 创建或更新 Secret Manager：
 
 ```bash
-DATABASE_URL="$(awk -F= '$1=="DATABASE_URL"{print substr($0,index($0,"=")+1); exit}' .env)"
+create_or_update_secret() {
+  local env_name="$1"
+  local secret_name="$2"
+  local value
 
-if gcloud secrets describe <database-url-secret-name> >/dev/null 2>&1; then
-  printf '%s' "$DATABASE_URL" | \
-    gcloud secrets versions add <database-url-secret-name> --data-file=-
-else
-  printf '%s' "$DATABASE_URL" | \
-    gcloud secrets create <database-url-secret-name> \
+  value="$(awk -F= -v key="$env_name" '$1==key {print substr($0,index($0,"=")+1); exit}' .env)"
+  if [ -z "$value" ]; then
+    echo "$env_name missing in .env" >&2
+    exit 1
+  fi
+
+  if gcloud secrets describe "$secret_name" >/dev/null 2>&1; then
+    printf '%s' "$value" | gcloud secrets versions add "$secret_name" --data-file=-
+  else
+    printf '%s' "$value" | gcloud secrets create "$secret_name" \
       --replication-policy=automatic \
       --data-file=-
-fi
+  fi
+}
+
+create_or_update_secret DATABASE_URL <database-url-secret-name>
+create_or_update_secret PUBLIC_ASSET_BASE_URL <public-asset-base-url-secret-name>
+create_or_update_secret API_ADDR <api-addr-secret-name>
+create_or_update_secret DEV_MODE <dev-mode-secret-name>
+create_or_update_secret API_GATEWAY_USERINFO_HEADER <api-gateway-userinfo-header-secret-name>
+create_or_update_secret PG_MAX_CONNS <pg-max-conns-secret-name>
 ```
 
-给 Cloud Run 默认运行服务账号读取 secret 的权限：
+这一步会为已有 secret 新增 latest version；Cloud Run 引用的是 `:latest`，但为了让所有实例稳定读取新版本，更新 secret 后仍建议重新部署或执行一次 `gcloud run services update` 创建新 revision。
+
+给 Cloud Run 默认运行服务账号读取 secrets 的权限：
 
 ```bash
 PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 RUN_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-gcloud secrets add-iam-policy-binding <database-url-secret-name> \
-  --member="serviceAccount:${RUN_SERVICE_ACCOUNT}" \
-  --role='roles/secretmanager.secretAccessor'
+for secret_name in \
+  <database-url-secret-name> \
+  <public-asset-base-url-secret-name> \
+  <api-addr-secret-name> \
+  <dev-mode-secret-name> \
+  <api-gateway-userinfo-header-secret-name> \
+  <pg-max-conns-secret-name>; do
+  gcloud secrets add-iam-policy-binding "$secret_name" \
+    --member="serviceAccount:${RUN_SERVICE_ACCOUNT}" \
+    --role='roles/secretmanager.secretAccessor'
+done
 ```
 
 ## 7. Cloud Build 权限
@@ -289,26 +338,17 @@ SUCCESS
 ```bash
 IMAGE="$(cat /tmp/<cloud-run-service-name>-image.txt)"
 
-runtime_env_file="$(mktemp)"
-awk -F= '
-  $1=="PUBLIC_ASSET_BASE_URL" || $1=="API_ADDR" || $1=="DEV_MODE" || $1=="API_GATEWAY_USERINFO_HEADER" {
-    key=$1
-    value=substr($0,index($0,"=")+1)
-    gsub(/\\/, "\\\\", value)
-    gsub(/"/, "\\\"", value)
-    printf "%s: \"%s\"\n", key, value
-  }
-' .env > "$runtime_env_file"
-
 gcloud run deploy <cloud-run-service-name> \
   --image "$IMAGE" \
   --region <gcp-region> \
   --allow-unauthenticated \
   --port 8080 \
-  --env-vars-file "$runtime_env_file" \
-  --set-secrets DATABASE_URL=<database-url-secret-name>:latest
-
-rm -f "$runtime_env_file"
+  --min-instances 1 \
+  --max-instances 10 \
+  --concurrency 40 \
+  --cpu 1 \
+  --memory 512Mi \
+  --set-secrets DATABASE_URL=<database-url-secret-name>:latest,PUBLIC_ASSET_BASE_URL=<public-asset-base-url-secret-name>:latest,API_ADDR=<api-addr-secret-name>:latest,DEV_MODE=<dev-mode-secret-name>:latest,API_GATEWAY_USERINFO_HEADER=<api-gateway-userinfo-header-secret-name>:latest,PG_MAX_CONNS=<pg-max-conns-secret-name>:latest
 ```
 
 成功输出类似：
@@ -319,6 +359,21 @@ Service URL: <cloud-run-service-url>
 ```
 
 同一个 service name `<cloud-run-service-name>` 重新部署时会创建新 revision，但 service URL 保持稳定。
+
+如果只想更新现有服务的自动扩展配置，不重新构建镜像：
+
+```bash
+gcloud run services update <cloud-run-service-name> \
+  --region <gcp-region> \
+  --min-instances 1 \
+  --max-instances 10 \
+  --concurrency 40 \
+  --cpu 1 \
+  --memory 512Mi \
+  --update-secrets PG_MAX_CONNS=<pg-max-conns-secret-name>:latest
+```
+
+这个命令会创建一个新 revision，但使用现有镜像。`PG_MAX_CONNS` 只有在镜像内的应用代码已经支持该环境变量后才会限制数据库连接池。
 
 ## 11. 验证
 
@@ -336,6 +391,26 @@ gcloud run services describe <cloud-run-service-name> \
 gcloud run services describe <cloud-run-service-name> \
   --region <gcp-region> \
   --format='yaml(spec.template.spec.containers[0].env,status.latestReadyRevisionName,status.url)'
+```
+
+预期所有运行时配置都通过 `valueFrom.secretKeyRef` 引用 Secret Manager；不要出现明文 `value`。
+
+确认自动扩展配置：
+
+```bash
+gcloud run services describe <cloud-run-service-name> \
+  --region <gcp-region> \
+  --format='yaml(spec.template.metadata.annotations,spec.template.spec.containerConcurrency,spec.template.spec.containers[0].resources,status.latestReadyRevisionName,status.traffic)'
+```
+
+预期包含：
+
+```text
+autoscaling.knative.dev/minScale: '1'
+autoscaling.knative.dev/maxScale: '10'
+containerConcurrency: 40
+cpu: '1'
+memory: 512Mi
 ```
 
 公网 HTTPS 可达性：
@@ -399,16 +474,6 @@ gcloud logging read \
 ```bash
 PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
 IMAGE="<gcp-region>-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/<cloud-run-service-name>:manual-$(date +%Y%m%d%H%M%S)"
-runtime_env_file="$(mktemp)"
-awk -F= '
-  $1=="PUBLIC_ASSET_BASE_URL" || $1=="API_ADDR" || $1=="DEV_MODE" || $1=="API_GATEWAY_USERINFO_HEADER" {
-    key=$1
-    value=substr($0,index($0,"=")+1)
-    gsub(/\\/, "\\\\", value)
-    gsub(/"/, "\\\"", value)
-    printf "%s: \"%s\"\n", key, value
-  }
-' .env > "$runtime_env_file"
 
 gcloud builds submit \
   --region <gcp-region> \
@@ -420,10 +485,12 @@ gcloud run deploy <cloud-run-service-name> \
   --region <gcp-region> \
   --allow-unauthenticated \
   --port 8080 \
-  --env-vars-file "$runtime_env_file" \
-  --set-secrets DATABASE_URL=<database-url-secret-name>:latest
-
-rm -f "$runtime_env_file"
+  --min-instances 1 \
+  --max-instances 10 \
+  --concurrency 40 \
+  --cpu 1 \
+  --memory 512Mi \
+  --set-secrets DATABASE_URL=<database-url-secret-name>:latest,PUBLIC_ASSET_BASE_URL=<public-asset-base-url-secret-name>:latest,API_ADDR=<api-addr-secret-name>:latest,DEV_MODE=<dev-mode-secret-name>:latest,API_GATEWAY_USERINFO_HEADER=<api-gateway-userinfo-header-secret-name>:latest,PG_MAX_CONNS=<pg-max-conns-secret-name>:latest
 ```
 
 ## 13. 绑定 Cloudflare 域名到 Load Balancer
@@ -697,7 +764,153 @@ Proxy status: DNS only
 - 保留 `_acme-challenge.<api-domain>` DNS only。
 - 避免启用会干扰 Google certificate renewal 的强制跳转规则，尤其是证书验证路径相关规则。
 
-## 14. 生产化前必须调整
+## 14. GitHub Actions 自动部署
+
+当前推荐自动部署边界：
+
+```text
+GitHub Actions 只负责构建镜像和部署镜像。
+Cloud Run 运行时配置全部来自 Secret Manager。
+GitHub 不保存 DATABASE_URL 或其他业务 secret 明文。
+```
+
+因此，GitHub Actions 触发前如果运行时配置有变化，先在本地更新 `.env`，再执行第 6 节同步到 Secret Manager。workflow 本身不会读取 `.env`，也不会把 `.env` 推送或上传。当前测试环境的 `DEV_MODE=true` 由 `<dev-mode-secret-name>:latest` 控制。
+
+### 14.1 GCP deploy 身份
+
+创建 GitHub Actions 专用 service account：
+
+```bash
+gcloud iam service-accounts create <github-actions-service-account-name> \
+  --display-name="GitHub Actions Cloud Run Deployer"
+```
+
+给 deploy service account 授权：
+
+```bash
+PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+GITHUB_ACTIONS_SERVICE_ACCOUNT="<github-actions-service-account-email>"
+RUN_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
+  --role="roles/run.admin"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
+  --role="roles/cloudbuild.builds.editor"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
+  --role="roles/storage.admin"
+
+gcloud iam service-accounts add-iam-policy-binding "$RUN_SERVICE_ACCOUNT" \
+  --member="serviceAccount:${GITHUB_ACTIONS_SERVICE_ACCOUNT}" \
+  --role="roles/iam.serviceAccountUser"
+```
+
+说明：
+
+- `roles/run.admin` 用于创建 Cloud Run revision 和切流量。
+- `roles/cloudbuild.builds.editor` 用于提交 Cloud Build。
+- `roles/storage.admin` 用于 `gcloud builds submit` 上传源码包。
+- `roles/iam.serviceAccountUser` 允许部署时使用 Cloud Run runtime service account。
+
+### 14.2 Workload Identity Federation
+
+创建 GitHub OIDC provider，并用 attribute condition 限制到当前 repository 和 `main` 分支：
+
+```bash
+gcloud iam workload-identity-pools create <workload-identity-pool-id> \
+  --location=global \
+  --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc <workload-identity-provider-id> \
+  --location=global \
+  --workload-identity-pool=<workload-identity-pool-id> \
+  --display-name="GitHub OIDC" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner,attribute.ref=assertion.ref" \
+  --attribute-condition="attribute.repository=='<github-owner>/<github-repo>' && attribute.ref=='refs/heads/main'"
+```
+
+允许该 repository impersonate deploy service account：
+
+```bash
+PROJECT_NUMBER="$(gcloud projects describe "$(gcloud config get-value project 2>/dev/null)" --format='value(projectNumber)')"
+MEMBER="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/<workload-identity-pool-id>/attribute.repository/<github-owner>/<github-repo>"
+
+gcloud iam service-accounts add-iam-policy-binding <github-actions-service-account-email> \
+  --member="$MEMBER" \
+  --role="roles/iam.workloadIdentityUser"
+```
+
+### 14.3 GitHub Actions secrets
+
+用 GitHub encrypted secrets 保存部署身份标识。它们不是业务 secret，但放入 GitHub secrets 可以减少 workflow 文件暴露的信息：
+
+```bash
+printf '%s' '<workload-identity-provider-resource-name>' | \
+  gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo <github-owner>/<github-repo>
+
+printf '%s' '<github-actions-service-account-email>' | \
+  gh secret set GCP_SERVICE_ACCOUNT --repo <github-owner>/<github-repo>
+
+printf '%s' '<gcp-project-id>' | \
+  gh secret set GCP_PROJECT_ID --repo <github-owner>/<github-repo>
+
+printf '%s' '<gcp-region>' | \
+  gh secret set GCP_REGION --repo <github-owner>/<github-repo>
+
+printf '%s' '<cloud-run-service-name>' | \
+  gh secret set CLOUD_RUN_SERVICE --repo <github-owner>/<github-repo>
+```
+
+### 14.4 Workflow 文件
+
+仓库使用：
+
+```text
+.github/workflows/deploy-cloud-run.yml
+```
+
+该 workflow 做：
+
+1. `make check`
+2. 使用 GitHub OIDC 通过 Workload Identity Federation 登录 GCP
+3. `gcloud builds submit` 构建镜像
+4. `gcloud run deploy` 部署镜像并保留 autoscaling 参数
+
+workflow 不读取 `.env`，不传 `--env-vars-file`，不保存业务配置。Cloud Run env 由 Secret Manager 引用保持。
+
+### 14.5 自动部署验证
+
+手动触发或 push 到 `main` 后检查：
+
+```bash
+gh run list --workflow deploy-cloud-run.yml --limit 5
+```
+
+如果失败，查看具体日志：
+
+```bash
+gh run view <run-id> --log-failed
+```
+
+成功后确认 Cloud Run 新 revision 和自定义域名：
+
+```bash
+gcloud run services describe <cloud-run-service-name> \
+  --region <gcp-region> \
+  --format='yaml(status.latestReadyRevisionName,status.traffic)'
+
+curl -i https://<api-domain>/api/me
+```
+
+未带 token 时返回 `401 unauthorized`，且响应包含 `via: 1.1 google`，表示 Load Balancer 到 Cloud Run 链路正常。
+
+## 15. 生产化前必须调整
 
 测试部署当前刻意使用：
 

@@ -24,7 +24,13 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	pool, err := pgxpool.New(ctx, config.DatabaseURL)
+	poolConfig, err := pgxpool.ParseConfig(config.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	poolConfig.MaxConns = int32(config.PGMaxConns)
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return err
 	}
