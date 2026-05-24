@@ -1,2 +1,0 @@
-drop index if exists learning.idx_user_unit_states_mastered_target;
-drop index if exists learning.idx_user_unit_states_active_target_priority;

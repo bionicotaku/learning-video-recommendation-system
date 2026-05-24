@@ -55,9 +55,9 @@ Content-Type: multipart/form-data
 | 范围 | 限制 |
 |---|---:|
 | `/api/feedback` | 5 MiB |
-| 其他当前 API | 1 MiB |
+| 其他会读取 request body 的当前 API | 1 MiB |
 
-`/api/feedback` 超过 5 MiB 返回 `413 payload_too_large`。其他当前 API 超过 1 MiB 也返回 `413 payload_too_large`。
+`/api/feedback` 超过 5 MiB 返回 `413 payload_too_large`。其他会读取 request body 的当前 API 超过 1 MiB 也返回 `413 payload_too_large`。GET API 当前不读取 request body，因此不会主动按 body 大小触发该错误。
 
 ### 1.4 时间字段
 

@@ -6,8 +6,6 @@ sql:
     schema:
       - "schema/*.sql"
       - "../migration/*.up.sql"
-      - "../../../analytics/infrastructure/migration/000001_create_analytics_schema.up.sql"
-      - "../../../analytics/infrastructure/migration/000003_create_video_watch_events.up.sql"
     gen:
       go:
         package: "catalogsqlc"

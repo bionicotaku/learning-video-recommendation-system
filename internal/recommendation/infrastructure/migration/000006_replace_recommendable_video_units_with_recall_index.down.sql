@@ -1,2 +1,0 @@
--- No rollback action. The up migration only removes the retired
--- recommendation.v_recommendable_video_units legacy view.

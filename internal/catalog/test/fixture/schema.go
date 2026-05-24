@@ -26,19 +26,11 @@ func schemaPlan() pgtest.SchemaPlan {
 			"infrastructure",
 			"migration",
 		)),
-		pgtest.SQLFile(pgtest.RepoPath(
+		pgtest.MigrationDir(pgtest.RepoPath(
 			"internal",
 			"analytics",
 			"infrastructure",
 			"migration",
-			"000001_create_analytics_schema.up.sql",
-		)),
-		pgtest.SQLFile(pgtest.RepoPath(
-			"internal",
-			"analytics",
-			"infrastructure",
-			"migration",
-			"000003_create_video_watch_events.up.sql",
 		)),
 	)
 }

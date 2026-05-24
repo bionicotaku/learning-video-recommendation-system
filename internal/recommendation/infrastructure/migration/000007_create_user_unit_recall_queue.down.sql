@@ -1,5 +1,0 @@
-drop index if exists recommendation.idx_user_unit_recall_queue_user_next_review;
-drop index if exists recommendation.idx_user_unit_recall_queue_user_status_priority;
-drop table if exists recommendation.user_unit_recall_queue_states;
-drop table if exists recommendation.user_unit_recall_queue;
-drop table if exists recommendation.recall_projection_metadata;

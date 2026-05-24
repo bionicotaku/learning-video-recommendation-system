@@ -93,25 +93,28 @@ func TestResolveModuleRejectsUnknownNames(t *testing.T) {
 	}
 }
 
-func TestRecommendationMigrationSixOnlyDropsLegacyRecallView(t *testing.T) {
-	up := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000006_replace_recommendable_video_units_with_recall_index.up.sql")
-	down := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000006_replace_recommendable_video_units_with_recall_index.down.sql")
+func TestRecommendationBaselineDoesNotContainLegacyRecallView(t *testing.T) {
+	up := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000001_baseline.up.sql")
+	down := readRepoFile(t, "internal", "recommendation", "infrastructure", "migration", "000001_baseline.down.sql")
 
 	for _, unexpected := range []string{
-		"create materialized view if not exists recommendation.v_video_unit_recall_index",
-		"create materialized view if not exists recommendation.v_unit_video_inventory",
-		"drop materialized view if exists recommendation.v_video_unit_recall_index",
-		"drop materialized view if exists recommendation.v_unit_video_inventory",
+		"v_recommendable_video_units",
 	} {
 		if strings.Contains(up, unexpected) {
-			t.Fatalf("migration 000006 up must not own current recall views, found %q", unexpected)
+			t.Fatalf("recommendation baseline up must not reference legacy recall view, found %q", unexpected)
 		}
 		if strings.Contains(down, unexpected) {
-			t.Fatalf("migration 000006 down must not drop current recall views, found %q", unexpected)
+			t.Fatalf("recommendation baseline down must not reference legacy recall view, found %q", unexpected)
 		}
 	}
-	if !strings.Contains(up, "drop materialized view if exists recommendation.v_recommendable_video_units") {
-		t.Fatalf("migration 000006 up should only remove the legacy recommendable view")
+
+	for _, expected := range []string{
+		"create materialized view if not exists recommendation.v_video_unit_recall_index",
+		"create materialized view if not exists recommendation.v_unit_video_inventory",
+	} {
+		if !strings.Contains(up, expected) {
+			t.Fatalf("recommendation baseline up should own current recall view, missing %q", expected)
+		}
 	}
 }
 

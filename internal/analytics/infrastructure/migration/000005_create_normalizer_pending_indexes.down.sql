@@ -1,4 +1,0 @@
-drop index if exists analytics.idx_learning_interaction_events_lookup_unit_time;
-drop index if exists analytics.idx_learning_interaction_events_exposure_session;
-drop index if exists analytics.idx_learning_interaction_events_pending_normalizer;
-drop index if exists analytics.idx_quiz_events_completed_at_event_id;

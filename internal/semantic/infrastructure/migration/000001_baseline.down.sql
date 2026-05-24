@@ -1,0 +1,2 @@
+-- Semantic data is durable base data. Do not drop the semantic schema from the
+-- baseline down migration.

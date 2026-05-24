@@ -2,7 +2,7 @@
 
 状态：LIVE DB SNAPSHOT
 更新时间：2026-05-23
-判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮执行 User module migration 000004 后记录。
+判定口径：基于当前仓库 `.env` 中的 `DATABASE_URL` 做探查，并在本轮 baseline squash 后记录。`semantic` 保留现有数据但压缩 migration history；`catalog`、`app_user`、`analytics`、`learning`、`recommendation` 已压缩为各模块 `000001_baseline`。
 
 ## 1. Schema 概览
 
@@ -18,7 +18,7 @@
 | `learning` | 存在，包含 `learning.unit_learning_events`、`learning.user_unit_states` |
 | `app_user` | 存在，包含 User profile、activity stats、feedback 表 |
 
-当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation、User 自有表、索引和物化视图。User module tracking 状态为 `module=user current=4 applied=4 pending=0`。视频观看状态与全局统计已用一次性临时 SQL 对齐，tracking 状态为 `module=analytics current=4 applied=4 pending=0`、`module=catalog current=11 applied=11 pending=0`。
+当前 live DB 已有 Catalog、Analytics、Learning Engine、Recommendation、User 自有表、索引和物化视图。所有业务模块和 `semantic` 都已压缩为 baseline；tracking 状态应为 `current=1 applied=1 pending=0`。
 
 时间字段统一口径：
 
@@ -36,40 +36,28 @@
 
 ## 2. Catalog Migration 状态
 
-`catalog_schema_migrations` 当前有 11 条记录，对应仓库内 11 个 Catalog migration：
+`catalog_schema_migrations` 当前只记录 baseline：
 
-- `000001_create_catalog_schema`
-- `000002_create_videos`
-- `000003_create_video_transcripts`
-- `000004_create_video_transcript_sentences`
-- `000005_create_video_semantic_spans`
-- `000006_create_video_unit_index`
-- `000007_create_video_ingestion_records`
-- `000008_create_video_user_states`
-- `000009_create_catalog_indexes`
-- `000010_create_questions`
-- `000011_create_video_engagement_stats`
+- `000001_baseline`
 
-当前新增的 `catalog.questions` 已存在。只读核对显示该表有 14 个字段，并包含以下索引：
+`catalog.questions` 已存在。只读核对显示该表有 14 个字段，并包含以下索引：
 
 - `questions_pkey`
 - `idx_questions_video_unit_active`
 - `idx_questions_unit_active`
 - `idx_questions_status_created_at`
 
-当前新增的 `catalog.video_engagement_stats` 已存在。只读核对显示该表字段为：`video_id`、`view_count`、`like_count`、`favorite_count`、`completed_count`、`total_watch_ms`、`updated_at`。
+`catalog.video_engagement_stats` 已存在。只读核对显示该表字段为：`video_id`、`view_count`、`like_count`、`favorite_count`、`completed_count`、`total_watch_ms`、`updated_at`。
 
 当前 `catalog.video_user_states` 已删除 `last_watch_ratio`、`max_watch_ratio`，并新增 `last_position_ms`、`max_position_ms`、`total_watch_ms`、`like_state_updated_at`、`favorite_state_updated_at`。其中 `like_state_updated_at` / `favorite_state_updated_at` 是 Video Interactions API 的状态水位，用于丢弃旧时间的点赞/收藏 set-unset 请求。
 
+当前 `catalog.word_favorites` 已包含在 Catalog baseline 中，用于 Word Favorite API 的单点状态、写入幂等和分页列表。
+
 ## 3. Analytics Migration 状态
 
-`analytics_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Analytics migration：
+`analytics_schema_migrations` 当前只记录 baseline：
 
-- `000001_create_analytics_schema`
-- `000002_create_quiz_events`
-- `000003_create_video_watch_events`
-- `000004_create_learning_interaction_events`
-- `000005_create_normalizer_pending_indexes`
+- `000001_baseline`
 
 当前新增的 `analytics.quiz_events` 已存在。只读核对显示该表有 16 个字段，并包含以下索引：
 
@@ -108,27 +96,18 @@
 
 ## 4. Recommendation Migration 状态
 
-`recommendation_schema_migrations` 当前有 5 条记录，对应仓库内 5 个 Recommendation migration：
+`recommendation_schema_migrations` 当前只记录 baseline：
 
-- `000001_create_recommendation_schema`
-- `000002_create_serving_state_tables`
-- `000003_create_recommendation_audit_tables`
-- `000004_create_materialized_views`
-- `000005_create_recommendation_indexes`
+- `000001_baseline`
 
-Recommendation 本轮没有重新执行 migrate 或 refresh。
+Recommendation baseline 直接包含 serving state、audit tables、当前物化视图、recall queue 与索引，不再保留 legacy view cleanup migration。
 
 ## 4.1 Learning Engine Migration 状态
 
 仓库内 Learning Engine migration 代码路径为
-`internal/learningengine/reducer/infrastructure/migration`：
+`internal/learningengine/reducer/infrastructure/migration`，当前只记录 baseline：
 
-- `000001_create_learning_schema`
-- `000002_create_user_unit_states`
-- `000003_create_unit_learning_events`
-- `000004_create_learning_indexes`
-- `000005_create_user_learning_profiles`
-- `000006_create_recommendation_target_indexes`
+- `000001_baseline`
 
 当前 `learning.unit_learning_events` 已是 normalized Learning Engine event ledger。clean baseline 中该表包含 `ledger_seq`、`reset_boundary_at` 等内部 ledger 字段，并包含以下关键约束与索引：
 
@@ -171,11 +150,9 @@ Recommendation 本轮没有重新执行 migrate 或 refresh。
 
 ## 4.2 User Migration 状态
 
-`user_schema_migrations` 当前有 3 条记录，对应仓库内 3 个 User migration：
+`user_schema_migrations` 当前只记录 baseline：
 
-- `000001_create_user_schema`
-- `000002_create_feedback_tables`
-- `000003_extend_user_profile_fields`
+- `000001_baseline`
 
 当前 `app_user.user_profiles` 已包含以下用户资料字段：
 

@@ -289,10 +289,10 @@ make recommendation-migrate-status
 本轮部署前已验证：
 
 ```text
-analytics: current=5 applied=5 pending=0
-catalog: current=12 applied=12 pending=0
-learningengine: current=6 applied=6 pending=0
-recommendation: current=7 applied=7 pending=0
+analytics: current=1 applied=1 pending=0
+catalog: current=1 applied=1 pending=0
+learningengine: current=1 applied=1 pending=0
+recommendation: current=1 applied=1 pending=0
 ```
 
 如有 pending，先执行：

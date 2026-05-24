@@ -79,29 +79,9 @@ func ToLearningStateSnapshot(row recommendationsqlc.LearningUserUnitState) (mode
 }
 
 func ToRecommendableVideoUnit(row recommendationsqlc.ListVideoUnitRecallRowsByUnitIDsRow) (model.RecommendableVideoUnit, error) {
-	coarseUnitID := int64(0)
-	if row.CoarseUnitID.Valid {
-		coarseUnitID = row.CoarseUnitID.Int64
-	}
-	mentionCount := int32(0)
-	if row.MentionCount.Valid {
-		mentionCount = row.MentionCount.Int32
-	}
-	sentenceCount := int32(0)
-	if row.SentenceCount.Valid {
-		sentenceCount = row.SentenceCount.Int32
-	}
-	coverageMs := int32(0)
-	if row.CoverageMs.Valid {
-		coverageMs = row.CoverageMs.Int32
-	}
 	coverageRatio, err := NumericToFloat64(row.CoverageRatio)
 	if err != nil {
 		return model.RecommendableVideoUnit{}, err
-	}
-	durationMs := int32(0)
-	if row.DurationMs.Valid {
-		durationMs = row.DurationMs.Int32
 	}
 	mappedSpanRatio, err := NumericToFloat64(row.MappedSpanRatio)
 	if err != nil {
@@ -118,24 +98,24 @@ func ToRecommendableVideoUnit(row recommendationsqlc.ListVideoUnitRecallRowsByUn
 
 	return model.RecommendableVideoUnit{
 		VideoID:         UUIDToString(row.VideoID),
-		CoarseUnitID:    coarseUnitID,
-		MentionCount:    mentionCount,
-		SentenceCount:   sentenceCount,
-		CoverageMs:      coverageMs,
+		CoarseUnitID:    row.CoarseUnitID,
+		MentionCount:    row.MentionCount,
+		SentenceCount:   row.SentenceCount,
+		CoverageMs:      row.CoverageMs,
 		CoverageRatio:   coverageRatio,
 		SentenceIndexes: row.SentenceIndexes,
 		BestEvidenceRef: model.EvidenceRef{
-			SentenceIndex: Int32FromPG(row.BestEvidenceSentenceIndex),
-			SpanIndex:     Int32FromPG(row.BestEvidenceSpanIndex),
+			SentenceIndex: row.BestEvidenceSentenceIndex,
+			SpanIndex:     row.BestEvidenceSpanIndex,
 		},
 		BestEvidenceStartMs:        Int32FromPG(row.BestEvidenceStartMs),
 		BestEvidenceEndMs:          Int32FromPG(row.BestEvidenceEndMs),
 		BestEvidenceCandidateScore: bestEvidenceCandidateScore,
 		BestEvidenceTargetText:     TextPointerFromPG(row.BestEvidenceTargetText),
-		DurationMs:                 durationMs,
+		DurationMs:                 row.DurationMs,
 		MappedSpanRatio:            mappedSpanRatio,
 		ContentQualityScore:        contentQualityScore,
-		RankWithinUnit:             Int32FromPG(row.RankWithinUnit),
+		RankWithinUnit:             row.RankWithinUnit,
 	}, nil
 }
 
@@ -198,14 +178,6 @@ func ToVideoFillCandidateFromPopular(row recommendationsqlc.ListPopularFillVideo
 }
 
 func ToUnitVideoInventory(row recommendationsqlc.RecommendationVUnitVideoInventory) (model.UnitVideoInventory, error) {
-	coarseUnitID := int64(0)
-	if row.CoarseUnitID.Valid {
-		coarseUnitID = row.CoarseUnitID.Int64
-	}
-	distinctVideoCount := int32(0)
-	if row.DistinctVideoCount.Valid {
-		distinctVideoCount = row.DistinctVideoCount.Int32
-	}
 	avgMentionCount, err := NumericToFloat64(row.AvgMentionCount)
 	if err != nil {
 		return model.UnitVideoInventory{}, err
@@ -222,20 +194,16 @@ func ToUnitVideoInventory(row recommendationsqlc.RecommendationVUnitVideoInvento
 	if err != nil {
 		return model.UnitVideoInventory{}, err
 	}
-	strongVideoCount := int32(0)
-	if row.StrongVideoCount.Valid {
-		strongVideoCount = row.StrongVideoCount.Int32
-	}
 
 	return model.UnitVideoInventory{
-		CoarseUnitID:       coarseUnitID,
-		DistinctVideoCount: distinctVideoCount,
+		CoarseUnitID:       row.CoarseUnitID,
+		DistinctVideoCount: row.DistinctVideoCount,
 		AvgMentionCount:    avgMentionCount,
 		AvgSentenceCount:   avgSentenceCount,
 		AvgCoverageMs:      avgCoverageMs,
 		AvgCoverageRatio:   avgCoverageRatio,
-		StrongVideoCount:   strongVideoCount,
-		SupplyGrade:        TextToString(row.SupplyGrade),
+		StrongVideoCount:   row.StrongVideoCount,
+		SupplyGrade:        row.SupplyGrade,
 		UpdatedAt:          TimeFromPG(row.UpdatedAt),
 	}, nil
 }

@@ -5,9 +5,7 @@ sql:
       - "query/*.sql"
     schema:
       - "schema/*.sql"
-      - "../migration/000001_create_recommendation_schema.up.sql"
-      - "../migration/000002_create_serving_state_tables.up.sql"
-      - "../migration/000003_create_recommendation_audit_tables.up.sql"
+      - "../migration/000001_baseline.up.sql"
     gen:
       go:
         package: "recommendationsqlc"

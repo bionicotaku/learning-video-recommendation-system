@@ -158,27 +158,27 @@ type RecommendationUserVideoServingState struct {
 }
 
 type RecommendationVUnitVideoInventory struct {
-	CoarseUnitID       pgtype.Int8        `json:"coarse_unit_id"`
-	DistinctVideoCount pgtype.Int4        `json:"distinct_video_count"`
+	CoarseUnitID       int64              `json:"coarse_unit_id"`
+	DistinctVideoCount int32              `json:"distinct_video_count"`
 	AvgMentionCount    pgtype.Numeric     `json:"avg_mention_count"`
 	AvgSentenceCount   pgtype.Numeric     `json:"avg_sentence_count"`
 	AvgCoverageMs      pgtype.Numeric     `json:"avg_coverage_ms"`
 	AvgCoverageRatio   pgtype.Numeric     `json:"avg_coverage_ratio"`
-	StrongVideoCount   pgtype.Int4        `json:"strong_video_count"`
-	SupplyGrade        pgtype.Text        `json:"supply_grade"`
+	StrongVideoCount   int32              `json:"strong_video_count"`
+	SupplyGrade        string             `json:"supply_grade"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RecommendationVVideoUnitRecallIndex struct {
 	VideoID                          pgtype.UUID        `json:"video_id"`
-	CoarseUnitID                     pgtype.Int8        `json:"coarse_unit_id"`
-	MentionCount                     pgtype.Int4        `json:"mention_count"`
-	SentenceCount                    pgtype.Int4        `json:"sentence_count"`
-	CoverageMs                       pgtype.Int4        `json:"coverage_ms"`
+	CoarseUnitID                     int64              `json:"coarse_unit_id"`
+	MentionCount                     int32              `json:"mention_count"`
+	SentenceCount                    int32              `json:"sentence_count"`
+	CoverageMs                       int32              `json:"coverage_ms"`
 	CoverageRatio                    pgtype.Numeric     `json:"coverage_ratio"`
 	SentenceIndexes                  []int32            `json:"sentence_indexes"`
-	BestEvidenceSentenceIndex        pgtype.Int4        `json:"best_evidence_sentence_index"`
-	BestEvidenceSpanIndex            pgtype.Int4        `json:"best_evidence_span_index"`
+	BestEvidenceSentenceIndex        int32              `json:"best_evidence_sentence_index"`
+	BestEvidenceSpanIndex            int32              `json:"best_evidence_span_index"`
 	BestEvidenceStartMs              pgtype.Int4        `json:"best_evidence_start_ms"`
 	BestEvidenceEndMs                pgtype.Int4        `json:"best_evidence_end_ms"`
 	BestEvidenceScores               []byte             `json:"best_evidence_scores"`
@@ -186,13 +186,13 @@ type RecommendationVVideoUnitRecallIndex struct {
 	BestEvidenceSelectionReason      pgtype.Text        `json:"best_evidence_selection_reason"`
 	BestEvidenceCandidateScore       pgtype.Numeric     `json:"best_evidence_candidate_score"`
 	BestEvidenceTargetText           pgtype.Text        `json:"best_evidence_target_text"`
-	DurationMs                       pgtype.Int4        `json:"duration_ms"`
+	DurationMs                       int32              `json:"duration_ms"`
 	MappedSpanRatio                  pgtype.Numeric     `json:"mapped_span_ratio"`
-	Status                           pgtype.Text        `json:"status"`
-	VisibilityStatus                 pgtype.Text        `json:"visibility_status"`
+	Status                           string             `json:"status"`
+	VisibilityStatus                 string             `json:"visibility_status"`
 	PublishAt                        pgtype.Timestamptz `json:"publish_at"`
 	ContentQualityScore              pgtype.Numeric     `json:"content_quality_score"`
-	RankWithinUnit                   pgtype.Int4        `json:"rank_within_unit"`
+	RankWithinUnit                   int32              `json:"rank_within_unit"`
 }
 
 type RecommendationVideoRecommendationItem struct {
