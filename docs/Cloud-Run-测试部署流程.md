@@ -884,6 +884,8 @@ printf '%s' '<cloud-run-service-name>' | \
 
 workflow 不读取 `.env`，不传 `--env-vars-file`，不保存业务配置。Cloud Run env 由 Secret Manager 引用保持。
 
+workflow 中的 `gcloud builds submit` 使用 `--suppress-logs`。原因是 GitHub Actions deploy service account 只负责提交构建和部署，不授予项目级 Viewer/Owner 来 stream Cloud Build logs；这样可以减少 GitHub Actions 日志里暴露的 GCP 细节。若 Cloud Build 失败，用本地已授权账号或 GCP Console 查看对应 build logs。
+
 ### 14.5 自动部署验证
 
 手动触发或 push 到 `main` 后检查：

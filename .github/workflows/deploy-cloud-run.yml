@@ -43,6 +43,7 @@ jobs:
           gcloud builds submit \
             --project="${{ secrets.GCP_PROJECT_ID }}" \
             --region="${{ secrets.GCP_REGION }}" \
+            --suppress-logs \
             --tag="${image}" \
             .
 
