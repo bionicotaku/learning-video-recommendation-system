@@ -17,11 +17,11 @@
 本轮已验证的 GCP 项目：
 
 ```text
-project_id: project-84868034-4a49-4556-b47
-project_name: My First Project
-region: us-central1
-service_name: lvrs-api
-service_url: https://lvrs-api-49376215414.us-central1.run.app
+project_id: <gcp-project-id>
+project_name: <gcp-project-name>
+region: <gcp-region>
+service_name: <cloud-run-service-name>
+service_url: <cloud-run-service-url>
 ```
 
 已启用 API：
@@ -36,7 +36,7 @@ secretmanager.googleapis.com
 已创建 Secret Manager secret：
 
 ```text
-lvrs-database-url
+<database-url-secret-name>
 ```
 
 当前 Cloud Run 环境变量：
@@ -46,7 +46,7 @@ API_ADDR=<from .env>
 DEV_MODE=<from .env>
 API_GATEWAY_USERINFO_HEADER=<from .env>
 PUBLIC_ASSET_BASE_URL=<from .env>
-DATABASE_URL=lvrs-database-url:latest
+DATABASE_URL=<database-url-secret-name>:latest
 ```
 
 ## 2. 为什么使用 Dockerfile
@@ -54,7 +54,7 @@ DATABASE_URL=lvrs-database-url:latest
 最初尝试过：
 
 ```bash
-gcloud run deploy lvrs-api --source .
+gcloud run deploy <cloud-run-service-name> --source .
 ```
 
 但本轮实际部署中，Cloud Run source deploy / buildpack 构建失败，且 Cloud Build 日志没有提供足够的 buildpack stderr。为了得到可重复、可排障的部署路径，当前采用：
@@ -104,8 +104,8 @@ server
 切换项目：
 
 ```bash
-gcloud config set project project-84868034-4a49-4556-b47
-gcloud config set run/region us-central1
+gcloud config set project <gcp-project-id>
+gcloud config set run/region <gcp-region>
 ```
 
 启用 API：
@@ -121,7 +121,7 @@ gcloud services enable \
 确认 billing：
 
 ```bash
-gcloud billing projects describe project-84868034-4a49-4556-b47 \
+gcloud billing projects describe <gcp-project-id> \
   --format='yaml(billingEnabled,billingAccountName)'
 ```
 
@@ -141,7 +141,7 @@ API_GATEWAY_USERINFO_HEADER
 
 ```dotenv
 DATABASE_URL=postgresql://...
-PUBLIC_ASSET_BASE_URL=https://storage.googleapis.com/videos2077
+PUBLIC_ASSET_BASE_URL=<public-asset-base-url>
 API_ADDR=:8080
 DEV_MODE=true
 API_GATEWAY_USERINFO_HEADER=X-Apigateway-Api-Userinfo
@@ -169,12 +169,12 @@ done
 ```bash
 DATABASE_URL="$(awk -F= '$1=="DATABASE_URL"{print substr($0,index($0,"=")+1); exit}' .env)"
 
-if gcloud secrets describe lvrs-database-url >/dev/null 2>&1; then
+if gcloud secrets describe <database-url-secret-name> >/dev/null 2>&1; then
   printf '%s' "$DATABASE_URL" | \
-    gcloud secrets versions add lvrs-database-url --data-file=-
+    gcloud secrets versions add <database-url-secret-name> --data-file=-
 else
   printf '%s' "$DATABASE_URL" | \
-    gcloud secrets create lvrs-database-url \
+    gcloud secrets create <database-url-secret-name> \
       --replication-policy=automatic \
       --data-file=-
 fi
@@ -187,7 +187,7 @@ PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
 PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
 RUN_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-gcloud secrets add-iam-policy-binding lvrs-database-url \
+gcloud secrets add-iam-policy-binding <database-url-secret-name> \
   --member="serviceAccount:${RUN_SERVICE_ACCOUNT}" \
   --role='roles/secretmanager.secretAccessor'
 ```
@@ -257,11 +257,11 @@ make recommendation-migrate-up
 
 ```bash
 PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
-IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/lvrs-api:manual-$(date +%Y%m%d%H%M%S)"
-echo "$IMAGE" > /tmp/lvrs-api-image.txt
+IMAGE="<gcp-region>-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/<cloud-run-service-name>:manual-$(date +%Y%m%d%H%M%S)"
+echo "$IMAGE" > /tmp/<cloud-run-service-name>-image.txt
 
 gcloud builds submit \
-  --region us-central1 \
+  --region <gcp-region> \
   --tag "$IMAGE" \
   .
 ```
@@ -276,7 +276,7 @@ SUCCESS
 并且镜像会被推送到：
 
 ```text
-us-central1-docker.pkg.dev/<project_id>/cloud-run-source-deploy/lvrs-api:<tag>
+<gcp-region>-docker.pkg.dev/<project_id>/cloud-run-source-deploy/<cloud-run-service-name>:<tag>
 ```
 
 ## 10. 部署 Cloud Run
@@ -284,7 +284,7 @@ us-central1-docker.pkg.dev/<project_id>/cloud-run-source-deploy/lvrs-api:<tag>
 使用刚构建好的镜像部署：
 
 ```bash
-IMAGE="$(cat /tmp/lvrs-api-image.txt)"
+IMAGE="$(cat /tmp/<cloud-run-service-name>-image.txt)"
 
 runtime_env_file="$(mktemp)"
 awk -F= '
@@ -297,13 +297,13 @@ awk -F= '
   }
 ' .env > "$runtime_env_file"
 
-gcloud run deploy lvrs-api \
+gcloud run deploy <cloud-run-service-name> \
   --image "$IMAGE" \
-  --region us-central1 \
+  --region <gcp-region> \
   --allow-unauthenticated \
   --port 8080 \
   --env-vars-file "$runtime_env_file" \
-  --set-secrets DATABASE_URL=lvrs-database-url:latest
+  --set-secrets DATABASE_URL=<database-url-secret-name>:latest
 
 rm -f "$runtime_env_file"
 ```
@@ -311,34 +311,34 @@ rm -f "$runtime_env_file"
 成功输出类似：
 
 ```text
-Service [lvrs-api] revision [lvrs-api-00001-tm8] has been deployed and is serving 100 percent of traffic.
-Service URL: https://lvrs-api-49376215414.us-central1.run.app
+Service [<cloud-run-service-name>] revision [<cloud-run-service-name>-00001-tm8] has been deployed and is serving 100 percent of traffic.
+Service URL: <cloud-run-service-url>
 ```
 
-同一个 service name `lvrs-api` 重新部署时会创建新 revision，但 service URL 保持稳定。
+同一个 service name `<cloud-run-service-name>` 重新部署时会创建新 revision，但 service URL 保持稳定。
 
 ## 11. 验证
 
 查看服务状态：
 
 ```bash
-gcloud run services describe lvrs-api \
-  --region us-central1 \
+gcloud run services describe <cloud-run-service-name> \
+  --region <gcp-region> \
   --format='yaml(status.url,status.conditions,status.latestReadyRevisionName,status.traffic)'
 ```
 
 确认环境变量：
 
 ```bash
-gcloud run services describe lvrs-api \
-  --region us-central1 \
+gcloud run services describe <cloud-run-service-name> \
+  --region <gcp-region> \
   --format='yaml(spec.template.spec.containers[0].env,status.latestReadyRevisionName,status.url)'
 ```
 
 公网 HTTPS 可达性：
 
 ```bash
-curl -i https://lvrs-api-49376215414.us-central1.run.app/
+curl -i <cloud-run-service-url>/
 ```
 
 当前根路径没有 handler，返回 `404 page not found` 是预期；它只证明 HTTPS endpoint 和 Cloud Run 路由可达。
@@ -346,7 +346,7 @@ curl -i https://lvrs-api-49376215414.us-central1.run.app/
 未带测试 token 的认证验证：
 
 ```bash
-curl -i https://lvrs-api-49376215414.us-central1.run.app/api/me
+curl -i <cloud-run-service-url>/api/me
 ```
 
 预期：
@@ -358,24 +358,24 @@ curl -i https://lvrs-api-49376215414.us-central1.run.app/api/me
 带 DEV_MODE 测试 token：
 
 ```bash
-TOKEN="$(printf '{"alg":"none"}' | base64 | tr '+/' '-_' | tr -d '=')"."$(printf '{"sub":"test-user-001"}' | base64 | tr '+/' '-_' | tr -d '=')".
+TOKEN="$(printf '{"alg":"none"}' | base64 | tr '+/' '-_' | tr -d '=')"."$(printf '{"sub":"<test-user-id>"}' | base64 | tr '+/' '-_' | tr -d '=')".
 
 curl -i \
   -H "Authorization: Bearer ${TOKEN}" \
-  https://lvrs-api-49376215414.us-central1.run.app/api/me
+  <cloud-run-service-url>/api/me
 ```
 
 说明：
 
 - 如果返回 `401`，说明 token payload 没有被 DEV_MODE auth 接受。
 - 如果返回 `500`，说明请求已经进入服务并解析出 `sub`，但业务层或数据库数据不满足该 endpoint 当前依赖。
-- 当前本轮验证中，`/api/me` 带 `sub=test-user-001` 返回过 `500`，日志显示 `user_id=test-user-001`，所以 Cloud Run 部署和 DEV_MODE auth 已经生效。
+- 当前本轮验证中，`/api/me` 带 `sub=<test-user-id>` 返回过 `500`，日志显示 `user_id=<test-user-id>`，所以 Cloud Run 部署和 DEV_MODE auth 已经生效。
 
 查看日志：
 
 ```bash
-gcloud run services logs read lvrs-api \
-  --region us-central1 \
+gcloud run services logs read <cloud-run-service-name> \
+  --region <gcp-region> \
   --limit 100
 ```
 
@@ -383,7 +383,7 @@ gcloud run services logs read lvrs-api \
 
 ```bash
 gcloud logging read \
-  'resource.type="cloud_run_revision" AND resource.labels.service_name="lvrs-api"' \
+  'resource.type="cloud_run_revision" AND resource.labels.service_name="<cloud-run-service-name>"' \
   --freshness=10m \
   --limit=100 \
   --format=json
@@ -395,7 +395,7 @@ gcloud logging read \
 
 ```bash
 PROJECT_ID="$(gcloud config get-value project 2>/dev/null)"
-IMAGE="us-central1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/lvrs-api:manual-$(date +%Y%m%d%H%M%S)"
+IMAGE="<gcp-region>-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/<cloud-run-service-name>:manual-$(date +%Y%m%d%H%M%S)"
 runtime_env_file="$(mktemp)"
 awk -F= '
   $1=="PUBLIC_ASSET_BASE_URL" || $1=="API_ADDR" || $1=="DEV_MODE" || $1=="API_GATEWAY_USERINFO_HEADER" {
@@ -408,22 +408,195 @@ awk -F= '
 ' .env > "$runtime_env_file"
 
 gcloud builds submit \
-  --region us-central1 \
+  --region <gcp-region> \
   --tag "$IMAGE" \
   .
 
-gcloud run deploy lvrs-api \
+gcloud run deploy <cloud-run-service-name> \
   --image "$IMAGE" \
-  --region us-central1 \
+  --region <gcp-region> \
   --allow-unauthenticated \
   --port 8080 \
   --env-vars-file "$runtime_env_file" \
-  --set-secrets DATABASE_URL=lvrs-database-url:latest
+  --set-secrets DATABASE_URL=<database-url-secret-name>:latest
 
 rm -f "$runtime_env_file"
 ```
 
-## 13. 生产化前必须调整
+## 13. 绑定 Cloudflare 域名
+
+当前 `<root-domain>` 已经在 Cloudflare 账号 `<cloudflare-account-name>` 中接入，且同一个域名已经承载：
+
+```text
+<root-domain>       A      -> <existing-web-host>
+www.<root-domain>   CNAME  -> <existing-web-host>
+MX / TXT / DKIM         -> <email-provider> 邮箱
+```
+
+因此后端 API 不绑定根域名，也不改 `www`，只使用独立子域名：
+
+```text
+<api-domain>
+```
+
+### 13.1 当前 Cloudflare DNS 保护边界
+
+绑定 API 域名时不要修改以下记录：
+
+```text
+<root-domain> A
+www.<root-domain> CNAME
+<root-domain> MX
+<root-domain> TXT
+sig1._domainkey.<root-domain> CNAME
+```
+
+本轮只新增了：
+
+```text
+<api-domain> CNAME ghs.googlehosted.com
+```
+
+并且保持：
+
+```text
+proxied=false
+DNS only / 灰云
+```
+
+证书签发完成前不要打开 Cloudflare 代理。Cloudflare 代理可能影响 Google managed certificate 的验证和续期。
+
+### 13.2 GCP 创建 Cloud Run domain mapping
+
+Cloud Run fully managed domain mapping 需要 `gcloud beta`：
+
+```bash
+gcloud components install beta --quiet
+```
+
+创建 mapping：
+
+```bash
+gcloud beta run domain-mappings create \
+  --service <cloud-run-service-name> \
+  --domain <api-domain> \
+  --region <gcp-region>
+```
+
+本轮创建成功后，GCP 返回的 DNS 要求是：
+
+```text
+NAME  RECORD TYPE  CONTENTS
+api   CNAME        ghs.googlehosted.com.
+```
+
+查看 mapping 状态：
+
+```bash
+gcloud beta run domain-mappings describe \
+  --domain <api-domain> \
+  --region <gcp-region> \
+  --format='yaml(status.resourceRecords,status.conditions,metadata.name)'
+```
+
+本轮当前状态：
+
+```text
+DomainRoutable: True
+CertificateProvisioned: Unknown
+Ready: CertificatePending
+```
+
+这表示 DNS 已经可路由，但 Google managed certificate 仍在自动签发。证书未完成前，`https://<api-domain>` 可能出现 SSL 连接错误，这是预期状态。
+
+### 13.3 Cloudflare 添加 DNS 记录
+
+在 Cloudflare 的 `<root-domain>` zone 中添加：
+
+```text
+Type: CNAME
+Name: api
+Target: ghs.googlehosted.com
+Proxy status: DNS only
+TTL: Auto
+Comment: Cloud Run <cloud-run-service-name>
+```
+
+本轮通过 Cloudflare API 创建的记录为：
+
+```text
+type: CNAME
+name: <api-domain>
+content: ghs.googlehosted.com
+proxied: false
+ttl: 1
+comment: Cloud Run <cloud-run-service-name>
+```
+
+DNS 验证：
+
+```bash
+dig +short <api-domain> CNAME
+dig +short <api-domain> A
+```
+
+本轮已验证：
+
+```text
+<api-domain> CNAME -> ghs.googlehosted.com.
+```
+
+### 13.4 等待证书完成
+
+重复检查：
+
+```bash
+gcloud beta run domain-mappings describe \
+  --domain <api-domain> \
+  --region <gcp-region> \
+  --format='yaml(status.conditions)'
+```
+
+当看到：
+
+```text
+Ready: True
+CertificateProvisioned: True
+```
+
+再验证 HTTPS：
+
+```bash
+curl -i https://<api-domain>/api/me
+```
+
+未带 token 时预期返回：
+
+```text
+401 unauthorized
+```
+
+这表示完整链路成功：
+
+```text
+<api-domain>
+  -> Cloudflare DNS only
+  -> ghs.googlehosted.com
+  -> Cloud Run domain mapping
+  -> <cloud-run-service-name>
+```
+
+### 13.5 以后是否打开 Cloudflare 代理
+
+测试阶段建议继续保持 DNS only。
+
+如果之后要打开 Cloudflare 橙云代理，先确认 Cloud Run domain mapping 已经 `Ready=True`，然后：
+
+- Cloudflare DNS record 改为 proxied。
+- Cloudflare SSL/TLS mode 使用 `Full (strict)`。
+- 避免启用会干扰 Google certificate renewal 的强制跳转规则，尤其是证书验证路径相关规则。
+
+## 14. 生产化前必须调整
 
 测试部署当前刻意使用：
 

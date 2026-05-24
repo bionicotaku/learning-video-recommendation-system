@@ -33,6 +33,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 	videoDetail := buildVideoDetailHandler(pool, config)
 	videoLibrary := buildVideoLibraryHandler(pool, config)
 	videoInteractions := buildVideoInteractionsHandler(pool)
+	wordFavorites := buildWordFavoritesHandler(pool)
 	watchProgress := buildWatchProgressHandler(pool)
 	unitProgress := buildUnitProgressHandler(pool)
 	meHandler := buildMeHandler(pool)
@@ -46,6 +47,7 @@ func buildHTTPHandler(pool *pgxpool.Pool, logger *slog.Logger, config config) (h
 		UnitCollections:   unitCollections,
 		LearningTargets:   learningTargets,
 		VideoInteractions: videoInteractions,
+		WordFavorites:     wordFavorites,
 		LearningEvents:    learningEvents,
 		WatchProgress:     watchProgress,
 		UnitProgress:      unitProgress,

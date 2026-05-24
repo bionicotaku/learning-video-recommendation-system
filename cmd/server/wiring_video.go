@@ -9,6 +9,7 @@ import (
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videodetail"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videointeractions"
 	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/videolibrary"
+	"learning-video-recommendation-system/internal/api/infrastructure/http/handler/wordfavorites"
 	catalogservice "learning-video-recommendation-system/internal/catalog/application/service"
 	catalogrepo "learning-video-recommendation-system/internal/catalog/infrastructure/persistence/repository"
 
@@ -20,6 +21,15 @@ func buildVideoInteractionsHandler(pool *pgxpool.Pool) *videointeractions.Handle
 	setLike := catalogservice.NewSetVideoLikeUsecase(writer)
 	setFavorite := catalogservice.NewSetVideoFavoriteUsecase(writer)
 	return videointeractions.NewHandler(setLike, setFavorite)
+}
+
+func buildWordFavoritesHandler(pool *pgxpool.Pool) *wordfavorites.Handler {
+	repository := catalogrepo.NewWordFavoriteRepository(pool)
+	status := catalogservice.NewGetWordFavoriteStatusUsecase(repository)
+	set := catalogservice.NewSetWordFavoriteUsecase(repository)
+	unset := catalogservice.NewUnsetWordFavoriteUsecase(repository)
+	list := catalogservice.NewListWordFavoritesUsecase(repository)
+	return wordfavorites.NewHandler(status, set, unset, list)
 }
 
 func buildVideoDetailHandler(pool *pgxpool.Pool, config config) *videodetail.Handler {

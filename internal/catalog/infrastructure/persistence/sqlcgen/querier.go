@@ -13,17 +13,25 @@ import (
 type Querier interface {
 	GetVideoDetailByID(ctx context.Context, arg GetVideoDetailByIDParams) (GetVideoDetailByIDRow, error)
 	GetVideoDurationMS(ctx context.Context, videoID pgtype.UUID) (int32, error)
+	GetWordFavoriteVideoContext(ctx context.Context, arg GetWordFavoriteVideoContextParams) (GetWordFavoriteVideoContextRow, error)
 	HasVisibleVideoForEndQuiz(ctx context.Context, videoID pgtype.UUID) (bool, error)
+	HasWordFavoriteByCoarse(ctx context.Context, arg HasWordFavoriteByCoarseParams) (bool, error)
+	HasWordFavoriteByToken(ctx context.Context, arg HasWordFavoriteByTokenParams) (bool, error)
 	ListFeedVideosByIDs(ctx context.Context, videoIds []pgtype.UUID) ([]ListFeedVideosByIDsRow, error)
 	ListUnitLabelsByIDs(ctx context.Context, coarseUnitIds []int64) ([]ListUnitLabelsByIDsRow, error)
 	ListUnitQuizQuestionCandidates(ctx context.Context, coarseUnitIds []int64) ([]ListUnitQuizQuestionCandidatesRow, error)
 	ListVideoFavorites(ctx context.Context, arg ListVideoFavoritesParams) ([]ListVideoFavoritesRow, error)
 	ListVideoHistory(ctx context.Context, arg ListVideoHistoryParams) ([]ListVideoHistoryRow, error)
 	ListVideoUnitQuizQuestionCandidates(ctx context.Context, arg ListVideoUnitQuizQuestionCandidatesParams) ([]ListVideoUnitQuizQuestionCandidatesRow, error)
+	ListWordFavorites(ctx context.Context, arg ListWordFavoritesParams) ([]ListWordFavoritesRow, error)
+	SetCoarseWordFavorite(ctx context.Context, arg SetCoarseWordFavoriteParams) (string, error)
+	SetTokenWordFavorite(ctx context.Context, arg SetTokenWordFavoriteParams) (string, error)
 	SetVideoFavorited(ctx context.Context, arg SetVideoFavoritedParams) (SetVideoFavoritedRow, error)
 	SetVideoLiked(ctx context.Context, arg SetVideoLikedParams) (SetVideoLikedRow, error)
 	SetVideoUnfavorited(ctx context.Context, arg SetVideoUnfavoritedParams) (SetVideoUnfavoritedRow, error)
 	SetVideoUnliked(ctx context.Context, arg SetVideoUnlikedParams) (SetVideoUnlikedRow, error)
+	UnsetWordFavoriteByCoarse(ctx context.Context, arg UnsetWordFavoriteByCoarseParams) error
+	UnsetWordFavoriteByToken(ctx context.Context, arg UnsetWordFavoriteByTokenParams) error
 	UpsertVideoEngagementStatsFromWatchProgress(ctx context.Context, arg UpsertVideoEngagementStatsFromWatchProgressParams) error
 	UpsertVideoUserStateFromWatchProgress(ctx context.Context, arg UpsertVideoUserStateFromWatchProgressParams) error
 	UpsertVideoWatchSession(ctx context.Context, arg UpsertVideoWatchSessionParams) (UpsertVideoWatchSessionRow, error)

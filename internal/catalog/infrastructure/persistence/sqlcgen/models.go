@@ -180,8 +180,28 @@ type CatalogVideoUserState struct {
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
+type CatalogWordFavorite struct {
+	FavoriteID      pgtype.UUID        `json:"favorite_id"`
+	UserID          pgtype.UUID        `json:"user_id"`
+	FavoriteKeyType string             `json:"favorite_key_type"`
+	CoarseUnitID    pgtype.Int8        `json:"coarse_unit_id"`
+	Source          string             `json:"source"`
+	VideoID         pgtype.UUID        `json:"video_id"`
+	SentenceIndex   pgtype.Int4        `json:"sentence_index"`
+	TokenIndex      pgtype.Int4        `json:"token_index"`
+	IsFavorited     bool               `json:"is_favorited"`
+	FavoritedAt     pgtype.Timestamptz `json:"favorited_at"`
+	StateUpdatedAt  pgtype.Timestamptz `json:"state_updated_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type SemanticCoarseUnit struct {
-	ID     int64  `json:"id"`
-	Label  string `json:"label"`
-	Status string `json:"status"`
+	ID           int64       `json:"id"`
+	Kind         string      `json:"kind"`
+	Label        string      `json:"label"`
+	Pos          pgtype.Text `json:"pos"`
+	ChineseDef   pgtype.Text `json:"chinese_def"`
+	ChineseLabel pgtype.Text `json:"chinese_label"`
+	Status       string      `json:"status"`
 }

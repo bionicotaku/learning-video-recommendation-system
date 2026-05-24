@@ -11,6 +11,7 @@
 - 用户对视频的互动状态投影
 - 观看进度上报命令 `RecordVideoWatchProgress`
 - 视频点赞/收藏 set-unset 命令 `SetVideoLike` / `SetVideoFavorite`
+- Word Favorite 状态、set/unset 和分页列表能力
 - Feed facade 使用的批量读取能力：视频列表 preview 字段、unit label
 - Video Detail 使用的单视频详情读取能力：播放资源、transcript 元数据、互动统计、当前用户状态
 - Video Favorites / Video History 使用的只读分页列表能力：当前收藏、当前观看历史 preview
@@ -71,6 +72,20 @@ PUT/DELETE /api/videos/{video_id}/favorite
 ```
 
 这两个命令都是幂等 set / unset，不做 toggle。调用方必须提供客户端动作时间 `occurred_at`。Repository 在同一事务内更新 `catalog.video_user_states.has_liked` / `has_bookmarked`、对应的 `like_state_updated_at` / `favorite_state_updated_at` 水位，以及 `catalog.video_engagement_stats.like_count` / `favorite_count`。重复 set 不重复增加计数，重复 unset 不重复减少计数；旧 `occurred_at` 请求不会覆盖更新状态，也不会改动计数；unset 没有状态行时不创建空的 user state 行。MVP 不新增点赞/收藏审计表，不写 Analytics，不写 Learning Engine，也不写 Recommendation。
+
+Word Favorite 维护当前用户对词 / 字幕 token 的收藏投影：
+
+```text
+POST /api/word-favorites/status
+PUT /api/word-favorites
+DELETE /api/word-favorites
+GET /api/word-favorites
+  -> internal/api
+  -> catalog.WordFavorite usecases
+  -> catalog.word_favorites
+```
+
+Word Favorite 使用 canonical key，而不是把前端点击文本作为持久化身份。`word_list + coarse_unit_id` 和 `video_transcript + coarse_unit_id` 都按 `user_id + coarse_unit_id` 收藏；`video_transcript + coarse_unit_id=null` 按 `user_id + video_id + sentence_index + token_index` 收藏。带 `coarse_unit_id` 的 transcript 请求会保存来源 token 字段用于列表展示，但不校验 token 是否实际映射到该 coarse unit。`PUT` / `DELETE` 都必须提供客户端动作时间 `occurred_at`；Repository 用 `state_updated_at` 做状态水位，旧请求 stale no-op，并且 stale `PUT` 与同一 `occurred_at` 的已生效 PUT 重试都会在目标存在性 / 可展示性校验之前被丢弃。`PUT` 生效时写 `is_favorited=true`，从 tombstone 恢复时用本次 `occurred_at` 作为 `favorited_at`；已收藏状态下较新同状态 PUT 只推进水位，不刷新列表排序时间。`DELETE` 不物理删除，而是写 `is_favorited=false`、`favorited_at=null` 的 tombstone，目标内容不存在时仍可返回成功。`catalog.word_favorites` 是用户状态投影，不对 `video_id` / `coarse_unit_id` 建内容 FK，保证 tombstone 能独立于内容生命周期挡住旧请求。该能力不写 Analytics、Learning Engine、Recommendation 或 User profile。
 
 Feed lookup 是只读能力，服务 `POST /api/feed` 的 facade 组装：
 

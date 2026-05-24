@@ -12,6 +12,10 @@ create sequence if not exists semantic.coarse_unit_id_seq;
 
 create table if not exists semantic.coarse_unit (
   id bigint primary key default nextval('semantic.coarse_unit_id_seq'::regclass),
+  kind text not null default 'word',
   label text not null default '',
+  pos text,
+  chinese_def text,
+  chinese_label text,
   status text not null default 'active'
 );

@@ -38,6 +38,10 @@ PUT /api/videos/{video_id}/like
 DELETE /api/videos/{video_id}/like
 PUT /api/videos/{video_id}/favorite
 DELETE /api/videos/{video_id}/favorite
+POST /api/word-favorites/status
+PUT /api/word-favorites
+DELETE /api/word-favorites
+GET /api/word-favorites
 POST /api/learning-interactions:batch
 POST /api/quiz-attempts
 POST /api/learning-units:mark-mastered
@@ -136,6 +140,19 @@ only `video_id`, `has_liked`, and `like_count`; favorite responses return only
 counts and current user state. Video Favorites / Video History list endpoints
 only provide navigation previews. Click writes still use the single-purpose
 Video Interactions endpoints above.
+
+`POST /api/word-favorites/status`, `PUT /api/word-favorites`,
+`DELETE /api/word-favorites`, and `GET /api/word-favorites` are owned by the
+`wordfavorites` HTTP handler and Catalog usecases. They use a flat word identity
+with `source=word_list` or `source=video_transcript`. The canonical favorite key
+is either `user_id + coarse_unit_id` or
+`user_id + video_id + sentence_index + token_index`; when a transcript request
+also carries `coarse_unit_id`, the coarse key wins and API does not validate the
+token-to-coarse mapping. `PUT` and `DELETE` require `occurred_at`, return
+`204 No Content`, and use Catalog's `state_updated_at` watermark so stale
+set/unset requests and same-event set retries are no-op before target
+validation. List reads use keyset pagination and do not expose `favorite_id` or
+timestamps.
 
 The raw learning-event endpoints return only Analytics acceptance results.
 Learning Engine normalization is attempted synchronously as best effort and is

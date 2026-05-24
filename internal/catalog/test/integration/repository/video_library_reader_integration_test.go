@@ -30,7 +30,7 @@ func TestVideoLibraryReaderListVideoFavoritesPaginatesAndFilters(t *testing.T) {
 
 	now := time.Date(2026, 5, 22, 10, 0, 0, 0, time.UTC)
 	older := now.Add(-time.Hour)
-	future := now.Add(24 * time.Hour)
+	future := time.Now().UTC().Add(24 * time.Hour)
 
 	seedVideoLibraryUser(t, db.Pool, userID)
 	seedFeedVideo(t, db.Pool, firstID, "First", "", "hls/first.m3u8", "covers/first.webp", "active", "public", nil)

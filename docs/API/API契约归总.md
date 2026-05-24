@@ -114,7 +114,7 @@ Content-Type: multipart/form-data
 
 ## 2. 已实现 API 总表
 
-当前实现注册 22 个业务 endpoint。
+当前实现注册 26 个业务 endpoint。
 
 | Method | Path | 分组 | Owner / 编排 | 成功边界 |
 |---|---|---|---|---|
@@ -132,6 +132,10 @@ Content-Type: multipart/form-data
 | `DELETE` | `/api/videos/{video_id}/like` | Video Interactions | Catalog | 幂等设置当前用户未点赞。 |
 | `PUT` | `/api/videos/{video_id}/favorite` | Video Interactions | Catalog | 幂等设置当前用户已收藏。 |
 | `DELETE` | `/api/videos/{video_id}/favorite` | Video Interactions | Catalog | 幂等设置当前用户未收藏。 |
+| `POST` | `/api/word-favorites/status` | Word Favorites | Catalog | 查询当前词 / 字幕 token identity 是否已收藏，可选返回视频句子上下文。 |
+| `PUT` | `/api/word-favorites` | Word Favorites | Catalog | 幂等收藏当前词 / 字幕 token identity。 |
+| `DELETE` | `/api/word-favorites` | Word Favorites | Catalog | 幂等取消收藏当前词 / 字幕 token identity。 |
+| `GET` | `/api/word-favorites` | Word Favorites | Catalog | 分页读取当前用户收藏的词 / 字幕 token 展示列表。 |
 | `POST` | `/api/video-watch-progress` | Watch Progress | Catalog + User stats projection | 写 watch session ledger、视频消费投影和活动统计。 |
 | `POST` | `/api/learning-interactions:batch` | Learning Events | Analytics + Learning Engine best-effort normalizer | 整批写入 exposure / lookup raw facts；HTTP success 只承诺 raw accepted。 |
 | `POST` | `/api/quiz-attempts` | Learning Events | Analytics + Learning Engine best-effort normalizer + User stats | 写入 completed quiz attempt raw fact。 |
@@ -1101,6 +1105,198 @@ Errors：
 Idempotency / side effects：如果同一用户此前已成功提交相同 `client_feedback_id`，重试返回已有 submission 的 `feedback_id`、`image_count` 和 `created_at`，不新增 submission，也不重复写图片。无 `client_feedback_id` 时每次成功请求都是新 submission。
 
 Retry：前端应为可重试提交生成并复用 `client_feedback_id`。
+
+### 3.23 `POST /api/word-favorites/status`
+
+文档来源：[Word-Favorite-API-MVP设计.md](Word-Favorite-API-MVP设计.md)；总体约束来源：[API模块总体设计规范.md](API模块总体设计规范.md)。
+
+用途：查询当前词 / 字幕 token identity 是否已收藏；可选返回视频句子上下文。
+
+Auth：必需。
+
+Owner：Catalog。
+
+Request body：
+
+| 字段 | 类型 | 必需 | 默认值 / 规则 |
+|---|---|---:|---|
+| `coarse_unit_id` | integer \| null | 条件 | `word_list` 必须为正整数；`video_transcript` 可为 null，提供时必须正整数。 |
+| `text` | string | 是 | trim 后必须非空；只做 validation，不参与查找。 |
+| `source` | string | 是 | 只允许 `word_list` / `video_transcript`。 |
+| `video_id` | string UUID \| null | 条件 | `video_transcript` 必须提供；`word_list` 忽略。 |
+| `sentence_index` | integer \| null | 条件 | `video_transcript` 必须提供且 `>=0`；`word_list` 忽略。 |
+| `token_index` | integer \| null | 条件 | `video_transcript` 必须提供且 `>=0`；`word_list` 忽略。 |
+| `include_video_context` | boolean | 否 | 缺省 `false`；`true` 时只允许 `source=video_transcript`。 |
+
+Canonical lookup：
+
+| 输入 | 收藏 key |
+|---|---|
+| `source=word_list` + `coarse_unit_id` | `user_id + coarse_unit_id` |
+| `source=video_transcript` + `coarse_unit_id` | `user_id + coarse_unit_id` |
+| `source=video_transcript` + `coarse_unit_id=null` | `user_id + video_id + sentence_index + token_index` |
+
+`source=video_transcript` 同时带 `coarse_unit_id` 时不校验 token 是否实际映射到该 coarse unit；coarse key 优先。
+
+Response `200 OK`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `is_favorited` | boolean | 当前 canonical key 是否已收藏。 |
+| `video_context.video_id` | string UUID | 请求 `include_video_context=true` 且上下文存在时返回；按 request 原样返回。 |
+| `video_context.video_title` | string | 来自 DB。 |
+| `video_context.video_duration_ms` | integer \| null | 来自 DB。 |
+| `video_context.token_index` | integer | 按 request 原样返回。 |
+| `video_context.sentence_index` | integer | 按 request 原样返回。 |
+| `video_context.sentence_text` | string | 来自 DB。 |
+| `video_context.sentence_translation` | string \| null | 来自 DB。 |
+| `video_context.sentence_start_ms` | integer \| null | 来自 DB。 |
+| `video_context.sentence_end_ms` | integer \| null | 来自 DB。 |
+
+Validation：`include_video_context=false` 或省略时只查收藏表，不查视频 / 字幕 / span 表。`include_video_context=true` 时按 `video_id + sentence_index` 查可展示视频和句子；即使 `is_favorited=false`，只要上下文存在也返回 `video_context`。
+
+Errors：
+
+| HTTP | code | 场景 |
+|---:|---|---|
+| 400 | `invalid_request` | JSON 非 object、unknown field、非法 source、`text` 为空、required 字段缺失、index 非整数或负数、`include_video_context=true` 但 source 不是 `video_transcript`。 |
+| 401 | `unauthorized` | principal 缺失。 |
+| 404 | `not_found` | `include_video_context=true` 时视频不可展示或句子不存在。 |
+| 413 | `payload_too_large` | body 超过 1 MiB。 |
+| 500 | `internal_error` | 数据库或未知错误。 |
+| 503 | `service_unavailable` | request 取消 / 超时。 |
+
+Side effects：无。
+
+Retry：只读，可安全重试。
+
+### 3.24 `PUT /api/word-favorites`
+
+文档来源：[Word-Favorite-API-MVP设计.md](Word-Favorite-API-MVP设计.md)；总体约束来源：[API模块总体设计规范.md](API模块总体设计规范.md)。
+
+用途：幂等收藏当前词 / 字幕 token identity。
+
+Auth：必需。
+
+Owner：Catalog。
+
+Request body：同 `POST /api/word-favorites/status` 的 identity 字段，不包含 `include_video_context`，并额外要求写入时间：
+
+| 字段 | 类型 | 必需 | 默认值 / 规则 |
+|---|---|---:|---|
+| `occurred_at` | RFC3339 datetime | 是 | 客户端收藏动作发生时间；必须带 `Z` 或 explicit offset。 |
+
+Response：`204 No Content`，无 JSON body。
+
+Validation：
+
+- `source=word_list + coarse_unit_id`：按 `user_id + coarse_unit_id` 收藏；非 stale 请求校验 coarse unit 存在且 active。
+- `source=video_transcript + coarse_unit_id`：按 `user_id + coarse_unit_id` 收藏，同时保存来源 token 字段供列表展示；不校验 token 是否映射到该 coarse unit。
+- `source=video_transcript + coarse_unit_id=null`：按 `user_id + video_id + sentence_index + token_index` 收藏；非 stale 请求校验视频可展示、句子存在、token/span 存在。
+- `text` 只做非空 validation，不参与查找或写入 key。
+- stale `PUT` 或同一 `occurred_at` 的已生效 PUT 重试，不因目标内容后来 inactive、hidden 或缺失而返回 `404`；它们仍是 `204` no-op。
+
+Errors：
+
+| HTTP | code | 场景 |
+|---:|---|---|
+| 400 | `invalid_request` | JSON 非 object、unknown field、非法 source、`text` 为空、required 字段缺失、index 非整数或负数、`occurred_at` 缺失或非法。 |
+| 401 | `unauthorized` | principal 缺失。 |
+| 404 | `not_found` | coarse unit 不存在 / inactive；token-only 目标视频、句子、span 不存在或视频不可展示。 |
+| 413 | `payload_too_large` | body 超过 1 MiB。 |
+| 500 | `internal_error` | 数据库或未知错误。 |
+| 503 | `service_unavailable` | request 取消 / 超时。 |
+
+Idempotency / side effects：upsert `catalog.word_favorites` 当前状态投影。生效请求设置 `is_favorited=true`，不存在或从 tombstone 恢复时 `favorited_at=occurred_at`；已收藏状态下较新 PUT 只推进 `state_updated_at`，不刷新 `favorited_at`；同一 `occurred_at` 的已生效 PUT 重试不刷新状态，也不重新要求目标存在。`occurred_at < state_updated_at` 是 stale no-op，仍返回 `204`。tombstone 可独立于内容行存在；`catalog.word_favorites` 不对 `video_id` / `coarse_unit_id` 建内容 FK。
+
+Retry：重试同一次收藏动作必须复用同一个 `occurred_at`；旧请求不会覆盖更新状态。
+
+### 3.25 `DELETE /api/word-favorites`
+
+文档来源：[Word-Favorite-API-MVP设计.md](Word-Favorite-API-MVP设计.md)；总体约束来源：[API模块总体设计规范.md](API模块总体设计规范.md)。
+
+用途：幂等取消收藏当前词 / 字幕 token identity。
+
+Auth：必需。
+
+Owner：Catalog。
+
+Request body：同 `PUT /api/word-favorites`，包括必填 `occurred_at`。
+
+Response：`204 No Content`，无 JSON body。
+
+Validation：只做请求语法、identity validation 和 `occurred_at` 解析。unset 按 canonical key 执行，不要求目标 coarse unit、视频、句子或 token 当前仍存在，避免内容下架后无法取消收藏。
+
+Errors：
+
+| HTTP | code | 场景 |
+|---:|---|---|
+| 400 | `invalid_request` | JSON 非 object、unknown field、非法 source、`text` 为空、required 字段缺失、index 非整数或负数、`occurred_at` 缺失或非法。 |
+| 401 | `unauthorized` | principal 缺失。 |
+| 413 | `payload_too_large` | body 超过 1 MiB。 |
+| 500 | `internal_error` | 数据库或未知错误。 |
+| 503 | `service_unavailable` | request 取消 / 超时。 |
+
+Idempotency / side effects：不物理删除。生效请求 upsert tombstone：`is_favorited=false`、`favorited_at=null`、`state_updated_at=occurred_at`；收藏不存在也返回 `204 No Content`。`occurred_at < state_updated_at` 是 stale no-op。
+
+Retry：重试同一次取消收藏动作必须复用同一个 `occurred_at`；旧请求不会覆盖更新状态。
+
+### 3.26 `GET /api/word-favorites`
+
+文档来源：[Word-Favorite-API-MVP设计.md](Word-Favorite-API-MVP设计.md)；总体约束来源：[API模块总体设计规范.md](API模块总体设计规范.md)。
+
+用途：分页读取当前用户收藏的词 / 字幕 token 展示列表。
+
+Auth：必需。
+
+Owner：Catalog。
+
+Query：
+
+| 参数 | 类型 | 必需 | 默认值 | 规则 |
+|---|---|---:|---|---|
+| `limit` | integer | 否 | `50` | `1..100`。 |
+| `cursor` | string | 否 | 无 | opaque cursor；trim 后空字符串等同不传；kind 必须是 `word_favorites`。 |
+
+Response `200 OK`：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `items[].coarse_unit_id` | integer \| null | coarse-key 收藏返回 coarse unit id；token-only 可为 null。 |
+| `items[].label` | string \| null | coarse unit label。 |
+| `items[].pos` | string \| null | coarse unit POS。 |
+| `items[].chinese_label` | string \| null | coarse unit 中文 label。 |
+| `items[].chinese_def` | string \| null | coarse unit 中文释义。 |
+| `items[].source` | string | `word_list` / `video_transcript`。 |
+| `items[].video_id` | string UUID \| null | 来源视频 id。 |
+| `items[].sentence_index` | integer \| null | 来源句索引。 |
+| `items[].token_index` | integer \| null | 来源 token 索引。 |
+| `items[].source_text` | string \| null | 来源 token/span 文本。 |
+| `items[].source_translation` | string \| null | 来源句翻译。 |
+| `items[].source_dictionary` | string \| null | 来源 span dictionary。 |
+| `items[].source_explanation` | string \| null | 来源 span explanation。 |
+| `page.limit` | integer | 本次生效 limit。 |
+| `page.has_more` | boolean | 是否还有下一页。 |
+| `page.next_cursor` | string \| null | 下一页 opaque cursor。 |
+
+不返回 `favorite_id`、`favorited_at`、`created_at`、`updated_at` 给前端。
+
+Selection / sorting：只返回 `is_favorited=true` 且 `favorited_at is not null` 的当前收藏，tombstone 不返回。coarse-key 收藏要求 coarse unit active；token-only 收藏要求对应视频、句子、span 仍可展示。排序为 `favorited_at DESC, favorite_id ASC`。
+
+Cursor：base64 raw URL encoding；payload 由后端拥有，格式为 `{"kind":"word_favorites","favorited_at":"...","favorite_id":"..."}`。前端必须视为 opaque string。
+
+Errors：
+
+| HTTP | code | 场景 |
+|---:|---|---|
+| 400 | `invalid_request` | `limit` 非法、cursor 解码失败、cursor kind 不匹配或 cursor 字段非法。 |
+| 401 | `unauthorized` | principal 缺失。 |
+| 500 | `internal_error` | 数据库或未知错误。 |
+| 503 | `service_unavailable` | request 取消 / 超时。 |
+
+Side effects：无。
+
+Retry：只读，可安全重试；翻页重试复用 cursor。
 
 ## 4. 当前没有单列的无法证明项
 
